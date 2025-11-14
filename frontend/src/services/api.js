@@ -1,0 +1,202 @@
+import axios from 'axios';
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+export const BASE_URL = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:5000';
+
+// Create axios instance
+const api = axios.create({
+  baseURL: API_BASE_URL,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+// Request interceptor to add auth token
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('access_token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
+// Response interceptor to handle token refresh
+api.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const originalRequest = error.config;
+
+    // If error is 401 and we haven't retried yet
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true;
+
+      try {
+        const refreshToken = localStorage.getItem('refresh_token');
+        if (refreshToken) {
+          const response = await axios.post(`${API_BASE_URL}/auth/refresh`, {}, {
+            headers: {
+              Authorization: `Bearer ${refreshToken}`,
+            },
+          });
+
+          const { access_token } = response.data;
+          localStorage.setItem('access_token', access_token);
+
+          // Retry original request with new token
+          originalRequest.headers.Authorization = `Bearer ${access_token}`;
+          return api(originalRequest);
+        }
+      } catch (refreshError) {
+        // Refresh failed, logout user
+        localStorage.removeItem('access_token');
+        localStorage.removeItem('refresh_token');
+        localStorage.removeItem('user');
+        window.location.href = '/login';
+        return Promise.reject(refreshError);
+      }
+    }
+
+    return Promise.reject(error);
+  }
+);
+
+// Auth API
+export const authAPI = {
+  registerCreator: (data) => api.post('/auth/register/creator', data),
+  registerBrand: (data) => api.post('/auth/register/brand', data),
+  login: (data) => api.post('/auth/login', data),
+  logout: () => api.post('/auth/logout'),
+  getCurrentUser: () => api.get('/auth/me'),
+  verifyEmail: (token) => api.get(`/auth/verify/${token}`),
+  verifyOTP: (data) => api.post('/auth/verify-otp', data),
+  resendOTP: (data) => api.post('/auth/resend-otp', data),
+  forgotPassword: (email) => api.post('/auth/forgot-password', { email }),
+  resetPassword: (token, password) => api.post(`/auth/reset-password/${token}`, { password }),
+};
+
+// Users API
+export const usersAPI = {
+  getProfile: () => api.get('/users/profile'),
+  updateProfile: (data) => api.put('/users/profile', data),
+};
+
+// Creators API
+export const creatorsAPI = {
+  getCreators: (params) => api.get('/creators', { params }),
+  getCreator: (id) => api.get(`/creators/${id}`),
+  getOwnProfile: () => api.get('/creators/profile'),
+  updateProfile: (data) => api.put('/creators/profile', data),
+  uploadProfilePicture: (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.post('/creators/profile/picture', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+};
+
+// Brands API
+export const brandsAPI = {
+  getBrand: (id) => api.get(`/brands/${id}`),
+  getOwnProfile: () => api.get('/brands/profile'),
+  updateProfile: (data) => api.put('/brands/profile', data),
+  uploadLogo: (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.post('/brands/profile/logo', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+  getSavedCreators: () => api.get('/brands/saved-creators'),
+  saveCreator: (creatorId) => api.post(`/brands/saved-creators/${creatorId}`),
+  unsaveCreator: (creatorId) => api.delete(`/brands/saved-creators/${creatorId}`),
+};
+
+// Packages API
+export const packagesAPI = {
+  getPackages: (params) => api.get('/packages', { params }),
+  getPackage: (id) => api.get(`/packages/${id}`),
+  getMyPackages: () => api.get('/packages', { params: { my_packages: 'true' } }),
+  createPackage: (data) => api.post('/packages', data),
+  updatePackage: (id, data) => api.put(`/packages/${id}`, data),
+  deletePackage: (id) => api.delete(`/packages/${id}`),
+};
+
+// Campaigns API
+export const campaignsAPI = {
+  // Basic CRUD
+  getCampaigns: (params) => api.get('/campaigns', { params }),
+  getCampaign: (id) => api.get(`/campaigns/${id}`),
+  createCampaign: (data) => api.post('/campaigns', data),
+  updateCampaign: (id, data) => api.put(`/campaigns/${id}`, data),
+  deleteCampaign: (id) => api.delete(`/campaigns/${id}`),
+
+  // Package Management
+  addPackageToCampaign: (campaignId, packageId) => api.post(`/campaigns/${campaignId}/packages`, { package_id: packageId }),
+  removePackageFromCampaign: (campaignId, packageId) => api.delete(`/campaigns/${campaignId}/packages/${packageId}`),
+  getCampaignPackages: (campaignId) => api.get(`/campaigns/${campaignId}/packages`),
+
+  // Creator Applications
+  browseCampaigns: (params) => api.get('/campaigns/browse', { params }),
+  applyToCampaign: (campaignId, data) => api.post(`/campaigns/${campaignId}/apply`, data),
+  getCampaignApplications: (campaignId) => api.get(`/campaigns/${campaignId}/applications`),
+  getApplicationDetails: (campaignId, applicationId) => api.get(`/campaigns/${campaignId}/applications/${applicationId}`),
+  updateApplicationStatus: (campaignId, applicationId, status) => api.patch(`/campaigns/${campaignId}/applications/${applicationId}`, { status }),
+};
+
+// Bookings API
+export const bookingsAPI = {
+  getBookings: (params) => api.get('/bookings', { params }),
+  getBooking: (id) => api.get(`/bookings/${id}`),
+  getMyBookings: () => api.get('/bookings'),
+  createBooking: (data) => api.post('/bookings', data),
+  updateBookingStatus: (id, status) => api.put(`/bookings/${id}/status`, { status }),
+  getPaymentStatus: (id) => api.get(`/bookings/${id}/payment-status`),
+};
+
+// Messages API
+export const messagesAPI = {
+  getMessages: (params) => api.get('/messages', { params }),
+  sendMessage: (data) => api.post('/messages', data),
+  markAsRead: (id) => api.put(`/messages/${id}/read`),
+  getConversations: () => api.get('/messages/conversations'),
+};
+
+// Notifications API
+export const notificationsAPI = {
+  getNotifications: (params) => api.get('/notifications', { params }),
+  markAsRead: (id) => api.put(`/notifications/${id}/read`),
+  markAllAsRead: () => api.put('/notifications/mark-all-read'),
+};
+
+// Analytics API
+export const analyticsAPI = {
+  getDashboardStats: () => api.get('/analytics/dashboard'),
+  getEarnings: (params) => api.get('/analytics/earnings', { params }),
+};
+
+// Collaborations API
+export const collaborationsAPI = {
+  getCollaborations: (params) => api.get('/collaborations', { params }),
+  getCollaboration: (id) => api.get(`/collaborations/${id}`),
+  updateProgress: (id, data) => api.patch(`/collaborations/${id}/progress`, data),
+  submitDeliverable: (id, data) => api.post(`/collaborations/${id}/deliverables`, data),
+  completeCollaboration: (id) => api.patch(`/collaborations/${id}/complete`),
+  cancelCollaboration: (id, reason) => api.patch(`/collaborations/${id}/cancel`, { reason }),
+};
+
+// Reviews API
+export const reviewsAPI = {
+  createReview: (data) => api.post('/reviews', data),
+  getCreatorReviews: (creatorId, params) => api.get(`/reviews/creator/${creatorId}`, { params }),
+  getReview: (id) => api.get(`/reviews/${id}`),
+  addCreatorResponse: (id, response) => api.patch(`/reviews/${id}/response`, { response }),
+  getBrandReviews: (params) => api.get('/reviews/brand', { params }),
+};
+
+export default api;
