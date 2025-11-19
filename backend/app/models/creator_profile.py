@@ -18,6 +18,11 @@ class CreatorProfile(db.Model):
     availability_status = db.Column(db.String(20), default='available')  # available, busy, unavailable
     social_links = db.Column(db.JSON, default=dict)  # {platform: url}
     success_stories = db.Column(db.Text)
+
+    # Revision policy
+    free_revisions = db.Column(db.Integer, default=2)  # Number of free revisions allowed per collaboration
+    revision_fee = db.Column(db.Float, default=0.0)  # Fee charged per revision after free limit
+
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -42,6 +47,8 @@ class CreatorProfile(db.Model):
             'availability_status': self.availability_status,
             'social_links': self.social_links or {},
             'success_stories': self.success_stories,
+            'free_revisions': self.free_revisions or 2,
+            'revision_fee': self.revision_fee or 0.0,
             'created_at': self.created_at.isoformat(),
             'updated_at': self.updated_at.isoformat()
         }

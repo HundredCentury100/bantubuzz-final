@@ -117,7 +117,7 @@ const ReviewForm = () => {
               <svg
                 className={`w-10 h-10 ${
                   star <= (hover || value)
-                    ? 'text-yellow-400 fill-current'
+                    ? 'text-primary-dark fill-current'
                     : 'text-gray-300'
                 }`}
                 fill="none"

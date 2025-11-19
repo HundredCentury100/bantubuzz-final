@@ -31,7 +31,16 @@ class Collaboration(db.Model):
 
     # Deliverables tracking
     deliverables = db.Column(db.JSON, default=list)  # List of expected deliverables
-    submitted_deliverables = db.Column(db.JSON, default=list)  # List of submitted deliverables with URLs/descriptions
+    submitted_deliverables = db.Column(db.JSON, default=list)  # List of approved/final deliverables
+    draft_deliverables = db.Column(db.JSON, default=list)  # List of deliverables pending review
+
+    # Revision tracking
+    revision_requests = db.Column(db.JSON, default=list)  # List of revision requests
+    total_revisions_used = db.Column(db.Integer, default=0)  # Total revisions made
+    paid_revisions = db.Column(db.Integer, default=0)  # Number of paid revisions
+
+    # Cancellation tracking
+    cancellation_request = db.Column(db.JSON)  # {requested_by, reason, requested_at, status: pending/approved/rejected}
 
     # Dates
     start_date = db.Column(db.DateTime, nullable=False)
@@ -53,6 +62,16 @@ class Collaboration(db.Model):
     campaign_application = db.relationship('CampaignApplication', backref=db.backref('collaboration', uselist=False))
     booking = db.relationship('Booking', backref=db.backref('collaboration', uselist=False))
 
+    def calculate_progress(self):
+        """Calculate progress based on approved deliverables vs expected deliverables"""
+        if not self.deliverables or len(self.deliverables) == 0:
+            return 0
+
+        total_expected = len(self.deliverables)
+        total_approved = len(self.submitted_deliverables or [])
+
+        return int((total_approved / total_expected) * 100)
+
     def to_dict(self, include_relations=False):
         """Convert collaboration to dictionary"""
         data = {
@@ -69,6 +88,11 @@ class Collaboration(db.Model):
             'progress_percentage': self.progress_percentage,
             'deliverables': self.deliverables or [],
             'submitted_deliverables': self.submitted_deliverables or [],
+            'draft_deliverables': self.draft_deliverables or [],
+            'revision_requests': self.revision_requests or [],
+            'total_revisions_used': self.total_revisions_used or 0,
+            'paid_revisions': self.paid_revisions or 0,
+            'cancellation_request': self.cancellation_request,
             'start_date': self.start_date.isoformat(),
             'expected_completion_date': self.expected_completion_date.isoformat() if self.expected_completion_date else None,
             'actual_completion_date': self.actual_completion_date.isoformat() if self.actual_completion_date else None,

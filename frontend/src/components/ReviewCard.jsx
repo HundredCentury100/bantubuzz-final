@@ -29,7 +29,7 @@ const ReviewCard = ({ review, onResponseSubmit, canRespond = false }) => {
           <svg
             key={star}
             className={`w-5 h-5 ${
-              star <= rating ? 'text-yellow-400 fill-current' : 'text-gray-300'
+              star <= rating ? 'text-primary-dark fill-current' : 'text-gray-300'
             }`}
             fill="none"
             stroke="currentColor"
@@ -85,10 +85,10 @@ const ReviewCard = ({ review, onResponseSubmit, canRespond = false }) => {
           {/* Recommendation Badge */}
           {review.would_recommend && (
             <div className="flex items-center gap-2 mb-3">
-              <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-5 text-primary-dark" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
-              <span className="text-sm text-green-700 font-medium">
+              <span className="text-sm text-primary-dark font-medium">
                 Would recommend working with this creator
               </span>
             </div>
@@ -143,15 +143,15 @@ const ReviewCard = ({ review, onResponseSubmit, canRespond = false }) => {
 
           {/* Creator Response */}
           {review.creator_response && (
-            <div className="mt-4 p-4 bg-blue-50 border-l-4 border-blue-500 rounded">
+            <div className="mt-4 p-4 bg-blue-50 border-l-4 border-primary rounded">
               <div className="flex items-start gap-3">
-                <svg className="w-5 h-5 text-blue-600 mt-1 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5 text-primary-dark mt-1 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
                 </svg>
                 <div className="flex-1">
-                  <p className="font-medium text-blue-900 mb-1">Creator's Response</p>
-                  <p className="text-blue-800 text-sm mb-1">{review.creator_response}</p>
-                  <p className="text-xs text-blue-600">
+                  <p className="font-medium text-primary-dark mb-1">Creator's Response</p>
+                  <p className="text-primary-dark text-sm mb-1">{review.creator_response}</p>
+                  <p className="text-xs text-primary-dark">
                     {formatDate(review.creator_response_date)}
                   </p>
                 </div>

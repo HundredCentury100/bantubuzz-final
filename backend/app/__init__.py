@@ -90,4 +90,8 @@ def create_app(config_name='development'):
         db.session.rollback()
         return {'error': 'Internal server error'}, 500
 
+    # Register Socket.IO handlers
+    with app.app_context():
+        from . import socket_handlers
+
     return app

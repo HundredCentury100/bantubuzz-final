@@ -8,9 +8,9 @@ export default {
     extend: {
       colors: {
         primary: {
-          DEFAULT: '#B5E61D',
-          light: '#C9F03F',
-          dark: '#9ACF1A',
+          DEFAULT: '#ccdb53',
+          light: '#d9e574',
+          dark: '#b8c63d',
         },
         dark: {
           DEFAULT: '#1F2937',
@@ -20,8 +20,8 @@ export default {
           DEFAULT: '#F3F4F6',
           dark: '#E5E7EB',
         },
-        success: '#10B981',
-        warning: '#F59E0B',
+        success: '#ccdb53',
+        warning: '#ccdb53',
         error: '#EF4444',
       },
       fontFamily: {
@@ -31,3 +31,4 @@ export default {
   },
   plugins: [],
 }
+ 

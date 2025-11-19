@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link } from 'react-router-dom';
 import { collaborationsAPI } from '../services/api';
 import { useAuth } from '../hooks/useAuth';
 import Navbar from '../components/Navbar';
@@ -8,16 +8,9 @@ import toast from 'react-hot-toast';
 
 const CollaborationDetails = () => {
   const { id } = useParams();
-  const navigate = useNavigate();
   const { user } = useAuth();
   const [collaboration, setCollaboration] = useState(null);
   const [loading, setLoading] = useState(true);
-
-  // Progress update state
-  const [showProgressModal, setShowProgressModal] = useState(false);
-  const [progressPercentage, setProgressPercentage] = useState('');
-  const [progressUpdate, setProgressUpdate] = useState('');
-  const [updating, setUpdating] = useState(false);
 
   // Deliverable submission state
   const [showDeliverableModal, setShowDeliverableModal] = useState(false);
@@ -25,6 +18,12 @@ const CollaborationDetails = () => {
   const [deliverableUrl, setDeliverableUrl] = useState('');
   const [deliverableDescription, setDeliverableDescription] = useState('');
   const [submitting, setSubmitting] = useState(false);
+
+  // Revision request state
+  const [showRevisionModal, setShowRevisionModal] = useState(false);
+  const [selectedDeliverableForRevision, setSelectedDeliverableForRevision] = useState(null);
+  const [revisionNotes, setRevisionNotes] = useState('');
+  const [requestingRevision, setRequestingRevision] = useState(false);
 
   const isBrand = user?.user_type === 'brand';
 
@@ -37,7 +36,6 @@ const CollaborationDetails = () => {
       setLoading(true);
       const response = await collaborationsAPI.getCollaboration(id);
       setCollaboration(response.data);
-      setProgressPercentage(response.data.progress_percentage.toString());
     } catch (error) {
       console.error('Error fetching collaboration:', error);
       toast.error('Failed to load collaboration details');
@@ -46,31 +44,7 @@ const CollaborationDetails = () => {
     }
   };
 
-  const handleUpdateProgress = async () => {
-    if (!progressPercentage || progressPercentage < 0 || progressPercentage > 100) {
-      toast.error('Please enter a valid progress percentage (0-100)');
-      return;
-    }
-
-    try {
-      setUpdating(true);
-      await collaborationsAPI.updateProgress(id, {
-        progress_percentage: parseInt(progressPercentage),
-        update: progressUpdate
-      });
-      toast.success('Progress updated successfully');
-      setShowProgressModal(false);
-      setProgressUpdate('');
-      fetchCollaboration();
-    } catch (error) {
-      console.error('Error updating progress:', error);
-      toast.error('Failed to update progress');
-    } finally {
-      setUpdating(false);
-    }
-  };
-
-  const handleSubmitDeliverable = async () => {
+  const handleSubmitDraftDeliverable = async () => {
     if (!deliverableTitle || !deliverableUrl) {
       toast.error('Please provide both title and URL');
       return;
@@ -78,12 +52,12 @@ const CollaborationDetails = () => {
 
     try {
       setSubmitting(true);
-      await collaborationsAPI.submitDeliverable(id, {
+      await collaborationsAPI.submitDraftDeliverable(id, {
         title: deliverableTitle,
         url: deliverableUrl,
         description: deliverableDescription
       });
-      toast.success('Deliverable submitted successfully');
+      toast.success('Deliverable submitted for review!');
       setShowDeliverableModal(false);
       setDeliverableTitle('');
       setDeliverableUrl('');
@@ -97,6 +71,53 @@ const CollaborationDetails = () => {
     }
   };
 
+  const handleApproveDeliverable = async (deliverableId) => {
+    try {
+      await collaborationsAPI.approveDeliverable(id, deliverableId);
+      toast.success('Deliverable approved! Progress updated automatically.');
+      fetchCollaboration();
+    } catch (error) {
+      console.error('Error approving deliverable:', error);
+      toast.error('Failed to approve deliverable');
+    }
+  };
+
+  const handleRequestRevision = async () => {
+    if (!revisionNotes.trim()) {
+      toast.error('Please provide revision notes');
+      return;
+    }
+
+    try {
+      setRequestingRevision(true);
+      const response = await collaborationsAPI.requestRevision(
+        id,
+        selectedDeliverableForRevision.id,
+        revisionNotes
+      );
+
+      const revisionRequest = response.data.revision_request;
+      if (revisionRequest.is_paid) {
+        toast.success(
+          `Revision requested (Fee: $${revisionRequest.fee}). Creator will be notified.`,
+          { duration: 5000 }
+        );
+      } else {
+        toast.success('Revision requested. Creator will be notified.');
+      }
+
+      setShowRevisionModal(false);
+      setRevisionNotes('');
+      setSelectedDeliverableForRevision(null);
+      fetchCollaboration();
+    } catch (error) {
+      console.error('Error requesting revision:', error);
+      toast.error('Failed to request revision');
+    } finally {
+      setRequestingRevision(false);
+    }
+  };
+
   const handleComplete = async () => {
     if (!window.confirm('Are you sure you want to mark this collaboration as completed?')) {
       return;
@@ -104,7 +125,7 @@ const CollaborationDetails = () => {
 
     try {
       await collaborationsAPI.completeCollaboration(id);
-      toast.success('Collaboration marked as completed');
+      toast.success('Collaboration marked as completed!');
       fetchCollaboration();
     } catch (error) {
       console.error('Error completing collaboration:', error);
@@ -113,26 +134,55 @@ const CollaborationDetails = () => {
   };
 
   const handleCancel = async () => {
-    const reason = window.prompt('Please provide a reason for cancellation:');
-    if (!reason) return;
+    if (isBrand) {
+      // Brands must request cancellation
+      const reason = window.prompt(
+        'Please provide a reason for your cancellation request. Our support team will review it:'
+      );
+      if (!reason) return;
 
-    try {
-      await collaborationsAPI.cancelCollaboration(id, reason);
-      toast.success('Collaboration cancelled');
-      fetchCollaboration();
-    } catch (error) {
-      console.error('Error cancelling collaboration:', error);
-      toast.error('Failed to cancel collaboration');
+      try {
+        await collaborationsAPI.requestCancellation(id, reason);
+        toast.success('Cancellation request submitted to support team for review');
+        fetchCollaboration();
+      } catch (error) {
+        console.error('Error requesting cancellation:', error);
+        toast.error(error.response?.data?.error || 'Failed to submit cancellation request');
+      }
+    } else {
+      // Creators can cancel directly
+      const reason = window.prompt('Please provide a reason for cancellation:');
+      if (!reason) return;
+
+      try {
+        await collaborationsAPI.cancelCollaboration(id, reason);
+        toast.success('Collaboration cancelled');
+        fetchCollaboration();
+      } catch (error) {
+        console.error('Error cancelling collaboration:', error);
+        toast.error('Failed to cancel collaboration');
+      }
     }
   };
 
   const getStatusColor = (status) => {
     const colors = {
-      in_progress: 'bg-blue-100 text-blue-800',
-      completed: 'bg-green-100 text-green-800',
+      in_progress: 'bg-primary/20 text-primary-dark',
+      completed: 'bg-primary/20 text-primary-dark',
       cancelled: 'bg-red-100 text-red-800'
     };
     return colors[status] || 'bg-gray-100 text-gray-800';
+  };
+
+  const getDeliverableStatusBadge = (status) => {
+    const badges = {
+      pending_review: 'bg-yellow-100 text-yellow-800',
+      revision_requested: 'bg-orange-100 text-orange-800',
+      approved: 'bg-green-100 text-green-800'
+    };
+    const colors = badges[status] || 'bg-gray-100 text-gray-800';
+    const text = status.replace('_', ' ');
+    return <span className={`px-2 py-1 rounded text-xs font-medium ${colors}`}>{text}</span>;
   };
 
   if (loading) {
@@ -159,6 +209,14 @@ const CollaborationDetails = () => {
       </div>
     );
   }
+
+  const totalExpected = collaboration.deliverables?.length || 0;
+  const totalApproved = collaboration.submitted_deliverables?.length || 0;
+  const totalDrafts = collaboration.draft_deliverables?.length || 0;
+  const totalRevisions = collaboration.total_revisions_used || 0;
+  const paidRevisions = collaboration.paid_revisions || 0;
+  const freeRevisions = collaboration.creator?.free_revisions || 2;
+  const revisionFee = collaboration.creator?.revision_fee || 0;
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -192,27 +250,36 @@ const CollaborationDetails = () => {
           </div>
         </div>
 
+        {/* Cancellation Request Pending Alert */}
+        {collaboration.cancellation_request && collaboration.cancellation_request.status === 'pending' && (
+          <div className="mb-6 bg-yellow-50 border-l-4 border-yellow-400 p-4">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <p className="text-sm text-yellow-700">
+                  <span className="font-medium">Cancellation Pending:</span> A cancellation request has been submitted to the support team for review.
+                </p>
+                <p className="text-xs text-yellow-600 mt-1">Reason: {collaboration.cancellation_request.reason}</p>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-6">
             {/* Progress Section */}
             <div className="bg-white rounded-lg shadow p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-bold text-gray-900">Progress</h2>
-                {!isBrand && collaboration.status === 'in_progress' && (
-                  <button
-                    onClick={() => setShowProgressModal(true)}
-                    className="px-4 py-2 bg-primary hover:bg-primary-dark text-white text-sm font-medium rounded-lg transition-colors"
-                  >
-                    Update Progress
-                  </button>
-                )}
-              </div>
+              <h2 className="text-xl font-bold text-gray-900 mb-4">Progress</h2>
 
               {/* Progress Bar */}
-              <div className="mb-4">
+              <div className="mb-6">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-gray-700">Completion</span>
+                  <span className="text-sm font-medium text-gray-700">Completion (Auto-calculated)</span>
                   <span className="text-2xl font-bold text-primary">{collaboration.progress_percentage}%</span>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-4">
@@ -221,6 +288,9 @@ const CollaborationDetails = () => {
                     style={{ width: `${collaboration.progress_percentage}%` }}
                   ></div>
                 </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  {totalApproved} of {totalExpected} deliverables approved
+                </p>
               </div>
 
               {/* Latest Update */}
@@ -235,16 +305,100 @@ const CollaborationDetails = () => {
               )}
             </div>
 
-            {/* Deliverables Section */}
+            {/* Revision Policy (Brand View) */}
+            {isBrand && (
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                <h3 className="font-semibold text-blue-900 mb-2">Creator's Revision Policy</h3>
+                <div className="text-sm text-blue-800 space-y-1">
+                  <p><span className="font-medium">{freeRevisions} free revisions</span> included per collaboration</p>
+                  <p>Additional revisions: <span className="font-medium">${revisionFee} each</span></p>
+                  <p className="text-xs mt-2">Revisions used: {totalRevisions} ({paidRevisions} paid)</p>
+                </div>
+              </div>
+            )}
+
+            {/* Draft Deliverables (Pending Review) */}
+            {totalDrafts > 0 && (
+              <div className="bg-white rounded-lg shadow p-6">
+                <h2 className="text-xl font-bold text-gray-900 mb-4">
+                  Deliverables Pending Review ({totalDrafts})
+                </h2>
+                <div className="space-y-4">
+                  {collaboration.draft_deliverables.map((deliverable) => (
+                    <div key={deliverable.id} className="border-2 border-yellow-200 rounded-lg p-4 bg-yellow-50">
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <h4 className="font-medium text-gray-900">{deliverable.title}</h4>
+                            {getDeliverableStatusBadge(deliverable.status)}
+                          </div>
+                          <span className="text-xs text-gray-500">
+                            Submitted {new Date(deliverable.submitted_at).toLocaleDateString()}
+                          </span>
+                        </div>
+                      </div>
+                      {deliverable.description && (
+                        <p className="text-sm text-gray-600 mb-3">{deliverable.description}</p>
+                      )}
+                      {deliverable.revision_notes && (
+                        <div className="bg-orange-100 border border-orange-200 rounded p-3 mb-3">
+                          <p className="text-xs font-medium text-orange-900 mb-1">Revision Requested:</p>
+                          <p className="text-sm text-orange-800">{deliverable.revision_notes}</p>
+                          <p className="text-xs text-orange-600 mt-1">
+                            {new Date(deliverable.revision_requested_at).toLocaleString()}
+                          </p>
+                        </div>
+                      )}
+                      <div className="flex items-center gap-3">
+                        <a
+                          href={deliverable.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm text-primary hover:text-primary-dark flex items-center gap-1"
+                        >
+                          View Deliverable
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                          </svg>
+                        </a>
+                        {isBrand && collaboration.status === 'in_progress' && (
+                          <div className="ml-auto flex gap-2">
+                            <button
+                              onClick={() => handleApproveDeliverable(deliverable.id)}
+                              className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition-colors"
+                            >
+                              Approve
+                            </button>
+                            <button
+                              onClick={() => {
+                                setSelectedDeliverableForRevision(deliverable);
+                                setShowRevisionModal(true);
+                              }}
+                              className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white text-sm font-medium rounded-lg transition-colors"
+                            >
+                              Request Revision
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Approved Deliverables */}
             <div className="bg-white rounded-lg shadow p-6">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-bold text-gray-900">Deliverables</h2>
+                <h2 className="text-xl font-bold text-gray-900">
+                  Approved Deliverables ({totalApproved}/{totalExpected})
+                </h2>
                 {!isBrand && collaboration.status === 'in_progress' && (
                   <button
                     onClick={() => setShowDeliverableModal(true)}
-                    className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition-colors"
+                    className="px-4 py-2 bg-primary hover:bg-primary-dark text-white text-sm font-medium rounded-lg transition-colors"
                   >
-                    Submit Deliverable
+                    Submit for Review
                   </button>
                 )}
               </div>
@@ -267,17 +421,26 @@ const CollaborationDetails = () => {
               {/* Submitted Deliverables */}
               <div>
                 <h3 className="text-sm font-medium text-gray-700 mb-3">
-                  Submitted: ({collaboration.submitted_deliverables?.length || 0})
+                  Submitted & Approved:
                 </h3>
                 {collaboration.submitted_deliverables && collaboration.submitted_deliverables.length > 0 ? (
                   <div className="space-y-3">
                     {collaboration.submitted_deliverables.map((deliverable, idx) => (
-                      <div key={idx} className="border border-gray-200 rounded-lg p-4">
+                      <div key={idx} className="border-2 border-green-200 rounded-lg p-4 bg-green-50">
                         <div className="flex items-start justify-between mb-2">
-                          <h4 className="font-medium text-gray-900">{deliverable.title}</h4>
-                          <span className="text-xs text-gray-500">
-                            {new Date(deliverable.submitted_at).toLocaleDateString()}
-                          </span>
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <h4 className="font-medium text-gray-900">{deliverable.title}</h4>
+                              <span className="px-2 py-1 rounded text-xs font-medium bg-green-100 text-green-800">
+                                Approved
+                              </span>
+                            </div>
+                            <span className="text-xs text-gray-500">
+                              {deliverable.approved_at
+                                ? `Approved ${new Date(deliverable.approved_at).toLocaleDateString()}`
+                                : `Submitted ${new Date(deliverable.submitted_at).toLocaleDateString()}`}
+                            </span>
+                          </div>
                         </div>
                         {deliverable.description && (
                           <p className="text-sm text-gray-600 mb-2">{deliverable.description}</p>
@@ -297,24 +460,43 @@ const CollaborationDetails = () => {
                     ))}
                   </div>
                 ) : (
-                  <p className="text-gray-500 text-sm">No deliverables submitted yet</p>
+                  <p className="text-gray-500 text-sm">No approved deliverables yet</p>
                 )}
               </div>
             </div>
+
+            {/* Revision History */}
+            {collaboration.revision_requests && collaboration.revision_requests.length > 0 && (
+              <div className="bg-white rounded-lg shadow p-6">
+                <h2 className="text-xl font-bold text-gray-900 mb-4">Revision History</h2>
+                <div className="space-y-3">
+                  {collaboration.revision_requests.map((revision, idx) => (
+                    <div key={idx} className="border border-gray-200 rounded-lg p-4">
+                      <div className="flex items-start justify-between mb-2">
+                        <div>
+                          <h4 className="font-medium text-gray-900">{revision.deliverable_title}</h4>
+                          <p className="text-xs text-gray-500">
+                            {new Date(revision.requested_at).toLocaleString()}
+                          </p>
+                        </div>
+                        {revision.is_paid && (
+                          <span className="px-2 py-1 rounded text-xs font-medium bg-red-100 text-red-800">
+                            Paid Revision - ${revision.fee}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-sm text-gray-700">{revision.notes}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Description */}
             {collaboration.description && (
               <div className="bg-white rounded-lg shadow p-6">
                 <h2 className="text-xl font-bold text-gray-900 mb-4">Description</h2>
                 <p className="text-gray-700 whitespace-pre-wrap">{collaboration.description}</p>
-              </div>
-            )}
-
-            {/* Notes */}
-            {collaboration.notes && (
-              <div className="bg-white rounded-lg shadow p-6">
-                <h2 className="text-xl font-bold text-gray-900 mb-4">Notes</h2>
-                <p className="text-gray-700 whitespace-pre-wrap">{collaboration.notes}</p>
               </div>
             )}
           </div>
@@ -387,7 +569,7 @@ const CollaborationDetails = () => {
                   {isBrand && (
                     <button
                       onClick={handleComplete}
-                      className="w-full px-4 py-3 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors"
+                      className="w-full px-4 py-3 bg-primary hover:bg-primary-dark text-white font-medium rounded-lg transition-colors"
                     >
                       Mark as Completed
                     </button>
@@ -396,8 +578,13 @@ const CollaborationDetails = () => {
                     onClick={handleCancel}
                     className="w-full px-4 py-3 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg transition-colors"
                   >
-                    Cancel Collaboration
+                    {isBrand ? 'Request Cancellation' : 'Cancel Collaboration'}
                   </button>
+                  {isBrand && (
+                    <p className="text-xs text-gray-500 text-center">
+                      Cancellation requests are reviewed by our support team
+                    </p>
+                  )}
                 </div>
               </div>
             )}
@@ -418,67 +605,14 @@ const CollaborationDetails = () => {
         </div>
       </div>
 
-      {/* Progress Update Modal */}
-      {showProgressModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg max-w-md w-full p-6">
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">Update Progress</h2>
-
-            <div className="mb-4">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Progress Percentage
-              </label>
-              <input
-                type="number"
-                min="0"
-                max="100"
-                value={progressPercentage}
-                onChange={(e) => setProgressPercentage(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-              />
-            </div>
-
-            <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Update Message (Optional)
-              </label>
-              <textarea
-                value={progressUpdate}
-                onChange={(e) => setProgressUpdate(e.target.value)}
-                rows={3}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                placeholder="Describe what you've accomplished..."
-              />
-            </div>
-
-            <div className="flex gap-3">
-              <button
-                onClick={handleUpdateProgress}
-                disabled={updating}
-                className="flex-1 px-6 py-3 bg-primary hover:bg-primary-dark text-white font-medium rounded-lg transition-colors disabled:opacity-50"
-              >
-                {updating ? 'Updating...' : 'Update'}
-              </button>
-              <button
-                onClick={() => {
-                  setShowProgressModal(false);
-                  setProgressUpdate('');
-                }}
-                disabled={updating}
-                className="px-6 py-3 border-2 border-gray-300 hover:border-gray-400 text-gray-700 font-medium rounded-lg transition-colors"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Deliverable Submission Modal */}
       {showDeliverableModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg max-w-md w-full p-6">
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">Submit Deliverable</h2>
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">Submit Deliverable for Review</h2>
+            <p className="text-sm text-gray-600 mb-4">
+              Your deliverable will be submitted for brand review before being marked as approved.
+            </p>
 
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -521,11 +655,11 @@ const CollaborationDetails = () => {
 
             <div className="flex gap-3">
               <button
-                onClick={handleSubmitDeliverable}
+                onClick={handleSubmitDraftDeliverable}
                 disabled={submitting}
-                className="flex-1 px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors disabled:opacity-50"
+                className="flex-1 px-6 py-3 bg-primary hover:bg-primary-dark text-white font-medium rounded-lg transition-colors disabled:opacity-50"
               >
-                {submitting ? 'Submitting...' : 'Submit'}
+                {submitting ? 'Submitting...' : 'Submit for Review'}
               </button>
               <button
                 onClick={() => {
@@ -535,6 +669,64 @@ const CollaborationDetails = () => {
                   setDeliverableDescription('');
                 }}
                 disabled={submitting}
+                className="px-6 py-3 border-2 border-gray-300 hover:border-gray-400 text-gray-700 font-medium rounded-lg transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Revision Request Modal */}
+      {showRevisionModal && selectedDeliverableForRevision && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg max-w-md w-full p-6">
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Request Revision</h2>
+            <p className="text-sm text-gray-600 mb-4">
+              Deliverable: <span className="font-medium">{selectedDeliverableForRevision.title}</span>
+            </p>
+
+            {/* Revision Fee Notice */}
+            {totalRevisions >= freeRevisions && (
+              <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 mb-4">
+                <p className="text-sm font-medium text-orange-900">
+                  This revision will incur a fee of <span className="font-bold">${revisionFee}</span>
+                </p>
+                <p className="text-xs text-orange-700 mt-1">
+                  You've used all {freeRevisions} free revisions for this collaboration.
+                </p>
+              </div>
+            )}
+
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Revision Notes <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                value={revisionNotes}
+                onChange={(e) => setRevisionNotes(e.target.value)}
+                rows={5}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                placeholder="Please provide detailed feedback on what needs to be revised..."
+              />
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={handleRequestRevision}
+                disabled={requestingRevision}
+                className="flex-1 px-6 py-3 bg-orange-600 hover:bg-orange-700 text-white font-medium rounded-lg transition-colors disabled:opacity-50"
+              >
+                {requestingRevision ? 'Requesting...' : 'Request Revision'}
+              </button>
+              <button
+                onClick={() => {
+                  setShowRevisionModal(false);
+                  setRevisionNotes('');
+                  setSelectedDeliverableForRevision(null);
+                }}
+                disabled={requestingRevision}
                 className="px-6 py-3 border-2 border-gray-300 hover:border-gray-400 text-gray-700 font-medium rounded-lg transition-colors"
               >
                 Cancel

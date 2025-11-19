@@ -2,8 +2,9 @@ from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from datetime import datetime
 from app import db
-from app.models import Campaign, BrandProfile, CreatorProfile, Package, CampaignApplication, Collaboration
+from app.models import Campaign, BrandProfile, CreatorProfile, Package, CampaignApplication, Collaboration, User
 from app.models.campaign import campaign_packages
+from app.utils.notifications import notify_campaign_application, notify_campaign_status
 
 bp = Blueprint('campaigns', __name__)
 
@@ -376,6 +377,15 @@ def apply_to_campaign(campaign_id):
         db.session.add(application)
         db.session.commit()
 
+        # Notify brand of new application
+        brand_user = User.query.get(campaign.brand.user_id)
+        if brand_user:
+            notify_campaign_application(
+                brand_id=brand_user.id,
+                creator_name=creator.user.email,
+                campaign_id=campaign.id
+            )
+
         return jsonify({
             'message': 'Application submitted successfully',
             'application': application.to_dict(include_relations=True)
@@ -496,6 +506,16 @@ def update_application_status(campaign_id, application_id):
                 db.session.add(collaboration)
 
         db.session.commit()
+
+        # Notify creator of application status change
+        creator_user = User.query.get(application.creator.user_id)
+        if creator_user:
+            notify_campaign_status(
+                user_id=creator_user.id,
+                status=status,
+                campaign_name=campaign.title,
+                campaign_id=campaign.id
+            )
 
         return jsonify({
             'message': f'Application {status} successfully'

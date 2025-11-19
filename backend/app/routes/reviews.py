@@ -3,6 +3,7 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 from datetime import datetime
 from app import db
 from app.models import Review, BrandProfile, CreatorProfile, Collaboration, User
+from app.utils.notifications import notify_new_review, notify_review_response
 
 bp = Blueprint('reviews', __name__)
 
@@ -64,6 +65,15 @@ def create_review():
 
         db.session.add(review)
         db.session.commit()
+
+        # Notify creator of new review
+        creator_user = User.query.get(collaboration.creator.user_id)
+        if creator_user:
+            notify_new_review(
+                creator_id=creator_user.id,
+                brand_name=brand.company_name or 'A brand',
+                review_id=review.id
+            )
 
         return jsonify({
             'message': 'Review created successfully',
@@ -166,6 +176,15 @@ def add_creator_response(review_id):
         review.updated_at = datetime.utcnow()
 
         db.session.commit()
+
+        # Notify brand that creator responded
+        brand_user = User.query.get(review.brand.user_id)
+        if brand_user:
+            notify_review_response(
+                user_id=brand_user.id,
+                creator_name=creator.user.email,
+                review_id=review.id
+            )
 
         return jsonify({
             'message': 'Response added successfully',

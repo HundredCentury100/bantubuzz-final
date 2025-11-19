@@ -185,9 +185,17 @@ export const collaborationsAPI = {
   getCollaborations: (params) => api.get('/collaborations', { params }),
   getCollaboration: (id) => api.get(`/collaborations/${id}`),
   updateProgress: (id, data) => api.patch(`/collaborations/${id}/progress`, data),
+
+  // Deliverables
   submitDeliverable: (id, data) => api.post(`/collaborations/${id}/deliverables`, data),
+  submitDraftDeliverable: (id, data) => api.post(`/collaborations/${id}/deliverables/draft`, data),
+  approveDeliverable: (id, deliverableId) => api.post(`/collaborations/${id}/deliverables/${deliverableId}/approve`),
+  requestRevision: (id, deliverableId, notes) => api.post(`/collaborations/${id}/deliverables/${deliverableId}/request-revision`, { notes }),
+
+  // Collaboration actions
   completeCollaboration: (id) => api.patch(`/collaborations/${id}/complete`),
   cancelCollaboration: (id, reason) => api.patch(`/collaborations/${id}/cancel`, { reason }),
+  requestCancellation: (id, reason) => api.post(`/collaborations/${id}/cancel-request`, { reason }),
 };
 
 // Reviews API

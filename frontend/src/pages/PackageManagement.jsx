@@ -168,7 +168,7 @@ const PackageManagement = () => {
                 <span
                   className={`px-3 py-1 rounded-full text-xs font-semibold ${
                     pkg.is_active
-                      ? 'bg-green-100 text-green-800'
+                      ? 'bg-primary/10 text-primary-dark'
                       : 'bg-gray-100 text-gray-800'
                   }`}
                 >
@@ -240,8 +240,8 @@ const PackageManagement = () => {
                   onClick={() => handleToggleStatus(pkg.id, pkg.is_active)}
                   className={`flex-1 px-4 py-2 rounded-lg font-medium transition ${
                     pkg.is_active
-                      ? 'bg-yellow-100 hover:bg-yellow-200 text-yellow-900'
-                      : 'bg-green-100 hover:bg-green-200 text-green-900'
+                      ? 'bg-primary/20 hover:bg-primary/20 text-primary-dark'
+                      : 'bg-primary/10 hover:bg-primary/10 text-primary-dark'
                   }`}
                 >
                   {pkg.is_active ? 'Deactivate' : 'Activate'}

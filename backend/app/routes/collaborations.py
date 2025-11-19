@@ -3,6 +3,7 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 from datetime import datetime
 from app import db
 from app.models import Collaboration, BrandProfile, CreatorProfile, User
+from app.utils.notifications import notify_collaboration_status, notify_collaboration_update
 
 bp = Blueprint('collaborations', __name__)
 
@@ -128,10 +129,255 @@ def update_progress(collab_id):
         return jsonify({'error': str(e)}), 500
 
 
+@bp.route('/<int:collab_id>/deliverables/draft', methods=['POST'])
+@jwt_required()
+def submit_draft_deliverable(collab_id):
+    """Submit a deliverable for review (creator only)"""
+    try:
+        user_id = int(get_jwt_identity())
+        creator = CreatorProfile.query.filter_by(user_id=user_id).first()
+
+        if not creator:
+            return jsonify({'error': 'Creator profile not found'}), 404
+
+        collaboration = Collaboration.query.get(collab_id)
+        if not collaboration:
+            return jsonify({'error': 'Collaboration not found'}), 404
+
+        if collaboration.creator_id != creator.id:
+            return jsonify({'error': 'Unauthorized'}), 403
+
+        data = request.get_json()
+
+        # Validate required fields
+        if 'title' not in data or 'url' not in data:
+            return jsonify({'error': 'Title and URL are required'}), 400
+
+        # Create deliverable object
+        deliverable = {
+            'id': len(collaboration.draft_deliverables or []) + 1,
+            'title': data['title'],
+            'url': data['url'],
+            'description': data.get('description', ''),
+            'submitted_at': datetime.utcnow().isoformat(),
+            'type': data.get('type', 'file'),
+            'status': 'pending_review'
+        }
+
+        # Add to draft deliverables
+        if collaboration.draft_deliverables is None:
+            collaboration.draft_deliverables = []
+
+        collaboration.draft_deliverables.append(deliverable)
+
+        # Update last update
+        collaboration.last_update = f"Submitted deliverable for review: {data['title']}"
+        collaboration.last_update_date = datetime.utcnow()
+        collaboration.updated_at = datetime.utcnow()
+
+        # Mark the flag as modified for JSON field
+        from sqlalchemy.orm.attributes import flag_modified
+        flag_modified(collaboration, 'draft_deliverables')
+
+        db.session.commit()
+
+        # Notify brand about new deliverable for review
+        brand_user = User.query.get(collaboration.brand.user_id)
+        if brand_user:
+            notify_collaboration_update(
+                user_id=brand_user.id,
+                collaboration_title=collaboration.title,
+                collaboration_id=collaboration.id,
+                update_message=f"New deliverable submitted for review: {data['title']}"
+            )
+
+        return jsonify({
+            'message': 'Deliverable submitted for review',
+            'deliverable': deliverable,
+            'collaboration': collaboration.to_dict()
+        }), 201
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@bp.route('/<int:collab_id>/deliverables/<int:deliverable_id>/approve', methods=['POST'])
+@jwt_required()
+def approve_deliverable(collab_id, deliverable_id):
+    """Approve a draft deliverable (brand only)"""
+    try:
+        user_id = int(get_jwt_identity())
+        brand = BrandProfile.query.filter_by(user_id=user_id).first()
+
+        if not brand:
+            return jsonify({'error': 'Brand profile not found'}), 404
+
+        collaboration = Collaboration.query.get(collab_id)
+        if not collaboration:
+            return jsonify({'error': 'Collaboration not found'}), 404
+
+        if collaboration.brand_id != brand.id:
+            return jsonify({'error': 'Unauthorized'}), 403
+
+        # Find the draft deliverable
+        draft_deliverables = collaboration.draft_deliverables or []
+        deliverable_to_approve = None
+        remaining_drafts = []
+
+        for d in draft_deliverables:
+            if d.get('id') == deliverable_id:
+                deliverable_to_approve = d.copy()
+                deliverable_to_approve['status'] = 'approved'
+                deliverable_to_approve['approved_at'] = datetime.utcnow().isoformat()
+            else:
+                remaining_drafts.append(d)
+
+        if not deliverable_to_approve:
+            return jsonify({'error': 'Deliverable not found'}), 404
+
+        # Move to submitted deliverables
+        if collaboration.submitted_deliverables is None:
+            collaboration.submitted_deliverables = []
+
+        collaboration.submitted_deliverables.append(deliverable_to_approve)
+        collaboration.draft_deliverables = remaining_drafts
+
+        # Auto-calculate progress
+        collaboration.progress_percentage = collaboration.calculate_progress()
+
+        # Update last update
+        collaboration.last_update = f"Deliverable approved: {deliverable_to_approve['title']}"
+        collaboration.last_update_date = datetime.utcnow()
+        collaboration.updated_at = datetime.utcnow()
+
+        # Mark the flags as modified for JSON fields
+        from sqlalchemy.orm.attributes import flag_modified
+        flag_modified(collaboration, 'submitted_deliverables')
+        flag_modified(collaboration, 'draft_deliverables')
+
+        db.session.commit()
+
+        # Notify creator about approval
+        creator_user = User.query.get(collaboration.creator.user_id)
+        if creator_user:
+            notify_collaboration_update(
+                user_id=creator_user.id,
+                collaboration_title=collaboration.title,
+                collaboration_id=collaboration.id,
+                update_message=f"Your deliverable '{deliverable_to_approve['title']}' has been approved!"
+            )
+
+        return jsonify({
+            'message': 'Deliverable approved successfully',
+            'collaboration': collaboration.to_dict()
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@bp.route('/<int:collab_id>/deliverables/<int:deliverable_id>/request-revision', methods=['POST'])
+@jwt_required()
+def request_revision(collab_id, deliverable_id):
+    """Request revision on a draft deliverable (brand only)"""
+    try:
+        user_id = int(get_jwt_identity())
+        brand = BrandProfile.query.filter_by(user_id=user_id).first()
+
+        if not brand:
+            return jsonify({'error': 'Brand profile not found'}), 404
+
+        collaboration = Collaboration.query.get(collab_id)
+        if not collaboration:
+            return jsonify({'error': 'Collaboration not found'}), 404
+
+        if collaboration.brand_id != brand.id:
+            return jsonify({'error': 'Unauthorized'}), 403
+
+        data = request.get_json()
+        revision_notes = data.get('notes', '')
+
+        if not revision_notes:
+            return jsonify({'error': 'Revision notes are required'}), 400
+
+        # Find the draft deliverable
+        draft_deliverables = collaboration.draft_deliverables or []
+        deliverable_found = False
+
+        for d in draft_deliverables:
+            if d.get('id') == deliverable_id:
+                d['status'] = 'revision_requested'
+                d['revision_notes'] = revision_notes
+                d['revision_requested_at'] = datetime.utcnow().isoformat()
+                deliverable_found = True
+                deliverable_title = d['title']
+                break
+
+        if not deliverable_found:
+            return jsonify({'error': 'Deliverable not found'}), 404
+
+        # Track revision request
+        creator = collaboration.creator
+        total_revisions = collaboration.total_revisions_used or 0
+        free_revisions = creator.free_revisions or 2
+
+        revision_request = {
+            'deliverable_id': deliverable_id,
+            'deliverable_title': deliverable_title,
+            'notes': revision_notes,
+            'requested_at': datetime.utcnow().isoformat(),
+            'is_paid': total_revisions >= free_revisions,
+            'fee': creator.revision_fee if total_revisions >= free_revisions else 0
+        }
+
+        if collaboration.revision_requests is None:
+            collaboration.revision_requests = []
+
+        collaboration.revision_requests.append(revision_request)
+        collaboration.total_revisions_used = total_revisions + 1
+
+        if revision_request['is_paid']:
+            collaboration.paid_revisions = (collaboration.paid_revisions or 0) + 1
+
+        # Update last update
+        collaboration.last_update = f"Revision requested for: {deliverable_title}"
+        collaboration.last_update_date = datetime.utcnow()
+        collaboration.updated_at = datetime.utcnow()
+
+        # Mark the flags as modified for JSON fields
+        from sqlalchemy.orm.attributes import flag_modified
+        flag_modified(collaboration, 'draft_deliverables')
+        flag_modified(collaboration, 'revision_requests')
+
+        db.session.commit()
+
+        # Notify creator about revision request
+        creator_user = User.query.get(collaboration.creator.user_id)
+        if creator_user:
+            notify_collaboration_update(
+                user_id=creator_user.id,
+                collaboration_title=collaboration.title,
+                collaboration_id=collaboration.id,
+                update_message=f"Revision requested for '{deliverable_title}'"
+            )
+
+        return jsonify({
+            'message': 'Revision requested successfully',
+            'revision_request': revision_request,
+            'collaboration': collaboration.to_dict()
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
 @bp.route('/<int:collab_id>/deliverables', methods=['POST'])
 @jwt_required()
 def submit_deliverable(collab_id):
-    """Submit a deliverable (creator only)"""
+    """Submit a final deliverable directly (creator only) - Legacy endpoint"""
     try:
         user_id = int(get_jwt_identity())
         creator = CreatorProfile.query.filter_by(user_id=user_id).first()
@@ -166,6 +412,9 @@ def submit_deliverable(collab_id):
             collaboration.submitted_deliverables = []
 
         collaboration.submitted_deliverables.append(deliverable)
+
+        # Auto-calculate progress
+        collaboration.progress_percentage = collaboration.calculate_progress()
 
         # Update last update
         collaboration.last_update = f"Submitted deliverable: {data['title']}"
@@ -214,6 +463,17 @@ def complete_collaboration(collab_id):
 
         db.session.commit()
 
+        # Notify creator that collaboration is completed
+        creator_user = User.query.get(collaboration.creator.user_id)
+        if creator_user:
+            notify_collaboration_status(
+                user_id=creator_user.id,
+                status='completed',
+                collaboration_title=collaboration.title,
+                collaboration_id=collaboration.id,
+                user_type='creator'
+            )
+
         return jsonify({
             'message': 'Collaboration marked as completed',
             'collaboration': collaboration.to_dict()
@@ -224,10 +484,10 @@ def complete_collaboration(collab_id):
         return jsonify({'error': str(e)}), 500
 
 
-@bp.route('/<int:collab_id>/cancel', methods=['PATCH'])
+@bp.route('/<int:collab_id>/cancel-request', methods=['POST'])
 @jwt_required()
-def cancel_collaboration(collab_id):
-    """Cancel collaboration (brand or creator)"""
+def request_cancellation(collab_id):
+    """Request cancellation (brand only - requires support approval)"""
     try:
         user_id = int(get_jwt_identity())
         user = User.query.get(user_id)
@@ -247,13 +507,120 @@ def cancel_collaboration(collab_id):
                 return jsonify({'error': 'Unauthorized'}), 403
 
         data = request.get_json()
+        cancellation_reason = data.get('reason', '')
+
+        if not cancellation_reason:
+            return jsonify({'error': 'Cancellation reason is required'}), 400
+
+        # For brands, create a cancellation request that needs support approval
+        if user.user_type == 'brand':
+            if collaboration.cancellation_request and collaboration.cancellation_request.get('status') == 'pending':
+                return jsonify({'error': 'Cancellation request already pending'}), 400
+
+            cancellation_request = {
+                'requested_by': 'brand',
+                'user_id': user_id,
+                'reason': cancellation_reason,
+                'requested_at': datetime.utcnow().isoformat(),
+                'status': 'pending'
+            }
+
+            collaboration.cancellation_request = cancellation_request
+            collaboration.updated_at = datetime.utcnow()
+
+            # Mark the flag as modified for JSON field
+            from sqlalchemy.orm.attributes import flag_modified
+            flag_modified(collaboration, 'cancellation_request')
+
+            db.session.commit()
+
+            # TODO: Send email/notification to support team
+            # For now, notify the creator about the cancellation request
+            creator_user = User.query.get(collaboration.creator.user_id)
+            if creator_user:
+                notify_collaboration_update(
+                    user_id=creator_user.id,
+                    collaboration_title=collaboration.title,
+                    collaboration_id=collaboration.id,
+                    update_message="Brand has requested to cancel this collaboration. Support team is reviewing."
+                )
+
+            return jsonify({
+                'message': 'Cancellation request submitted to support team for review',
+                'collaboration': collaboration.to_dict()
+            }), 200
+
+        else:
+            # Creators can still cancel directly
+            collaboration.status = 'cancelled'
+            collaboration.notes = f"{collaboration.notes or ''}\n\nCancelled by creator: {cancellation_reason}"
+            collaboration.updated_at = datetime.utcnow()
+
+            db.session.commit()
+
+            # Notify brand about cancellation
+            brand_user = User.query.get(collaboration.brand.user_id)
+            if brand_user:
+                notify_collaboration_status(
+                    user_id=brand_user.id,
+                    status='cancelled',
+                    collaboration_title=collaboration.title,
+                    collaboration_id=collaboration.id,
+                    user_type='brand'
+                )
+
+            return jsonify({
+                'message': 'Collaboration cancelled',
+                'collaboration': collaboration.to_dict()
+            }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@bp.route('/<int:collab_id>/cancel', methods=['PATCH'])
+@jwt_required()
+def cancel_collaboration(collab_id):
+    """Cancel collaboration (creator only, or support admin)"""
+    try:
+        user_id = int(get_jwt_identity())
+        user = User.query.get(user_id)
+
+        collaboration = Collaboration.query.get(collab_id)
+        if not collaboration:
+            return jsonify({'error': 'Collaboration not found'}), 404
+
+        data = request.get_json()
         cancellation_reason = data.get('reason', 'No reason provided')
 
+        # Only creators can directly cancel, brands must use cancel-request endpoint
+        if user.user_type == 'brand':
+            return jsonify({
+                'error': 'Brands cannot directly cancel collaborations. Please use the cancellation request endpoint.'
+            }), 403
+
+        # Check authorization for creator
+        creator = CreatorProfile.query.filter_by(user_id=user_id).first()
+        if collaboration.creator_id != creator.id:
+            return jsonify({'error': 'Unauthorized'}), 403
+
         collaboration.status = 'cancelled'
-        collaboration.notes = f"{collaboration.notes or ''}\n\nCancelled: {cancellation_reason}"
+        collaboration.notes = f"{collaboration.notes or ''}\n\nCancelled by creator: {cancellation_reason}"
         collaboration.updated_at = datetime.utcnow()
 
         db.session.commit()
+
+        # Notify brand about cancellation
+        brand_user = User.query.get(collaboration.brand.user_id)
+        if brand_user:
+            notify_collaboration_status(
+                user_id=brand_user.id,
+                status='cancelled',
+                collaboration_title=collaboration.title,
+                collaboration_id=collaboration.id,
+                user_type='brand'
+            )
 
         return jsonify({
             'message': 'Collaboration cancelled',

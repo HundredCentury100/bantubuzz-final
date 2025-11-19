@@ -94,19 +94,19 @@ const BrandDashboard = () => {
 
         {/* Profile Completion Alert */}
         {!profileComplete && (
-          <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+          <div className="mb-6 p-4 bg-primary/20 border border-primary rounded-lg">
             <div className="flex items-start">
-              <svg className="w-5 h-5 text-yellow-600 mt-0.5 mr-3" fill="currentColor" viewBox="0 0 20 20">
+              <svg className="w-5 h-5 text-primary-dark mt-0.5 mr-3" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
               </svg>
               <div className="flex-1">
-                <h3 className="font-medium text-yellow-900">Complete Your Brand Profile</h3>
-                <p className="text-sm text-yellow-800 mt-1">
+                <h3 className="font-medium text-primary-dark">Complete Your Brand Profile</h3>
+                <p className="text-sm text-primary-dark mt-1">
                   Fill out your company information to start collaborating with creators!
                 </p>
                 <Link
                   to="/brand/profile/edit"
-                  className="inline-block mt-3 px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors text-sm font-medium"
+                  className="inline-block mt-3 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary transition-colors text-sm font-medium"
                 >
                   Complete Profile
                 </Link>
@@ -140,8 +140,8 @@ const BrandDashboard = () => {
                 <p className="text-sm text-gray-600 mb-1">Completed</p>
                 <p className="text-3xl font-bold text-dark">{stats.completedBookings}</p>
               </div>
-              <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
-                <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="w-12 h-12 bg-primary rounded-lg flex items-center justify-center">
+                <svg className="w-6 h-6 text-primary-dark" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </div>
@@ -156,8 +156,8 @@ const BrandDashboard = () => {
                 <p className="text-sm text-gray-600 mb-1">Total Spent</p>
                 <p className="text-3xl font-bold text-dark">${stats.totalSpent.toFixed(2)}</p>
               </div>
-              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
-                <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="w-12 h-12 bg-primary rounded-lg flex items-center justify-center">
+                <svg className="w-6 h-6 text-primary-dark" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </div>
@@ -172,8 +172,8 @@ const BrandDashboard = () => {
                 <p className="text-sm text-gray-600 mb-1">Saved Creators</p>
                 <p className="text-3xl font-bold text-dark">{stats.savedCreators}</p>
               </div>
-              <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
-                <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="w-12 h-12 bg-primary rounded-lg flex items-center justify-center">
+                <svg className="w-6 h-6 text-primary-dark" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
                 </svg>
               </div>
@@ -271,9 +271,9 @@ const BrandDashboard = () => {
                     <div key={booking.id} className="p-4 border border-gray-200 rounded-lg">
                       <div className="flex items-center justify-between mb-2">
                         <span className={`px-2 py-1 rounded text-xs font-medium ${
-                          booking.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                          booking.status === 'accepted' ? 'bg-blue-100 text-blue-800' :
-                          booking.status === 'completed' ? 'bg-green-100 text-green-800' :
+                          booking.status === 'pending' ? 'bg-primary text-primary-dark' :
+                          booking.status === 'accepted' ? 'bg-primary text-primary-dark' :
+                          booking.status === 'completed' ? 'bg-primary text-primary-dark' :
                           'bg-red-100 text-red-800'
                         }`}>
                           {booking.status}

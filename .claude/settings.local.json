@@ -12,7 +12,18 @@
       "Bash(dir:*)",
       "Bash(npm run dev:*)",
       "Bash(git init:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git remote add:*)",
+      "Bash(git branch:*)",
+      "Bash(git push:*)",
+      "Bash(if not exist \"d:\\Bantubuzz Platform\\backend\\app\\utils\" mkdir \"d:\\Bantubuzz Platform\\backend\\app\\utils\")",
+      "Bash(npm install:*)",
+      "Bash(npm start)",
+      "Bash(timeout:*)",
+      "Bash(powershell:*)",
+      "Bash(del replace-colors.ps1)",
+      "Bash(git checkout:*)"
     ],
     "deny": [],
     "ask": []

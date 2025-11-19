@@ -2,7 +2,7 @@ from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from datetime import datetime
 from app import db
-from app.models import CreatorProfile, User, Review
+from app.models import CreatorProfile, User, Review, Package
 from app.utils import save_profile_picture, delete_profile_picture
 from sqlalchemy import or_, and_, func
 
@@ -43,12 +43,12 @@ def get_creators():
                 )
             )
 
-        # Paginate
-        pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+        # Get all creators matching the filters (we'll sort them by reviews)
+        all_creators = query.all()
 
-        # Add review stats to each creator
-        creators = []
-        for creator in pagination.items:
+        # Add review stats and cheapest package price
+        creators_with_stats = []
+        for creator in all_creators:
             creator_dict = creator.to_dict(include_user=True)
 
             # Get review stats
@@ -65,12 +65,36 @@ def get_creators():
                     'total_reviews': 0
                 }
 
-            creators.append(creator_dict)
+            # Get cheapest package price
+            packages = Package.query.filter_by(creator_id=creator.id, is_active=True).all()
+            if packages:
+                prices = [p.price for p in packages]
+                creator_dict['cheapest_package_price'] = min(prices)
+            else:
+                creator_dict['cheapest_package_price'] = None
+
+            creators_with_stats.append(creator_dict)
+
+        # Sort by total reviews (descending), then by average rating (descending)
+        creators_with_stats.sort(
+            key=lambda x: (x['review_stats']['total_reviews'], x['review_stats']['average_rating']),
+            reverse=True
+        )
+
+        # Apply pagination manually after sorting
+        total = len(creators_with_stats)
+        start = (page - 1) * per_page
+        end = start + per_page
+        creators = creators_with_stats[start:end]
+
+        # Calculate total pages
+        import math
+        total_pages = math.ceil(total / per_page) if total > 0 else 1
 
         return jsonify({
             'creators': creators,
-            'total': pagination.total,
-            'pages': pagination.pages,
+            'total': total,
+            'pages': total_pages,
             'current_page': page
         }), 200
 

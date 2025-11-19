@@ -153,9 +153,9 @@ const Payment = () => {
               <div className="flex justify-between items-center pb-4 border-b border-gray-200">
                 <span className="text-gray-600">Booking Status</span>
                 <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                  booking.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                  booking.status === 'accepted' ? 'bg-blue-100 text-blue-800' :
-                  booking.status === 'completed' ? 'bg-green-100 text-green-800' :
+                  booking.status === 'pending' ? 'bg-primary text-primary-dark' :
+                  booking.status === 'accepted' ? 'bg-primary text-primary-dark' :
+                  booking.status === 'completed' ? 'bg-primary text-primary-dark' :
                   'bg-red-100 text-red-800'
                 }`}>
                   {booking.status}
@@ -176,8 +176,8 @@ const Payment = () => {
               <div className="flex items-center justify-between">
                 <span className="text-gray-600">Current Status</span>
                 <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                  booking.payment_status === 'paid' ? 'bg-green-100 text-green-800' :
-                  booking.payment_status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                  booking.payment_status === 'paid' ? 'bg-primary text-primary-dark' :
+                  booking.payment_status === 'pending' ? 'bg-primary text-primary-dark' :
                   'bg-red-100 text-red-800'
                 }`}>
                   {booking.payment_status}
@@ -254,8 +254,8 @@ const Payment = () => {
           {/* Payment Complete */}
           {booking.payment_status === 'paid' && (
             <div className="card text-center">
-              <div className="w-16 h-16 bg-green-100 rounded-full mx-auto mb-4 flex items-center justify-center">
-                <svg className="w-10 h-10 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="w-16 h-16 bg-primary rounded-full mx-auto mb-4 flex items-center justify-center">
+                <svg className="w-10 h-10 text-primary-dark" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
               </div>
@@ -270,14 +270,14 @@ const Payment = () => {
           )}
 
           {/* Security Notice */}
-          <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="mt-6 p-4 bg-primary/10 border border-primary rounded-lg">
             <div className="flex items-start">
-              <svg className="w-5 h-5 text-blue-600 mr-3 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+              <svg className="w-5 h-5 text-primary-dark mr-3 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
               </svg>
               <div>
-                <h3 className="font-medium text-blue-900 mb-1">Secure Payment</h3>
-                <p className="text-sm text-blue-800">
+                <h3 className="font-medium text-primary-dark mb-1">Secure Payment</h3>
+                <p className="text-sm text-primary-dark">
                   All payments are processed securely through Paynow. Your financial information is encrypted and protected.
                 </p>
               </div>

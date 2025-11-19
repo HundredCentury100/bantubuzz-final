@@ -305,7 +305,7 @@ const BrowseCreators = () => {
                     <div className="text-center p-2 bg-gray-50 rounded">
                       <p className="text-xs text-gray-600">Rating</p>
                       <div className="flex items-center justify-center gap-1">
-                        <svg className="w-4 h-4 text-yellow-400 fill-current" viewBox="0 0 24 24">
+                        <svg className="w-4 h-4 text-primary-dark fill-current" viewBox="0 0 24 24">
                           <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
                         </svg>
                         <p className="font-bold text-dark text-sm">
@@ -349,13 +349,13 @@ const BrowseCreators = () => {
                     {/* Availability Status */}
                     <div className="mb-4">
                       <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
-                        creator.availability_status === 'available' ? 'bg-green-100 text-green-800' :
-                        creator.availability_status === 'busy' ? 'bg-yellow-100 text-yellow-800' :
+                        creator.availability_status === 'available' ? 'bg-primary text-primary-dark' :
+                        creator.availability_status === 'busy' ? 'bg-primary text-primary-dark' :
                         'bg-red-100 text-red-800'
                       }`}>
                         <span className={`w-2 h-2 rounded-full mr-2 ${
-                          creator.availability_status === 'available' ? 'bg-green-600' :
-                          creator.availability_status === 'busy' ? 'bg-yellow-600' :
+                          creator.availability_status === 'available' ? 'bg-primary' :
+                          creator.availability_status === 'busy' ? 'bg-primary' :
                           'bg-red-600'
                         }`}></span>
                         {creator.availability_status || 'unavailable'}

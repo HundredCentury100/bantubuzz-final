@@ -1,12 +1,358 @@
+import { useState, useEffect, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
+import { useMessaging } from '../contexts/MessagingContext';
+import messagingService from '../services/messagingAPI';
 import Navbar from '../components/Navbar';
+import toast from 'react-hot-toast';
 
 const Messages = () => {
+  const location = useLocation();
+  const {
+    isConnected,
+    messages,
+    onlineUsers,
+    typingUsers,
+    sendMessage,
+    markMessagesAsRead,
+    sendTypingIndicator,
+    loadConversationMessages,
+  } = useMessaging();
+
+  const [conversations, setConversations] = useState([]);
+  const [selectedConversation, setSelectedConversation] = useState(null);
+  const [messageText, setMessageText] = useState('');
+  const [loading, setLoading] = useState(true);
+  const messagesEndRef = useRef(null);
+  const typingTimeoutRef = useRef(null);
+
+  // Load all conversations on mount
+  useEffect(() => {
+    loadConversations();
+  }, []);
+
+  // Handle starting a new conversation from another page
+  useEffect(() => {
+    if (location.state?.startConversationWith && !loading) {
+      const { id, email } = location.state.startConversationWith;
+
+      console.log('Starting conversation with:', { id, email });
+      console.log('Available conversations:', conversations);
+
+      // Check if conversation already exists
+      const existingConv = conversations.find(c => c.id === id);
+
+      if (existingConv) {
+        console.log('Found existing conversation:', existingConv);
+        loadConversation(existingConv);
+      } else {
+        console.log('Creating new conversation');
+        // Create a new conversation object for display
+        const newConversation = {
+          id: id,
+          email: email,
+          user_type: null,
+          last_message: null,
+          unread_count: 0
+        };
+        setSelectedConversation(newConversation);
+        loadConversationMessages(id, []); // Empty messages initially
+      }
+
+      // Clear the state to avoid reloading
+      window.history.replaceState({}, document.title);
+    }
+  }, [location.state, conversations, loading]);
+
+  // Auto-scroll to bottom when new messages arrive
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, selectedConversation]);
+
+  // Mark messages as read when conversation is selected
+  useEffect(() => {
+    if (selectedConversation) {
+      const conversationMessages = messages[selectedConversation.id] || [];
+      const unreadIds = conversationMessages
+        .filter(msg => !msg.read_at && msg.receiver_id === getCurrentUserId())
+        .map(msg => msg.id);
+
+      if (unreadIds.length > 0) {
+        markMessagesAsRead(unreadIds);
+      }
+    }
+  }, [selectedConversation, messages]);
+
+  const getCurrentUserId = () => {
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    return user.id;
+  };
+
+  const loadConversations = async () => {
+    try {
+      setLoading(true);
+      const response = await messagingService.getConversations();
+      setConversations(response.data.conversations || []);
+    } catch (error) {
+      console.error('Error loading conversations:', error);
+      toast.error('Failed to load conversations');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadConversation = async (conversation) => {
+    try {
+      setSelectedConversation(conversation);
+      const response = await messagingService.getConversation(conversation.id);
+      loadConversationMessages(conversation.id, response.data.messages || []);
+    } catch (error) {
+      console.error('Error loading conversation:', error);
+      toast.error('Failed to load messages');
+    }
+  };
+
+  const handleSendMessage = (e) => {
+    e.preventDefault();
+
+    if (!messageText.trim() || !selectedConversation) {
+      return;
+    }
+
+    const success = sendMessage(selectedConversation.id, messageText.trim());
+
+    if (success) {
+      setMessageText('');
+      sendTypingIndicator(selectedConversation.id, false);
+    }
+  };
+
+  const handleTyping = (e) => {
+    setMessageText(e.target.value);
+
+    if (!selectedConversation) return;
+
+    // Send typing indicator
+    sendTypingIndicator(selectedConversation.id, true);
+
+    // Clear existing timeout
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    }
+
+    // Set new timeout to stop typing indicator
+    typingTimeoutRef.current = setTimeout(() => {
+      sendTypingIndicator(selectedConversation.id, false);
+    }, 2000);
+  };
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const formatMessageTime = (timestamp) => {
+    const date = new Date(timestamp);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return 'Just now';
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+
+    return date.toLocaleDateString();
+  };
+
+  const isUserOnline = (userId) => {
+    return onlineUsers.has(userId?.toString());
+  };
+
+  const isUserTyping = (userId) => {
+    return typingUsers.has(userId?.toString());
+  };
+
+  const currentUserId = getCurrentUserId();
+  const conversationMessages = selectedConversation
+    ? (messages[selectedConversation.id] || [])
+    : [];
+
   return (
     <div className="min-h-screen bg-light">
       <Navbar />
       <div className="container-custom section-padding">
         <h1 className="text-4xl font-bold mb-8">Messages</h1>
-        <p className="text-gray-600">Messaging page - To be implemented</p>
+
+        {!isConnected && (
+          <div className="bg-primary/20 border border-primary text-primary-dark px-4 py-3 rounded-lg mb-6">
+            Connecting to messaging service...
+          </div>
+        )}
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-250px)]">
+          {/* Conversations List */}
+          <div className="lg:col-span-1 bg-white rounded-lg shadow-md overflow-hidden">
+            <div className="p-4 border-b border-gray-200">
+              <h2 className="text-xl font-semibold">Conversations</h2>
+            </div>
+
+            <div className="overflow-y-auto h-full">
+              {loading ? (
+                <div className="p-4 text-center text-gray-500">
+                  Loading conversations...
+                </div>
+              ) : conversations.length === 0 ? (
+                <div className="p-4 text-center text-gray-500">
+                  No conversations yet
+                </div>
+              ) : (
+                conversations.map((conversation) => (
+                  <div
+                    key={conversation.id}
+                    onClick={() => loadConversation(conversation)}
+                    className={`p-4 border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition ${
+                      selectedConversation?.id === conversation.id ? 'bg-primary/10' : ''
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3 flex-1 min-w-0">
+                        <div className="relative">
+                          <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center text-primary font-semibold">
+                            {conversation.email?.[0]?.toUpperCase() || '?'}
+                          </div>
+                          {isUserOnline(conversation.id) && (
+                            <div className="absolute bottom-0 right-0 w-3 h-3 bg-primary/10 rounded-full border-2 border-white"></div>
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-gray-900 truncate">
+                            {conversation.email || 'Unknown User'}
+                          </p>
+                          <p className="text-sm text-gray-500 truncate">
+                            {conversation.last_message || 'No messages yet'}
+                          </p>
+                        </div>
+                      </div>
+                      {conversation.unread_count > 0 && (
+                        <div className="ml-2 bg-primary text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center flex-shrink-0">
+                          {conversation.unread_count}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          {/* Message Thread */}
+          <div className="lg:col-span-2 bg-white rounded-lg shadow-md overflow-hidden flex flex-col">
+            {selectedConversation ? (
+              <>
+                {/* Conversation Header */}
+                <div className="p-4 border-b border-gray-200 bg-gray-50">
+                  <div className="flex items-center space-x-3">
+                    <div className="relative">
+                      <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary font-semibold">
+                        {selectedConversation.email?.[0]?.toUpperCase() || '?'}
+                      </div>
+                      {isUserOnline(selectedConversation.id) && (
+                        <div className="absolute bottom-0 right-0 w-3 h-3 bg-primary/10 rounded-full border-2 border-white"></div>
+                      )}
+                    </div>
+                    <div>
+                      <p className="font-semibold text-gray-900">
+                        {selectedConversation.email || 'Unknown User'}
+                      </p>
+                      <p className="text-sm text-gray-500">
+                        {isUserOnline(selectedConversation.id)
+                          ? 'Online'
+                          : 'Offline'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Messages */}
+                <div className="flex-1 overflow-y-auto p-4 space-y-4">
+                  {conversationMessages.length === 0 ? (
+                    <div className="text-center text-gray-500 mt-8">
+                      No messages yet. Start the conversation!
+                    </div>
+                  ) : (
+                    conversationMessages.map((message, index) => {
+                      const isOwnMessage = message.sender_id === currentUserId;
+                      return (
+                        <div
+                          key={message.id || index}
+                          className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'}`}
+                        >
+                          <div
+                            className={`max-w-[70%] rounded-lg px-4 py-2 ${
+                              isOwnMessage
+                                ? 'bg-primary text-white'
+                                : 'bg-gray-100 text-gray-900'
+                            }`}
+                          >
+                            <p className="break-words">{message.content}</p>
+                            <p
+                              className={`text-xs mt-1 ${
+                                isOwnMessage ? 'text-white/70' : 'text-gray-500'
+                              }`}
+                            >
+                              {formatMessageTime(message.created_at)}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+
+                  {/* Typing Indicator */}
+                  {isUserTyping(selectedConversation.id) && (
+                    <div className="flex justify-start">
+                      <div className="bg-gray-100 rounded-lg px-4 py-2">
+                        <div className="flex space-x-1">
+                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
+                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <div ref={messagesEndRef} />
+                </div>
+
+                {/* Message Input */}
+                <form onSubmit={handleSendMessage} className="p-4 border-t border-gray-200">
+                  <div className="flex space-x-2">
+                    <input
+                      type="text"
+                      value={messageText}
+                      onChange={handleTyping}
+                      placeholder="Type a message..."
+                      className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
+                      disabled={!isConnected}
+                    />
+                    <button
+                      type="submit"
+                      disabled={!messageText.trim() || !isConnected}
+                      className="btn-primary px-6 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      Send
+                    </button>
+                  </div>
+                </form>
+              </>
+            ) : (
+              <div className="flex-1 flex items-center justify-center text-gray-500">
+                Select a conversation to start messaging
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );

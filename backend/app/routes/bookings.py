@@ -2,8 +2,9 @@ from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from datetime import datetime
 from app import db
-from app.models import Booking, Package, Campaign, BrandProfile, CreatorProfile, User
+from app.models import Booking, Package, Campaign, BrandProfile, CreatorProfile, User, Collaboration
 from app.services.payment_service import initiate_payment, check_payment_status, process_payment_webhook
+from app.utils.notifications import notify_new_booking, notify_booking_status
 
 bp = Blueprint('bookings', __name__)
 
@@ -92,6 +93,15 @@ def create_booking():
         # Refresh booking to load relationships
         db.session.refresh(booking)
 
+        # Notify creator of new booking
+        creator_user = User.query.get(package.creator.user_id)
+        if creator_user:
+            notify_new_booking(
+                creator_id=creator_user.id,
+                brand_name=brand.company_name or user.email,
+                booking_id=booking.id
+            )
+
         # Initiate payment - pass email and package title explicitly
         payment_response = initiate_payment(booking, user.email, package.title)
 
@@ -150,7 +160,57 @@ def update_booking_status(booking_id):
         if new_status == 'completed':
             booking.completion_date = datetime.utcnow()
 
+        # Create collaboration when booking is accepted
+        if new_status == 'accepted':
+            # Check if collaboration already exists for this booking
+            existing_collaboration = Collaboration.query.filter_by(
+                booking_id=booking.id
+            ).first()
+
+            if not existing_collaboration:
+                # Load package if not already loaded
+                package = Package.query.get(booking.package_id)
+
+                # Calculate expected completion date based on package duration
+                from datetime import timedelta
+                start_date = datetime.utcnow()
+                expected_completion = None
+                if package and package.duration_days:
+                    expected_completion = start_date + timedelta(days=package.duration_days)
+
+                # Create new collaboration with package deliverables
+                collaboration = Collaboration(
+                    collaboration_type='package',
+                    booking_id=booking.id,
+                    creator_id=booking.creator_id,
+                    brand_id=booking.brand_id,
+                    title=f"Collaboration for {package.title if package else 'Package'}",
+                    description=package.description if package else '',
+                    amount=booking.amount,
+                    status='in_progress',
+                    start_date=start_date,
+                    expected_completion_date=expected_completion,
+                    deliverables=package.deliverables if package and package.deliverables else [],
+                    progress_percentage=0
+                )
+                db.session.add(collaboration)
+
         db.session.commit()
+
+        # Notify the other party about status change
+        user_id = int(get_jwt_identity())
+        user = User.query.get(user_id)
+
+        if user.user_type == 'creator':
+            # Creator updated status, notify brand
+            brand_user = User.query.get(booking.brand.user_id)
+            if brand_user:
+                notify_booking_status(brand_user.id, new_status, booking.id)
+        else:
+            # Brand updated status, notify creator
+            creator_user = User.query.get(booking.creator.user_id)
+            if creator_user:
+                notify_booking_status(creator_user.id, new_status, booking.id)
 
         return jsonify({
             'message': 'Booking status updated',
@@ -159,6 +219,9 @@ def update_booking_status(booking_id):
 
     except Exception as e:
         db.session.rollback()
+        import traceback
+        error_trace = traceback.format_exc()
+        print(f"Error updating booking status: {error_trace}")
         return jsonify({'error': str(e)}), 500
 
 

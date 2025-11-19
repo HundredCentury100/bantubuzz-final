@@ -45,13 +45,13 @@ def get_notifications():
 def mark_as_read(notification_id):
     """Mark notification as read"""
     try:
-        user_id = get_jwt_identity()
+        user_id = str(get_jwt_identity())
         notification = Notification.query.get(notification_id)
 
         if not notification:
             return jsonify({'error': 'Notification not found'}), 404
 
-        if notification.user_id != user_id:
+        if str(notification.user_id) != user_id:
             return jsonify({'error': 'Unauthorized'}), 403
 
         notification.is_read = True
@@ -69,7 +69,7 @@ def mark_as_read(notification_id):
 def mark_all_as_read():
     """Mark all notifications as read"""
     try:
-        user_id = get_jwt_identity()
+        user_id = str(get_jwt_identity())
 
         Notification.query.filter_by(
             user_id=user_id,

@@ -1,13 +1,16 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { useAuth } from '../hooks/useAuth';
 import { bookingsAPI } from '../services/api';
 import Navbar from '../components/Navbar';
 import toast from 'react-hot-toast';
 
 const Bookings = () => {
+  const { user } = useAuth();
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all'); // all, pending, accepted, completed, cancelled
+  const isCreator = user?.user_type === 'creator';
 
   useEffect(() => {
     fetchBookings();
@@ -28,23 +31,11 @@ const Bookings = () => {
   };
 
   const getStatusColor = (status) => {
-    const colors = {
-      pending: 'bg-yellow-100 text-yellow-800',
-      accepted: 'bg-blue-100 text-blue-800',
-      completed: 'bg-green-100 text-green-800',
-      cancelled: 'bg-red-100 text-red-800',
-      rejected: 'bg-red-100 text-red-800'
-    };
-    return colors[status] || 'bg-gray-100 text-gray-800';
+    return 'bg-primary/20 text-primary-dark';
   };
 
   const getPaymentStatusColor = (status) => {
-    const colors = {
-      pending: 'bg-yellow-100 text-yellow-800',
-      paid: 'bg-green-100 text-green-800',
-      failed: 'bg-red-100 text-red-800'
-    };
-    return colors[status] || 'bg-gray-100 text-gray-800';
+    return 'bg-primary/20 text-primary-dark';
   };
 
   const filteredBookings = bookings.filter(booking => {
@@ -72,11 +63,17 @@ const Bookings = () => {
         <div className="mb-8">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">My Bookings</h1>
-              <p className="text-gray-600 mt-1">View and manage your bookings</p>
+              <h1 className="text-3xl font-bold text-gray-900">
+                {isCreator ? 'Booking Requests' : 'My Bookings'}
+              </h1>
+              <p className="text-gray-600 mt-1">
+                {isCreator
+                  ? 'Manage booking requests from brands'
+                  : 'View and manage your bookings'}
+              </p>
             </div>
             <Link
-              to="/brand/dashboard"
+              to={`/${user?.user_type}/dashboard`}
               className="text-gray-600 hover:text-gray-900 flex items-center gap-2"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -139,16 +136,22 @@ const Bookings = () => {
             </svg>
             <h3 className="text-xl font-medium text-gray-900 mb-2">No bookings found</h3>
             <p className="text-gray-600 mb-6">
-              {filter === 'all'
+              {isCreator
+                ? filter === 'all'
+                  ? "You haven't received any booking requests yet."
+                  : `No ${filter} booking requests at the moment.`
+                : filter === 'all'
                 ? "You haven't made any bookings yet."
                 : `No ${filter} bookings at the moment.`}
             </p>
-            <Link
-              to="/browse/packages"
-              className="inline-block px-6 py-3 bg-primary hover:bg-primary-dark text-white font-medium rounded-lg transition-colors"
-            >
-              Browse Packages
-            </Link>
+            {!isCreator && (
+              <Link
+                to="/browse/packages"
+                className="inline-block px-6 py-3 bg-primary hover:bg-primary-dark text-white font-medium rounded-lg transition-colors"
+              >
+                Browse Packages
+              </Link>
+            )}
           </div>
         ) : (
           <div className="space-y-4">
@@ -171,7 +174,9 @@ const Bookings = () => {
                           {booking.package?.title || 'Package'}
                         </h3>
                         <p className="text-gray-600 mb-3">
-                          Creator: {booking.creator?.user?.email?.split('@')[0] || 'Unknown'}
+                          {isCreator
+                            ? `Brand: ${booking.brand?.company_name || booking.brand?.user?.email?.split('@')[0] || 'Unknown'}`
+                            : `Creator: ${booking.creator?.user?.email?.split('@')[0] || 'Unknown'}`}
                         </p>
 
                         <div className="grid grid-cols-2 gap-4 text-sm">
@@ -219,20 +224,61 @@ const Bookings = () => {
 
                   {/* Actions */}
                   <div className="flex flex-col gap-2 ml-4">
-                    {booking.payment_status === 'pending' && (
-                      <Link
-                        to={`/bookings/${booking.id}/payment`}
-                        className="px-4 py-2 bg-primary hover:bg-primary-dark text-white text-sm font-medium rounded-lg transition-colors text-center"
-                      >
-                        Complete Payment
-                      </Link>
+                    {isCreator ? (
+                      // Creator Actions
+                      <>
+                        {booking.status === 'pending' && (
+                          <>
+                            <Link
+                              to={`/bookings/${booking.id}`}
+                              className="px-4 py-2 bg-primary hover:bg-primary-dark text-white text-sm font-medium rounded-lg transition-colors text-center"
+                            >
+                              Accept / Decline
+                            </Link>
+                          </>
+                        )}
+                        {booking.status === 'accepted' && (
+                          <Link
+                            to={`/${user?.user_type}/collaborations`}
+                            className="px-4 py-2 bg-primary hover:bg-primary-dark text-dark text-sm font-medium rounded-lg transition-colors text-center"
+                          >
+                            View Collaboration
+                          </Link>
+                        )}
+                        <Link
+                          to={`/bookings/${booking.id}`}
+                          className="px-4 py-2 border-2 border-gray-300 hover:border-gray-400 text-gray-700 text-sm font-medium rounded-lg transition-colors text-center"
+                        >
+                          View Details
+                        </Link>
+                      </>
+                    ) : (
+                      // Brand Actions
+                      <>
+                        {booking.payment_status === 'pending' && booking.status === 'pending' && (
+                          <Link
+                            to={`/bookings/${booking.id}/payment`}
+                            className="px-4 py-2 bg-primary hover:bg-primary-dark text-white text-sm font-medium rounded-lg transition-colors text-center"
+                          >
+                            Complete Payment
+                          </Link>
+                        )}
+                        {booking.status === 'accepted' && (
+                          <Link
+                            to={`/${user?.user_type}/collaborations`}
+                            className="px-4 py-2 bg-primary hover:bg-primary-dark text-dark text-sm font-medium rounded-lg transition-colors text-center"
+                          >
+                            View Collaboration
+                          </Link>
+                        )}
+                        <Link
+                          to={`/bookings/${booking.id}`}
+                          className="px-4 py-2 border-2 border-gray-300 hover:border-gray-400 text-gray-700 text-sm font-medium rounded-lg transition-colors text-center"
+                        >
+                          View Details
+                        </Link>
+                      </>
                     )}
-                    <Link
-                      to={`/packages/${booking.package_id}`}
-                      className="px-4 py-2 border-2 border-gray-300 hover:border-gray-400 text-gray-700 text-sm font-medium rounded-lg transition-colors text-center"
-                    >
-                      View Package
-                    </Link>
                   </div>
                 </div>
               </div>

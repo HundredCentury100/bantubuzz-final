@@ -46,11 +46,11 @@
   }
 
   .badge-success {
-    @apply bg-success/10 text-success;
+    @apply bg-primary/10 text-primary-dark;
   }
 
   .badge-warning {
-    @apply bg-warning/10 text-warning;
+    @apply bg-primary/10 text-primary-dark;
   }
 
   .badge-error {

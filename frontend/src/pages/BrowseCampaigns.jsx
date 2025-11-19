@@ -105,7 +105,7 @@ const BrowseCampaigns = () => {
                   <div className="flex items-center justify-between mb-4">
                     <span className="text-sm text-gray-600">{campaign.category}</span>
                     {campaign.has_applied && (
-                      <span className="px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                      <span className="px-3 py-1 rounded-full text-xs font-medium bg-primary text-primary-dark">
                         Applied
                       </span>
                     )}

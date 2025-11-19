@@ -9,6 +9,7 @@ import {
   ArrowRightOnRectangleIcon,
   Cog6ToothIcon,
 } from '@heroicons/react/24/outline';
+import NotificationBell from './NotificationBell';
 
 const Navbar = () => {
   const { isAuthenticated, user, logout } = useAuth();
@@ -19,38 +20,39 @@ const Navbar = () => {
   };
 
   return (
-    <nav className="bg-white shadow-md sticky top-0 z-50">
-      <div className="container-custom">
-        <div className="flex items-center justify-between h-16">
+    <nav className="bg-white border-b border-gray-200 sticky top-0 z-50">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between h-20">
           {/* Logo */}
-          <Link to="/" className="flex items-center space-x-2">
-            <div className="text-2xl font-black">
-              <span className="text-primary">Bantu</span>
-              <span className="text-dark">Buzz</span>
-            </div>
+          <Link to="/" className="flex items-center">
+            <img
+              src="/bantubuzz-logo-with-text.png"
+              alt="BantuBuzz Logo"
+              className="h-12 w-auto"
+            />
           </Link>
 
           {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center space-x-8">
+          <div className="hidden md:flex items-center space-x-10">
             <Link
               to="/creators"
-              className="text-dark hover:text-primary transition-colors font-medium"
+              className="text-gray-700 hover:text-gray-900 transition-colors text-sm font-medium"
             >
-              Find Creators
+              Search
             </Link>
             <Link
               to="/packages"
-              className="text-dark hover:text-primary transition-colors font-medium"
+              className="text-gray-700 hover:text-gray-900 transition-colors text-sm font-medium"
             >
-              Browse Packages
+              How It Works
             </Link>
 
             {isAuthenticated ? (
-              <div className="flex items-center space-x-4">
+              <div className="flex items-center space-x-6">
                 {user?.user_type === 'brand' && (
                   <Link
                     to="/brand/campaigns"
-                    className="text-dark hover:text-primary transition-colors font-medium"
+                    className="text-gray-700 hover:text-gray-900 transition-colors text-sm font-medium"
                   >
                     Campaigns
                   </Link>
@@ -58,29 +60,32 @@ const Navbar = () => {
                 {user?.user_type === 'creator' && (
                   <Link
                     to="/creator/campaigns"
-                    className="text-dark hover:text-primary transition-colors font-medium"
+                    className="text-gray-700 hover:text-gray-900 transition-colors text-sm font-medium"
                   >
                     Campaigns
                   </Link>
                 )}
                 <Link
                   to={`/${user?.user_type}/collaborations`}
-                  className="text-dark hover:text-primary transition-colors font-medium"
+                  className="text-gray-700 hover:text-gray-900 transition-colors text-sm font-medium"
                 >
                   Collaborations
                 </Link>
                 <Link
                   to="/messages"
-                  className="text-dark hover:text-primary transition-colors font-medium"
+                  className="text-gray-700 hover:text-gray-900 transition-colors text-sm font-medium"
                 >
                   Messages
                 </Link>
 
+                {/* Notification Bell */}
+                <NotificationBell />
+
                 {/* User Menu */}
                 <Menu as="div" className="relative">
-                  <Menu.Button className="flex items-center space-x-2 p-2 rounded-lg hover:bg-light transition-colors">
-                    <UserCircleIcon className="h-6 w-6 text-dark" />
-                    <span className="text-dark font-medium">{user?.email}</span>
+                  <Menu.Button className="flex items-center space-x-2 p-2 rounded-lg hover:bg-gray-50 transition-colors">
+                    <UserCircleIcon className="h-6 w-6 text-gray-700" />
+                    <span className="text-gray-700 text-sm font-medium">{user?.email}</span>
                   </Menu.Button>
 
                   <Transition
@@ -99,8 +104,8 @@ const Navbar = () => {
                             <Link
                               to={`/${user?.user_type}/dashboard`}
                               className={`${
-                                active ? 'bg-light' : ''
-                              } flex items-center space-x-2 px-4 py-2 text-sm text-dark rounded-lg`}
+                                active ? 'bg-gray-50' : ''
+                              } flex items-center space-x-2 px-4 py-2 text-sm text-gray-700 rounded-lg`}
                             >
                               <Cog6ToothIcon className="h-5 w-5" />
                               <span>Dashboard</span>
@@ -112,8 +117,8 @@ const Navbar = () => {
                             <button
                               onClick={handleLogout}
                               className={`${
-                                active ? 'bg-light' : ''
-                              } flex items-center space-x-2 w-full px-4 py-2 text-sm text-dark rounded-lg`}
+                                active ? 'bg-gray-50' : ''
+                              } flex items-center space-x-2 w-full px-4 py-2 text-sm text-gray-700 rounded-lg`}
                             >
                               <ArrowRightOnRectangleIcon className="h-5 w-5" />
                               <span>Logout</span>
@@ -126,12 +131,21 @@ const Navbar = () => {
                 </Menu>
               </div>
             ) : (
-              <div className="flex items-center space-x-4">
-                <Link to="/login" className="btn btn-outline">
+              <div className="flex items-center space-x-3">
+                <Link to="/login" className="text-gray-700 hover:text-gray-900 text-sm font-medium px-4 py-2">
                   Login
                 </Link>
-                <Link to="/register/creator" className="btn btn-primary">
-                  Get Started
+                <Link
+                  to="/register/creator"
+                  className="bg-primary text-dark px-5 py-2 rounded-full text-sm font-bold hover:bg-primary-light transition-all"
+                >
+                  Join as Creator
+                </Link>
+                <Link
+                  to="/register/brand"
+                  className="bg-gray-900 text-white px-5 py-2 rounded-full text-sm font-semibold hover:bg-gray-800 transition-colors"
+                >
+                  Join as Brand
                 </Link>
               </div>
             )}
@@ -141,7 +155,7 @@ const Navbar = () => {
           <div className="md:hidden">
             <Menu as="div" className="relative">
               <Menu.Button className="p-2">
-                <Bars3Icon className="h-6 w-6 text-dark" />
+                <Bars3Icon className="h-6 w-6 text-gray-700" />
               </Menu.Button>
 
               <Transition
@@ -160,10 +174,10 @@ const Navbar = () => {
                         <Link
                           to="/creators"
                           className={`${
-                            active ? 'bg-light' : ''
-                          } block px-4 py-2 text-sm text-dark rounded-lg`}
+                            active ? 'bg-gray-50' : ''
+                          } block px-4 py-2 text-sm text-gray-700 rounded-lg`}
                         >
-                          Find Creators
+                          Search
                         </Link>
                       )}
                     </Menu.Item>
@@ -172,10 +186,10 @@ const Navbar = () => {
                         <Link
                           to="/packages"
                           className={`${
-                            active ? 'bg-light' : ''
-                          } block px-4 py-2 text-sm text-dark rounded-lg`}
+                            active ? 'bg-gray-50' : ''
+                          } block px-4 py-2 text-sm text-gray-700 rounded-lg`}
                         >
-                          Browse Packages
+                          How It Works
                         </Link>
                       )}
                     </Menu.Item>
@@ -187,8 +201,8 @@ const Navbar = () => {
                             <Link
                               to={`/${user?.user_type}/campaigns`}
                               className={`${
-                                active ? 'bg-light' : ''
-                              } block px-4 py-2 text-sm text-dark rounded-lg`}
+                                active ? 'bg-gray-50' : ''
+                              } block px-4 py-2 text-sm text-gray-700 rounded-lg`}
                             >
                               Campaigns
                             </Link>
@@ -199,8 +213,8 @@ const Navbar = () => {
                             <Link
                               to={`/${user?.user_type}/collaborations`}
                               className={`${
-                                active ? 'bg-light' : ''
-                              } block px-4 py-2 text-sm text-dark rounded-lg`}
+                                active ? 'bg-gray-50' : ''
+                              } block px-4 py-2 text-sm text-gray-700 rounded-lg`}
                             >
                               Collaborations
                             </Link>
@@ -211,8 +225,8 @@ const Navbar = () => {
                             <Link
                               to="/messages"
                               className={`${
-                                active ? 'bg-light' : ''
-                              } block px-4 py-2 text-sm text-dark rounded-lg`}
+                                active ? 'bg-gray-50' : ''
+                              } block px-4 py-2 text-sm text-gray-700 rounded-lg`}
                             >
                               Messages
                             </Link>
@@ -223,8 +237,8 @@ const Navbar = () => {
                             <Link
                               to={`/${user?.user_type}/dashboard`}
                               className={`${
-                                active ? 'bg-light' : ''
-                              } block px-4 py-2 text-sm text-dark rounded-lg`}
+                                active ? 'bg-gray-50' : ''
+                              } block px-4 py-2 text-sm text-gray-700 rounded-lg`}
                             >
                               Dashboard
                             </Link>
@@ -235,8 +249,8 @@ const Navbar = () => {
                             <button
                               onClick={handleLogout}
                               className={`${
-                                active ? 'bg-light' : ''
-                              } block w-full text-left px-4 py-2 text-sm text-dark rounded-lg`}
+                                active ? 'bg-gray-50' : ''
+                              } block w-full text-left px-4 py-2 text-sm text-gray-700 rounded-lg`}
                             >
                               Logout
                             </button>
@@ -250,8 +264,8 @@ const Navbar = () => {
                             <Link
                               to="/login"
                               className={`${
-                                active ? 'bg-light' : ''
-                              } block px-4 py-2 text-sm text-dark rounded-lg`}
+                                active ? 'bg-gray-50' : ''
+                              } block px-4 py-2 text-sm text-gray-700 rounded-lg`}
                             >
                               Login
                             </Link>
@@ -262,10 +276,22 @@ const Navbar = () => {
                             <Link
                               to="/register/creator"
                               className={`${
-                                active ? 'bg-light' : ''
-                              } block px-4 py-2 text-sm text-dark rounded-lg`}
+                                active ? 'bg-gray-50' : ''
+                              } block px-4 py-2 text-sm text-gray-700 rounded-lg`}
                             >
-                              Get Started
+                              Join as Creator
+                            </Link>
+                          )}
+                        </Menu.Item>
+                        <Menu.Item>
+                          {({ active }) => (
+                            <Link
+                              to="/register/brand"
+                              className={`${
+                                active ? 'bg-gray-50' : ''
+                              } block px-4 py-2 text-sm text-gray-700 rounded-lg`}
+                            >
+                              Join as Brand
                             </Link>
                           )}
                         </Menu.Item>

@@ -180,15 +180,15 @@ const BrandProfileEdit = () => {
 
           {/* Success Message */}
           {success && (
-            <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
-              <p className="text-green-800 font-medium">Profile updated successfully! Redirecting...</p>
+            <div className="mb-6 p-4 bg-green-50 border border-primary rounded-lg">
+              <p className="text-primary-dark font-medium">Profile updated successfully! Redirecting...</p>
             </div>
           )}
 
           {/* Error Message */}
           {error && (
             <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-              <p className="text-red-800">{error}</p>
+              <p className="text-error">{error}</p>
             </div>
           )}
 

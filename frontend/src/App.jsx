@@ -20,6 +20,7 @@ import PackageDetails from './pages/PackageDetails';
 import BrowsePackages from './pages/BrowsePackages';
 import BrowseCreators from './pages/BrowseCreators';
 import Bookings from './pages/Bookings';
+import BookingDetails from './pages/BookingDetails';
 import Payment from './pages/Payment';
 import PaymentReturn from './pages/PaymentReturn';
 import Messages from './pages/Messages';
@@ -186,6 +187,14 @@ function App() {
           </ProtectedRoute>
         }
       />
+      <Route
+        path="/creator/bookings"
+        element={
+          <ProtectedRoute requiredType="creator">
+            <Bookings />
+          </ProtectedRoute>
+        }
+      />
 
       {/* Brand Protected Routes */}
       <Route
@@ -303,6 +312,22 @@ function App() {
         element={
           <ProtectedRoute>
             <Messages />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/bookings/:id"
+        element={
+          <ProtectedRoute>
+            <BookingDetails />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/bookings"
+        element={
+          <ProtectedRoute>
+            <Bookings />
           </ProtectedRoute>
         }
       />

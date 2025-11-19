@@ -135,7 +135,7 @@ const CreatorCampaignDetails = () => {
             <div className="flex-1">
               <div className="flex items-center gap-3 mb-2">
                 <h1 className="text-3xl font-bold text-gray-900">{campaign.title}</h1>
-                <span className="px-3 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
+                <span className="px-3 py-1 rounded-full text-sm font-medium bg-primary/10 text-primary-dark">
                   Active
                 </span>
               </div>

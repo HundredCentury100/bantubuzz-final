@@ -9,9 +9,16 @@ const Footer = () => {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
           {/* Brand */}
           <div className="space-y-4">
-            <div className="text-2xl font-black">
-              <span className="text-primary">Bantu</span>
-              <span className="text-white">Buzz</span>
+            <div className="flex items-center gap-3">
+              <img
+                src="/bantubuzz-logo-without-text.png"
+                alt="BantuBuzz Logo"
+                className="h-12 w-12"
+              />
+              <div className="text-2xl font-black">
+                <span className="text-primary">Bantu</span>
+                <span className="text-white">Buzz</span>
+              </div>
             </div>
             <p className="text-gray-400 text-sm">
               Africa's premier creator-brand collaboration platform. Connecting talent with opportunity.
