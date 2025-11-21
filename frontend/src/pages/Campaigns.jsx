@@ -44,9 +44,9 @@ const Campaigns = () => {
   const getStatusColor = (status) => {
     const colors = {
       draft: 'bg-gray-100 text-gray-800',
-      active: 'bg-primary text-primary-dark',
-      paused: 'bg-primary text-primary-dark',
-      completed: 'bg-primary text-primary-dark',
+      active: 'bg-primary/20 text-primary-dark',
+      paused: 'bg-primary/20 text-primary-dark',
+      completed: 'bg-primary/20 text-primary-dark',
       cancelled: 'bg-red-100 text-red-800'
     };
     return colors[status] || 'bg-gray-100 text-gray-800';
@@ -59,7 +59,7 @@ const Campaigns = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-light">
         <Navbar />
         <div className="flex items-center justify-center h-screen">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
@@ -69,7 +69,7 @@ const Campaigns = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-light">
       <Navbar />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

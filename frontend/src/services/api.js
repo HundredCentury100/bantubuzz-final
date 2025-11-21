@@ -98,6 +98,14 @@ export const creatorsAPI = {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
   },
+  uploadGalleryImage: (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.post('/creators/profile/gallery', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+  deleteGalleryImage: (index) => api.delete(`/creators/profile/gallery/${index}`),
 };
 
 // Brands API

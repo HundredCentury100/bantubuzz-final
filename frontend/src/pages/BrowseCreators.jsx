@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { creatorsAPI, brandsAPI, BASE_URL } from '../services/api';
 import { useAuth } from '../hooks/useAuth';
 import Navbar from '../components/Navbar';
 import toast from 'react-hot-toast';
 import Avatar from '../components/Avatar';
+import SEO from '../components/SEO';
 
 const CATEGORIES = [
   'Fashion & Beauty',
@@ -30,6 +31,7 @@ const FOLLOWER_RANGES = [
 
 const BrowseCreators = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user } = useAuth();
   const [creators, setCreators] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -38,13 +40,30 @@ const BrowseCreators = () => {
     category: '',
     location: '',
     min_followers: '',
-    search: ''
+    search: '',
+    platform: ''
   });
   const [pagination, setPagination] = useState({
     current_page: 1,
     total_pages: 1,
     total: 0
   });
+
+  // Initialize filters from URL params on mount
+  useEffect(() => {
+    const categoryParam = searchParams.get('category');
+    const platformParam = searchParams.get('platform');
+    const searchParam = searchParams.get('search');
+
+    if (categoryParam || platformParam || searchParam) {
+      setFilters(prev => ({
+        ...prev,
+        category: categoryParam || '',
+        platform: platformParam || '',
+        search: searchParam || ''
+      }));
+    }
+  }, []);
 
   useEffect(() => {
     fetchCreators();
@@ -137,6 +156,11 @@ const BrowseCreators = () => {
 
   return (
     <div className="min-h-screen bg-light">
+      <SEO
+        title="Browse Creators"
+        description="Discover talented African content creators for your brand campaigns. Filter by category, location, and platform to find the perfect match."
+        keywords="browse creators, find influencers, content creators, African talent"
+      />
       <Navbar />
 
       <div className="container-custom section-padding">
@@ -288,7 +312,7 @@ const BrowseCreators = () => {
 
                     {/* Stats */}
                     <div className="grid grid-cols-3 gap-2 mb-4">
-                    <div className="text-center p-2 bg-gray-50 rounded">
+                    <div className="text-center p-2 bg-light rounded">
                       <p className="text-xs text-gray-600">Followers</p>
                       <p className="font-bold text-dark text-sm">
                         {creator.follower_count >= 1000
@@ -296,13 +320,13 @@ const BrowseCreators = () => {
                           : creator.follower_count || 0}
                       </p>
                     </div>
-                    <div className="text-center p-2 bg-gray-50 rounded">
+                    <div className="text-center p-2 bg-light rounded">
                       <p className="text-xs text-gray-600">Engagement</p>
                       <p className="font-bold text-dark text-sm">
                         {creator.engagement_rate ? `${creator.engagement_rate.toFixed(1)}%` : 'N/A'}
                       </p>
                     </div>
-                    <div className="text-center p-2 bg-gray-50 rounded">
+                    <div className="text-center p-2 bg-light rounded">
                       <p className="text-xs text-gray-600">Rating</p>
                       <div className="flex items-center justify-center gap-1">
                         <svg className="w-4 h-4 text-primary-dark fill-current" viewBox="0 0 24 24">
@@ -331,7 +355,7 @@ const BrowseCreators = () => {
                           </span>
                         ))}
                         {creator.categories.length > 2 && (
-                          <span className="text-xs px-2 py-1 bg-gray-100 text-gray-600 rounded">
+                          <span className="text-xs px-2 py-1 bg-primary-light/30 text-primary-dark rounded">
                             +{creator.categories.length - 2}
                           </span>
                         )}

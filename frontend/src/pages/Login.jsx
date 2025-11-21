@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { useAuth } from '../hooks/useAuth';
 import Navbar from '../components/Navbar';
+import SEO from '../components/SEO';
 
 const Login = () => {
   const { login } = useAuth();
@@ -26,6 +27,11 @@ const Login = () => {
 
   return (
     <div className="min-h-screen bg-light">
+      <SEO
+        title="Login"
+        description="Sign in to your BantuBuzz account to manage collaborations, campaigns, and connect with creators or brands."
+        keywords="login, sign in, account access"
+      />
       <Navbar />
 
       <div className="container-custom section-padding">

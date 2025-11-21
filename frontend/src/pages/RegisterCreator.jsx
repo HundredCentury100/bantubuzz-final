@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { authAPI } from '../services/api';
 import Navbar from '../components/Navbar';
+import SEO from '../components/SEO';
 
 const RegisterCreator = () => {
   const navigate = useNavigate();
@@ -42,6 +43,11 @@ const RegisterCreator = () => {
 
   return (
     <div className="min-h-screen bg-light">
+      <SEO
+        title="Register as Creator"
+        description="Join BantuBuzz as a content creator. Showcase your work, connect with brands, and grow your influence across Africa."
+        keywords="creator registration, influencer signup, content creator account"
+      />
       <Navbar />
 
       <div className="container-custom section-padding">

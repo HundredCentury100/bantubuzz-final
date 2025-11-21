@@ -2,6 +2,8 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
 import { io } from 'socket.io-client';
 import toast from 'react-hot-toast';
 
+const MESSAGING_SOCKET_URL = import.meta.env.VITE_MESSAGING_SOCKET_URL || 'http://localhost:3001';
+
 const MessagingContext = createContext(null);
 
 export const useMessaging = () => {
@@ -31,7 +33,7 @@ export const MessagingProvider = ({ children }) => {
     console.log('User ID:', user.id);
 
     if (token && user.id) {
-      const socketInstance = io('http://localhost:3001', {
+      const socketInstance = io(MESSAGING_SOCKET_URL, {
         transports: ['websocket', 'polling'],
         reconnection: true,
         reconnectionAttempts: 5,

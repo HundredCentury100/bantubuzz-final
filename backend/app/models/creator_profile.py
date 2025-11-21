@@ -7,6 +7,7 @@ class CreatorProfile(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), unique=True, nullable=False)
+    username = db.Column(db.String(50), unique=True, nullable=True)  # Unique username for creators
     bio = db.Column(db.Text)
     profile_picture = db.Column(db.String(255))
     portfolio_url = db.Column(db.String(255))
@@ -18,6 +19,7 @@ class CreatorProfile(db.Model):
     availability_status = db.Column(db.String(20), default='available')  # available, busy, unavailable
     social_links = db.Column(db.JSON, default=dict)  # {platform: url}
     success_stories = db.Column(db.Text)
+    gallery = db.Column(db.JSON, default=list)  # List of gallery image paths
 
     # Revision policy
     free_revisions = db.Column(db.Integer, default=2)  # Number of free revisions allowed per collaboration
@@ -36,6 +38,7 @@ class CreatorProfile(db.Model):
         data = {
             'id': self.id,
             'user_id': self.user_id,
+            'username': self.username,
             'bio': self.bio,
             'profile_picture': self.profile_picture,
             'portfolio_url': self.portfolio_url,
@@ -47,6 +50,7 @@ class CreatorProfile(db.Model):
             'availability_status': self.availability_status,
             'social_links': self.social_links or {},
             'success_stories': self.success_stories,
+            'gallery': self.gallery or [],
             'free_revisions': self.free_revisions or 2,
             'revision_fee': self.revision_fee or 0.0,
             'created_at': self.created_at.isoformat(),

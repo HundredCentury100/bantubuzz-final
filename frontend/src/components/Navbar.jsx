@@ -1,6 +1,6 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-import { Fragment } from 'react';
+import { Fragment, useState, useEffect } from 'react';
 import { Menu, Transition } from '@headlessui/react';
 import {
   Bars3Icon,
@@ -10,10 +10,33 @@ import {
   Cog6ToothIcon,
 } from '@heroicons/react/24/outline';
 import NotificationBell from './NotificationBell';
+import { messagingService } from '../services/messagingAPI';
 
 const Navbar = () => {
   const { isAuthenticated, user, logout } = useAuth();
   const navigate = useNavigate();
+  const [unreadMessageCount, setUnreadMessageCount] = useState(0);
+
+  // Fetch unread message count
+  useEffect(() => {
+    const fetchUnreadCount = async () => {
+      if (isAuthenticated) {
+        try {
+          const response = await messagingService.getConversations();
+          const conversations = response.data.conversations || [];
+          const totalUnread = conversations.reduce((sum, conv) => sum + (conv.unread_count || 0), 0);
+          setUnreadMessageCount(totalUnread);
+        } catch (error) {
+          console.error('Error fetching unread message count:', error);
+        }
+      }
+    };
+
+    fetchUnreadCount();
+    // Refresh every 30 seconds
+    const interval = setInterval(fetchUnreadCount, 30000);
+    return () => clearInterval(interval);
+  }, [isAuthenticated]);
 
   const handleLogout = () => {
     logout();
@@ -73,9 +96,14 @@ const Navbar = () => {
                 </Link>
                 <Link
                   to="/messages"
-                  className="text-gray-700 hover:text-gray-900 transition-colors text-sm font-medium"
+                  className="text-gray-700 hover:text-gray-900 transition-colors text-sm font-medium relative"
                 >
                   Messages
+                  {unreadMessageCount > 0 && (
+                    <span className="absolute -top-2 -right-3 inline-flex items-center justify-center w-5 h-5 text-xs font-bold text-white bg-primary rounded-full">
+                      {unreadMessageCount > 9 ? '9+' : unreadMessageCount}
+                    </span>
+                  )}
                 </Link>
 
                 {/* Notification Bell */}
@@ -83,7 +111,7 @@ const Navbar = () => {
 
                 {/* User Menu */}
                 <Menu as="div" className="relative">
-                  <Menu.Button className="flex items-center space-x-2 p-2 rounded-lg hover:bg-gray-50 transition-colors">
+                  <Menu.Button className="flex items-center space-x-2 p-2 rounded-lg hover:bg-light transition-colors">
                     <UserCircleIcon className="h-6 w-6 text-gray-700" />
                     <span className="text-gray-700 text-sm font-medium">{user?.email}</span>
                   </Menu.Button>
@@ -104,7 +132,7 @@ const Navbar = () => {
                             <Link
                               to={`/${user?.user_type}/dashboard`}
                               className={`${
-                                active ? 'bg-gray-50' : ''
+                                active ? 'bg-light' : ''
                               } flex items-center space-x-2 px-4 py-2 text-sm text-gray-700 rounded-lg`}
                             >
                               <Cog6ToothIcon className="h-5 w-5" />
@@ -117,7 +145,7 @@ const Navbar = () => {
                             <button
                               onClick={handleLogout}
                               className={`${
-                                active ? 'bg-gray-50' : ''
+                                active ? 'bg-light' : ''
                               } flex items-center space-x-2 w-full px-4 py-2 text-sm text-gray-700 rounded-lg`}
                             >
                               <ArrowRightOnRectangleIcon className="h-5 w-5" />
@@ -174,7 +202,7 @@ const Navbar = () => {
                         <Link
                           to="/creators"
                           className={`${
-                            active ? 'bg-gray-50' : ''
+                            active ? 'bg-light' : ''
                           } block px-4 py-2 text-sm text-gray-700 rounded-lg`}
                         >
                           Search
@@ -186,7 +214,7 @@ const Navbar = () => {
                         <Link
                           to="/packages"
                           className={`${
-                            active ? 'bg-gray-50' : ''
+                            active ? 'bg-light' : ''
                           } block px-4 py-2 text-sm text-gray-700 rounded-lg`}
                         >
                           How It Works
@@ -201,7 +229,7 @@ const Navbar = () => {
                             <Link
                               to={`/${user?.user_type}/campaigns`}
                               className={`${
-                                active ? 'bg-gray-50' : ''
+                                active ? 'bg-light' : ''
                               } block px-4 py-2 text-sm text-gray-700 rounded-lg`}
                             >
                               Campaigns
@@ -213,7 +241,7 @@ const Navbar = () => {
                             <Link
                               to={`/${user?.user_type}/collaborations`}
                               className={`${
-                                active ? 'bg-gray-50' : ''
+                                active ? 'bg-light' : ''
                               } block px-4 py-2 text-sm text-gray-700 rounded-lg`}
                             >
                               Collaborations
@@ -225,10 +253,17 @@ const Navbar = () => {
                             <Link
                               to="/messages"
                               className={`${
-                                active ? 'bg-gray-50' : ''
-                              } block px-4 py-2 text-sm text-gray-700 rounded-lg`}
+                                active ? 'bg-light' : ''
+                              } block px-4 py-2 text-sm text-gray-700 rounded-lg relative`}
                             >
-                              Messages
+                              <span className="flex items-center justify-between">
+                                Messages
+                                {unreadMessageCount > 0 && (
+                                  <span className="inline-flex items-center justify-center w-5 h-5 text-xs font-bold text-white bg-primary rounded-full ml-2">
+                                    {unreadMessageCount > 9 ? '9+' : unreadMessageCount}
+                                  </span>
+                                )}
+                              </span>
                             </Link>
                           )}
                         </Menu.Item>
@@ -237,7 +272,7 @@ const Navbar = () => {
                             <Link
                               to={`/${user?.user_type}/dashboard`}
                               className={`${
-                                active ? 'bg-gray-50' : ''
+                                active ? 'bg-light' : ''
                               } block px-4 py-2 text-sm text-gray-700 rounded-lg`}
                             >
                               Dashboard
@@ -249,7 +284,7 @@ const Navbar = () => {
                             <button
                               onClick={handleLogout}
                               className={`${
-                                active ? 'bg-gray-50' : ''
+                                active ? 'bg-light' : ''
                               } block w-full text-left px-4 py-2 text-sm text-gray-700 rounded-lg`}
                             >
                               Logout
@@ -264,7 +299,7 @@ const Navbar = () => {
                             <Link
                               to="/login"
                               className={`${
-                                active ? 'bg-gray-50' : ''
+                                active ? 'bg-light' : ''
                               } block px-4 py-2 text-sm text-gray-700 rounded-lg`}
                             >
                               Login
@@ -275,9 +310,7 @@ const Navbar = () => {
                           {({ active }) => (
                             <Link
                               to="/register/creator"
-                              className={`${
-                                active ? 'bg-gray-50' : ''
-                              } block px-4 py-2 text-sm text-gray-700 rounded-lg`}
+                              className="bg-primary text-dark px-4 py-2 rounded-full text-sm font-bold hover:bg-primary-light transition-all text-center block my-2"
                             >
                               Join as Creator
                             </Link>
@@ -287,9 +320,7 @@ const Navbar = () => {
                           {({ active }) => (
                             <Link
                               to="/register/brand"
-                              className={`${
-                                active ? 'bg-gray-50' : ''
-                              } block px-4 py-2 text-sm text-gray-700 rounded-lg`}
+                              className="bg-gray-900 text-white px-4 py-2 rounded-full text-sm font-semibold hover:bg-gray-800 transition-colors text-center block my-2"
                             >
                               Join as Brand
                             </Link>

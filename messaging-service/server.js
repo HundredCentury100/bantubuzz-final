@@ -3,15 +3,21 @@ const http = require('http');
 const socketIO = require('socket.io');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
-const sqlite3 = require('sqlite3').verbose();
+const { Pool } = require('pg');
 require('dotenv').config();
 
 const app = express();
 const server = http.createServer(app);
 
-// CORS configuration
+// CORS configuration - allow both development and production origins
+const allowedOrigins = [
+  'http://localhost:3000',
+  'http://localhost:5000',
+  process.env.CORS_ORIGIN // Production frontend URL from .env
+].filter(Boolean); // Remove undefined values
+
 app.use(cors({
-  origin: ['http://localhost:3000', 'http://localhost:5000'],
+  origin: allowedOrigins,
   credentials: true
 }));
 
@@ -20,19 +26,23 @@ app.use(express.json());
 // Socket.IO setup with CORS
 const io = socketIO(server, {
   cors: {
-    origin: ['http://localhost:3000', 'http://localhost:5000'],
+    origin: allowedOrigins,
     methods: ['GET', 'POST'],
     credentials: true
   }
 });
 
-// Database connection (shared with Flask backend)
-const db = new sqlite3.Database('../backend/instance/bantubuzz.db', (err) => {
-  if (err) {
-    console.error('Error connecting to database:', err);
-  } else {
-    console.log('Connected to SQLite database');
-  }
+// PostgreSQL Database connection
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL
+});
+
+pool.on('connect', () => {
+  console.log('✅ Connected to PostgreSQL database');
+});
+
+pool.on('error', (err) => {
+  console.error('❌ PostgreSQL connection error:', err);
 });
 
 // JWT Secret (should match Flask backend)
@@ -95,61 +105,51 @@ io.on('connection', (socket) => {
         return;
       }
 
-      // Save message to database
-      const query = `
+      // Save message to database (PostgreSQL)
+      const insertQuery = `
         INSERT INTO messages (sender_id, receiver_id, booking_id, content, is_read, created_at)
-        VALUES (?, ?, ?, ?, ?, datetime('now'))
+        VALUES ($1, $2, $3, $4, $5, NOW())
+        RETURNING id
       `;
 
-      db.run(query, [socket.userId, receiverId, bookingId || null, content, false], function(err) {
-        if (err) {
-          console.error('Error saving message:', err);
-          socket.emit('error', { message: 'Failed to send message' });
-          return;
+      const insertResult = await pool.query(insertQuery, [socket.userId, receiverId, bookingId || null, content, false]);
+      const messageId = insertResult.rows[0].id;
+
+      // Fetch the complete message with sender info
+      const fetchQuery = `
+        SELECT m.*, u.email as sender_email, u.user_type as sender_type
+        FROM messages m
+        JOIN users u ON m.sender_id = u.id
+        WHERE m.id = $1
+      `;
+
+      const fetchResult = await pool.query(fetchQuery, [messageId]);
+      const message = fetchResult.rows[0];
+
+      const messageData = {
+        id: message.id,
+        sender_id: message.sender_id,
+        receiver_id: message.receiver_id,
+        booking_id: message.booking_id,
+        content: message.content,
+        is_read: message.is_read,
+        created_at: message.created_at,
+        sender: {
+          email: message.sender_email,
+          user_type: message.sender_type
         }
+      };
 
-        const messageId = this.lastID;
+      // Send to sender (confirmation)
+      socket.emit('message_sent', messageData);
 
-        // Fetch the complete message with sender info
-        db.get(
-          `SELECT m.*, u.email as sender_email, u.user_type as sender_type
-           FROM messages m
-           JOIN users u ON m.sender_id = u.id
-           WHERE m.id = ?`,
-          [messageId],
-          (err, message) => {
-            if (err) {
-              console.error('Error fetching message:', err);
-              return;
-            }
+      // Send to receiver if online
+      const receiverSocketId = activeUsers.get(receiverId.toString());
+      if (receiverSocketId) {
+        io.to(receiverSocketId).emit('new_message', messageData);
+      }
 
-            const messageData = {
-              id: message.id,
-              sender_id: message.sender_id,
-              receiver_id: message.receiver_id,
-              booking_id: message.booking_id,
-              content: message.content,
-              is_read: message.is_read === 1,
-              created_at: message.created_at,
-              sender: {
-                email: message.sender_email,
-                user_type: message.sender_type
-              }
-            };
-
-            // Send to sender (confirmation)
-            socket.emit('message_sent', messageData);
-
-            // Send to receiver if online
-            const receiverSocketId = activeUsers.get(receiverId.toString());
-            if (receiverSocketId) {
-              io.to(receiverSocketId).emit('new_message', messageData);
-            }
-
-            console.log(`Message ${messageId} sent from ${socket.userId} to ${receiverId}`);
-          }
-        );
-      });
+      console.log(`Message ${messageId} sent from ${socket.userId} to ${receiverId}`);
     } catch (error) {
       console.error('Error in send_message:', error);
       socket.emit('error', { message: 'Server error' });
@@ -165,17 +165,11 @@ io.on('connection', (socket) => {
         return;
       }
 
-      const placeholders = messageIds.map(() => '?').join(',');
-      const query = `UPDATE messages SET is_read = 1 WHERE id IN (${placeholders}) AND receiver_id = ?`;
+      const placeholders = messageIds.map((_, i) => `$${i + 1}`).join(',');
+      const query = `UPDATE messages SET is_read = true WHERE id IN (${placeholders}) AND receiver_id = $${messageIds.length + 1}`;
 
-      db.run(query, [...messageIds, socket.userId], (err) => {
-        if (err) {
-          console.error('Error marking messages as read:', err);
-          return;
-        }
-
-        socket.emit('messages_marked_read', { messageIds });
-      });
+      await pool.query(query, [...messageIds, socket.userId]);
+      socket.emit('messages_marked_read', { messageIds });
     } catch (error) {
       console.error('Error in mark_read:', error);
     }
@@ -225,8 +219,8 @@ app.get('/api/conversations/:userId', async (req, res) => {
 
     const currentUserId = decoded.sub;
     const otherUserId = req.params.userId;
-    const limit = req.query.limit || 50;
-    const offset = req.query.offset || 0;
+    const limit = parseInt(req.query.limit) || 50;
+    const offset = parseInt(req.query.offset) || 0;
 
     const query = `
       SELECT m.*,
@@ -235,38 +229,34 @@ app.get('/api/conversations/:userId', async (req, res) => {
       FROM messages m
       JOIN users sender ON m.sender_id = sender.id
       JOIN users receiver ON m.receiver_id = receiver.id
-      WHERE (m.sender_id = ? AND m.receiver_id = ?)
-         OR (m.sender_id = ? AND m.receiver_id = ?)
+      WHERE (m.sender_id = $1 AND m.receiver_id = $2)
+         OR (m.sender_id = $2 AND m.receiver_id = $1)
       ORDER BY m.created_at DESC
-      LIMIT ? OFFSET ?
+      LIMIT $3 OFFSET $4
     `;
 
-    db.all(query, [currentUserId, otherUserId, otherUserId, currentUserId, limit, offset], (err, messages) => {
-      if (err) {
-        console.error('Error fetching messages:', err);
-        return res.status(500).json({ error: 'Failed to fetch messages' });
+    const result = await pool.query(query, [currentUserId, otherUserId, limit, offset]);
+    const messages = result.rows;
+
+    const formattedMessages = messages.map(m => ({
+      id: m.id,
+      sender_id: m.sender_id,
+      receiver_id: m.receiver_id,
+      booking_id: m.booking_id,
+      content: m.content,
+      is_read: m.is_read,
+      created_at: m.created_at,
+      sender: {
+        email: m.sender_email,
+        user_type: m.sender_type
+      },
+      receiver: {
+        email: m.receiver_email,
+        user_type: m.receiver_type
       }
+    }));
 
-      const formattedMessages = messages.map(m => ({
-        id: m.id,
-        sender_id: m.sender_id,
-        receiver_id: m.receiver_id,
-        booking_id: m.booking_id,
-        content: m.content,
-        is_read: m.is_read === 1,
-        created_at: m.created_at,
-        sender: {
-          email: m.sender_email,
-          user_type: m.sender_type
-        },
-        receiver: {
-          email: m.receiver_email,
-          user_type: m.receiver_type
-        }
-      }));
-
-      res.json({ messages: formattedMessages.reverse() }); // Reverse to get chronological order
-    });
+    res.json({ messages: formattedMessages.reverse() }); // Reverse to get chronological order
   } catch (error) {
     console.error('Error in get conversation:', error);
     res.status(500).json({ error: 'Server error' });
@@ -290,39 +280,33 @@ app.get('/api/conversations', async (req, res) => {
       WITH conversation_partners AS (
         SELECT DISTINCT
           CASE
-            WHEN sender_id = ? THEN receiver_id
+            WHEN sender_id = $1 THEN receiver_id
             ELSE sender_id
           END as other_user_id
         FROM messages
-        WHERE sender_id = ? OR receiver_id = ?
+        WHERE sender_id = $1 OR receiver_id = $1
       )
       SELECT
         cp.other_user_id as id,
         u.email as email,
         u.user_type as user_type,
         (SELECT content FROM messages
-         WHERE (sender_id = ? AND receiver_id = cp.other_user_id)
-            OR (sender_id = cp.other_user_id AND receiver_id = ?)
+         WHERE (sender_id = $1 AND receiver_id = cp.other_user_id)
+            OR (sender_id = cp.other_user_id AND receiver_id = $1)
          ORDER BY created_at DESC LIMIT 1) as last_message,
         (SELECT created_at FROM messages
-         WHERE (sender_id = ? AND receiver_id = cp.other_user_id)
-            OR (sender_id = cp.other_user_id AND receiver_id = ?)
+         WHERE (sender_id = $1 AND receiver_id = cp.other_user_id)
+            OR (sender_id = cp.other_user_id AND receiver_id = $1)
          ORDER BY created_at DESC LIMIT 1) as last_message_time,
         (SELECT COUNT(*) FROM messages
-         WHERE sender_id = cp.other_user_id AND receiver_id = ? AND is_read = 0) as unread_count
+         WHERE sender_id = cp.other_user_id AND receiver_id = $1 AND is_read = false) as unread_count
       FROM conversation_partners cp
       JOIN users u ON u.id = cp.other_user_id
       ORDER BY last_message_time DESC
     `;
 
-    db.all(query, [userId, userId, userId, userId, userId, userId, userId, userId], (err, conversations) => {
-      if (err) {
-        console.error('Error fetching conversations:', err);
-        return res.status(500).json({ error: 'Failed to fetch conversations' });
-      }
-
-      res.json({ conversations });
-    });
+    const result = await pool.query(query, [userId]);
+    res.json({ conversations: result.rows });
   } catch (error) {
     console.error('Error in get conversations:', error);
     res.status(500).json({ error: 'Server error' });
@@ -348,8 +332,8 @@ server.listen(PORT, () => {
 // Graceful shutdown
 process.on('SIGTERM', () => {
   console.log('SIGTERM received, closing server...');
-  server.close(() => {
-    db.close();
+  server.close(async () => {
+    await pool.end();
     console.log('Server closed');
   });
 });

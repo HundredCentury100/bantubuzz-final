@@ -31,6 +31,9 @@ const CreatorProfileEdit = () => {
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [uploadingPicture, setUploadingPicture] = useState(false);
   const [profilePicture, setProfilePicture] = useState(null);
+  const [gallery, setGallery] = useState([]);
+  const [uploadingGallery, setUploadingGallery] = useState(false);
+  const [deletingGalleryIndex, setDeletingGalleryIndex] = useState(null);
 
   const {
     register,
@@ -53,8 +56,10 @@ const CreatorProfileEdit = () => {
       const data = response.data;
       setProfile(data);
       setProfilePicture(data.profile_picture);
+      setGallery(data.gallery || []);
 
       // Set form values
+      setValue('username', data.username || '');
       setValue('bio', data.bio || '');
       setValue('location', data.location || '');
       setValue('portfolio_url', data.portfolio_url || '');
@@ -122,6 +127,49 @@ const CreatorProfileEdit = () => {
     }
   };
 
+  const handleGalleryUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select an image file');
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('File size must be less than 5MB');
+      return;
+    }
+
+    setUploadingGallery(true);
+    try {
+      const response = await creatorsAPI.uploadGalleryImage(file);
+      setGallery(response.data.gallery);
+      toast.success('Gallery image uploaded successfully!');
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to upload gallery image');
+    } finally {
+      setUploadingGallery(false);
+      // Reset the file input
+      e.target.value = '';
+    }
+  };
+
+  const handleDeleteGalleryImage = async (index) => {
+    setDeletingGalleryIndex(index);
+    try {
+      const response = await creatorsAPI.deleteGalleryImage(index);
+      setGallery(response.data.gallery);
+      toast.success('Gallery image deleted successfully!');
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to delete gallery image');
+    } finally {
+      setDeletingGalleryIndex(null);
+    }
+  };
+
   const onSubmit = async (data) => {
     setLoading(true);
     setError('');
@@ -138,6 +186,7 @@ const CreatorProfileEdit = () => {
 
       // Build update payload
       const payload = {
+        username: data.username || null,
         bio: data.bio,
         location: data.location,
         portfolio_url: data.portfolio_url,
@@ -266,9 +315,97 @@ const CreatorProfileEdit = () => {
               </div>
             </div>
 
+            {/* Gallery */}
+            <div className="card">
+              <h2 className="text-xl font-bold text-dark mb-4">Portfolio Gallery</h2>
+              <p className="text-sm text-gray-600 mb-4">Upload images to showcase your work (max 10 images)</p>
+
+              {/* Gallery Grid */}
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-4">
+                {gallery.map((imagePath, index) => (
+                  <div key={index} className="relative group aspect-square">
+                    <img
+                      src={`${BASE_URL}${imagePath}`}
+                      alt={`Gallery ${index + 1}`}
+                      className="w-full h-full object-cover rounded-lg"
+                    />
+                    {/* Delete Button */}
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteGalleryImage(index)}
+                      disabled={deletingGalleryIndex === index}
+                      className="absolute top-2 right-2 p-1.5 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
+                    >
+                      {deletingGalleryIndex === index ? (
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                      ) : (
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      )}
+                    </button>
+                  </div>
+                ))}
+
+                {/* Upload Button */}
+                {gallery.length < 10 && (
+                  <label className="cursor-pointer aspect-square border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center hover:border-primary transition-colors">
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={handleGalleryUpload}
+                      className="hidden"
+                      disabled={uploadingGallery}
+                    />
+                    {uploadingGallery ? (
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                    ) : (
+                      <>
+                        <svg className="w-8 h-8 text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                        </svg>
+                        <span className="text-sm text-gray-500">Add Image</span>
+                      </>
+                    )}
+                  </label>
+                )}
+              </div>
+
+              {gallery.length === 0 && (
+                <p className="text-center text-gray-500 py-4">No gallery images yet. Upload some to showcase your work!</p>
+              )}
+            </div>
+
             {/* Basic Info */}
             <div className="card">
               <h2 className="text-xl font-bold text-dark mb-4">Basic Information</h2>
+
+              {/* Username */}
+              <div className="mb-6">
+                <label className="block text-sm font-medium text-dark mb-2">
+                  Username
+                </label>
+                <div className="flex">
+                  <span className="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-gray-300 bg-gray-50 text-gray-500 text-sm">
+                    @
+                  </span>
+                  <input
+                    type="text"
+                    className="input rounded-l-none"
+                    placeholder="username"
+                    {...register('username', {
+                      pattern: {
+                        value: /^[a-zA-Z0-9_]{3,20}$/,
+                        message: 'Username must be 3-20 characters (letters, numbers, underscores only)'
+                      }
+                    })}
+                  />
+                </div>
+                {errors.username && (
+                  <p className="mt-1 text-sm text-error">{errors.username.message}</p>
+                )}
+                <p className="text-xs text-gray-500 mt-1">This will be displayed instead of your email</p>
+              </div>
 
               {/* Bio */}
               <div className="mb-6">

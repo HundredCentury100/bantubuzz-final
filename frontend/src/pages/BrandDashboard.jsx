@@ -140,8 +140,8 @@ const BrandDashboard = () => {
                 <p className="text-sm text-gray-600 mb-1">Completed</p>
                 <p className="text-3xl font-bold text-dark">{stats.completedBookings}</p>
               </div>
-              <div className="w-12 h-12 bg-primary rounded-lg flex items-center justify-center">
-                <svg className="w-6 h-6 text-primary-dark" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
+                <svg className="w-6 h-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </div>
@@ -156,8 +156,8 @@ const BrandDashboard = () => {
                 <p className="text-sm text-gray-600 mb-1">Total Spent</p>
                 <p className="text-3xl font-bold text-dark">${stats.totalSpent.toFixed(2)}</p>
               </div>
-              <div className="w-12 h-12 bg-primary rounded-lg flex items-center justify-center">
-                <svg className="w-6 h-6 text-primary-dark" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
+                <svg className="w-6 h-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </div>
@@ -172,8 +172,8 @@ const BrandDashboard = () => {
                 <p className="text-sm text-gray-600 mb-1">Saved Creators</p>
                 <p className="text-3xl font-bold text-dark">{stats.savedCreators}</p>
               </div>
-              <div className="w-12 h-12 bg-primary rounded-lg flex items-center justify-center">
-                <svg className="w-6 h-6 text-primary-dark" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
+                <svg className="w-6 h-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
                 </svg>
               </div>
@@ -190,8 +190,8 @@ const BrandDashboard = () => {
                 <p className="text-sm text-gray-600 mb-1">Industry</p>
                 <p className="text-lg font-bold text-dark">{profile?.industry || 'Not set'}</p>
               </div>
-              <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
-                <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
+                <svg className="w-6 h-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                 </svg>
               </div>

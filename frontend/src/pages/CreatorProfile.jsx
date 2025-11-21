@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { creatorsAPI, packagesAPI, brandsAPI, reviewsAPI } from '../services/api';
+import { creatorsAPI, packagesAPI, brandsAPI, reviewsAPI, BASE_URL } from '../services/api';
 import { useAuth } from '../hooks/useAuth';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import ReviewCard from '../components/ReviewCard';
+import SEO from '../components/SEO';
 import toast from 'react-hot-toast';
 
 const CreatorProfile = () => {
@@ -18,6 +19,7 @@ const CreatorProfile = () => {
   const [loading, setLoading] = useState(true);
   const [reviewsLoading, setReviewsLoading] = useState(true);
   const [isSaved, setIsSaved] = useState(false);
+  const [selectedImage, setSelectedImage] = useState(null);
 
   useEffect(() => {
     fetchCreatorData();
@@ -126,6 +128,11 @@ const CreatorProfile = () => {
 
   return (
     <div className="min-h-screen bg-light">
+      <SEO
+        title={creator ? `${creator.user?.email?.split('@')[0] || 'Creator'} - Creator Profile` : 'Creator Profile'}
+        description={creator?.bio || `View this creator's profile, packages, and reviews on BantuBuzz.`}
+        keywords={creator?.categories ? creator.categories.join(', ') + ', creator profile' : 'creator profile, influencer'}
+      />
       <Navbar />
 
       <div className="container-custom section-padding">
@@ -155,11 +162,19 @@ const CreatorProfile = () => {
           <div className="flex flex-col md:flex-row gap-6">
             {/* Avatar */}
             <div className="flex-shrink-0">
-              <div className="w-32 h-32 bg-primary/10 rounded-full flex items-center justify-center">
-                <svg className="w-16 h-16 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                </svg>
-              </div>
+              {creator.profile_picture ? (
+                <img
+                  src={`${BASE_URL}${creator.profile_picture}`}
+                  alt={creator.user?.email?.split('@')[0] || 'Creator'}
+                  className="w-32 h-32 rounded-full object-cover border-4 border-primary/20"
+                />
+              ) : (
+                <div className="w-32 h-32 bg-primary/10 rounded-full flex items-center justify-center">
+                  <svg className="w-16 h-16 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                  </svg>
+                </div>
+              )}
             </div>
 
             {/* Creator Info */}
@@ -210,7 +225,7 @@ const CreatorProfile = () => {
 
               {/* Stats */}
               <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-4">
-                <div className="text-center p-3 bg-gray-50 rounded-lg">
+                <div className="text-center p-3 bg-light rounded-lg">
                   <p className="text-2xl font-bold text-dark">
                     {creator.follower_count >= 1000
                       ? `${(creator.follower_count / 1000).toFixed(1)}K`
@@ -218,17 +233,17 @@ const CreatorProfile = () => {
                   </p>
                   <p className="text-sm text-gray-600">Followers</p>
                 </div>
-                <div className="text-center p-3 bg-gray-50 rounded-lg">
+                <div className="text-center p-3 bg-light rounded-lg">
                   <p className="text-2xl font-bold text-dark">
                     {creator.engagement_rate ? `${creator.engagement_rate.toFixed(1)}%` : 'N/A'}
                   </p>
                   <p className="text-sm text-gray-600">Engagement</p>
                 </div>
-                <div className="text-center p-3 bg-gray-50 rounded-lg">
+                <div className="text-center p-3 bg-light rounded-lg">
                   <p className="text-2xl font-bold text-dark">{packages.length}</p>
                   <p className="text-sm text-gray-600">Packages</p>
                 </div>
-                <div className="text-center p-3 bg-gray-50 rounded-lg">
+                <div className="text-center p-3 bg-light rounded-lg">
                   <div className="flex items-center justify-center gap-1 mb-1">
                     <svg className="w-5 h-5 text-primary-dark fill-current" viewBox="0 0 24 24">
                       <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
@@ -241,15 +256,15 @@ const CreatorProfile = () => {
                     {reviews.length} {reviews.length === 1 ? 'Review' : 'Reviews'}
                   </p>
                 </div>
-                <div className="text-center p-3 bg-gray-50 rounded-lg">
+                <div className="text-center p-3 bg-light rounded-lg">
                   <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
                     creator.availability_status === 'available' ? 'bg-primary/10 text-primary-dark' :
                     creator.availability_status === 'busy' ? 'bg-primary/20 text-primary-dark' :
                     'bg-red-100 text-red-800'
                   }`}>
                     <span className={`w-2 h-2 rounded-full mr-2 ${
-                      creator.availability_status === 'available' ? 'bg-primary/10' :
-                      creator.availability_status === 'busy' ? 'bg-primary/20' :
+                      creator.availability_status === 'available' ? 'bg-primary' :
+                      creator.availability_status === 'busy' ? 'bg-primary-light' :
                       'bg-red-600'
                     }`}></span>
                     {creator.availability_status || 'unavailable'}
@@ -417,6 +432,53 @@ const CreatorProfile = () => {
           )}
         </div>
 
+        {/* Gallery Section */}
+        {creator.gallery && creator.gallery.length > 0 && (
+          <div className="mb-8">
+            <h2 className="text-2xl font-bold text-dark mb-6">Portfolio Gallery</h2>
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {creator.gallery.map((imagePath, index) => (
+                <div
+                  key={index}
+                  className="aspect-square cursor-pointer overflow-hidden rounded-lg shadow-md hover:shadow-lg transition-shadow"
+                  onClick={() => setSelectedImage(imagePath)}
+                >
+                  <img
+                    src={`${BASE_URL}${imagePath}`}
+                    alt={`Gallery ${index + 1}`}
+                    className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Image Modal */}
+        {selectedImage && (
+          <div
+            className="fixed inset-0 bg-black bg-opacity-80 z-50 flex items-center justify-center p-4"
+            onClick={() => setSelectedImage(null)}
+          >
+            <div className="relative max-w-4xl max-h-full">
+              <button
+                onClick={() => setSelectedImage(null)}
+                className="absolute -top-12 right-0 text-white hover:text-gray-300 transition-colors"
+              >
+                <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+              <img
+                src={`${BASE_URL}${selectedImage}`}
+                alt="Gallery full view"
+                className="max-w-full max-h-[80vh] object-contain rounded-lg"
+                onClick={(e) => e.stopPropagation()}
+              />
+            </div>
+          </div>
+        )}
+
         {/* Reviews Section */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-6">
@@ -442,7 +504,7 @@ const CreatorProfile = () => {
                 <div className="card mb-6">
                   <div className="flex flex-col md:flex-row gap-8">
                     {/* Overall Rating */}
-                    <div className="flex flex-col items-center justify-center p-6 bg-gray-50 rounded-lg">
+                    <div className="flex flex-col items-center justify-center p-6 bg-light rounded-lg">
                       <div className="text-5xl font-bold text-dark mb-2">
                         {reviewsStats.overall}
                       </div>

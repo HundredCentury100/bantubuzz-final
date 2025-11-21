@@ -54,13 +54,14 @@ const PackageManagement = () => {
 
   if (loading) {
     return (
-      <div className="flex justify-center items-center min-h-screen">
+      <div className="flex justify-center items-center min-h-screen bg-light">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
       </div>
     );
   }
 
   return (
+    <div className="min-h-screen bg-light">
     <div className="max-w-7xl mx-auto px-4 py-8">
       {/* Header */}
       <div className="mb-8">
@@ -287,6 +288,7 @@ const PackageManagement = () => {
           </div>
         </div>
       )}
+    </div>
     </div>
   );
 };

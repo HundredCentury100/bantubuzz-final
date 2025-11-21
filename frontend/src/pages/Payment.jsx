@@ -162,7 +162,7 @@ const Payment = () => {
                 </span>
               </div>
 
-              <div className="flex justify-between items-center py-4 bg-gray-50 rounded-lg px-4">
+              <div className="flex justify-between items-center py-4 bg-light rounded-lg px-4">
                 <span className="text-lg font-bold text-dark">Total Amount</span>
                 <span className="text-2xl font-bold text-primary">${booking.amount?.toFixed(2) || '0.00'}</span>
               </div>

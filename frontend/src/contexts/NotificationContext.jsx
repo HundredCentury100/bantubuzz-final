@@ -1,6 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { io } from 'socket.io-client';
-import { notificationsAPI } from '../services/api';
+import { notificationsAPI, BASE_URL } from '../services/api';
 import toast from 'react-hot-toast';
 
 const NotificationContext = createContext(null);
@@ -87,7 +87,7 @@ export const NotificationProvider = ({ children }) => {
 
     if (token && user.id) {
       // Connect to Socket.IO server with authentication
-      const socketInstance = io('http://localhost:5000', {
+      const socketInstance = io(BASE_URL, {
         auth: {
           token: token
         },

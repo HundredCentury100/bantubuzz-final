@@ -187,7 +187,7 @@ const CollaborationDetails = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-light">
         <Navbar />
         <div className="flex items-center justify-center h-screen">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
@@ -198,7 +198,7 @@ const CollaborationDetails = () => {
 
   if (!collaboration) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-light">
         <Navbar />
         <div className="max-w-7xl mx-auto px-4 py-8 text-center">
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Collaboration not found</h2>
@@ -219,7 +219,7 @@ const CollaborationDetails = () => {
   const revisionFee = collaboration.creator?.revision_fee || 0;
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-light">
       <Navbar />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -295,7 +295,7 @@ const CollaborationDetails = () => {
 
               {/* Latest Update */}
               {collaboration.last_update && (
-                <div className="bg-gray-50 rounded-lg p-4">
+                <div className="bg-light rounded-lg p-4">
                   <p className="text-sm font-medium text-gray-700 mb-2">Latest Update:</p>
                   <p className="text-gray-700">{collaboration.last_update}</p>
                   <p className="text-xs text-gray-500 mt-2">

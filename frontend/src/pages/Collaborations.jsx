@@ -75,7 +75,7 @@ const Collaborations = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-light">
       <Navbar />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -248,7 +248,7 @@ const Collaborations = () => {
 
                       {/* Latest Update */}
                       {collab.last_update && (
-                        <div className="bg-gray-50 rounded-lg p-3">
+                        <div className="bg-light rounded-lg p-3">
                           <p className="text-xs font-medium text-gray-700 mb-1">Latest Update:</p>
                           <p className="text-sm text-gray-600">{collab.last_update}</p>
                           <p className="text-xs text-gray-500 mt-1">

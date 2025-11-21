@@ -4,6 +4,7 @@ import { campaignsAPI } from '../services/api';
 import Navbar from '../components/Navbar';
 import toast from 'react-hot-toast';
 import Avatar from '../components/Avatar';
+import SEO from '../components/SEO';
 
 const BrowseCampaigns = () => {
   const [campaigns, setCampaigns] = useState([]);
@@ -55,6 +56,11 @@ const BrowseCampaigns = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <SEO
+        title="Browse Campaigns"
+        description="Find brand collaboration opportunities. Browse active campaigns and apply to work with top African brands."
+        keywords="brand campaigns, collaboration opportunities, influencer jobs, creator opportunities"
+      />
       <Navbar />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">

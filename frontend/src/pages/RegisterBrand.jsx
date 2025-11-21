@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { authAPI } from '../services/api';
 import Navbar from '../components/Navbar';
+import SEO from '../components/SEO';
 
 const RegisterBrand = () => {
   const navigate = useNavigate();
@@ -43,6 +44,11 @@ const RegisterBrand = () => {
 
   return (
     <div className="min-h-screen bg-light">
+      <SEO
+        title="Register as Brand"
+        description="Join BantuBuzz as a brand. Find and collaborate with top African creators to amplify your marketing campaigns."
+        keywords="brand registration, business signup, advertiser account"
+      />
       <Navbar />
 
       <div className="container-custom section-padding">

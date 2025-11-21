@@ -1,6 +1,7 @@
 import axios from 'axios';
 
-const MESSAGING_API_URL = 'http://localhost:3001/api';
+const MESSAGING_API_URL = import.meta.env.VITE_MESSAGING_URL || 'http://localhost:3001/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 // Create axios instance for messaging service
 const messagingAPI = axios.create({
@@ -30,7 +31,7 @@ messagingAPI.interceptors.response.use(
       // Token expired, try to refresh
       try {
         const refreshToken = localStorage.getItem('refresh_token');
-        const response = await axios.post('http://localhost:5000/api/auth/refresh', {}, {
+        const response = await axios.post(`${API_BASE_URL}/auth/refresh`, {}, {
           headers: { Authorization: `Bearer ${refreshToken}` }
         });
 

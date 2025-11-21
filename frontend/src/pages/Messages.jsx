@@ -222,7 +222,7 @@ const Messages = () => {
                             {conversation.email?.[0]?.toUpperCase() || '?'}
                           </div>
                           {isUserOnline(conversation.id) && (
-                            <div className="absolute bottom-0 right-0 w-3 h-3 bg-primary/10 rounded-full border-2 border-white"></div>
+                            <div className="absolute bottom-0 right-0 w-3 h-3 bg-primary rounded-full border-2 border-white"></div>
                           )}
                         </div>
                         <div className="flex-1 min-w-0">
@@ -251,14 +251,14 @@ const Messages = () => {
             {selectedConversation ? (
               <>
                 {/* Conversation Header */}
-                <div className="p-4 border-b border-gray-200 bg-gray-50">
+                <div className="p-4 border-b border-gray-200 bg-light">
                   <div className="flex items-center space-x-3">
                     <div className="relative">
                       <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary font-semibold">
                         {selectedConversation.email?.[0]?.toUpperCase() || '?'}
                       </div>
                       {isUserOnline(selectedConversation.id) && (
-                        <div className="absolute bottom-0 right-0 w-3 h-3 bg-primary/10 rounded-full border-2 border-white"></div>
+                        <div className="absolute bottom-0 right-0 w-3 h-3 bg-primary rounded-full border-2 border-white"></div>
                       )}
                     </div>
                     <div>

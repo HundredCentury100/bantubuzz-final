@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Toaster } from 'react-hot-toast'
+import { HelmetProvider } from 'react-helmet-async'
 import App from './App'
 import './index.css'
 import { AuthProvider } from './hooks/useAuth'
@@ -22,32 +23,34 @@ const queryClient = new QueryClient({
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <BrowserRouter>
-      <QueryClientProvider client={queryClient}>
-        <AuthProvider>
-          <NotificationProvider>
-            <MessagingProvider>
-              <App />
-              <Toaster
-                position="top-right"
-                toastOptions={{
-                  duration: 4000,
-                  style: {
-                    background: '#1F2937',
-                    color: '#F3F4F6',
-                  },
-                  success: {
-                    iconTheme: {
-                      primary: '#ccdb53',
-                      secondary: '#1F2937',
+    <HelmetProvider>
+      <BrowserRouter>
+        <QueryClientProvider client={queryClient}>
+          <AuthProvider>
+            <NotificationProvider>
+              <MessagingProvider>
+                <App />
+                <Toaster
+                  position="top-right"
+                  toastOptions={{
+                    duration: 4000,
+                    style: {
+                      background: '#1F2937',
+                      color: '#F3F4F6',
                     },
-                  },
-                }}
-              />
-            </MessagingProvider>
-          </NotificationProvider>
-        </AuthProvider>
-      </QueryClientProvider>
-    </BrowserRouter>
+                    success: {
+                      iconTheme: {
+                        primary: '#ccdb53',
+                        secondary: '#1F2937',
+                      },
+                    },
+                  }}
+                />
+              </MessagingProvider>
+            </NotificationProvider>
+          </AuthProvider>
+        </QueryClientProvider>
+      </BrowserRouter>
+    </HelmetProvider>
   </React.StrictMode>,
 )

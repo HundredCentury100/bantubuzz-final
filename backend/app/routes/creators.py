@@ -19,6 +19,7 @@ def get_creators():
         min_followers = request.args.get('min_followers', type=int)
         max_price = request.args.get('max_price', type=float)
         search = request.args.get('search')
+        platform = request.args.get('platform')
         page = request.args.get('page', 1, type=int)
         per_page = request.args.get('per_page', 12, type=int)
 
@@ -35,16 +36,71 @@ def get_creators():
         if min_followers:
             query = query.filter(CreatorProfile.follower_count >= min_followers)
 
+        # Platform filter - search in social_links JSON for platform keys
+        if platform:
+            # Map common platform names to social_links keys
+            platform_map = {
+                'IG': 'instagram',
+                'Instagram': 'instagram',
+                'TikTok': 'tiktok',
+                'YouTube': 'youtube',
+                'Twitter': 'twitter',
+                'X': 'twitter',
+                'Facebook': 'facebook',
+                'LinkedIn': 'linkedin'
+            }
+            platform_key = platform_map.get(platform, platform.lower())
+            # Filter creators who have this platform in their social_links
+            query = query.filter(
+                CreatorProfile.social_links.has_key(platform_key)
+            )
+
         if search:
             query = query.filter(
                 or_(
                     CreatorProfile.bio.ilike(f'%{search}%'),
+                    CreatorProfile.username.ilike(f'%{search}%'),
                     User.email.ilike(f'%{search}%')
                 )
             )
 
         # Get all creators matching the filters (we'll sort them by reviews)
         all_creators = query.all()
+
+        # If search term was provided, also do case-insensitive category matching in Python
+        if search:
+            search_lower = search.lower()
+            all_creators = [
+                c for c in all_creators
+                if any(search_lower in cat.lower() for cat in (c.categories or []))
+                or search_lower in (c.bio or '').lower()
+                or search_lower in (c.user.email or '').lower()
+            ]
+
+        # If category was provided but no exact match, try case-insensitive partial match
+        if category and not all_creators:
+            # Re-run query without category filter
+            query = CreatorProfile.query.join(User).filter(User.is_active == True)
+            if location:
+                query = query.filter(CreatorProfile.location.ilike(f'%{location}%'))
+            if min_followers:
+                query = query.filter(CreatorProfile.follower_count >= min_followers)
+            if platform:
+                platform_map = {
+                    'IG': 'instagram', 'Instagram': 'instagram', 'TikTok': 'tiktok',
+                    'YouTube': 'youtube', 'Twitter': 'twitter', 'X': 'twitter',
+                    'Facebook': 'facebook', 'LinkedIn': 'linkedin'
+                }
+                platform_key = platform_map.get(platform, platform.lower())
+                query = query.filter(CreatorProfile.social_links.has_key(platform_key))
+
+            all_creators = query.all()
+            # Filter by category in Python (case-insensitive partial match)
+            category_lower = category.lower()
+            all_creators = [
+                c for c in all_creators
+                if any(category_lower in cat.lower() for cat in (c.categories or []))
+            ]
 
         # Add review stats and cheapest package price
         creators_with_stats = []
@@ -154,6 +210,27 @@ def update_profile():
 
         data = request.get_json()
 
+        # Update username if provided
+        if 'username' in data:
+            username = data['username'].strip()
+            if username:
+                # Validate username format (alphanumeric, underscores, 3-20 chars)
+                import re
+                if not re.match(r'^[a-zA-Z0-9_]{3,20}$', username):
+                    return jsonify({'error': 'Username must be 3-20 characters and contain only letters, numbers, and underscores'}), 400
+
+                # Check if username is already taken by another creator
+                existing = CreatorProfile.query.filter(
+                    CreatorProfile.username == username,
+                    CreatorProfile.id != creator.id
+                ).first()
+                if existing:
+                    return jsonify({'error': 'Username already taken'}), 400
+
+                creator.username = username
+            else:
+                creator.username = None
+
         # Update fields if provided
         if 'bio' in data:
             creator.bio = data['bio']
@@ -243,6 +320,100 @@ def upload_profile_picture():
 
         except ValueError as e:
             return jsonify({'error': str(e)}), 400
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@bp.route('/profile/gallery', methods=['POST'])
+@jwt_required()
+def upload_gallery_image():
+    """Upload image to creator's gallery"""
+    try:
+        user_id = int(get_jwt_identity())
+        user = User.query.get(user_id)
+
+        if not user or user.user_type != 'creator':
+            return jsonify({'error': 'Not authorized'}), 403
+
+        creator = user.creator_profile
+        if not creator:
+            return jsonify({'error': 'Creator profile not found'}), 404
+
+        # Check if file is in request
+        if 'file' not in request.files:
+            return jsonify({'error': 'No file provided'}), 400
+
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({'error': 'No file selected'}), 400
+
+        # Save gallery image
+        try:
+            file_path = save_profile_picture(file, folder='profiles/creators/gallery')
+
+            # Initialize gallery if None
+            if creator.gallery is None:
+                creator.gallery = []
+
+            # Add to gallery
+            gallery = list(creator.gallery)
+            gallery.append(file_path)
+            creator.gallery = gallery
+            creator.updated_at = datetime.utcnow()
+            db.session.commit()
+
+            return jsonify({
+                'message': 'Gallery image uploaded successfully',
+                'image_path': file_path,
+                'gallery': creator.gallery
+            }), 200
+
+        except ValueError as e:
+            return jsonify({'error': str(e)}), 400
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@bp.route('/profile/gallery/<int:index>', methods=['DELETE'])
+@jwt_required()
+def delete_gallery_image(index):
+    """Delete image from creator's gallery"""
+    try:
+        user_id = int(get_jwt_identity())
+        user = User.query.get(user_id)
+
+        if not user or user.user_type != 'creator':
+            return jsonify({'error': 'Not authorized'}), 403
+
+        creator = user.creator_profile
+        if not creator:
+            return jsonify({'error': 'Creator profile not found'}), 404
+
+        # Check if gallery exists and index is valid
+        if not creator.gallery or index < 0 or index >= len(creator.gallery):
+            return jsonify({'error': 'Invalid gallery index'}), 400
+
+        # Get file path to delete
+        file_path = creator.gallery[index]
+
+        # Delete the file
+        delete_profile_picture(file_path)
+
+        # Remove from gallery array
+        gallery = list(creator.gallery)
+        gallery.pop(index)
+        creator.gallery = gallery
+        creator.updated_at = datetime.utcnow()
+        db.session.commit()
+
+        return jsonify({
+            'message': 'Gallery image deleted successfully',
+            'gallery': creator.gallery
+        }), 200
 
     except Exception as e:
         db.session.rollback()
