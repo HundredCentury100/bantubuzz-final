@@ -197,6 +197,7 @@ export const collaborationsAPI = {
   // Deliverables
   submitDeliverable: (id, data) => api.post(`/collaborations/${id}/deliverables`, data),
   submitDraftDeliverable: (id, data) => api.post(`/collaborations/${id}/deliverables/draft`, data),
+  updateDraftDeliverable: (id, deliverableId, data) => api.put(`/collaborations/${id}/deliverables/${deliverableId}`, data),
   approveDeliverable: (id, deliverableId) => api.post(`/collaborations/${id}/deliverables/${deliverableId}/approve`),
   requestRevision: (id, deliverableId, notes) => api.post(`/collaborations/${id}/deliverables/${deliverableId}/request-revision`, { notes }),
 
@@ -213,6 +214,12 @@ export const reviewsAPI = {
   getReview: (id) => api.get(`/reviews/${id}`),
   addCreatorResponse: (id, response) => api.patch(`/reviews/${id}/response`, { response }),
   getBrandReviews: (params) => api.get('/reviews/brand', { params }),
+};
+
+// Categories API
+export const categoriesAPI = {
+  getCategories: () => api.get('/categories'),
+  getCategory: (id) => api.get(`/categories/${id}`),
 };
 
 export default api;

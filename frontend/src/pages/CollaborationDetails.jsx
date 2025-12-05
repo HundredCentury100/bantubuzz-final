@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { collaborationsAPI } from '../services/api';
 import { useAuth } from '../hooks/useAuth';
+import { useMessaging } from '../contexts/MessagingContext';
 import Navbar from '../components/Navbar';
 import Avatar from '../components/Avatar';
 import toast from 'react-hot-toast';
@@ -25,11 +26,33 @@ const CollaborationDetails = () => {
   const [revisionNotes, setRevisionNotes] = useState('');
   const [requestingRevision, setRequestingRevision] = useState(false);
 
+  const { socket } = useMessaging();
+  const [editingDeliverable, setEditingDeliverable] = useState(null);
+  
   const isBrand = user?.user_type === 'brand';
 
   useEffect(() => {
     fetchCollaboration();
   }, [id]);
+
+  // Real-time updates via Socket.IO
+  useEffect(() => {
+    if (!socket) return;
+
+    const handleCollaborationUpdate = (data) => {
+      if (data.collaboration_id === parseInt(id)) {
+        console.log('Collaboration updated, refreshing...');
+        toast.info('Collaboration updated');
+        fetchCollaboration();
+      }
+    };
+
+    socket.on('collaboration_updated', handleCollaborationUpdate);
+
+    return () => {
+      socket.off('collaboration_updated', handleCollaborationUpdate);
+    };
+  }, [socket, id]);
 
   const fetchCollaboration = async () => {
     try {
@@ -361,6 +384,20 @@ const CollaborationDetails = () => {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                           </svg>
                         </a>
+                        {!isBrand && deliverable.status === 'revision_requested' && collaboration.status === 'in_progress' && (
+                          <button
+                            onClick={() => {
+                              setEditingDeliverable(deliverable);
+                              setDeliverableTitle(deliverable.title);
+                              setDeliverableUrl(deliverable.url);
+                              setDeliverableDescription(deliverable.description || '');
+                              setShowDeliverableModal(true);
+                            }}
+                            className="ml-auto px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white text-sm font-medium rounded-lg transition-colors"
+                          >
+                            Edit & Resubmit
+                          </button>
+                        )}
                         {isBrand && collaboration.status === 'in_progress' && (
                           <div className="ml-auto flex gap-2">
                             <button

@@ -84,6 +84,7 @@ def create_booking():
             creator_id=package.creator_id,
             brand_id=brand.id,
             amount=package.price,
+            total_price=package.price,
             notes=data.get('notes')
         )
 

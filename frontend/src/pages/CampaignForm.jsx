@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams, Link } from 'react-router-dom';
-import { campaignsAPI } from '../services/api';
+import { campaignsAPI, categoriesAPI } from '../services/api';
 import Navbar from '../components/Navbar';
 import toast from 'react-hot-toast';
 
@@ -10,6 +10,8 @@ const CampaignForm = () => {
   const isEditMode = !!id;
 
   const [loading, setLoading] = useState(false);
+  const [categories, setCategories] = useState([]);
+  const [categoriesLoading, setCategoriesLoading] = useState(true);
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -23,10 +25,24 @@ const CampaignForm = () => {
   });
 
   useEffect(() => {
+    fetchCategories();
     if (isEditMode) {
       fetchCampaign();
     }
   }, [id]);
+
+  const fetchCategories = async () => {
+    try {
+      setCategoriesLoading(true);
+      const response = await categoriesAPI.getCategories();
+      setCategories(response.data.categories.map(cat => cat.name));
+    } catch (error) {
+      console.error('Error fetching categories:', error);
+      toast.error('Failed to load categories');
+    } finally {
+      setCategoriesLoading(false);
+    }
+  };
 
   const fetchCampaign = async () => {
     try {
@@ -96,19 +112,6 @@ const CampaignForm = () => {
       setLoading(false);
     }
   };
-
-  const categories = [
-    'Fashion & Beauty',
-    'Food & Beverage',
-    'Technology',
-    'Lifestyle',
-    'Travel',
-    'Fitness & Health',
-    'Gaming',
-    'Education',
-    'Entertainment',
-    'Other'
-  ];
 
   if (loading && isEditMode) {
     return (

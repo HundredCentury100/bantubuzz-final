@@ -9,6 +9,78 @@ from sqlalchemy import or_, and_, func
 bp = Blueprint('creators', __name__)
 
 
+@bp.route('/featured', methods=['GET'])
+def get_featured_creators():
+    """
+    Get featured creators for homepage display
+    Public endpoint - no authentication required
+    Query params: featured_type - 'general', 'tiktok', 'instagram'
+    """
+    try:
+        featured_type = request.args.get('featured_type')  # Optional filter
+
+        # Try to get featured creators
+        try:
+            query = CreatorProfile.query.join(User).filter(
+                CreatorProfile.is_featured == True,
+                User.is_active == True,
+                User.is_verified == True
+            )
+
+            # Filter by featured_type if provided
+            if featured_type:
+                query = query.filter(CreatorProfile.featured_type == featured_type)
+
+            featured = query.order_by(
+                CreatorProfile.featured_order,
+                CreatorProfile.featured_since.desc()
+            ).limit(8).all()
+        except Exception:
+            # Featured fields don't exist yet, fallback to top creators
+            featured = CreatorProfile.query.join(User).filter(
+                User.is_active == True,
+                User.is_verified == True
+            ).order_by(
+                CreatorProfile.follower_count.desc()
+            ).limit(8).all()
+
+        creators_data = []
+        for creator in featured:
+            creator_dict = creator.to_dict(include_user=True)
+
+            # Get review stats
+            reviews = Review.query.filter_by(creator_id=creator.id).all()
+            if reviews:
+                avg_rating = sum(r.rating for r in reviews) / len(reviews)
+                creator_dict['review_stats'] = {
+                    'average_rating': round(avg_rating, 1),
+                    'total_reviews': len(reviews)
+                }
+            else:
+                creator_dict['review_stats'] = {
+                    'average_rating': 0,
+                    'total_reviews': 0
+                }
+
+            # Get cheapest package price
+            packages = Package.query.filter_by(creator_id=creator.id, is_active=True).all()
+            if packages:
+                prices = [p.price for p in packages]
+                creator_dict['cheapest_package_price'] = min(prices)
+            else:
+                creator_dict['cheapest_package_price'] = None
+
+            creators_data.append(creator_dict)
+
+        return jsonify({
+            'creators': creators_data,
+            'total': len(creators_data)
+        }), 200
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @bp.route('/', methods=['GET'])
 def get_creators():
     """Get all creators with filters"""

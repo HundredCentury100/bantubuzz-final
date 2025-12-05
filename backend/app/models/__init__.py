@@ -11,6 +11,10 @@ from .analytics import Analytics
 from .otp import OTP
 from .collaboration import Collaboration
 from .review import Review
+from .category import Category, Niche
+from .wallet import Wallet, WalletTransaction
+from .payment import Payment, PaymentVerification
+from .cashout import CashoutRequest
 
 __all__ = [
     'User',
@@ -26,5 +30,12 @@ __all__ = [
     'Analytics',
     'OTP',
     'Collaboration',
-    'Review'
+    'Review',
+    'Category',
+    'Niche',
+    'Wallet',
+    'WalletTransaction',
+    'Payment',
+    'PaymentVerification',
+    'CashoutRequest'
 ]

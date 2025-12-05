@@ -235,8 +235,8 @@ const Messages = () => {
                         </div>
                       </div>
                       {conversation.unread_count > 0 && (
-                        <div className="ml-2 bg-primary text-white text-xs font-bold rounded-full w-6 h-6 flex items-center justify-center flex-shrink-0">
-                          {conversation.unread_count}
+                        <div className="ml-2 bg-primary text-white text-xs font-bold rounded-full min-w-6 h-6 px-2 flex items-center justify-center flex-shrink-0">
+                          {parseInt(conversation.unread_count, 10)}
                         </div>
                       )}
                     </div>

@@ -14,6 +14,7 @@ class Booking(db.Model):
     booking_date = db.Column(db.DateTime, default=datetime.utcnow)
     completion_date = db.Column(db.DateTime)
     amount = db.Column(db.Float, nullable=False)
+    total_price = db.Column(db.Float, nullable=False)  # Alias for amount (for compatibility)
     payment_status = db.Column(db.String(20), default='pending')  # pending, paid, failed, refunded
     payment_reference = db.Column(db.String(100))
     paynow_poll_url = db.Column(db.String(255))
@@ -36,6 +37,7 @@ class Booking(db.Model):
             'booking_date': self.booking_date.isoformat(),
             'completion_date': self.completion_date.isoformat() if self.completion_date else None,
             'amount': self.amount,
+            'total_price': self.total_price if hasattr(self, 'total_price') and self.total_price else self.amount,
             'payment_status': self.payment_status,
             'payment_reference': self.payment_reference,
             'notes': self.notes,

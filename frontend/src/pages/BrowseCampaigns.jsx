@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { campaignsAPI } from '../services/api';
+import { campaignsAPI, categoriesAPI } from '../services/api';
 import Navbar from '../components/Navbar';
 import toast from 'react-hot-toast';
 import Avatar from '../components/Avatar';
@@ -10,10 +10,25 @@ const BrowseCampaigns = () => {
   const [campaigns, setCampaigns] = useState([]);
   const [loading, setLoading] = useState(true);
   const [category, setCategory] = useState('');
+  const [categories, setCategories] = useState(['All Categories']);
+
+  useEffect(() => {
+    fetchCategories();
+  }, []);
 
   useEffect(() => {
     fetchCampaigns();
   }, [category]);
+
+  const fetchCategories = async () => {
+    try {
+      const response = await categoriesAPI.getCategories();
+      setCategories(['All Categories', ...response.data.categories.map(cat => cat.name)]);
+    } catch (error) {
+      console.error('Error fetching categories:', error);
+      // Keep default 'All Categories' if fetch fails
+    }
+  };
 
   const fetchCampaigns = async () => {
     try {
@@ -28,20 +43,6 @@ const BrowseCampaigns = () => {
       setLoading(false);
     }
   };
-
-  const categories = [
-    'All Categories',
-    'Fashion & Beauty',
-    'Food & Beverage',
-    'Technology',
-    'Lifestyle',
-    'Travel',
-    'Fitness & Health',
-    'Gaming',
-    'Education',
-    'Entertainment',
-    'Other'
-  ];
 
   if (loading) {
     return (

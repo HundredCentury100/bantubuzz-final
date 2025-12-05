@@ -23,7 +23,16 @@
       "Bash(timeout:*)",
       "Bash(powershell:*)",
       "Bash(del replace-colors.ps1)",
-      "Bash(git checkout:*)"
+      "Bash(git checkout:*)",
+      "Read(//d/**)",
+      "Bash(ssh:*)",
+      "Bash(npm run build:*)",
+      "Bash(scp -r \"D:\\Bantubuzz Platform\\frontend\\dist\\*\" root@173.212.245.22:/var/www/bantubuzz/frontend/dist/)",
+      "Bash(scp:*)",
+      "Bash(del nul)",
+      "Bash(if exist nul del nul)",
+      "Bash(xcopy:*)",
+      "Bash(cat:*)"
     ],
     "deny": [],
     "ask": []

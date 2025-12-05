@@ -10,9 +10,11 @@ class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     email = db.Column(db.String(120), unique=True, nullable=False, index=True)
     password_hash = db.Column(db.String(255), nullable=False)
-    user_type = db.Column(db.String(20), nullable=False)  # 'creator' or 'brand'
+    user_type = db.Column(db.String(20), nullable=False)  # 'creator', 'brand', or 'admin'
     is_verified = db.Column(db.Boolean, default=False)
     is_active = db.Column(db.Boolean, default=True)
+    is_admin = db.Column(db.Boolean, default=False)  # Admin flag
+    admin_role = db.Column(db.String(20))  # 'super_admin', 'moderator', 'support', 'finance'
     verification_token = db.Column(db.String(100), unique=True)
     reset_token = db.Column(db.String(100), unique=True)
     reset_token_expires = db.Column(db.DateTime)
@@ -64,6 +66,8 @@ class User(db.Model):
             'user_type': self.user_type,
             'is_verified': self.is_verified,
             'is_active': self.is_active,
+            'is_admin': self.is_admin,
+            'admin_role': self.admin_role,
             'last_login': self.last_login.isoformat() if self.last_login else None,
             'created_at': self.created_at.isoformat(),
             'updated_at': self.updated_at.isoformat()

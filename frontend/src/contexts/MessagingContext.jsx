@@ -21,6 +21,7 @@ export const MessagingProvider = ({ children }) => {
  // conversationId -> messages array
   const [onlineUsers, setOnlineUsers] = useState(new Set());
   const [typingUsers, setTypingUsers] = useState(new Map()); // userId -> isTyping
+  const [notifications, setNotifications] = useState([]);
   const socketRef = useRef(null);
 
   // Initialize Socket.IO connection
@@ -36,8 +37,12 @@ export const MessagingProvider = ({ children }) => {
       const socketInstance = io(MESSAGING_SOCKET_URL, {
         transports: ['websocket', 'polling'],
         reconnection: true,
-        reconnectionAttempts: 5,
+        reconnectionAttempts: 10, // Increased from 5 to 10
         reconnectionDelay: 1000,
+        reconnectionDelayMax: 5000,
+        timeout: 20000,
+        forceNew: false,
+        multiplex: true,
         auth: {
           token: token
         }
@@ -69,6 +74,24 @@ export const MessagingProvider = ({ children }) => {
       socketInstance.on('connect_error', (error) => {
         console.error('❌ Connection error:', error.message);
         setIsConnected(false);
+      });
+
+      socketInstance.on('reconnect', (attemptNumber) => {
+        console.log(`✅ Reconnected to messaging service after ${attemptNumber} attempts`);
+        // Re-authenticate on reconnect
+        const currentToken = localStorage.getItem('access_token');
+        if (currentToken) {
+          socketInstance.emit('authenticate', currentToken);
+        }
+      });
+
+      socketInstance.on('reconnect_attempt', (attemptNumber) => {
+        console.log(`🔄 Attempting to reconnect... (attempt ${attemptNumber})`);
+      });
+
+      socketInstance.on('reconnect_failed', () => {
+        console.error('❌ Failed to reconnect after maximum attempts');
+        toast.error('Unable to connect to messaging service. Please refresh the page.');
       });
 
       socketInstance.on('authenticated', (data) => {
@@ -169,6 +192,23 @@ export const MessagingProvider = ({ children }) => {
         toast.error(error.message || 'Messaging error occurred');
       });
 
+      // Real-time notifications
+      socketInstance.on('new_notification', (notification) => {
+        console.log('New notification received:', notification);
+
+        // Add to notifications list
+        setNotifications(prev => [notification, ...prev].slice(0, 50)); // Keep last 50
+
+        // Play notification sound
+        playNotificationSound();
+
+        // Show toast notification
+        toast(notification.message, {
+          duration: 4000,
+          icon: notification.type === 'success' ? '✅' : notification.type === 'error' ? '❌' : '📢',
+        });
+      });
+
       // Cleanup
       return () => {
         socketInstance.disconnect();
@@ -248,6 +288,7 @@ export const MessagingProvider = ({ children }) => {
     messages,
     onlineUsers,
     typingUsers,
+    notifications,
     sendMessage,
     markMessagesAsRead,
     sendTypingIndicator,

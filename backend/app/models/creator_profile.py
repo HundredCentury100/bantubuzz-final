@@ -25,6 +25,12 @@ class CreatorProfile(db.Model):
     free_revisions = db.Column(db.Integer, default=2)  # Number of free revisions allowed per collaboration
     revision_fee = db.Column(db.Float, default=0.0)  # Fee charged per revision after free limit
 
+    # Featured creator fields
+    is_featured = db.Column(db.Boolean, default=False)
+    featured_type = db.Column(db.String(20), nullable=True)  # 'general', 'tiktok', 'instagram'
+    featured_order = db.Column(db.Integer, default=0)
+    featured_since = db.Column(db.DateTime, nullable=True)
+
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

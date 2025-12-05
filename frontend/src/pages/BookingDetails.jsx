@@ -14,6 +14,7 @@ import {
   DocumentTextIcon,
   UserIcon,
   BuildingOfficeIcon,
+  ArrowLeftIcon,
 } from '@heroicons/react/24/outline';
 
 const BookingDetails = () => {
@@ -118,18 +119,27 @@ const BookingDetails = () => {
       <Navbar />
       <div className="container-custom py-8">
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Booking Details</h1>
-            <p className="text-gray-600 mt-1">Booking ID: #{booking.id}</p>
-          </div>
-          <div className="flex items-center space-x-2">
-            <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(booking.status)}`}>
-              {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
-            </span>
-            <span className={`px-3 py-1 rounded-full text-sm font-medium ${getPaymentStatusColor(booking.payment_status)}`}>
-              Payment: {booking.payment_status}
-            </span>
+        <div className="mb-6">
+          <button
+            onClick={() => navigate(-1)}
+            className="flex items-center text-gray-600 hover:text-gray-900 mb-4"
+          >
+            <ArrowLeftIcon className="h-5 w-5 mr-2" />
+            Back
+          </button>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-900">Booking Details</h1>
+              <p className="text-gray-600 mt-1">Booking ID: #{booking.id}</p>
+            </div>
+            <div className="flex items-center space-x-2">
+              <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(booking.status)}`}>
+                {booking.status.charAt(0).toUpperCase() + booking.status.slice(1)}
+              </span>
+              <span className={`px-3 py-1 rounded-full text-sm font-medium ${getPaymentStatusColor(booking.payment_status)}`}>
+                Payment: {booking.payment_status}
+              </span>
+            </div>
           </div>
         </div>
 

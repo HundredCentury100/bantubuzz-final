@@ -27,7 +27,12 @@ def create_app(config_name='development'):
     db.init_app(app)
     jwt.init_app(app)
     mail.init_app(app)
-    CORS(app, origins=app.config['CORS_ORIGINS'], supports_credentials=True)
+    CORS(app,
+         origins=app.config['CORS_ORIGINS'],
+         supports_credentials=True,
+         allow_headers=['Content-Type', 'Authorization'],
+         methods=['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+         expose_headers=['Content-Type', 'Authorization'])
     socketio.init_app(app, cors_allowed_origins=app.config['CORS_ORIGINS'], async_mode='threading')
     migrate.init_app(app, db)
 
@@ -50,7 +55,8 @@ def create_app(config_name='development'):
         return {'error': 'Token has been revoked'}, 401
 
     # Register blueprints
-    from .routes import auth, users, creators, brands, packages, campaigns, bookings, messages, notifications, analytics, collaborations, reviews
+    from .routes import auth, users, creators, brands, packages, campaigns, bookings, messages, notifications, analytics, collaborations, reviews, wallet, categories
+    from .routes import admin  # New admin module structure
 
     app.register_blueprint(auth.bp, url_prefix='/api/auth')
     app.register_blueprint(users.bp, url_prefix='/api/users')
@@ -64,6 +70,9 @@ def create_app(config_name='development'):
     app.register_blueprint(messages.bp, url_prefix='/api/messages')
     app.register_blueprint(notifications.bp, url_prefix='/api/notifications')
     app.register_blueprint(analytics.bp, url_prefix='/api/analytics')
+    app.register_blueprint(categories.bp, url_prefix='/api/categories')
+    app.register_blueprint(wallet.bp, url_prefix='/api')
+    app.register_blueprint(admin.bp, url_prefix='/api/admin')  # Admin routes at /api/admin/*
 
     # Serve uploaded files
     from flask import send_from_directory

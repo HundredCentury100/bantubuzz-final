@@ -188,6 +188,22 @@ io.on('connection', (socket) => {
     }
   });
 
+  // Handle real-time notifications
+  socket.on('send_notification', (notification) => {
+    const { userId, title, message, type, link } = notification;
+    const targetSocketId = activeUsers.get(userId.toString());
+
+    if (targetSocketId) {
+      io.to(targetSocketId).emit('new_notification', {
+        title,
+        message,
+        type,
+        link,
+        timestamp: new Date().toISOString()
+      });
+    }
+  });
+
   // Handle disconnection
   socket.on('disconnect', () => {
     if (socket.userId) {

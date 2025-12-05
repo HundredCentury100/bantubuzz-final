@@ -134,10 +134,15 @@ def login():
         user.update_last_login()
         db.session.commit()
 
-        # Create tokens
+        # Create tokens with admin claims
+        claims = {
+            'user_type': user.user_type,
+            'is_admin': user.is_admin,
+            'admin_role': user.admin_role if user.is_admin else None
+        }
         access_token = create_access_token(
             identity=str(user.id),
-            additional_claims={'user_type': user.user_type}
+            additional_claims=claims
         )
         refresh_token = create_refresh_token(identity=str(user.id))
 

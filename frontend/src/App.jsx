@@ -33,6 +33,25 @@ import Collaborations from './pages/Collaborations';
 import CollaborationDetails from './pages/CollaborationDetails';
 import ReviewForm from './pages/ReviewForm';
 import NotFound from './pages/NotFound';
+import ForgotPassword from './pages/ForgotPassword';
+import ResetPassword from './pages/ResetPassword';
+
+// Admin Pages
+import AdminLogin from './pages/AdminLogin';
+import AdminDashboard from './pages/admin/Dashboard';
+import AdminUsers from './pages/admin/Users';
+import AdminCashouts from './pages/admin/Cashouts';
+import AdminFeaturedCreators from './pages/admin/FeaturedCreators';
+import AdminCategories from './pages/AdminCategories';
+import AdminCollaborations from './pages/AdminCollaborations';
+import AdminBookings from './pages/AdminBookings';
+import AdminCampaigns from './pages/AdminCampaigns';
+import AdminPayments from './pages/AdminPayments';
+import AdminReviews from './pages/AdminReviews';
+
+// Wallet Pages
+import Wallet from './pages/Wallet';
+import CashoutRequest from './pages/CashoutRequest';
 
 // Protected Route Component
 const ProtectedRoute = ({ children, requiredType }) => {
@@ -77,6 +96,18 @@ const PublicRoute = ({ children }) => {
   return children;
 };
 
+// Admin Route Component
+const AdminRoute = ({ children }) => {
+  const user = JSON.parse(localStorage.getItem('user') || '{}');
+  const token = localStorage.getItem('token');
+
+  if (!token || !user.is_admin) {
+    return <Navigate to="/admin/login" replace />;
+  }
+
+  return children;
+};
+
 function App() {
   return (
     <Routes>
@@ -113,6 +144,8 @@ function App() {
         }
       />
       <Route path="/verify-otp" element={<VerifyOTP />} />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/reset-password/:token" element={<ResetPassword />} />
 
       {/* Creator Protected Routes */}
       <Route
@@ -192,6 +225,22 @@ function App() {
         element={
           <ProtectedRoute requiredType="creator">
             <Bookings />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/wallet"
+        element={
+          <ProtectedRoute requiredType="creator">
+            <Wallet />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/wallet/cashout"
+        element={
+          <ProtectedRoute requiredType="creator">
+            <CashoutRequest />
           </ProtectedRoute>
         }
       />
@@ -331,6 +380,90 @@ function App() {
           </ProtectedRoute>
         }
       />
+
+      {/* Admin Routes */}
+      <Route path="/admin/login" element={<AdminLogin />} />
+      <Route
+        path="/admin/dashboard"
+        element={
+          <AdminRoute>
+            <AdminDashboard />
+          </AdminRoute>
+        }
+      />
+      <Route
+        path="/admin/users"
+        element={
+          <AdminRoute>
+            <AdminUsers />
+          </AdminRoute>
+        }
+      />
+      <Route
+        path="/admin/cashouts"
+        element={
+          <AdminRoute>
+            <AdminCashouts />
+          </AdminRoute>
+        }
+      />
+      <Route
+        path="/admin/featured"
+        element={
+          <AdminRoute>
+            <AdminFeaturedCreators />
+          </AdminRoute>
+        }
+      />
+      <Route
+        path="/admin/categories"
+        element={
+          <AdminRoute>
+            <AdminCategories />
+          </AdminRoute>
+        }
+      />
+      <Route
+        path="/admin/collaborations"
+        element={
+          <AdminRoute>
+            <AdminCollaborations />
+          </AdminRoute>
+        }
+      />
+      <Route
+        path="/admin/bookings"
+        element={
+          <AdminRoute>
+            <AdminBookings />
+          </AdminRoute>
+        }
+      />
+      <Route
+        path="/admin/campaigns"
+        element={
+          <AdminRoute>
+            <AdminCampaigns />
+          </AdminRoute>
+        }
+      />
+      <Route
+        path="/admin/payments"
+        element={
+          <AdminRoute>
+            <AdminPayments />
+          </AdminRoute>
+        }
+      />
+      <Route
+        path="/admin/reviews"
+        element={
+          <AdminRoute>
+            <AdminReviews />
+          </AdminRoute>
+        }
+      />
+      <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
 
       {/* 404 */}
       <Route path="*" element={<NotFound />} />

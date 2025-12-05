@@ -1,219 +1,512 @@
-from flask import current_app
-from paynow import Paynow
+"""
+Payment Service - Handles payment verification and management
+"""
+from datetime import datetime, timedelta
+from app import db
+from app.models import Payment, PaymentVerification, Booking, WalletTransaction, Collaboration, User
+from app.services.wallet_service import get_or_create_wallet
+from app.utils.email_service import send_payment_verified_notification
 
 
-def get_paynow_client():
-    """Initialize Paynow client"""
-    print(f"[PAYMENT] Creating Paynow client with:")
-    print(f"[PAYMENT]   Integration ID: {current_app.config['PAYNOW_INTEGRATION_ID']}")
-    print(f"[PAYMENT]   Return URL: {current_app.config['PAYNOW_RETURN_URL']}")
-    print(f"[PAYMENT]   Result URL: {current_app.config['PAYNOW_RESULT_URL']}")
-
-    return Paynow(
-        current_app.config['PAYNOW_INTEGRATION_ID'],
-        current_app.config['PAYNOW_INTEGRATION_KEY'],
-        current_app.config['PAYNOW_RETURN_URL'],
-        current_app.config['PAYNOW_RESULT_URL']
+def create_payment_record(booking_id, user_id, amount, payment_method='paynow', payment_type='automated'):
+    """Create initial payment record when booking is created"""
+    payment = Payment(
+        booking_id=booking_id,
+        user_id=user_id,
+        amount=amount,
+        payment_method=payment_method,
+        payment_type=payment_type,
+        status='pending',
+        escrow_status='pending'
     )
 
+    if payment_type == 'manual':
+        payment.payment_instructions = generate_payment_instructions(booking_id, amount)
 
-def initiate_payment(booking, email, package_title, phone=None):
-    """
-    Initiate payment via Paynow
+    db.session.add(payment)
+    db.session.commit()
+    return payment
 
-    Args:
-        booking: Booking object
-        email: Customer email
-        package_title: Package title for payment description
-        phone: Customer phone number (optional, for mobile payments)
 
-    Returns:
-        dict: Payment response with redirect URL or error
-    """
+def generate_payment_instructions(booking_id, amount):
+    """Generate payment instructions for brands"""
+    reference = f"BP-{datetime.utcnow().strftime('%Y%m%d')}-{booking_id}"
+    instructions = f"""
+Please complete payment of ${amount:.2f}:
+
+**Bank Transfer:**
+Bank: CBZ Bank | Account: 1234567890
+Branch: Harare | Reference: {reference}
+
+**EcoCash:** +263771234567
+**OneMoney:** +263771234567
+Reference: {reference}
+
+Upload proof after payment.
+"""
+    return instructions.strip()
+
+
+def verify_manual_payment(payment_id, admin_user_id, verification_data):
+    """Admin verifies manual payment"""
+    payment = Payment.query.get(payment_id)
+    if not payment:
+        raise ValueError("Payment not found")
+    if payment.status == 'completed':
+        raise ValueError("Already verified")
+
+    booking = Booking.query.get(payment.booking_id)
+
+    payment.status = 'completed'
+    payment.payment_type = 'manual'
+    payment.payment_method = verification_data.get('payment_method', 'bank_transfer')
+    payment.payment_reference = verification_data.get('transaction_reference')
+    payment.verified_by = admin_user_id
+    payment.verified_at = datetime.utcnow()
+    payment.completed_at = datetime.utcnow()
+    payment.verification_notes = verification_data.get('notes', '')
+    payment.escrow_status = 'escrowed'
+    payment.held_amount = payment.amount
+
+    if verification_data.get('proof_url'):
+        payment.payment_proof_url = verification_data['proof_url']
+
+    booking.payment_status = 'paid'
+    booking.escrow_status = 'escrowed'
+    booking.escrowed_at = datetime.utcnow()
+
+    verification = PaymentVerification(
+        payment_id=payment.id,
+        booking_id=booking.id,
+        verified_by=admin_user_id,
+        verified_at=datetime.utcnow(),
+        amount_verified=verification_data.get('amount', payment.amount),
+        payment_method=verification_data.get('payment_method', 'bank_transfer'),
+        transaction_reference=verification_data.get('transaction_reference'),
+        payment_date=verification_data.get('payment_date'),
+        proof_url=verification_data.get('proof_url'),
+        verification_notes=verification_data.get('notes', '')
+    )
+    db.session.add(verification)
+    db.session.commit()
+
+    # Send email notification to creator
     try:
-        print(f"[PAYMENT] Initiating payment for booking {booking.id}")
-        print(f"[PAYMENT] Email: {email}, Amount: {booking.amount}, Package: {package_title}")
+        # Get creator email from booking
+        if booking.creator_id:
+            creator_user = User.query.filter_by(id=booking.creator_id).first()
+            if creator_user and creator_user.email:
+                send_payment_verified_notification(payment, creator_user.email)
+    except Exception as e:
+        # Log error but don't fail the verification
+        print(f"Failed to send payment verified email: {str(e)}")
 
-        paynow = get_paynow_client()
-        print(f"[PAYMENT] Paynow client created")
+    return payment
 
+
+def add_manual_payment(admin_user_id, payment_data):
+    """Admin adds offline payment"""
+    booking = Booking.query.get(payment_data['booking_id'])
+    if not booking:
+        raise ValueError("Booking not found")
+    if booking.payment_status == 'paid':
+        raise ValueError("Already paid")
+
+    # Get the brand's user_id from the brand profile
+    from app.models import BrandProfile
+    brand = BrandProfile.query.get(booking.brand_id)
+    if not brand:
+        raise ValueError("Brand profile not found")
+
+    payment = Payment(
+        booking_id=booking.id,
+        user_id=brand.user_id,  # Use brand's user_id instead of brand_id
+        amount=payment_data['amount'],
+        currency=payment_data.get('currency', 'USD'),
+        payment_method=payment_data['payment_method'],
+        payment_type='admin_added',
+        payment_reference=payment_data.get('transaction_reference'),
+        external_reference=payment_data.get('external_reference'),
+        status='completed',
+        verified_by=admin_user_id,
+        verified_at=datetime.utcnow(),
+        completed_at=datetime.utcnow(),
+        verification_notes=payment_data.get('notes', ''),
+        escrow_status='escrowed',
+        held_amount=payment_data['amount']
+    )
+
+    if payment_data.get('proof_url'):
+        payment.payment_proof_url = payment_data['proof_url']
+
+    db.session.add(payment)
+    db.session.flush()
+
+    booking.payment_status = 'paid'
+    booking.escrow_status = 'escrowed'
+    booking.escrowed_at = datetime.utcnow()
+
+    verification = PaymentVerification(
+        payment_id=payment.id,
+        booking_id=booking.id,
+        verified_by=admin_user_id,
+        verified_at=datetime.utcnow(),
+        amount_verified=payment_data['amount'],
+        payment_method=payment_data['payment_method'],
+        transaction_reference=payment_data.get('transaction_reference'),
+        payment_date=payment_data.get('payment_date', datetime.utcnow().date()),
+        proof_url=payment_data.get('proof_url'),
+        verification_notes=payment_data.get('notes', '')
+    )
+    db.session.add(verification)
+    db.session.commit()
+    return payment
+
+
+def release_escrow_to_wallet(collaboration_id, platform_fee_percentage=15):
+    """Release money to creator wallet with 30-day clearance"""
+    collaboration = Collaboration.query.get(collaboration_id)
+    if not collaboration:
+        raise ValueError("Collaboration not found")
+    if collaboration.status != 'completed':
+        raise ValueError("Not completed")
+    if collaboration.payment_released:
+        raise ValueError("Already released")
+
+    booking = collaboration.booking
+    payment = Payment.query.filter_by(booking_id=booking.id, status='completed').first()
+    if not payment or payment.escrow_status != 'escrowed':
+        raise ValueError("Payment not ready")
+
+    creator = collaboration.creator
+    gross_amount = float(payment.amount)
+    platform_fee = gross_amount * (platform_fee_percentage / 100)
+    net_amount = gross_amount - platform_fee
+
+    wallet = get_or_create_wallet(creator.user_id)
+    completed_at = datetime.utcnow()
+    available_at = completed_at + timedelta(days=30)
+
+    transaction = WalletTransaction(
+        wallet_id=wallet.id,
+        user_id=creator.user_id,
+        transaction_type='earning',
+        amount=net_amount,
+        status='pending_clearance',
+        clearance_required=True,
+        clearance_days=30,
+        completed_at=completed_at,
+        available_at=available_at,
+        collaboration_id=collaboration.id,
+        booking_id=booking.id,
+        gross_amount=gross_amount,
+        platform_fee=platform_fee,
+        platform_fee_percentage=platform_fee_percentage,
+        net_amount=net_amount,
+        description=f"Earnings from {booking.package.name if booking.package else 'booking'}",
+        transaction_metadata={
+            'brand_name': collaboration.brand.company_name if collaboration.brand else 'Unknown',
+            'package_name': booking.package.name if booking.package else 'Unknown',
+            'booking_id': booking.id
+        }
+    )
+    db.session.add(transaction)
+
+    collaboration.payment_released = True
+    collaboration.payment_released_at = completed_at
+    collaboration.escrow_amount = gross_amount
+    payment.escrow_status = 'released'
+    booking.escrow_status = 'released'
+
+    wallet.pending_clearance = float(wallet.pending_clearance or 0) + net_amount
+    wallet.total_earned = float(wallet.total_earned or 0) + gross_amount
+    wallet.updated_at = datetime.utcnow()
+
+    db.session.commit()
+    return transaction
+
+
+def get_pending_payments_for_admin():
+    """Get all payments pending verification"""
+    payments = Payment.query.filter(
+        Payment.status == 'pending',
+        Payment.payment_type.in_(['manual', 'admin_added'])
+    ).order_by(Payment.created_at.desc()).all()
+
+    return [p.to_dict(include_relations=True) for p in payments]
+
+
+def get_payment_statistics():
+    """Get payment statistics for admin"""
+    from sqlalchemy import func
+
+    total_payments = Payment.query.filter_by(status='completed').count()
+    pending_verifications = Payment.query.filter_by(status='pending').count()
+
+    total_amount = db.session.query(
+        func.coalesce(func.sum(Payment.amount), 0)
+    ).filter(Payment.status == 'completed').scalar()
+
+    escrowed_amount = db.session.query(
+        func.coalesce(func.sum(Payment.held_amount), 0)
+    ).filter(Payment.escrow_status == 'escrowed').scalar()
+
+    return {
+        'total_payments': total_payments,
+        'pending_verifications': pending_verifications,
+        'total_amount': float(total_amount),
+        'escrowed_amount': float(escrowed_amount)
+    }
+
+
+def initiate_payment(booking, user_email, package_title):
+    """Initiate Paynow payment"""
+    import os
+    from paynow import Paynow
+    from flask import current_app
+
+    # Get Paynow credentials from environment
+    # Use current_app.config if available, otherwise fall back to os.getenv
+    try:
+        integration_id = current_app.config.get('PAYNOW_INTEGRATION_ID') or os.getenv('PAYNOW_INTEGRATION_ID')
+        integration_key = current_app.config.get('PAYNOW_INTEGRATION_KEY') or os.getenv('PAYNOW_INTEGRATION_KEY')
+        return_url = current_app.config.get('PAYNOW_RETURN_URL') or os.getenv('PAYNOW_RETURN_URL')
+        result_url = current_app.config.get('PAYNOW_RESULT_URL') or os.getenv('PAYNOW_RESULT_URL')
+    except RuntimeError:
+        # No app context, use os.getenv directly
+        integration_id = os.getenv('PAYNOW_INTEGRATION_ID')
+        integration_key = os.getenv('PAYNOW_INTEGRATION_KEY')
+        return_url = os.getenv('PAYNOW_RETURN_URL')
+        result_url = os.getenv('PAYNOW_RESULT_URL')
+
+    # Initialize Paynow
+    paynow = Paynow(
+        integration_id=integration_id,
+        integration_key=integration_key,
+        return_url=return_url,
+        result_url=result_url
+    )
+
+    try:
         # Create payment
-        payment = paynow.create_payment(
-            f'Booking-{booking.id}',
-            email
-        )
-        print(f"[PAYMENT] Payment object created")
+        payment = paynow.create_payment(f'BOOKING-{booking.id}', user_email)
 
-        # Add item to payment
-        payment.add(
-            f'Package: {package_title}',
-            booking.amount
-        )
-        print(f"[PAYMENT] Item added to payment")
+        # Add items to the payment
+        payment.add(package_title, booking.amount)
 
-        # Send payment request
-        if phone:
-            # Mobile payment (EcoCash, OneMoney, etc.)
-            response = paynow.send_mobile(payment, phone, 'ecocash')
-        else:
-            # Web payment
-            response = paynow.send(payment)
+        # Send payment to Paynow
+        response = paynow.send(payment)
 
-        print(f"[PAYMENT] Payment sent, response received")
-        print(f"[PAYMENT] Response type: {type(response)}")
-        print(f"[PAYMENT] Response success: {response.success if hasattr(response, 'success') else 'N/A'}")
-
-        # Check if request was successful
         if response.success:
-            print(f"[PAYMENT] Payment successful!")
-            print(f"[PAYMENT] Redirect URL: {response.redirect_url if hasattr(response, 'redirect_url') else 'N/A'}")
-            print(f"[PAYMENT] Poll URL: {response.poll_url if hasattr(response, 'poll_url') else 'N/A'}")
+            # Get poll URL for checking payment status
+            poll_url = response.poll_url
+            redirect_url = response.redirect_url
 
-            # Save poll URL for checking payment status
-            booking.paynow_poll_url = response.poll_url
-            from app import db
+            # Update booking with Paynow reference
+            booking.payment_reference = f'PAYNOW-{response.hash}'
+
+            # Create or update payment record
+            payment_record = Payment.query.filter_by(booking_id=booking.id).first()
+            if not payment_record:
+                payment_record = Payment(
+                    booking_id=booking.id,
+                    user_id=booking.brand.user_id,
+                    amount=booking.amount,
+                    payment_method='paynow',
+                    payment_type='automated',
+                    status='pending',
+                    escrow_status='pending'
+                )
+                db.session.add(payment_record)
+
+            payment_record.paynow_poll_url = poll_url
+            # response.hash might be boolean True instead of string, so convert it
+            payment_hash = str(response.hash) if response.hash and response.hash != True else poll_url.split('guid=')[-1] if '?guid=' in poll_url else None
+            payment_record.paynow_reference = payment_hash
+            payment_record.external_reference = f'BOOKING-{booking.id}'
+
             db.session.commit()
-
-            # Get instructions safely (check if it's a valid string, not a type object)
-            instructions = None
-            if hasattr(response, 'instructions'):
-                instr = response.instructions
-                # Only include if it's an actual string instance, not the str type class
-                if isinstance(instr, str) and instr:
-                    instructions = instr
 
             return {
                 'success': True,
-                'redirect_url': response.redirect_url,
-                'poll_url': response.poll_url,
-                'instructions': instructions
+                'message': 'Payment initiated successfully',
+                'redirect_url': redirect_url,
+                'poll_url': poll_url,
+                'payment_reference': payment_hash
             }
         else:
-            # Get error message from response
-            error_msg = 'Payment initiation failed'
-
-            # Try to get error from response.data first (this is the actual error message)
-            if hasattr(response, 'data') and isinstance(response.data, dict):
-                if 'error' in response.data:
-                    error_msg = response.data['error']
-                    print(f"[PAYMENT] Error from response.data: {error_msg}")
-                elif 'errors' in response.data:
-                    error_msg = response.data['errors']
-                    print(f"[PAYMENT] Errors from response.data: {error_msg}")
-
-            # Also check status
-            if hasattr(response, 'status'):
-                print(f"[PAYMENT] Response status: {response.status}")
-
-            print(f"[PAYMENT] Payment failed: {error_msg}")
+            # Get error details
+            error_msg = 'Unknown error'
+            if hasattr(response, 'errors') and response.errors:
+                error_msg = str(response.errors)
+            elif hasattr(response, 'status') and response.status:
+                error_msg = f"Paynow Status: {response.status}"
 
             return {
                 'success': False,
-                'error': error_msg
+                'error': 'Failed to initiate payment',
+                'message': error_msg,
+                'paynow_status': getattr(response, 'status', None)
             }
 
     except Exception as e:
-        import traceback
-        print(f"[PAYMENT] Exception occurred: {str(e)}")
-        print(f"[PAYMENT] Traceback: {traceback.format_exc()}")
         return {
             'success': False,
-            'error': str(e)
+            'error': 'Payment initialization failed',
+            'message': str(e)
         }
 
 
 def check_payment_status(booking):
-    """
-    Check payment status using poll URL
+    """Check Paynow payment status"""
+    import os
+    from paynow import Paynow
+    from flask import current_app
 
-    Args:
-        booking: Booking object with paynow_poll_url
-
-    Returns:
-        dict: Payment status information
-    """
-    try:
-        if not booking.paynow_poll_url:
-            return {
-                'success': False,
-                'error': 'No poll URL available'
-            }
-
-        paynow = get_paynow_client()
-        status = paynow.check_transaction_status(booking.paynow_poll_url)
-
-        # Update booking payment status
-        if status.paid:
-            booking.payment_status = 'paid'
-            booking.payment_reference = status.reference
-        elif status.status.lower() == 'failed':
-            booking.payment_status = 'failed'
-
-        from app import db
-        db.session.commit()
-
+    # First check if already paid in database
+    if booking.payment_status == 'paid':
         return {
-            'success': True,
-            'paid': status.paid,
-            'status': status.status,
-            'reference': status.reference if hasattr(status, 'reference') else None,
-            'amount': status.amount if hasattr(status, 'amount') else None
+            'status': 'paid',
+            'paid': True,
+            'message': 'Payment already confirmed'
         }
 
-    except Exception as e:
+    # Get payment record
+    payment_record = Payment.query.filter_by(booking_id=booking.id).first()
+
+    if not payment_record or not payment_record.paynow_poll_url:
         return {
-            'success': False,
-            'error': str(e)
+            'status': booking.payment_status,
+            'paid': False,
+            'message': 'No payment initiated'
+        }
+
+    try:
+        # Get Paynow credentials
+        try:
+            integration_id = current_app.config.get('PAYNOW_INTEGRATION_ID') or os.getenv('PAYNOW_INTEGRATION_ID')
+            integration_key = current_app.config.get('PAYNOW_INTEGRATION_KEY') or os.getenv('PAYNOW_INTEGRATION_KEY')
+            return_url = current_app.config.get('PAYNOW_RETURN_URL') or os.getenv('PAYNOW_RETURN_URL')
+            result_url = current_app.config.get('PAYNOW_RESULT_URL') or os.getenv('PAYNOW_RESULT_URL')
+        except RuntimeError:
+            integration_id = os.getenv('PAYNOW_INTEGRATION_ID')
+            integration_key = os.getenv('PAYNOW_INTEGRATION_KEY')
+            return_url = os.getenv('PAYNOW_RETURN_URL')
+            result_url = os.getenv('PAYNOW_RESULT_URL')
+
+        # Initialize Paynow
+        paynow = Paynow(
+            integration_id=integration_id,
+            integration_key=integration_key,
+            return_url=return_url,
+            result_url=result_url
+        )
+
+        # Check status from Paynow
+        status = paynow.check_transaction_status(payment_record.paynow_poll_url)
+
+        if status.paid:
+            # Update booking and payment status
+            booking.payment_status = 'paid'
+            booking.escrow_status = 'escrowed'
+            booking.escrowed_at = datetime.utcnow()
+
+            payment_record.status = 'completed'
+            payment_record.completed_at = datetime.utcnow()
+            payment_record.escrow_status = 'escrowed'
+            payment_record.held_amount = booking.amount
+
+            db.session.commit()
+
+            return {
+                'status': 'paid',
+                'paid': True,
+                'message': 'Payment confirmed'
+            }
+        else:
+            return {
+                'status': status.status if hasattr(status, 'status') else 'pending',
+                'paid': False,
+                'message': 'Payment not yet completed'
+            }
+
+    except Exception as e:
+        print(f"Error checking payment status: {str(e)}")
+        return {
+            'status': booking.payment_status,
+            'paid': False,
+            'message': f'Error checking status: {str(e)}'
         }
 
 
 def process_payment_webhook(data):
-    """
-    Process Paynow webhook/IPN (Instant Payment Notification)
+    """Process Paynow payment webhook/IPN"""
+    import os
+    from paynow import Paynow
+    from flask import current_app
 
-    Args:
-        data: Webhook POST data from Paynow
-
-    Returns:
-        bool: True if processed successfully
-    """
     try:
-        from app.models import Booking
-        from app import db
+        # Get Paynow credentials
+        try:
+            integration_id = current_app.config.get('PAYNOW_INTEGRATION_ID') or os.getenv('PAYNOW_INTEGRATION_ID')
+            integration_key = current_app.config.get('PAYNOW_INTEGRATION_KEY') or os.getenv('PAYNOW_INTEGRATION_KEY')
+            return_url = current_app.config.get('PAYNOW_RETURN_URL') or os.getenv('PAYNOW_RETURN_URL')
+            result_url = current_app.config.get('PAYNOW_RESULT_URL') or os.getenv('PAYNOW_RESULT_URL')
+        except RuntimeError:
+            integration_id = os.getenv('PAYNOW_INTEGRATION_ID')
+            integration_key = os.getenv('PAYNOW_INTEGRATION_KEY')
+            return_url = os.getenv('PAYNOW_RETURN_URL')
+            result_url = os.getenv('PAYNOW_RESULT_URL')
 
-        # Extract booking ID from reference
-        reference = data.get('reference', '')
-        if reference.startswith('Booking-'):
-            booking_id = int(reference.split('-')[1])
-            booking = Booking.query.get(booking_id)
+        # Initialize Paynow
+        paynow = Paynow(
+            integration_id=integration_id,
+            integration_key=integration_key,
+            return_url=return_url,
+            result_url=result_url
+        )
 
+        # Parse webhook data
+        reference = data.get('reference')
+        paynow_reference = data.get('paynowreference')
+        status = data.get('status')
+        amount = data.get('amount')
+
+        # Find payment by reference
+        payment_record = Payment.query.filter_by(paynow_reference=paynow_reference).first()
+
+        if not payment_record:
+            # Try to find by external reference
+            external_ref = data.get('merchantreference') or data.get('reference')
+            if external_ref and 'BOOKING-' in external_ref:
+                booking_id = int(external_ref.replace('BOOKING-', ''))
+                payment_record = Payment.query.filter_by(booking_id=booking_id).first()
+
+        if not payment_record:
+            print(f"Payment not found for webhook data: {data}")
+            return False
+
+        # Update payment status based on Paynow status
+        if status and status.lower() in ['paid', 'delivered', 'awaiting delivery']:
+            payment_record.status = 'completed'
+            payment_record.completed_at = datetime.utcnow()
+            payment_record.escrow_status = 'escrowed'
+            payment_record.held_amount = payment_record.amount
+
+            # Update booking
+            booking = Booking.query.get(payment_record.booking_id)
             if booking:
-                # Update payment status based on webhook data
-                status = data.get('status', '').lower()
+                booking.payment_status = 'paid'
+                booking.escrow_status = 'escrowed'
+                booking.escrowed_at = datetime.utcnow()
 
-                if status == 'paid' or status == 'delivered':
-                    booking.payment_status = 'paid'
-                    booking.payment_reference = data.get('paynowreference')
-
-                    # Update booking status if pending
-                    if booking.status == 'pending':
-                        booking.status = 'accepted'
-
-                    # Send confirmation emails
-                    from app.services.email_service import send_booking_confirmation_email
-                    send_booking_confirmation_email(
-                        booking,
-                        booking.brand.user.email,
-                        booking.creator.user.email
-                    )
-
-                elif status == 'failed' or status == 'cancelled':
-                    booking.payment_status = 'failed'
-
-                db.session.commit()
-                return True
-
-        return False
+            db.session.commit()
+            return True
+        else:
+            # Update status but don't mark as paid
+            payment_record.payment_reference = f'PAYNOW-{paynow_reference}' if paynow_reference else payment_record.payment_reference
+            db.session.commit()
+            return True
 
     except Exception as e:
         print(f"Webhook processing error: {str(e)}")

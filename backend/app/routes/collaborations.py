@@ -153,6 +153,12 @@ def submit_draft_deliverable(collab_id):
         if 'title' not in data or 'url' not in data:
             return jsonify({'error': 'Title and URL are required'}), 400
 
+        # Check deliverable limit (max 3 total deliverables)
+        total_deliverables = (len(collaboration.draft_deliverables or []) +
+                             len(collaboration.submitted_deliverables or []))
+        if total_deliverables >= 3:
+            return jsonify({'error': 'Maximum of 3 deliverables allowed per collaboration'}), 400
+
         # Create deliverable object
         deliverable = {
             'id': len(collaboration.draft_deliverables or []) + 1,
@@ -374,6 +380,88 @@ def request_revision(collab_id, deliverable_id):
         return jsonify({'error': str(e)}), 500
 
 
+@bp.route('/<int:collab_id>/deliverables/<int:deliverable_id>', methods=['PUT'])
+@jwt_required()
+def update_deliverable(collab_id, deliverable_id):
+    """Update a deliverable with revision_requested status (creator only)"""
+    try:
+        user_id = int(get_jwt_identity())
+        creator = CreatorProfile.query.filter_by(user_id=user_id).first()
+
+        if not creator:
+            return jsonify({'error': 'Creator profile not found'}), 404
+
+        collaboration = Collaboration.query.get(collab_id)
+        if not collaboration:
+            return jsonify({'error': 'Collaboration not found'}), 404
+
+        if collaboration.creator_id != creator.id:
+            return jsonify({'error': 'Unauthorized'}), 403
+
+        data = request.get_json()
+
+        # Validate required fields
+        if 'title' not in data or 'url' not in data:
+            return jsonify({'error': 'Title and URL are required'}), 400
+
+        # Find the draft deliverable
+        draft_deliverables = collaboration.draft_deliverables or []
+        deliverable_updated = False
+
+        for d in draft_deliverables:
+            if d.get('id') == deliverable_id:
+                # Only allow editing if status is revision_requested
+                if d.get('status') != 'revision_requested':
+                    return jsonify({'error': 'Can only edit deliverables with revision requested'}), 400
+
+                # Update the deliverable
+                d['title'] = data['title']
+                d['url'] = data['url']
+                d['description'] = data.get('description', '')
+                d['type'] = data.get('type', 'file')
+                d['status'] = 'pending_review'  # Reset to pending review after update
+                d['submitted_at'] = datetime.utcnow().isoformat()
+                # Clear revision notes
+                d.pop('revision_notes', None)
+                d.pop('revision_requested_at', None)
+                deliverable_updated = True
+                deliverable_title = d['title']
+                break
+
+        if not deliverable_updated:
+            return jsonify({'error': 'Deliverable not found'}), 404
+
+        # Update last update
+        collaboration.last_update = f"Updated deliverable: {deliverable_title}"
+        collaboration.last_update_date = datetime.utcnow()
+        collaboration.updated_at = datetime.utcnow()
+
+        # Mark the flag as modified for JSON field
+        from sqlalchemy.orm.attributes import flag_modified
+        flag_modified(collaboration, 'draft_deliverables')
+
+        db.session.commit()
+
+        # Notify brand about updated deliverable
+        brand_user = User.query.get(collaboration.brand.user_id)
+        if brand_user:
+            notify_collaboration_update(
+                user_id=brand_user.id,
+                collaboration_title=collaboration.title,
+                collaboration_id=collaboration.id,
+                update_message=f"Deliverable '{deliverable_title}' has been updated and resubmitted"
+            )
+
+        return jsonify({
+            'message': 'Deliverable updated successfully',
+            'collaboration': collaboration.to_dict()
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
 @bp.route('/<int:collab_id>/deliverables', methods=['POST'])
 @jwt_required()
 def submit_deliverable(collab_id):
@@ -397,6 +485,12 @@ def submit_deliverable(collab_id):
         # Validate required fields
         if 'title' not in data or 'url' not in data:
             return jsonify({'error': 'Title and URL are required'}), 400
+
+        # Check deliverable limit (max 3 total deliverables)
+        total_deliverables = (len(collaboration.draft_deliverables or []) +
+                             len(collaboration.submitted_deliverables or []))
+        if total_deliverables >= 3:
+            return jsonify({'error': 'Maximum of 3 deliverables allowed per collaboration'}), 400
 
         # Create deliverable object
         deliverable = {
@@ -460,6 +554,14 @@ def complete_collaboration(collab_id):
         collaboration.actual_completion_date = datetime.utcnow()
         collaboration.progress_percentage = 100
         collaboration.updated_at = datetime.utcnow()
+
+        # Also mark the related booking as completed if it exists
+        if collaboration.booking_id:
+            from app.models import Booking
+            booking = Booking.query.get(collaboration.booking_id)
+            if booking and booking.status != 'completed':
+                booking.status = 'completed'
+                booking.completion_date = datetime.utcnow()
 
         db.session.commit()
 
