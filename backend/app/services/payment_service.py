@@ -185,7 +185,8 @@ def release_escrow_to_wallet(collaboration_id, platform_fee_percentage=15):
 
     wallet = get_or_create_wallet(creator.user_id)
     completed_at = datetime.utcnow()
-    available_at = completed_at + timedelta(days=30)
+    # CHANGED: 1 day (24 hours) clearance for testing instead of 30 days
+    available_at = completed_at + timedelta(days=1)
 
     transaction = WalletTransaction(
         wallet_id=wallet.id,
@@ -194,7 +195,7 @@ def release_escrow_to_wallet(collaboration_id, platform_fee_percentage=15):
         amount=net_amount,
         status='pending_clearance',
         clearance_required=True,
-        clearance_days=30,
+        clearance_days=1,  # CHANGED: 1 day for testing instead of 30
         completed_at=completed_at,
         available_at=available_at,
         collaboration_id=collaboration.id,
