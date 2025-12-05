@@ -170,9 +170,19 @@ def submit_draft_deliverable(collab_id):
         if total_deliverables >= 3:
             return jsonify({'error': 'Maximum of 3 deliverables allowed per collaboration'}), 400
 
+        # Generate unique ID for deliverable
+        # Find the max ID from both draft and submitted deliverables
+        existing_ids = []
+        if collaboration.draft_deliverables:
+            existing_ids.extend([d.get('id', 0) for d in collaboration.draft_deliverables])
+        if collaboration.submitted_deliverables:
+            existing_ids.extend([d.get('id', 0) for d in collaboration.submitted_deliverables])
+
+        next_id = max(existing_ids) + 1 if existing_ids else 1
+
         # Create deliverable object
         deliverable = {
-            'id': len(collaboration.draft_deliverables or []) + 1,
+            'id': next_id,
             'title': data['title'],
             'url': data['url'],
             'description': data.get('description', ''),
@@ -219,6 +229,9 @@ def submit_draft_deliverable(collab_id):
 
     except Exception as e:
         db.session.rollback()
+        print(f"Error submitting draft deliverable: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 
