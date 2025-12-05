@@ -174,18 +174,21 @@ def submit_draft_deliverable(collab_id):
             print(f"[SUBMIT_DRAFT] Error: Empty values. Title: '{data.get('title')}', URL: '{data.get('url')}'")
             return jsonify({'error': 'Title and URL cannot be empty'}), 400
 
-        # Check deliverable limit (max 3 total unique deliverables, not counting revisions)
-        # Count only unique deliverables (by checking IDs, not counting revision_requested status)
+        # Check deliverable limit based on expected deliverables for this collaboration
+        # The limit is determined by the number of deliverables specified in the package/campaign
+        expected_deliverables_count = len(collaboration.deliverables or [])
+
+        # Count only unique deliverables (not counting revision_requested status which are edits)
         draft_count = len([d for d in (collaboration.draft_deliverables or []) if d.get('status') != 'revision_requested'])
         submitted_count = len(collaboration.submitted_deliverables or [])
         total_unique_deliverables = draft_count + submitted_count
 
-        print(f"[SUBMIT_DRAFT] Draft: {draft_count}, Submitted: {submitted_count}, Total: {total_unique_deliverables}")
+        print(f"[SUBMIT_DRAFT] Expected: {expected_deliverables_count}, Draft: {draft_count}, Submitted: {submitted_count}, Total: {total_unique_deliverables}")
 
-        if total_unique_deliverables >= 3:
+        if total_unique_deliverables >= expected_deliverables_count:
             return jsonify({
-                'error': 'Maximum of 3 deliverables allowed per collaboration',
-                'message': 'You have already submitted 3 deliverables for this collaboration. You can only edit existing deliverables that need revision.'
+                'error': f'Maximum of {expected_deliverables_count} deliverables allowed for this collaboration',
+                'message': f'You have already submitted {total_unique_deliverables} of {expected_deliverables_count} expected deliverables. You can only edit existing deliverables that need revision.'
             }), 400
 
         # Generate unique ID for deliverable

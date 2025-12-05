@@ -255,10 +255,11 @@ const CollaborationDetails = () => {
   const freeRevisions = collaboration.creator?.free_revisions || 2;
   const revisionFee = collaboration.creator?.revision_fee || 0;
 
-  // Check if user can submit new deliverables (max 3 total, excluding revisions)
+  // Check if user can submit new deliverables based on expected deliverables count
+  const expectedDeliverablesCount = collaboration.deliverables?.length || 0;
   const draftsWithoutRevisions = collaboration.draft_deliverables?.filter(d => d.status !== 'revision_requested').length || 0;
   const totalUniqueDeliverables = draftsWithoutRevisions + totalApproved;
-  const canSubmitNewDeliverable = totalUniqueDeliverables < 3;
+  const canSubmitNewDeliverable = totalUniqueDeliverables < expectedDeliverablesCount;
 
   return (
     <div className="min-h-screen bg-light">
@@ -455,13 +456,13 @@ const CollaborationDetails = () => {
                       onClick={() => setShowDeliverableModal(true)}
                       disabled={!canSubmitNewDeliverable}
                       className="px-4 py-2 bg-primary hover:bg-primary-dark text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                      title={!canSubmitNewDeliverable ? 'Maximum 3 deliverables allowed per collaboration' : ''}
+                      title={!canSubmitNewDeliverable ? `Maximum ${expectedDeliverablesCount} deliverables allowed for this collaboration` : ''}
                     >
                       Submit for Review
                     </button>
                     {!canSubmitNewDeliverable && (
                       <p className="text-xs text-gray-500 mt-1">
-                        Maximum of 3 deliverables reached. You can only edit existing deliverables.
+                        Maximum of {expectedDeliverablesCount} deliverables reached. You can only edit existing deliverables.
                       </p>
                     )}
                   </div>
