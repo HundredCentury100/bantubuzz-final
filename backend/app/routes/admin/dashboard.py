@@ -92,28 +92,56 @@ def get_dashboard_stats():
         ).count()
 
         # ===== FINANCIAL STATISTICS =====
-        # Total platform revenue
-        total_revenue = db.session.query(
+        # Total transaction volume (all completed/paid payments)
+        total_transaction_volume = db.session.query(
             func.sum(Payment.amount)
-        ).filter_by(status='completed').scalar() or 0
+        ).filter(
+            Payment.status.in_(['completed', 'paid'])
+        ).scalar() or 0
 
-        # Revenue this month
+        # Calculate actual platform revenue (15% commission from wallet transactions)
+        platform_revenue = db.session.query(
+            func.sum(WalletTransaction.platform_fee)
+        ).filter(
+            WalletTransaction.transaction_type == 'earning',
+            WalletTransaction.platform_fee.isnot(None)
+        ).scalar() or 0
+
+        # Transaction volume this month
         first_day_month = datetime.utcnow().replace(
             day=1, hour=0, minute=0, second=0, microsecond=0
         )
-        month_revenue = db.session.query(
+        month_transaction_volume = db.session.query(
             func.sum(Payment.amount)
         ).filter(
-            Payment.status == 'completed',
+            Payment.status.in_(['completed', 'paid']),
             Payment.created_at >= first_day_month
         ).scalar() or 0
 
-        # Revenue this week
-        week_revenue = db.session.query(
+        # Platform revenue this month (15% commission)
+        month_platform_revenue = db.session.query(
+            func.sum(WalletTransaction.platform_fee)
+        ).filter(
+            WalletTransaction.transaction_type == 'earning',
+            WalletTransaction.platform_fee.isnot(None),
+            WalletTransaction.created_at >= first_day_month
+        ).scalar() or 0
+
+        # Transaction volume this week
+        week_transaction_volume = db.session.query(
             func.sum(Payment.amount)
         ).filter(
-            Payment.status == 'completed',
+            Payment.status.in_(['completed', 'paid']),
             Payment.created_at >= week_ago
+        ).scalar() or 0
+
+        # Platform revenue this week (15% commission)
+        week_platform_revenue = db.session.query(
+            func.sum(WalletTransaction.platform_fee)
+        ).filter(
+            WalletTransaction.transaction_type == 'earning',
+            WalletTransaction.platform_fee.isnot(None),
+            WalletTransaction.created_at >= week_ago
         ).scalar() or 0
 
         # Total in escrow (pending collaborations)
@@ -232,9 +260,12 @@ def get_dashboard_stats():
                     'approved_pending_processing': approved_cashouts_pending_processing
                 },
                 'revenue': {
-                    'total': float(total_revenue),
-                    'this_month': float(month_revenue),
-                    'this_week': float(week_revenue),
+                    'platform_revenue': float(platform_revenue),
+                    'platform_revenue_month': float(month_platform_revenue),
+                    'platform_revenue_week': float(week_platform_revenue),
+                    'transaction_volume': float(total_transaction_volume),
+                    'transaction_volume_month': float(month_transaction_volume),
+                    'transaction_volume_week': float(week_transaction_volume),
                     'in_escrow': float(escrow_amount)
                 },
                 'platform': {

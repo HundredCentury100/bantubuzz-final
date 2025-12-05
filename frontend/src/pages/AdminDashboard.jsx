@@ -217,15 +217,17 @@ export default function AdminDashboard() {
 
       {/* Revenue & Reviews */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Revenue Card */}
+        {/* Platform Revenue Card (15% Commission) */}
         <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-4">Platform Revenue</h3>
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Platform Revenue (15% Commission)</h3>
           <div className="text-4xl font-bold text-primary mb-2">
-            ${(stats.revenue?.total || 0).toLocaleString()}
+            ${(stats.revenue?.platform_revenue || 0).toLocaleString()}
           </div>
-          <p className="text-sm text-gray-600">Total platform revenue</p>
-          <div className="mt-4 pt-4 border-t border-gray-200">
-            <p className="text-sm text-gray-600">This Month: ${(stats.revenue?.this_month || 0).toLocaleString()}</p>
+          <p className="text-sm text-gray-600">Total platform commission earned</p>
+          <div className="mt-4 pt-4 border-t border-gray-200 space-y-1">
+            <p className="text-sm text-gray-600">This Month: ${(stats.revenue?.platform_revenue_month || 0).toLocaleString()}</p>
+            <p className="text-sm text-gray-600">This Week: ${(stats.revenue?.platform_revenue_week || 0).toLocaleString()}</p>
+            <p className="text-xs text-gray-500 mt-2">Transaction Volume: ${(stats.revenue?.transaction_volume || 0).toLocaleString()}</p>
           </div>
         </div>
 
