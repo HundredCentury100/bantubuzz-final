@@ -140,6 +140,7 @@ def update_collaboration_payment(collaboration_id):
     """
     try:
         from app.services.payment_service import release_escrow_to_wallet
+        from flask_jwt_extended import get_jwt_identity
 
         data = request.get_json()
         payment_status = data.get('payment_status')
@@ -150,29 +151,43 @@ def update_collaboration_payment(collaboration_id):
         if not collab:
             return jsonify({'error': 'Collaboration not found'}), 404
 
+        # Get admin user ID for verification tracking
+        admin_user_id = get_jwt_identity()
+
         # Find or create payment record
         payment = Payment.query.filter_by(
             collaboration_id=collaboration_id
         ).first()
 
         if not payment:
-            # Get the brand's user_id for the payment record
+            # Create new payment record
             payment = Payment(
                 collaboration_id=collaboration_id,
                 user_id=collab.brand.user_id,  # Brand user_id is required
                 amount=collab.amount,
                 status=payment_status or 'pending',
                 payment_method='manual',
-                payment_type='manual'
+                payment_type='admin_added'
             )
             db.session.add(payment)
         else:
+            # Update existing payment
             if payment_status:
                 payment.status = payment_status
+                payment.payment_type = 'admin_added'
 
+        # Set verification notes (not 'notes')
         if notes:
-            payment.notes = notes
+            payment.verification_notes = notes
 
+        # If marking as paid, set verification details and timestamps
+        if payment_status == 'paid':
+            payment.verified_by = admin_user_id
+            payment.verified_at = datetime.utcnow()
+            payment.completed_at = datetime.utcnow()
+            payment.escrow_status = 'escrowed'
+
+        # Commit the payment update first
         db.session.commit()
 
         # If marking as paid and collaboration is completed, credit the wallet with 24hr hold
