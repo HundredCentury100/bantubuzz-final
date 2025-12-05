@@ -255,6 +255,11 @@ const CollaborationDetails = () => {
   const freeRevisions = collaboration.creator?.free_revisions || 2;
   const revisionFee = collaboration.creator?.revision_fee || 0;
 
+  // Check if user can submit new deliverables (max 3 total, excluding revisions)
+  const draftsWithoutRevisions = collaboration.draft_deliverables?.filter(d => d.status !== 'revision_requested').length || 0;
+  const totalUniqueDeliverables = draftsWithoutRevisions + totalApproved;
+  const canSubmitNewDeliverable = totalUniqueDeliverables < 3;
+
   return (
     <div className="min-h-screen bg-light">
       <Navbar />
@@ -445,12 +450,21 @@ const CollaborationDetails = () => {
                   Approved Deliverables ({totalApproved}/{totalExpected})
                 </h2>
                 {!isBrand && collaboration.status === 'in_progress' && (
-                  <button
-                    onClick={() => setShowDeliverableModal(true)}
-                    className="px-4 py-2 bg-primary hover:bg-primary-dark text-white text-sm font-medium rounded-lg transition-colors"
-                  >
-                    Submit for Review
-                  </button>
+                  <div>
+                    <button
+                      onClick={() => setShowDeliverableModal(true)}
+                      disabled={!canSubmitNewDeliverable}
+                      className="px-4 py-2 bg-primary hover:bg-primary-dark text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      title={!canSubmitNewDeliverable ? 'Maximum 3 deliverables allowed per collaboration' : ''}
+                    >
+                      Submit for Review
+                    </button>
+                    {!canSubmitNewDeliverable && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        Maximum of 3 deliverables reached. You can only edit existing deliverables.
+                      </p>
+                    )}
+                  </div>
                 )}
               </div>
 

@@ -159,16 +159,34 @@ def submit_draft_deliverable(collab_id):
             return jsonify({'error': 'Unauthorized'}), 403
 
         data = request.get_json()
+        print(f"[SUBMIT_DRAFT] Received data: {data}")
 
         # Validate required fields
+        if not data:
+            print("[SUBMIT_DRAFT] Error: No data received")
+            return jsonify({'error': 'No data provided'}), 400
+
         if 'title' not in data or 'url' not in data:
+            print(f"[SUBMIT_DRAFT] Error: Missing fields. Keys: {list(data.keys()) if data else 'None'}")
             return jsonify({'error': 'Title and URL are required'}), 400
 
-        # Check deliverable limit (max 3 total deliverables)
-        total_deliverables = (len(collaboration.draft_deliverables or []) +
-                             len(collaboration.submitted_deliverables or []))
-        if total_deliverables >= 3:
-            return jsonify({'error': 'Maximum of 3 deliverables allowed per collaboration'}), 400
+        if not data.get('title') or not data.get('url'):
+            print(f"[SUBMIT_DRAFT] Error: Empty values. Title: '{data.get('title')}', URL: '{data.get('url')}'")
+            return jsonify({'error': 'Title and URL cannot be empty'}), 400
+
+        # Check deliverable limit (max 3 total unique deliverables, not counting revisions)
+        # Count only unique deliverables (by checking IDs, not counting revision_requested status)
+        draft_count = len([d for d in (collaboration.draft_deliverables or []) if d.get('status') != 'revision_requested'])
+        submitted_count = len(collaboration.submitted_deliverables or [])
+        total_unique_deliverables = draft_count + submitted_count
+
+        print(f"[SUBMIT_DRAFT] Draft: {draft_count}, Submitted: {submitted_count}, Total: {total_unique_deliverables}")
+
+        if total_unique_deliverables >= 3:
+            return jsonify({
+                'error': 'Maximum of 3 deliverables allowed per collaboration',
+                'message': 'You have already submitted 3 deliverables for this collaboration. You can only edit existing deliverables that need revision.'
+            }), 400
 
         # Generate unique ID for deliverable
         # Find the max ID from both draft and submitted deliverables
