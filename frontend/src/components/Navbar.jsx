@@ -105,6 +105,14 @@ const Navbar = () => {
                     </span>
                   )}
                 </Link>
+                {user?.user_type === 'creator' && (
+                  <Link
+                    to="/wallet"
+                    className="text-gray-700 hover:text-gray-900 transition-colors text-sm font-medium"
+                  >
+                    Wallet
+                  </Link>
+                )}
 
                 {/* Notification Bell */}
                 <NotificationBell />
@@ -267,6 +275,20 @@ const Navbar = () => {
                             </Link>
                           )}
                         </Menu.Item>
+                        {user?.user_type === 'creator' && (
+                          <Menu.Item>
+                            {({ active }) => (
+                              <Link
+                                to="/wallet"
+                                className={`${
+                                  active ? 'bg-light' : ''
+                                } block px-4 py-2 text-sm text-gray-700 rounded-lg`}
+                              >
+                                Wallet
+                              </Link>
+                            )}
+                          </Menu.Item>
+                        )}
                         <Menu.Item>
                           {({ active }) => (
                             <Link
