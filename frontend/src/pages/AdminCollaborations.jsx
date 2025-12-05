@@ -127,8 +127,9 @@ export default function AdminCollaborations() {
   const openPaymentModal = (collab) => {
     setSelectedCollab(collab);
     setPaymentAmount(collab.amount || '');
-    setPaymentStatus('pending');
-    setPaymentNotes('');
+    // Load current payment status from collaboration payment data
+    setPaymentStatus(collab.payment?.status || 'pending');
+    setPaymentNotes(collab.payment?.verification_notes || '');
     setShowPaymentModal(true);
   };
 

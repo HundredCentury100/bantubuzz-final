@@ -75,6 +75,14 @@ def get_collaborations():
                 'username': collab.creator.username,
                 'email': collab.creator.user.email
             }
+
+            # Include payment information for admin
+            payment = Payment.query.filter_by(collaboration_id=collab.id).first()
+            if payment:
+                collab_dict['payment'] = payment.to_dict()
+            else:
+                collab_dict['payment'] = None
+
             collabs_data.append(collab_dict)
 
         return jsonify({
