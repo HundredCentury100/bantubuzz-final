@@ -9,9 +9,9 @@ const Payment = () => {
   const navigate = useNavigate();
   const [booking, setBooking] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [checkingStatus, setCheckingStatus] = useState(false);
+  const [paymentLoading, setPaymentLoading] = useState(false);
   const [paymentData, setPaymentData] = useState(null);
-  const [initiatingPayment, setInitiatingPayment] = useState(false);
+  const [checkingStatus, setCheckingStatus] = useState(false);
 
   useEffect(() => {
     fetchBooking();
@@ -21,13 +21,20 @@ const Payment = () => {
     try {
       setLoading(true);
       const response = await bookingsAPI.getBooking(id);
+      console.log('Booking data:', response.data); // Debug log
       setBooking(response.data);
 
-      // Check if payment data exists from booking creation
-      const storedPayment = localStorage.getItem(`payment_${id}`);
-      if (storedPayment) {
-        const paymentInfo = JSON.parse(storedPayment);
-        setPaymentData(paymentInfo);
+      // If payment data exists in the booking, set it
+      if (response.data.payment) {
+        console.log('Payment data from booking:', response.data.payment); // Debug log
+        setPaymentData(response.data.payment);
+      } else {
+        // Try to get from localStorage (set during booking creation)
+        const storedPayment = localStorage.getItem(`payment_${id}`);
+        if (storedPayment) {
+          console.log('Payment data from localStorage:', storedPayment); // Debug log
+          setPaymentData(JSON.parse(storedPayment));
+        }
       }
     } catch (error) {
       console.error('Error fetching booking:', error);
@@ -38,11 +45,17 @@ const Payment = () => {
   };
 
   const handleProceedToPayment = () => {
+    console.log('handleProceedToPayment called');
+    console.log('paymentData:', paymentData);
+    console.log('redirect_url:', paymentData?.redirect_url);
+
     if (paymentData?.redirect_url) {
-      // Redirect to Paynow
+      // Redirect to Paynow payment page
+      console.log('Redirecting to:', paymentData.redirect_url);
       window.location.href = paymentData.redirect_url;
     } else {
-      toast.error('Payment URL not available');
+      console.error('No payment redirect URL available');
+      toast.error('Payment URL not available. Please contact support.');
     }
   };
 
@@ -181,64 +194,34 @@ const Payment = () => {
           {/* Payment Actions */}
           {booking.payment_status !== 'paid' && (
             <div className="card">
-              <h2 className="text-xl font-bold text-dark mb-4">Complete Payment</h2>
+              <h2 className="text-xl font-bold text-dark mb-4">Payment Options</h2>
 
               <div className="space-y-4">
-                {/* Paynow Payment Option */}
-                {paymentData?.redirect_url ? (
-                  <div className="p-4 border border-gray-200 rounded-lg bg-white">
-                    <div className="flex items-start mb-3">
-                      <svg className="w-6 h-6 text-primary mr-3 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-                      </svg>
-                      <div className="flex-1">
-                        <h3 className="font-medium text-dark mb-1">Pay with Paynow</h3>
-                        <p className="text-sm text-gray-600 mb-3">
-                          Secure payment via EcoCash, OneMoney, Visa, or Mastercard
+                <div className="p-4 border border-gray-200 rounded-lg">
+                  <div className="flex items-start mb-3">
+                    <svg className="w-6 h-6 text-primary mr-3 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                    </svg>
+                    <div className="flex-1">
+                      <h3 className="font-medium text-dark mb-1">Pay with Paynow</h3>
+                      <p className="text-sm text-gray-600 mb-3">
+                        Secure payment via EcoCash, OneMoney, Visa, or Mastercard
+                      </p>
+                      <button
+                        onClick={handleProceedToPayment}
+                        disabled={!paymentData?.redirect_url}
+                        className="btn btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {!paymentData?.redirect_url ? 'Initializing Payment...' : 'Proceed to Payment'}
+                      </button>
+                      {!paymentData?.redirect_url && (
+                        <p className="text-sm text-gray-500 mt-2 text-center">
+                          Payment link is being generated...
                         </p>
-                        <button
-                          onClick={handleProceedToPayment}
-                          className="btn btn-primary w-full"
-                        >
-                          Proceed to Paynow Payment
-                        </button>
-                      </div>
+                      )}
                     </div>
                   </div>
-                ) : (
-                  <div className="p-4 border border-red-200 rounded-lg bg-red-50">
-                    <div className="flex items-start mb-3">
-                      <svg className="w-6 h-6 text-red-600 mr-3 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                      </svg>
-                      <div className="flex-1">
-                        <h3 className="font-medium text-red-800 mb-2">Payment Link Not Available</h3>
-                        <p className="text-sm text-red-700 mb-3">
-                          The payment link was not generated when you created this booking. This may be due to a connection issue with Paynow.
-                        </p>
-                        <div className="bg-white p-3 rounded border border-red-200 mb-3">
-                          <div className="space-y-2 text-sm">
-                            <div className="flex justify-between">
-                              <span className="text-gray-600 font-medium">Amount:</span>
-                              <span className="font-mono font-bold text-primary">${booking.amount?.toFixed(2)}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-gray-600 font-medium">Booking ID:</span>
-                              <span className="font-mono font-medium">#{booking.id}</span>
-                            </div>
-                          </div>
-                        </div>
-                        <p className="text-sm text-red-700 mb-2">
-                          <strong>What to do:</strong>
-                        </p>
-                        <ul className="text-sm text-red-700 list-disc list-inside space-y-1">
-                          <li>Go back to dashboard and try creating a new booking</li>
-                          <li>Or contact admin support if you've already paid</li>
-                        </ul>
-                      </div>
-                    </div>
-                  </div>
-                )}
+                </div>
 
                 <div className="text-center">
                   <p className="text-sm text-gray-600 mb-3">

@@ -1,11 +1,22 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from datetime import datetime
-from app import db
+from app import db, socketio
 from app.models import Collaboration, BrandProfile, CreatorProfile, User
 from app.utils.notifications import notify_collaboration_status, notify_collaboration_update
 
 bp = Blueprint('collaborations', __name__)
+
+
+
+def emit_collaboration_update(collaboration_id):
+    """Emit Socket.IO event when collaboration is updated"""
+    try:
+        socketio.emit('collaboration_updated', {
+            'collaboration_id': collaboration_id
+        }, namespace='/')
+    except Exception as e:
+        print(f"Socket.IO emit error: {e}")
 
 
 @bp.route('/', methods=['GET'])
