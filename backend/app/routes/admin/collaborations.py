@@ -135,13 +135,16 @@ def get_collaboration_details(collaboration_id):
 @role_required('super_admin', 'finance')
 def update_collaboration_payment(collaboration_id):
     """
-    Update payment information for a collaboration
-    Body: { payment_status, notes }
+    Update payment information for a collaboration and credit wallet
+    Body: { payment_status, notes, auto_release }
     """
     try:
+        from app.services.payment_service import release_escrow_to_wallet
+
         data = request.get_json()
         payment_status = data.get('payment_status')
         notes = data.get('notes', '')
+        auto_release = data.get('auto_release', True)  # Auto credit wallet when marking as paid
 
         collab = Collaboration.query.get(collaboration_id)
         if not collab:
@@ -158,7 +161,9 @@ def update_collaboration_payment(collaboration_id):
                 collaboration_id=collaboration_id,
                 user_id=collab.brand.user_id,  # Brand user_id is required
                 amount=collab.amount,
-                status=payment_status or 'pending'
+                status=payment_status or 'pending',
+                payment_method='manual',
+                payment_type='manual'
             )
             db.session.add(payment)
         else:
@@ -169,6 +174,27 @@ def update_collaboration_payment(collaboration_id):
             payment.notes = notes
 
         db.session.commit()
+
+        # If marking as paid and collaboration is completed, credit the wallet with 24hr hold
+        if payment_status == 'paid' and collab.status == 'completed' and auto_release:
+            try:
+                transaction = release_escrow_to_wallet(collaboration_id)
+                return jsonify({
+                    'success': True,
+                    'message': 'Payment verified and funds added to creator wallet (24hr pending)',
+                    'data': {
+                        'payment': payment.to_dict(),
+                        'wallet_transaction': transaction.to_dict()
+                    }
+                }), 200
+            except Exception as wallet_error:
+                # Payment updated but wallet credit failed
+                return jsonify({
+                    'success': True,
+                    'message': f'Payment updated but wallet credit failed: {str(wallet_error)}',
+                    'data': payment.to_dict(),
+                    'warning': 'Manual wallet credit may be required'
+                }), 200
 
         return jsonify({
             'success': True,
