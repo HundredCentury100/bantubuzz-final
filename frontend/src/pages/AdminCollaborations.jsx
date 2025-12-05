@@ -26,6 +26,8 @@ export default function AdminCollaborations() {
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [selectedCollab, setSelectedCollab] = useState(null);
   const [paymentAmount, setPaymentAmount] = useState('');
+  const [paymentStatus, setPaymentStatus] = useState('pending');
+  const [paymentNotes, setPaymentNotes] = useState('');
   const [actionLoading, setActionLoading] = useState(null);
   const navigate = useNavigate();
 
@@ -48,17 +50,25 @@ export default function AdminCollaborations() {
 
   const handleUpdatePayment = async (e) => {
     e.preventDefault();
-    if (!selectedCollab || !paymentAmount) return;
+    if (!selectedCollab) return;
 
     try {
       setActionLoading('payment');
       await updateCollaborationPayment(selectedCollab.id, {
-        amount: parseFloat(paymentAmount)
+        payment_status: paymentStatus,
+        notes: paymentNotes
       });
-      toast.success('Payment updated successfully');
+
+      const message = paymentStatus === 'paid'
+        ? 'Payment verified and wallet credited (24hr pending)'
+        : 'Payment status updated successfully';
+      toast.success(message);
+
       setShowPaymentModal(false);
       setSelectedCollab(null);
       setPaymentAmount('');
+      setPaymentStatus('pending');
+      setPaymentNotes('');
       fetchCollaborations();
     } catch (error) {
       toast.error(error.response?.data?.message || 'Failed to update payment');
@@ -117,6 +127,8 @@ export default function AdminCollaborations() {
   const openPaymentModal = (collab) => {
     setSelectedCollab(collab);
     setPaymentAmount(collab.amount || '');
+    setPaymentStatus('pending');
+    setPaymentNotes('');
     setShowPaymentModal(true);
   };
 
@@ -337,7 +349,7 @@ export default function AdminCollaborations() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-lg max-w-md w-full p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">
-              Update Payment Amount
+              Verify Payment & Credit Wallet
             </h3>
             <form onSubmit={handleUpdatePayment} className="space-y-4">
               <div>
@@ -345,22 +357,57 @@ export default function AdminCollaborations() {
                   Collaboration
                 </label>
                 <p className="text-sm text-gray-600">{selectedCollab?.title}</p>
+                <p className="text-sm font-semibold text-gray-900 mt-1">
+                  Amount: ${selectedCollab?.amount?.toFixed(2) || '0.00'}
+                </p>
               </div>
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Payment Amount ($)
+                  Payment Status *
                 </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={paymentAmount}
-                  onChange={(e) => setPaymentAmount(e.target.value)}
-                  className="input w-full"
-                  placeholder="Enter amount"
+                <select
+                  value={paymentStatus}
+                  onChange={(e) => setPaymentStatus(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                   required
+                >
+                  <option value="pending">Pending</option>
+                  <option value="paid">Paid (Credits Wallet)</option>
+                  <option value="failed">Failed</option>
+                  <option value="refunded">Refunded</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Notes (Optional)
+                </label>
+                <textarea
+                  value={paymentNotes}
+                  onChange={(e) => setPaymentNotes(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                  placeholder="Payment verification notes, transaction ID, etc."
+                  rows="3"
                 />
               </div>
+
+              {paymentStatus === 'paid' && selectedCollab?.status === 'completed' && (
+                <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                  <p className="text-sm text-green-800">
+                    ✓ Marking as paid will automatically credit the creator's wallet with a 24-hour pending period.
+                  </p>
+                </div>
+              )}
+
+              {paymentStatus === 'paid' && selectedCollab?.status !== 'completed' && (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                  <p className="text-sm text-yellow-800">
+                    ⚠ Collaboration must be marked as "completed" before funds are credited to wallet.
+                  </p>
+                </div>
+              )}
+
               <div className="flex justify-end space-x-3">
                 <button
                   type="button"
@@ -368,15 +415,17 @@ export default function AdminCollaborations() {
                     setShowPaymentModal(false);
                     setSelectedCollab(null);
                     setPaymentAmount('');
+                    setPaymentStatus('pending');
+                    setPaymentNotes('');
                   }}
-                  className="btn-secondary"
+                  className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={actionLoading === 'payment'}
-                  className="btn-primary disabled:opacity-50"
+                  className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark disabled:opacity-50"
                 >
                   {actionLoading === 'payment' ? 'Updating...' : 'Update Payment'}
                 </button>
