@@ -75,20 +75,34 @@ const CollaborationDetails = () => {
 
     try {
       setSubmitting(true);
-      await collaborationsAPI.submitDraftDeliverable(id, {
-        title: deliverableTitle,
-        url: deliverableUrl,
-        description: deliverableDescription
-      });
-      toast.success('Deliverable submitted for review!');
+
+      if (editingDeliverable) {
+        // Update existing deliverable
+        await collaborationsAPI.updateDraftDeliverable(id, editingDeliverable.id, {
+          title: deliverableTitle,
+          url: deliverableUrl,
+          description: deliverableDescription
+        });
+        toast.success('Deliverable updated and resubmitted for review!');
+      } else {
+        // Submit new deliverable
+        await collaborationsAPI.submitDraftDeliverable(id, {
+          title: deliverableTitle,
+          url: deliverableUrl,
+          description: deliverableDescription
+        });
+        toast.success('Deliverable submitted for review!');
+      }
+
       setShowDeliverableModal(false);
       setDeliverableTitle('');
       setDeliverableUrl('');
       setDeliverableDescription('');
+      setEditingDeliverable(null);
       fetchCollaboration();
     } catch (error) {
       console.error('Error submitting deliverable:', error);
-      toast.error('Failed to submit deliverable');
+      toast.error(editingDeliverable ? 'Failed to update deliverable' : 'Failed to submit deliverable');
     } finally {
       setSubmitting(false);
     }
@@ -646,9 +660,14 @@ const CollaborationDetails = () => {
       {showDeliverableModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg max-w-md w-full p-6">
-            <h2 className="text-2xl font-bold text-gray-900 mb-4">Submit Deliverable for Review</h2>
+            <h2 className="text-2xl font-bold text-gray-900 mb-4">
+              {editingDeliverable ? 'Edit & Resubmit Deliverable' : 'Submit Deliverable for Review'}
+            </h2>
             <p className="text-sm text-gray-600 mb-4">
-              Your deliverable will be submitted for brand review before being marked as approved.
+              {editingDeliverable
+                ? 'Update your deliverable based on the revision feedback and resubmit for review.'
+                : 'Your deliverable will be submitted for brand review before being marked as approved.'
+              }
             </p>
 
             <div className="mb-4">
@@ -696,7 +715,7 @@ const CollaborationDetails = () => {
                 disabled={submitting}
                 className="flex-1 px-6 py-3 bg-primary hover:bg-primary-dark text-white font-medium rounded-lg transition-colors disabled:opacity-50"
               >
-                {submitting ? 'Submitting...' : 'Submit for Review'}
+                {submitting ? (editingDeliverable ? 'Updating...' : 'Submitting...') : (editingDeliverable ? 'Update & Resubmit' : 'Submit for Review')}
               </button>
               <button
                 onClick={() => {
@@ -704,6 +723,7 @@ const CollaborationDetails = () => {
                   setDeliverableTitle('');
                   setDeliverableUrl('');
                   setDeliverableDescription('');
+                  setEditingDeliverable(null);
                 }}
                 disabled={submitting}
                 className="px-6 py-3 border-2 border-gray-300 hover:border-gray-400 text-gray-700 font-medium rounded-lg transition-colors"

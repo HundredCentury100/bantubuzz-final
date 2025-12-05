@@ -198,6 +198,9 @@ def submit_draft_deliverable(collab_id):
 
         db.session.commit()
 
+        # Emit Socket.IO update
+        emit_collaboration_update(collaboration.id)
+
         # Notify brand about new deliverable for review
         brand_user = User.query.get(collaboration.brand.user_id)
         if brand_user:
@@ -274,6 +277,9 @@ def approve_deliverable(collab_id, deliverable_id):
         flag_modified(collaboration, 'draft_deliverables')
 
         db.session.commit()
+
+        # Emit Socket.IO update
+        emit_collaboration_update(collaboration.id)
 
         # Notify creator about approval
         creator_user = User.query.get(collaboration.creator.user_id)
@@ -370,6 +376,9 @@ def request_revision(collab_id, deliverable_id):
 
         db.session.commit()
 
+        # Emit Socket.IO update
+        emit_collaboration_update(collaboration.id)
+
         # Notify creator about revision request
         creator_user = User.query.get(collaboration.creator.user_id)
         if creator_user:
@@ -452,6 +461,9 @@ def update_deliverable(collab_id, deliverable_id):
         flag_modified(collaboration, 'draft_deliverables')
 
         db.session.commit()
+
+        # Emit Socket.IO update
+        emit_collaboration_update(collaboration.id)
 
         # Notify brand about updated deliverable
         brand_user = User.query.get(collaboration.brand.user_id)
