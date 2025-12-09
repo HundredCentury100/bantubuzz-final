@@ -25,20 +25,12 @@ def get_cashouts():
         page = request.args.get('page', 1, type=int)
         per_page = request.args.get('per_page', 20, type=int)
 
-        # Base query with joins
-        query = CashoutRequest.query.join(Wallet).join(User).join(CreatorProfile)
+        # Simple query - just get cashouts
+        query = CashoutRequest.query
 
-        # Apply filters
+        # Apply status filter
         if status:
             query = query.filter(CashoutRequest.status == status)
-
-        if search:
-            query = query.filter(
-                db.or_(
-                    User.email.ilike(f'%{search}%'),
-                    CreatorProfile.username.ilike(f'%{search}%')
-                )
-            )
 
         # Order by creation date
         query = query.order_by(CashoutRequest.created_at.desc())
@@ -48,16 +40,24 @@ def get_cashouts():
 
         cashouts_data = []
         for cashout in paginated.items:
-            creator = cashout.wallet.user.creator_profile
+            # Get user and creator separately
+            user = User.query.get(cashout.wallet.user_id) if cashout.wallet else None
+            creator = CreatorProfile.query.filter_by(user_id=user.id).first() if user else None
+
+            # Apply search filter
+            if search and user and creator:
+                if not (search.lower() in user.email.lower() or (creator.username and search.lower() in creator.username.lower())):
+                    continue
+
             cashouts_data.append({
                 **cashout.to_dict(),
                 'creator': {
-                    'id': creator.id,
-                    'name': creator.username or cashout.wallet.user.email,
-                    'email': cashout.wallet.user.email,
-                    'profile_picture': creator.profile_picture
+                    'id': creator.id if creator else None,
+                    'name': creator.username if creator else (user.email if user else 'Unknown'),
+                    'email': user.email if user else None,
+                    'profile_picture': creator.profile_picture if creator else None
                 },
-                'wallet_balance': float(cashout.wallet.balance)
+                'wallet_balance': float(cashout.wallet.available_balance) if cashout.wallet else 0
             })
 
         return jsonify({
@@ -90,20 +90,24 @@ def get_cashout_details(cashout_id):
         if not cashout:
             return jsonify({'error': 'Cashout request not found'}), 404
 
-        creator = cashout.wallet.user.creator_profile
+        # Get user and creator separately
+        user = User.query.get(cashout.wallet.user_id) if cashout.wallet else None
+        creator = CreatorProfile.query.filter_by(user_id=user.id).first() if user else None
+
         data = {
             **cashout.to_dict(),
             'creator': {
-                'id': creator.id,
-                'name': creator.username or cashout.wallet.user.email,
-                'email': cashout.wallet.user.email,
-                'profile_picture': creator.profile_picture,
-                'bio': creator.bio
+                'id': creator.id if creator else None,
+                'name': creator.username if creator else (user.email if user else 'Unknown'),
+                'email': user.email if user else None,
+                'profile_picture': creator.profile_picture if creator else None,
+                'bio': creator.bio if creator else None
             },
             'wallet': {
-                'balance': float(cashout.wallet.balance),
-                'total_earned': float(cashout.wallet.total_earned or 0),
-                'total_withdrawn': float(cashout.wallet.total_withdrawn or 0)
+                'available_balance': float(cashout.wallet.available_balance) if cashout.wallet else 0,
+                'pending_clearance': float(cashout.wallet.pending_clearance or 0) if cashout.wallet else 0,
+                'total_earned': float(cashout.wallet.total_earned or 0) if cashout.wallet else 0,
+                'total_withdrawn': float(cashout.wallet.total_withdrawn or 0) if cashout.wallet else 0
             }
         }
 
