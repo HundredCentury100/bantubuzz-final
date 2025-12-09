@@ -198,25 +198,44 @@ def update_collaboration_payment(collaboration_id):
         # Commit the payment update first
         db.session.commit()
 
-        # If marking as paid and collaboration is completed, credit the wallet with 24hr hold
-        if payment_status == 'paid' and collab.status == 'completed' and auto_release:
-            try:
-                transaction = release_escrow_to_wallet(collaboration_id)
+        # If payment is paid and collaboration is completed, ensure wallet transaction exists
+        # This handles both new payments and existing payments that were marked as paid before fix
+        if payment.status == 'paid' and collab.status == 'completed' and auto_release:
+            # Check if wallet transaction already exists for this collaboration
+            existing_transaction = WalletTransaction.query.filter_by(
+                collaboration_id=collaboration_id,
+                transaction_type='earning'
+            ).first()
+
+            if not existing_transaction:
+                # No wallet transaction exists - create it now
+                try:
+                    transaction = release_escrow_to_wallet(collaboration_id)
+                    return jsonify({
+                        'success': True,
+                        'message': 'Payment verified and funds added to creator wallet (24hr pending)',
+                        'data': {
+                            'payment': payment.to_dict(),
+                            'wallet_transaction': transaction.to_dict()
+                        }
+                    }), 200
+                except Exception as wallet_error:
+                    # Payment updated but wallet credit failed
+                    return jsonify({
+                        'success': True,
+                        'message': f'Payment updated but wallet credit failed: {str(wallet_error)}',
+                        'data': payment.to_dict(),
+                        'warning': 'Manual wallet credit may be required'
+                    }), 200
+            else:
+                # Wallet transaction already exists
                 return jsonify({
                     'success': True,
-                    'message': 'Payment verified and funds added to creator wallet (24hr pending)',
+                    'message': 'Payment information updated (wallet already credited)',
                     'data': {
                         'payment': payment.to_dict(),
-                        'wallet_transaction': transaction.to_dict()
+                        'wallet_transaction': existing_transaction.to_dict()
                     }
-                }), 200
-            except Exception as wallet_error:
-                # Payment updated but wallet credit failed
-                return jsonify({
-                    'success': True,
-                    'message': f'Payment updated but wallet credit failed: {str(wallet_error)}',
-                    'data': payment.to_dict(),
-                    'warning': 'Manual wallet credit may be required'
                 }), 200
 
         return jsonify({

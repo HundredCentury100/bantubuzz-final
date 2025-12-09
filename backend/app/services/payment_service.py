@@ -164,30 +164,79 @@ def add_manual_payment(admin_user_id, payment_data):
 
 
 def release_escrow_to_wallet(collaboration_id, platform_fee_percentage=15):
-    """Release money to creator wallet with 30-day clearance"""
+    """
+    Release money to creator wallet with 24-hour clearance
+    Works with both booking-based and collaboration-based payments
+    """
     collaboration = Collaboration.query.get(collaboration_id)
     if not collaboration:
         raise ValueError("Collaboration not found")
+
     if collaboration.status != 'completed':
-        raise ValueError("Not completed")
-    if collaboration.payment_released:
-        raise ValueError("Already released")
+        raise ValueError("Collaboration must be completed before releasing funds")
 
-    booking = collaboration.booking
-    payment = Payment.query.filter_by(booking_id=booking.id, status='completed').first()
-    if not payment or payment.escrow_status != 'escrowed':
-        raise ValueError("Payment not ready")
+    # Check if wallet transaction already exists for this collaboration
+    existing_transaction = WalletTransaction.query.filter_by(
+        collaboration_id=collaboration_id,
+        transaction_type='earning'
+    ).first()
 
+    if existing_transaction:
+        raise ValueError("Funds already released to wallet")
+
+    # Find payment - try collaboration_id first, then booking_id
+    payment = Payment.query.filter_by(collaboration_id=collaboration_id).first()
+
+    if not payment:
+        # Try finding by booking_id if collaboration has a booking
+        booking = collaboration.booking if hasattr(collaboration, 'booking') else None
+        if booking:
+            payment = Payment.query.filter_by(booking_id=booking.id).first()
+
+    if not payment:
+        raise ValueError("No payment found for this collaboration")
+
+    # Check payment status - accept both 'paid' (admin-added) and 'completed' (paynow)
+    if payment.status not in ['paid', 'completed']:
+        raise ValueError(f"Payment not ready - status is '{payment.status}', expected 'paid' or 'completed'")
+
+    if payment.escrow_status not in ['escrowed', 'pending']:
+        raise ValueError(f"Payment escrow status invalid - '{payment.escrow_status}'")
+
+    # Calculate amounts
     creator = collaboration.creator
     gross_amount = float(payment.amount)
     platform_fee = gross_amount * (platform_fee_percentage / 100)
     net_amount = gross_amount - platform_fee
 
+    # Get or create wallet
     wallet = get_or_create_wallet(creator.user_id)
-    completed_at = datetime.utcnow()
-    # CHANGED: 1 day (24 hours) clearance for testing instead of 30 days
-    available_at = completed_at + timedelta(days=1)
 
+    # Set timestamps for 24-hour clearance
+    completed_at = datetime.utcnow()
+    available_at = completed_at + timedelta(days=1)  # 24 hours for testing
+
+    # Build description and metadata
+    description = f"Earnings from collaboration with {collaboration.brand.company_name if collaboration.brand else 'brand'}"
+    metadata = {
+        'brand_name': collaboration.brand.company_name if collaboration.brand else 'Unknown',
+        'collaboration_id': collaboration.id,
+        'collaboration_title': collaboration.title if hasattr(collaboration, 'title') else 'Collaboration'
+    }
+
+    # Add booking info if available
+    booking = collaboration.booking if hasattr(collaboration, 'booking') and collaboration.booking else None
+    if booking:
+        metadata['booking_id'] = booking.id
+        # Safely access package name
+        try:
+            if hasattr(booking, 'package') and booking.package and hasattr(booking.package, 'name'):
+                metadata['package_name'] = booking.package.name
+                description = f"Earnings from {booking.package.name}"
+        except Exception:
+            pass  # Skip package name if it's not available
+
+    # Create wallet transaction
     transaction = WalletTransaction(
         wallet_id=wallet.id,
         user_id=creator.user_id,
@@ -195,35 +244,35 @@ def release_escrow_to_wallet(collaboration_id, platform_fee_percentage=15):
         amount=net_amount,
         status='pending_clearance',
         clearance_required=True,
-        clearance_days=1,  # CHANGED: 1 day for testing instead of 30
+        clearance_days=1,  # 24 hours
         completed_at=completed_at,
         available_at=available_at,
         collaboration_id=collaboration.id,
-        booking_id=booking.id,
+        booking_id=booking.id if booking else None,
         gross_amount=gross_amount,
         platform_fee=platform_fee,
         platform_fee_percentage=platform_fee_percentage,
         net_amount=net_amount,
-        description=f"Earnings from {booking.package.name if booking.package else 'booking'}",
-        transaction_metadata={
-            'brand_name': collaboration.brand.company_name if collaboration.brand else 'Unknown',
-            'package_name': booking.package.name if booking.package else 'Unknown',
-            'booking_id': booking.id
-        }
+        description=description,
+        transaction_metadata=metadata
     )
     db.session.add(transaction)
 
-    collaboration.payment_released = True
-    collaboration.payment_released_at = completed_at
-    collaboration.escrow_amount = gross_amount
+    # Update payment escrow status to released
     payment.escrow_status = 'released'
-    booking.escrow_status = 'released'
 
+    # Update booking if it exists
+    if booking:
+        booking.escrow_status = 'released'
+
+    # Update wallet balances
     wallet.pending_clearance = float(wallet.pending_clearance or 0) + net_amount
     wallet.total_earned = float(wallet.total_earned or 0) + gross_amount
     wallet.updated_at = datetime.utcnow()
 
+    # Commit all changes
     db.session.commit()
+
     return transaction
 
 
