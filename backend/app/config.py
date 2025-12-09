@@ -44,8 +44,15 @@ class Config:
     # Frontend
     FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:3000')
 
-    # CORS
-    CORS_ORIGINS = [FRONTEND_URL]
+    # CORS - Allow multiple origins
+    CORS_ORIGINS = [
+        FRONTEND_URL,
+        'http://bantubuzz.com',
+        'https://bantubuzz.com',
+        'http://www.bantubuzz.com',
+        'https://www.bantubuzz.com',
+        'http://173.212.245.22:8080'
+    ]
 
     # File Upload
     MAX_CONTENT_LENGTH = int(os.getenv('MAX_CONTENT_LENGTH', 16 * 1024 * 1024))  # 16MB
