@@ -267,7 +267,7 @@ def release_escrow_to_wallet(collaboration_id, platform_fee_percentage=15):
 
     # Update wallet balances
     wallet.pending_clearance = float(wallet.pending_clearance or 0) + net_amount
-    wallet.total_earned = float(wallet.total_earned or 0) + gross_amount
+    wallet.total_earned = float(wallet.total_earned or 0) + net_amount  # Fixed: Use net_amount instead of gross
     wallet.updated_at = datetime.utcnow()
 
     # Commit all changes

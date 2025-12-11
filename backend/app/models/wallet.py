@@ -12,7 +12,7 @@ class Wallet(db.Model):
     pending_clearance = db.Column(db.Numeric(10, 2), default=0.00)  # Money in 30-day hold
     available_balance = db.Column(db.Numeric(10, 2), default=0.00)  # Money ready to withdraw
     withdrawn_total = db.Column(db.Numeric(10, 2), default=0.00)    # Lifetime withdrawals
-    total_earned = db.Column(db.Numeric(10, 2), default=0.00)       # Lifetime earnings (before fees)
+    total_earned = db.Column(db.Numeric(10, 2), default=0.00)       # Lifetime NET earnings (after platform fees)
 
     # Metadata
     currency = db.Column(db.String(3), default='USD')

@@ -222,4 +222,10 @@ export const categoriesAPI = {
   getCategory: (id) => api.get(`/categories/${id}`),
 };
 
+// Brand Wallet API
+export const brandWalletAPI = {
+  getWallet: () => api.get('/brand/wallet'),
+  getTransactions: (params) => api.get('/brand/wallet/transactions', { params }),
+};
+
 export default api;

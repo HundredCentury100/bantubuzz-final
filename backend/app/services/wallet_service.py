@@ -51,9 +51,9 @@ def calculate_wallet_balances(user_id):
         CashoutRequest.status == 'completed'
     ).scalar()
 
-    # Calculate total earned (lifetime, before fees)
+    # Calculate total earned (lifetime, NET after fees)
     total_earned = db.session.query(
-        func.coalesce(func.sum(WalletTransaction.gross_amount), 0)
+        func.coalesce(func.sum(WalletTransaction.net_amount), 0)
     ).filter(
         WalletTransaction.user_id == user_id,
         WalletTransaction.transaction_type == 'earning'
@@ -190,3 +190,40 @@ def get_transaction_history(user_id, limit=50, offset=0, transaction_type=None):
         'limit': limit,
         'offset': offset
     }
+
+
+def credit_brand_wallet(user_id, amount, transaction_type, description, metadata=None):
+    """
+    Credit a brand's wallet with refunded amount
+    Used when bookings are rejected or collaborations are cancelled
+    """
+    wallet = get_or_create_wallet(user_id)
+
+    # Create credit transaction
+    transaction = WalletTransaction(
+        wallet_id=wallet.id,
+        user_id=user_id,
+        transaction_type=transaction_type,  # 'refund' or 'credit'
+        amount=amount,
+        status='available',  # Immediately available
+        clearance_required=False,
+        description=description,
+        transaction_metadata=metadata or {}
+    )
+    db.session.add(transaction)
+
+    # Update wallet balance
+    wallet.available_balance = float(wallet.available_balance or 0) + float(amount)
+    wallet.updated_at = datetime.utcnow()
+
+    db.session.commit()
+    return transaction
+
+
+def get_wallet_transactions(user_id, page=1, per_page=20):
+    """
+    Get paginated wallet transactions with details
+    Helper function for API endpoints
+    """
+    offset = (page - 1) * per_page
+    return get_transaction_history(user_id, limit=per_page, offset=offset)

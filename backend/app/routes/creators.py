@@ -338,6 +338,21 @@ def update_profile():
         if 'success_stories' in data:
             creator.success_stories = data['success_stories']
 
+        # Update revision settings
+        if 'free_revisions' in data:
+            free_revisions = int(data['free_revisions'])
+            if 0 <= free_revisions <= 10:
+                creator.free_revisions = free_revisions
+            else:
+                return jsonify({'error': 'Free revisions must be between 0 and 10'}), 400
+
+        if 'revision_fee' in data:
+            revision_fee = float(data['revision_fee'])
+            if revision_fee >= 0:
+                creator.revision_fee = revision_fee
+            else:
+                return jsonify({'error': 'Revision fee cannot be negative'}), 400
+
         creator.updated_at = datetime.utcnow()
         db.session.commit()
 

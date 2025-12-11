@@ -7,6 +7,7 @@ class BrandProfile(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), unique=True, nullable=False)
+    username = db.Column(db.String(50), unique=True, nullable=True)  # Unique username for brands
     company_name = db.Column(db.String(200), nullable=False)
     logo = db.Column(db.String(255))
     description = db.Column(db.Text)
@@ -29,6 +30,7 @@ class BrandProfile(db.Model):
         data = {
             'id': self.id,
             'user_id': self.user_id,
+            'username': self.username,
             'company_name': self.company_name,
             'logo': self.logo,
             'description': self.description,

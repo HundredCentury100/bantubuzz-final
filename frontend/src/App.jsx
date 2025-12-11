@@ -52,6 +52,7 @@ import AdminReviews from './pages/AdminReviews';
 // Wallet Pages
 import Wallet from './pages/Wallet';
 import CashoutRequest from './pages/CashoutRequest';
+import BrandWallet from './pages/BrandWallet';
 
 // Protected Route Component
 const ProtectedRoute = ({ children, requiredType }) => {
@@ -339,6 +340,14 @@ function App() {
         element={
           <ProtectedRoute requiredType="brand">
             <ReviewForm />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/brand/wallet"
+        element={
+          <ProtectedRoute requiredType="brand">
+            <BrandWallet />
           </ProtectedRoute>
         }
       />
