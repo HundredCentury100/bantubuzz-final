@@ -521,7 +521,7 @@ const Home = () => {
               Find and collaborate with the perfect influencers for your brand campaigns.
             </p>
             <Link
-              to="/register?type=brand"
+              to="/register/brand"
               className="inline-block bg-primary text-dark px-8 py-3 rounded-full font-semibold hover:bg-primary/90 transition-colors"
             >
               Get Started
@@ -535,7 +535,7 @@ const Home = () => {
               Showcase your talent, connect with brands, and grow your influence.
             </p>
             <Link
-              to="/register?type=creator"
+              to="/register/creator"
               className="inline-block bg-dark text-white px-8 py-3 rounded-full font-semibold hover:bg-gray-800 transition-colors"
             >
               Get Started

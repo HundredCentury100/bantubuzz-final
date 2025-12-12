@@ -95,7 +95,7 @@ const BrowseCreators = () => {
       }));
     } catch (error) {
       console.error('Error fetching creators:', error);
-      toast.error('Failed to load creators');
+      // Don't show error toast - empty state handles this gracefully
     } finally {
       setLoading(false);
     }

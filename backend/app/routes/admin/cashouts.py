@@ -45,8 +45,13 @@ def get_cashouts():
             creator = CreatorProfile.query.filter_by(user_id=user.id).first() if user else None
 
             # Apply search filter
-            if search and user and creator:
-                if not (search.lower() in user.email.lower() or (creator.username and search.lower() in creator.username.lower())):
+            if search:
+                if not user:
+                    continue
+                search_match = search.lower() in user.email.lower()
+                if creator and creator.username:
+                    search_match = search_match or search.lower() in creator.username.lower()
+                if not search_match:
                     continue
 
             cashouts_data.append({
@@ -107,7 +112,7 @@ def get_cashout_details(cashout_id):
                 'available_balance': float(cashout.wallet.available_balance) if cashout.wallet else 0,
                 'pending_clearance': float(cashout.wallet.pending_clearance or 0) if cashout.wallet else 0,
                 'total_earned': float(cashout.wallet.total_earned or 0) if cashout.wallet else 0,
-                'total_withdrawn': float(cashout.wallet.total_withdrawn or 0) if cashout.wallet else 0
+                'withdrawn_total': float(cashout.wallet.withdrawn_total or 0) if cashout.wallet else 0
             }
         }
 
@@ -127,7 +132,7 @@ def get_cashout_details(cashout_id):
 @bp.route('/cashouts/<int:cashout_id>/approve', methods=['PUT'])
 @role_required('super_admin', 'finance')
 def approve_cashout(cashout_id):
-    """Approve a cashout request"""
+    """Approve a cashout request and deduct from available balance"""
     try:
         cashout = CashoutRequest.query.get(cashout_id)
         if not cashout:
@@ -136,15 +141,41 @@ def approve_cashout(cashout_id):
         if cashout.status != 'pending':
             return jsonify({'error': f'Cannot approve cashout with status: {cashout.status}'}), 400
 
+        # Get the wallet
+        wallet = cashout.wallet
+        if not wallet:
+            return jsonify({'error': 'Wallet not found for this cashout request'}), 404
+
+        # Check if wallet has sufficient balance
+        if wallet.available_balance < cashout.amount:
+            return jsonify({'error': f'Insufficient balance. Available: ${wallet.available_balance}, Requested: ${cashout.amount}'}), 400
+
+        # Deduct amount from available balance
+        wallet.available_balance -= cashout.amount
+
+        # Update cashout status
         cashout.status = 'approved'
         cashout.approved_at = datetime.utcnow()
+
+        # Create withdrawal transaction record
+        transaction = WalletTransaction(
+            wallet_id=wallet.id,
+            user_id=wallet.user_id,
+            transaction_type='withdrawal',
+            amount=cashout.amount,
+            description=f'Cashout approved - Reference: {cashout.request_reference}',
+            status='withdrawn',
+            cashout_request_id=cashout.id,
+            transaction_metadata={'cashout_reference': cashout.request_reference}
+        )
+        db.session.add(transaction)
         db.session.commit()
 
         # Send notification
         notification = Notification(
             user_id=cashout.wallet.user_id,
             title='Cashout Approved',
-            message=f'Your cashout request for ${cashout.amount} has been approved. Payment will be processed within 2-3 business days.',
+            message=f'Your cashout request for ${cashout.amount} has been approved and deducted from your balance. Payment will be processed within 2-3 business days.',
             type='success'
         )
         db.session.add(notification)
@@ -181,7 +212,7 @@ def reject_cashout(cashout_id):
             return jsonify({'error': f'Cannot reject cashout with status: {cashout.status}'}), 400
 
         cashout.status = 'rejected'
-        cashout.notes = reason
+        cashout.admin_notes = reason
         db.session.commit()
 
         # Send notification
@@ -227,22 +258,26 @@ def complete_cashout(cashout_id):
         # Update cashout
         cashout.status = 'completed'
         cashout.completed_at = datetime.utcnow()
+        cashout.transaction_reference = transaction_reference
         if transaction_reference:
-            cashout.notes = f'{cashout.notes or ""}\nTransaction Ref: {transaction_reference}'
+            cashout.admin_notes = f'{cashout.admin_notes or ""}\nTransaction Ref: {transaction_reference}'
 
         # Update wallet
         wallet = cashout.wallet
-        wallet.total_withdrawn = (wallet.total_withdrawn or 0) + cashout.amount
+        wallet.withdrawn_total = (wallet.withdrawn_total or 0) + cashout.amount
 
-        # Create transaction record
-        transaction = WalletTransaction(
-            wallet_id=wallet.id,
-            type='withdrawal',
-            amount=cashout.amount,
-            description=f'Cashout completed - {transaction_reference}',
-            status='completed'
-        )
-        db.session.add(transaction)
+        # Update the existing withdrawal transaction to completed status
+        # The transaction was already created when cashout was approved
+        if cashout.status == 'approved':
+            # Find and update existing transaction
+            existing_transaction = WalletTransaction.query.filter_by(
+                cashout_request_id=cashout.id
+            ).first()
+            if existing_transaction:
+                existing_transaction.status = 'completed'
+                if transaction_reference:
+                    existing_transaction.description += f' - Completed: {transaction_reference}'
+
         db.session.commit()
 
         # Send notification

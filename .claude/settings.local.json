@@ -32,7 +32,8 @@
       "Bash(del nul)",
       "Bash(if exist nul del nul)",
       "Bash(xcopy:*)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(python3:*)"
     ],
     "deny": [],
     "ask": []
