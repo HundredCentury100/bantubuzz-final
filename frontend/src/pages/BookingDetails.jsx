@@ -191,7 +191,7 @@ const BookingDetails = () => {
                     </div>
                     <div className="flex-1">
                       <p className="text-sm font-medium text-gray-700">Creator</p>
-                      <p className="text-lg font-semibold text-gray-900">{booking.creator.user?.email}</p>
+                      <p className="text-lg font-semibold text-gray-900">{booking.creator.username || booking.creator.user?.email}</p>
                       {booking.creator.bio && (
                         <p className="text-sm text-gray-600 mt-1">{booking.creator.bio}</p>
                       )}
@@ -208,7 +208,7 @@ const BookingDetails = () => {
                     <div className="flex-1">
                       <p className="text-sm font-medium text-gray-700">Brand</p>
                       <p className="text-lg font-semibold text-gray-900">
-                        {booking.brand.company_name || booking.brand.user?.email}
+                        {booking.brand.username || booking.brand.company_name || booking.brand.user?.email}
                       </p>
                       {booking.brand.description && (
                         <p className="text-sm text-gray-600 mt-1">{booking.brand.description}</p>

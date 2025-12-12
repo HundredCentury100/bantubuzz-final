@@ -76,6 +76,10 @@ const CreatorProfileEdit = () => {
       setValue('youtube', data.social_links?.youtube || '');
       setValue('twitter', data.social_links?.twitter || '');
 
+      // Revision settings
+      setValue('free_revisions', data.free_revisions !== undefined ? data.free_revisions : 2);
+      setValue('revision_fee', data.revision_fee || 0);
+
     } catch (err) {
       setError('Failed to load profile');
     } finally {
@@ -196,7 +200,9 @@ const CreatorProfileEdit = () => {
         languages: data.languages || [],
         availability_status: data.availability_status,
         social_links: socialLinks,
-        success_stories: data.success_stories
+        success_stories: data.success_stories,
+        free_revisions: parseInt(data.free_revisions) >= 0 ? parseInt(data.free_revisions) : 2,
+        revision_fee: parseFloat(data.revision_fee) || 0
       };
 
       const response = await creatorsAPI.updateProfile(payload);
@@ -512,6 +518,54 @@ const CreatorProfileEdit = () => {
                   {errors.engagement_rate && (
                     <p className="mt-1 text-sm text-error">{errors.engagement_rate.message}</p>
                   )}
+                </div>
+              </div>
+            </div>
+
+            {/* Revision Settings */}
+            <div className="card">
+              <h2 className="text-xl font-bold text-dark mb-4">Revision Policy</h2>
+              <p className="text-sm text-gray-600 mb-4">Set your revision policy for collaborations</p>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Free Revisions */}
+                <div>
+                  <label className="block text-sm font-medium text-dark mb-2">
+                    Free Revisions Included
+                  </label>
+                  <input
+                    type="number"
+                    className="input"
+                    placeholder="2"
+                    {...register('free_revisions', {
+                      min: { value: 0, message: 'Cannot be negative' },
+                      max: { value: 10, message: 'Maximum 10 free revisions' }
+                    })}
+                  />
+                  {errors.free_revisions && (
+                    <p className="mt-1 text-sm text-error">{errors.free_revisions.message}</p>
+                  )}
+                  <p className="text-xs text-gray-500 mt-1">Number of free revisions per collaboration</p>
+                </div>
+
+                {/* Revision Fee */}
+                <div>
+                  <label className="block text-sm font-medium text-dark mb-2">
+                    Fee per Additional Revision ($)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    className="input"
+                    placeholder="50.00"
+                    {...register('revision_fee', {
+                      min: { value: 0, message: 'Cannot be negative' }
+                    })}
+                  />
+                  {errors.revision_fee && (
+                    <p className="mt-1 text-sm text-error">{errors.revision_fee.message}</p>
+                  )}
+                  <p className="text-xs text-gray-500 mt-1">Charge for revisions beyond free limit</p>
                 </div>
               </div>
             </div>
