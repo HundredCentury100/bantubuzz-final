@@ -48,7 +48,7 @@ def get_featured_creators():
 
         creators_data = []
         for creator in featured:
-            creator_dict = creator.to_dict(include_user=True)
+            creator_dict = creator.to_dict(include_user=True, public_view=True)
 
             # Get review stats
             reviews = Review.query.filter_by(creator_id=creator.id).all()
@@ -179,7 +179,7 @@ def get_creators():
         # Add review stats and cheapest package price
         creators_with_stats = []
         for creator in all_creators:
-            creator_dict = creator.to_dict(include_user=True)
+            creator_dict = creator.to_dict(include_user=True, public_view=True)
 
             # Get review stats
             reviews = Review.query.filter_by(creator_id=creator.id).all()
@@ -240,7 +240,7 @@ def get_creator(creator_id):
         if not creator:
             return jsonify({'error': 'Creator not found'}), 404
 
-        return jsonify(creator.to_dict(include_user=True)), 200
+        return jsonify(creator.to_dict(include_user=True, public_view=True)), 200
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500

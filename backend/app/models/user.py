@@ -59,7 +59,7 @@ class User(db.Model):
         self.last_login = datetime.utcnow()
 
     def to_dict(self):
-        """Convert user to dictionary"""
+        """Convert user to dictionary (includes email - use for owner/admin only)"""
         return {
             'id': self.id,
             'email': self.email,
@@ -71,6 +71,15 @@ class User(db.Model):
             'last_login': self.last_login.isoformat() if self.last_login else None,
             'created_at': self.created_at.isoformat(),
             'updated_at': self.updated_at.isoformat()
+        }
+
+    def to_public_dict(self):
+        """Convert user to dictionary for public view (no email exposure)"""
+        return {
+            'id': self.id,
+            'user_type': self.user_type,
+            'is_verified': self.is_verified,
+            # Do NOT include email, is_admin, admin_role, or last_login
         }
 
     def __repr__(self):

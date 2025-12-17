@@ -25,6 +25,7 @@ const RegisterCreator = () => {
       const response = await authAPI.registerCreator({
         email: data.email,
         password: data.password,
+        username: data.username,
       });
 
       // Navigate to OTP verification page
@@ -87,6 +88,40 @@ const RegisterCreator = () => {
                 {errors.email && (
                   <p className="mt-1 text-sm text-error">{errors.email.message}</p>
                 )}
+              </div>
+
+              {/* Username */}
+              <div>
+                <label htmlFor="username" className="block text-sm font-medium text-dark mb-2">
+                  Username
+                </label>
+                <input
+                  id="username"
+                  type="text"
+                  className="input"
+                  placeholder="your_creator_name"
+                  {...register('username', {
+                    required: 'Username is required',
+                    minLength: {
+                      value: 3,
+                      message: 'Username must be at least 3 characters',
+                    },
+                    maxLength: {
+                      value: 30,
+                      message: 'Username must be less than 30 characters',
+                    },
+                    pattern: {
+                      value: /^[a-zA-Z0-9_]+$/,
+                      message: 'Username can only contain letters, numbers, and underscores',
+                    },
+                  })}
+                />
+                {errors.username && (
+                  <p className="mt-1 text-sm text-error">{errors.username.message}</p>
+                )}
+                <p className="mt-1 text-xs text-gray-500">
+                  This will be your public display name
+                </p>
               </div>
 
               {/* Password */}

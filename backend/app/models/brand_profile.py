@@ -26,13 +26,20 @@ class BrandProfile(db.Model):
     bookings_as_brand = db.relationship('Booking', foreign_keys='Booking.brand_id', backref='brand', lazy='dynamic')
     saved_creators = db.relationship('SavedCreator', backref='brand', lazy='dynamic', cascade='all, delete-orphan')
 
-    def to_dict(self, include_user=False):
-        """Convert brand profile to dictionary"""
+    def to_dict(self, include_user=False, public_view=False):
+        """
+        Convert brand profile to dictionary
+
+        Args:
+            include_user: Include user object
+            public_view: If True, exclude private info (email) from user object
+        """
         data = {
             'id': self.id,
             'user_id': self.user_id,
             'username': self.username,
             'company_name': self.company_name,
+            'display_name': self.company_name or 'Brand',  # Brands use company name as display name
             'logo': self.logo,
             'logo_sizes': self.logo_sizes or {},
             'description': self.description,
@@ -47,7 +54,10 @@ class BrandProfile(db.Model):
         }
 
         if include_user and self.user:
-            data['user'] = self.user.to_dict()
+            if public_view:
+                data['user'] = self.user.to_public_dict()  # No email!
+            else:
+                data['user'] = self.user.to_dict()  # Full data for owner
 
         return data
 

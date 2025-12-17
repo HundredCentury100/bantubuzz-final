@@ -267,7 +267,7 @@ const Creators = () => {
                   <div className="relative w-full h-64 bg-gradient-to-br from-primary/20 to-primary/5 overflow-hidden">
                     <ResponsiveImage
                       sizes={creator.profile_picture_sizes || creator.profile_picture}
-                      alt={creator.user?.email?.split('@')[0] || 'Creator'}
+                      alt={creator.display_name || creator.username || 'Creator'}
                       className="w-full h-64"
                       objectFit="cover"
                       showLoading={true}
@@ -278,7 +278,7 @@ const Creators = () => {
                   <div className="p-6">
                     {/* Creator Info */}
                     <h3 className="font-bold text-lg text-dark mb-1">
-                      {creator.user?.email?.split('@')[0] || 'Creator'}
+                      {creator.display_name || creator.username || 'Creator'}
                     </h3>
                     <p className="text-sm text-gray-500 mb-4">{creator.location || 'Location not set'}</p>
 

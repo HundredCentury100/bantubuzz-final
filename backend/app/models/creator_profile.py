@@ -41,12 +41,19 @@ class CreatorProfile(db.Model):
     bookings_as_creator = db.relationship('Booking', foreign_keys='Booking.creator_id', backref='creator', lazy='dynamic')
     saved_by_brands = db.relationship('SavedCreator', backref='creator', lazy='dynamic', cascade='all, delete-orphan')
 
-    def to_dict(self, include_user=False):
-        """Convert creator profile to dictionary"""
+    def to_dict(self, include_user=False, public_view=False):
+        """
+        Convert creator profile to dictionary
+
+        Args:
+            include_user: Include user object
+            public_view: If True, exclude private info (email) from user object
+        """
         data = {
             'id': self.id,
             'user_id': self.user_id,
             'username': self.username,
+            'display_name': self.username or 'Creator',  # Frontend-friendly fallback
             'bio': self.bio,
             'profile_picture': self.profile_picture,
             'profile_picture_sizes': self.profile_picture_sizes or {},
@@ -68,7 +75,10 @@ class CreatorProfile(db.Model):
         }
 
         if include_user and self.user:
-            data['user'] = self.user.to_dict()
+            if public_view:
+                data['user'] = self.user.to_public_dict()  # No email!
+            else:
+                data['user'] = self.user.to_dict()  # Full data for owner
 
         return data
 

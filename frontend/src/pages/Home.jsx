@@ -139,7 +139,7 @@ const Home = () => {
                     <div className="aspect-square m-4 rounded-2xl overflow-hidden bg-gray-100">
                       <ResponsiveImage
                         sizes={creator.profile_picture_sizes || creator.profile_picture}
-                        alt={creator.user?.email || 'Creator profile'}
+                        alt={creator.display_name || creator.username || 'Creator profile'}
                         className="w-full h-full"
                         objectFit="cover"
                         showLoading={true}
@@ -151,7 +151,7 @@ const Home = () => {
                       {/* Name and Followers */}
                       <div className="flex justify-between items-start mb-3">
                         <h3 className="font-semibold text-gray-900">
-                          {creator.user?.email?.split('@')[0] || 'Creator'}
+                          {creator.display_name || creator.username || 'Creator'}
                         </h3>
                         <div className="text-right">
                           <span className="text-lg font-bold">{formatFollowers(creator.follower_count)}</span>
@@ -233,7 +233,7 @@ const Home = () => {
                 <div className="aspect-square m-4 rounded-2xl overflow-hidden bg-white/20">
                   <ResponsiveImage
                     sizes={creator.profile_picture_sizes || creator.profile_picture}
-                    alt={creator.user?.email || 'Creator profile'}
+                    alt={creator.display_name || creator.username || 'Creator profile'}
                     className="w-full h-full"
                     objectFit="cover"
                     showLoading={true}
@@ -245,7 +245,7 @@ const Home = () => {
                   {/* Name and Followers */}
                   <div className="flex justify-between items-start mb-3">
                     <h3 className="font-semibold text-gray-900">
-                      {creator.user?.email?.split('@')[0] || 'Creator'}
+                      {creator.display_name || creator.username || 'Creator'}
                     </h3>
                     <div className="text-right">
                       <span className="text-lg font-bold">{formatFollowers(creator.follower_count)}</span>
@@ -300,7 +300,7 @@ const Home = () => {
                 <div className="aspect-square m-4 rounded-2xl overflow-hidden bg-gray-100">
                   <ResponsiveImage
                     sizes={creator.profile_picture_sizes || creator.profile_picture}
-                    alt={creator.user?.email || 'Creator profile'}
+                    alt={creator.display_name || creator.username || 'Creator profile'}
                     className="w-full h-full"
                     objectFit="cover"
                     showLoading={true}
@@ -312,7 +312,7 @@ const Home = () => {
                   {/* Name and Followers */}
                   <div className="flex justify-between items-start mb-3">
                     <h3 className="font-semibold text-gray-900">
-                      {creator.user?.email?.split('@')[0] || 'Creator'}
+                      {creator.display_name || creator.username || 'Creator'}
                     </h3>
                     <div className="text-right">
                       <span className="text-lg font-bold">{formatFollowers(creator.follower_count)}</span>

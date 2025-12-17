@@ -7,6 +7,7 @@ from flask_jwt_extended import (
     get_jwt
 )
 from datetime import datetime, timedelta
+import re
 from app import db
 from app.models import User, CreatorProfile, BrandProfile, OTP
 from app.services.email_service import send_otp_email, send_verification_email, send_password_reset_email
@@ -21,9 +22,22 @@ def register_creator():
         data = request.get_json()
 
         # Validate required fields
-        required_fields = ['email', 'password']
+        required_fields = ['email', 'password', 'username']
         if not all(field in data for field in required_fields):
             return jsonify({'error': 'Missing required fields'}), 400
+
+        # Validate username
+        username = data['username'].strip()
+        if len(username) < 3:
+            return jsonify({'error': 'Username must be at least 3 characters'}), 400
+        if len(username) > 30:
+            return jsonify({'error': 'Username must be less than 30 characters'}), 400
+        if not re.match(r'^[a-zA-Z0-9_]+$', username):
+            return jsonify({'error': 'Username can only contain letters, numbers, and underscores'}), 400
+
+        # Check if username is already taken
+        if CreatorProfile.query.filter_by(username=username).first():
+            return jsonify({'error': 'Username already taken'}), 409
 
         # Check if user already exists
         if User.query.filter_by(email=data['email'].lower()).first():
@@ -38,8 +52,11 @@ def register_creator():
         db.session.add(user)
         db.session.flush()  # Get user.id without committing
 
-        # Create creator profile
-        creator_profile = CreatorProfile(user_id=user.id)
+        # Create creator profile with username
+        creator_profile = CreatorProfile(
+            user_id=user.id,
+            username=username
+        )
         db.session.add(creator_profile)
 
         # Generate OTP
