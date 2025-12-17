@@ -4,6 +4,8 @@ from datetime import datetime
 from app import db
 from app.models import CreatorProfile, User, Review, Package
 from app.utils import save_profile_picture, delete_profile_picture
+from app.utils.file_upload import save_and_compress_image
+from app.utils.image_compression import delete_image_variants
 from sqlalchemy import or_, and_, func
 
 bp = Blueprint('creators', __name__)
@@ -369,7 +371,7 @@ def update_profile():
 @bp.route('/profile/picture', methods=['POST'])
 @jwt_required()
 def upload_profile_picture():
-    """Upload creator profile picture"""
+    """Upload creator profile picture with automatic compression"""
     try:
         user_id = int(get_jwt_identity())
         user = User.query.get(user_id)
@@ -389,20 +391,38 @@ def upload_profile_picture():
         if file.filename == '':
             return jsonify({'error': 'No file selected'}), 400
 
-        # Delete old profile picture if exists
-        if creator.profile_picture:
+        # Delete old profile picture variants if they exist
+        if creator.profile_picture_sizes:
+            delete_image_variants(creator.profile_picture_sizes)
+        elif creator.profile_picture:
+            # Fallback: delete old single file
             delete_profile_picture(creator.profile_picture)
 
-        # Save new profile picture
+        # Save and compress new profile picture
         try:
-            file_path = save_profile_picture(file, folder='profiles/creators')
-            creator.profile_picture = file_path
+            image_data = save_and_compress_image(file, folder='profiles/creators')
+
+            # Store multi-size paths
+            creator.profile_picture_sizes = {
+                'thumbnail': image_data['thumbnail'],
+                'medium': image_data['medium'],
+                'large': image_data['large']
+            }
+
+            # Backward compatibility: store medium size as main profile picture
+            creator.profile_picture = image_data['medium']
             creator.updated_at = datetime.utcnow()
             db.session.commit()
 
             return jsonify({
-                'message': 'Profile picture uploaded successfully',
-                'profile_picture': file_path
+                'message': 'Profile picture uploaded and compressed successfully',
+                'profile_picture': image_data['medium'],
+                'profile_picture_sizes': creator.profile_picture_sizes,
+                'compression_stats': {
+                    'original_size_kb': image_data.get('original_size_kb', 0),
+                    'compressed_size_kb': image_data.get('compressed_size_kb', 0),
+                    'savings_percent': image_data.get('savings_percent', 0)
+                }
             }), 200
 
         except ValueError as e:
@@ -416,7 +436,7 @@ def upload_profile_picture():
 @bp.route('/profile/gallery', methods=['POST'])
 @jwt_required()
 def upload_gallery_image():
-    """Upload image to creator's gallery"""
+    """Upload image to creator's gallery with automatic compression"""
     try:
         user_id = int(get_jwt_identity())
         user = User.query.get(user_id)
@@ -436,25 +456,50 @@ def upload_gallery_image():
         if file.filename == '':
             return jsonify({'error': 'No file selected'}), 400
 
-        # Save gallery image
+        # Save and compress gallery image
         try:
-            file_path = save_profile_picture(file, folder='profiles/creators/gallery')
+            import uuid
+            image_data = save_and_compress_image(file, folder='profiles/creators/gallery')
 
-            # Initialize gallery if None
+            # Initialize gallery_images if None
+            if creator.gallery_images is None:
+                creator.gallery_images = []
+
+            # Create gallery item with multi-size support
+            gallery_item = {
+                'id': str(uuid.uuid4()),
+                'thumbnail': image_data['thumbnail'],
+                'medium': image_data['medium'],
+                'large': image_data['large'],
+                'uploaded_at': datetime.utcnow().isoformat(),
+                'original_size_kb': image_data.get('original_size_kb', 0),
+                'compressed_size_kb': image_data.get('compressed_size_kb', 0)
+            }
+
+            # Add to new gallery structure
+            gallery_images = list(creator.gallery_images)
+            gallery_images.append(gallery_item)
+            creator.gallery_images = gallery_images
+
+            # Backward compatibility: also add medium size to old gallery
             if creator.gallery is None:
                 creator.gallery = []
-
-            # Add to gallery
             gallery = list(creator.gallery)
-            gallery.append(file_path)
+            gallery.append(image_data['medium'])
             creator.gallery = gallery
+
             creator.updated_at = datetime.utcnow()
             db.session.commit()
 
             return jsonify({
-                'message': 'Gallery image uploaded successfully',
-                'image_path': file_path,
-                'gallery': creator.gallery
+                'message': 'Gallery image uploaded and compressed successfully',
+                'gallery_item': gallery_item,
+                'gallery_images': creator.gallery_images,
+                'compression_stats': {
+                    'original_size_kb': image_data.get('original_size_kb', 0),
+                    'compressed_size_kb': image_data.get('compressed_size_kb', 0),
+                    'savings_percent': image_data.get('savings_percent', 0)
+                }
             }), 200
 
         except ValueError as e:
@@ -468,7 +513,7 @@ def upload_gallery_image():
 @bp.route('/profile/gallery/<int:index>', methods=['DELETE'])
 @jwt_required()
 def delete_gallery_image(index):
-    """Delete image from creator's gallery"""
+    """Delete image from creator's gallery (supports both old and new format)"""
     try:
         user_id = int(get_jwt_identity())
         user = User.query.get(user_id)
@@ -480,26 +525,46 @@ def delete_gallery_image(index):
         if not creator:
             return jsonify({'error': 'Creator profile not found'}), 404
 
-        # Check if gallery exists and index is valid
-        if not creator.gallery or index < 0 or index >= len(creator.gallery):
+        # Try new gallery_images format first
+        if creator.gallery_images and len(creator.gallery_images) > index >= 0:
+            gallery_item = creator.gallery_images[index]
+
+            # Delete all size variants
+            delete_image_variants({
+                'thumbnail': gallery_item.get('thumbnail'),
+                'medium': gallery_item.get('medium'),
+                'large': gallery_item.get('large')
+            })
+
+            # Remove from gallery_images array
+            gallery_images = list(creator.gallery_images)
+            gallery_images.pop(index)
+            creator.gallery_images = gallery_images
+
+            # Also remove from old gallery if it exists
+            if creator.gallery and len(creator.gallery) > index:
+                gallery = list(creator.gallery)
+                gallery.pop(index)
+                creator.gallery = gallery
+
+        # Fallback to old gallery format
+        elif creator.gallery and len(creator.gallery) > index >= 0:
+            file_path = creator.gallery[index]
+            delete_profile_picture(file_path)
+
+            gallery = list(creator.gallery)
+            gallery.pop(index)
+            creator.gallery = gallery
+        else:
             return jsonify({'error': 'Invalid gallery index'}), 400
 
-        # Get file path to delete
-        file_path = creator.gallery[index]
-
-        # Delete the file
-        delete_profile_picture(file_path)
-
-        # Remove from gallery array
-        gallery = list(creator.gallery)
-        gallery.pop(index)
-        creator.gallery = gallery
         creator.updated_at = datetime.utcnow()
         db.session.commit()
 
         return jsonify({
             'message': 'Gallery image deleted successfully',
-            'gallery': creator.gallery
+            'gallery': creator.gallery or [],
+            'gallery_images': creator.gallery_images or []
         }), 200
 
     except Exception as e:

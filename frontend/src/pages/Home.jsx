@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
+import ResponsiveImage from '../components/ResponsiveImage';
 import { creatorsAPI, BASE_URL } from '../services/api';
 import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import SEO from '../components/SEO';
@@ -136,15 +137,13 @@ const Home = () => {
                   >
                     {/* Image */}
                     <div className="aspect-square m-4 rounded-2xl overflow-hidden bg-gray-100">
-                      {creator.profile_picture ? (
-                        <img
-                          src={`${BASE_URL}${creator.profile_picture}`}
-                          alt={creator.user?.email}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full bg-gray-200"></div>
-                      )}
+                      <ResponsiveImage
+                        sizes={creator.profile_picture_sizes || creator.profile_picture}
+                        alt={creator.user?.email || 'Creator profile'}
+                        className="w-full h-full"
+                        objectFit="cover"
+                        showLoading={true}
+                      />
                     </div>
 
                     {/* Content */}
@@ -232,15 +231,13 @@ const Home = () => {
               >
                 {/* Image */}
                 <div className="aspect-square m-4 rounded-2xl overflow-hidden bg-white/20">
-                  {creator.profile_picture ? (
-                    <img
-                      src={`${BASE_URL}${creator.profile_picture}`}
-                      alt={creator.user?.email}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full bg-white/30"></div>
-                  )}
+                  <ResponsiveImage
+                    sizes={creator.profile_picture_sizes || creator.profile_picture}
+                    alt={creator.user?.email || 'Creator profile'}
+                    className="w-full h-full"
+                    objectFit="cover"
+                    showLoading={true}
+                  />
                 </div>
 
                 {/* Content */}
@@ -301,15 +298,13 @@ const Home = () => {
               >
                 {/* Image */}
                 <div className="aspect-square m-4 rounded-2xl overflow-hidden bg-gray-100">
-                  {creator.profile_picture ? (
-                    <img
-                      src={`${BASE_URL}${creator.profile_picture}`}
-                      alt={creator.user?.email}
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    <div className="w-full h-full bg-gray-200"></div>
-                  )}
+                  <ResponsiveImage
+                    sizes={creator.profile_picture_sizes || creator.profile_picture}
+                    alt={creator.user?.email || 'Creator profile'}
+                    className="w-full h-full"
+                    objectFit="cover"
+                    showLoading={true}
+                  />
                 </div>
 
                 {/* Content */}

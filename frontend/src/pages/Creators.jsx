@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { creatorsAPI, brandsAPI, BASE_URL } from '../services/api';
 import { useAuth } from '../hooks/useAuth';
 import Navbar from '../components/Navbar';
+import ResponsiveImage from '../components/ResponsiveImage';
 import toast from 'react-hot-toast';
 import Avatar from '../components/Avatar';
 
@@ -264,19 +265,13 @@ const Creators = () => {
                 <div key={creator.id} className="bg-white rounded-lg shadow hover:shadow-lg transition-shadow overflow-hidden">
                   {/* Creator Avatar - Full Width Image */}
                   <div className="relative w-full h-64 bg-gradient-to-br from-primary/20 to-primary/5 overflow-hidden">
-                    {creator.profile_picture ? (
-                      <img
-                        src={`${BASE_URL}${creator.profile_picture}`}
-                        alt={creator.user?.email?.split('@')[0] || 'Creator'}
-                        className="w-full h-full object-cover object-top"
-                      />
-                    ) : (
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <svg className="w-24 h-24 text-primary/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                        </svg>
-                      </div>
-                    )}
+                    <ResponsiveImage
+                      sizes={creator.profile_picture_sizes || creator.profile_picture}
+                      alt={creator.user?.email?.split('@')[0] || 'Creator'}
+                      className="w-full h-64"
+                      objectFit="cover"
+                      showLoading={true}
+                    />
                   </div>
 
                   {/* Content */}

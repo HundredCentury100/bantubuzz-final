@@ -9,7 +9,8 @@ class BrandProfile(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), unique=True, nullable=False)
     username = db.Column(db.String(50), unique=True, nullable=True)  # Unique username for brands
     company_name = db.Column(db.String(200), nullable=False)
-    logo = db.Column(db.String(255))
+    logo = db.Column(db.String(255))  # Kept for backward compatibility
+    logo_sizes = db.Column(db.JSON, default=dict)  # Multi-size storage: {thumbnail, medium, large}
     description = db.Column(db.Text)
     website = db.Column(db.String(255))
     industry = db.Column(db.String(100))
@@ -33,6 +34,7 @@ class BrandProfile(db.Model):
             'username': self.username,
             'company_name': self.company_name,
             'logo': self.logo,
+            'logo_sizes': self.logo_sizes or {},
             'description': self.description,
             'website': self.website,
             'industry': self.industry,

@@ -4,6 +4,8 @@ from datetime import datetime
 from app import db
 from app.models import BrandProfile, SavedCreator, CreatorProfile, User
 from app.utils import save_profile_picture, delete_profile_picture
+from app.utils.file_upload import save_and_compress_image
+from app.utils.image_compression import delete_image_variants
 
 bp = Blueprint('brands', __name__)
 
@@ -102,7 +104,7 @@ def update_profile():
 @bp.route('/profile/logo', methods=['POST'])
 @jwt_required()
 def upload_logo():
-    """Upload brand logo"""
+    """Upload brand logo with automatic compression"""
     try:
         user_id = int(get_jwt_identity())
         user = User.query.get(user_id)
@@ -122,20 +124,38 @@ def upload_logo():
         if file.filename == '':
             return jsonify({'error': 'No file selected'}), 400
 
-        # Delete old logo if exists
-        if brand.logo:
+        # Delete old logo variants if they exist
+        if brand.logo_sizes:
+            delete_image_variants(brand.logo_sizes)
+        elif brand.logo:
+            # Fallback: delete old single file
             delete_profile_picture(brand.logo)
 
-        # Save new logo
+        # Save and compress new logo
         try:
-            file_path = save_profile_picture(file, folder='profiles/brands')
-            brand.logo = file_path
+            image_data = save_and_compress_image(file, folder='profiles/brands')
+
+            # Store multi-size paths
+            brand.logo_sizes = {
+                'thumbnail': image_data['thumbnail'],
+                'medium': image_data['medium'],
+                'large': image_data['large']
+            }
+
+            # Backward compatibility: store medium size as main logo
+            brand.logo = image_data['medium']
             brand.updated_at = datetime.utcnow()
             db.session.commit()
 
             return jsonify({
-                'message': 'Logo uploaded successfully',
-                'logo': file_path
+                'message': 'Logo uploaded and compressed successfully',
+                'logo': image_data['medium'],
+                'logo_sizes': brand.logo_sizes,
+                'compression_stats': {
+                    'original_size_kb': image_data.get('original_size_kb', 0),
+                    'compressed_size_kb': image_data.get('compressed_size_kb', 0),
+                    'savings_percent': image_data.get('savings_percent', 0)
+                }
             }), 200
 
         except ValueError as e:
