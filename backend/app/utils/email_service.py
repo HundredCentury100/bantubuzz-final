@@ -166,7 +166,7 @@ def send_cashout_request_notification_to_admin(cashout):
                 ''' if cashout.creator_notes else ''}
 
                 <div style="text-align: center;">
-                    <a href="http://bantubuzz.com/admin/cashouts" class="button">
+                    <a href="https://bantubuzz.com/admin/cashouts" class="button">
                         Process Cashout →
                     </a>
                 </div>
@@ -174,6 +174,10 @@ def send_cashout_request_notification_to_admin(cashout):
                 <div class="footer">
                     <p>This is an automated notification from BantuBuzz</p>
                     <p>Please process this cashout request within 24-48 hours</p>
+                    <p style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
+                        © 2025 BantuBuzz. All rights reserved.<br>
+                        <a href="https://bantubuzz.com" style="color: #7c3aed; text-decoration: none;">bantubuzz.com</a>
+                    </p>
                 </div>
             </div>
         </div>
@@ -285,6 +289,10 @@ def send_cashout_completed_notification(cashout, creator_email):
                 <div class="footer">
                     <p>Thank you for being part of BantuBuzz!</p>
                     <p>If you have any questions, please contact support@bantubuzz.com</p>
+                    <p style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
+                        © 2025 BantuBuzz. All rights reserved.<br>
+                        <a href="https://bantubuzz.com" style="color: #10b981; text-decoration: none;">bantubuzz.com</a>
+                    </p>
                 </div>
             </div>
         </div>
@@ -384,6 +392,10 @@ def send_payment_verified_notification(payment, creator_email):
                 <div class="footer">
                     <p>The payment is now held in escrow and will be released to your wallet once the work is completed and approved.</p>
                     <p>Questions? Contact support@bantubuzz.com</p>
+                    <p style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
+                        © 2025 BantuBuzz. All rights reserved.<br>
+                        <a href="https://bantubuzz.com" style="color: #3b82f6; text-decoration: none;">bantubuzz.com</a>
+                    </p>
                 </div>
             </div>
         </div>
