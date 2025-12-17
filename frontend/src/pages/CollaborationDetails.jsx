@@ -350,9 +350,9 @@ const CollaborationDetails = () => {
 
             {/* Revision Policy (Brand View) */}
             {isBrand && (
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                <h3 className="font-semibold text-blue-900 mb-2">Creator's Revision Policy</h3>
-                <div className="text-sm text-blue-800 space-y-1">
+              <div className="bg-primary/5 border border-primary/20 rounded-lg p-4">
+                <h3 className="font-semibold text-primary-dark leading-snug mb-2">Creator's Revision Policy</h3>
+                <div className="text-sm text-dark leading-relaxed space-y-1">
                   <p><span className="font-medium">{freeRevisions} free revisions</span> included per collaboration</p>
                   <p>Additional revisions: <span className="font-medium">${revisionFee} each</span></p>
                   <p className="text-xs mt-2">Revisions used: {totalRevisions} ({paidRevisions} paid)</p>

@@ -92,7 +92,7 @@ export default function AdminDashboard() {
           <StatCard
             title="Brands"
             value={stats.users.brands}
-            color="blue-600"
+            color="primary-dark"
             icon={
               <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
@@ -120,7 +120,7 @@ export default function AdminDashboard() {
             title="Completed Collaborations"
             value={stats.collaborations.completed}
             subtitle={`${stats.collaborations.active} active`}
-            color="purple-600"
+            color="primary-dark"
             icon={
               <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
@@ -130,7 +130,7 @@ export default function AdminDashboard() {
           <StatCard
             title="Active Bookings"
             value={stats.platform?.active_bookings || 0}
-            color="indigo-600"
+            color="primary"
             icon={
               <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
@@ -140,7 +140,7 @@ export default function AdminDashboard() {
           <StatCard
             title="Active Campaigns"
             value={stats.platform?.active_campaigns || 0}
-            color="pink-600"
+            color="primary"
             icon={
               <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
@@ -150,7 +150,7 @@ export default function AdminDashboard() {
           <StatCard
             title="Completed Collaborations"
             value={stats.collaborations.completed}
-            color="teal-600"
+            color="green-600"
             icon={
               <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -188,13 +188,13 @@ export default function AdminDashboard() {
           <div className="bg-white rounded-lg shadow p-6">
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-sm font-medium text-gray-600">Transaction Volume</h3>
-              <div className="text-blue-600 opacity-20">
+              <div className="text-primary-dark opacity-20">
                 <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
                 </svg>
               </div>
             </div>
-            <div className="text-3xl font-bold text-blue-600 mb-1">
+            <div className="text-3xl font-bold text-primary-dark mb-1">
               ${(stats.revenue?.transaction_volume || 0).toLocaleString()}
             </div>
             <p className="text-xs text-gray-500">Total payments processed</p>
@@ -208,13 +208,13 @@ export default function AdminDashboard() {
           <div className="bg-white rounded-lg shadow p-6">
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-sm font-medium text-gray-600">In Escrow</h3>
-              <div className="text-purple-600 opacity-20">
+              <div className="text-primary opacity-20">
                 <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                 </svg>
               </div>
             </div>
-            <div className="text-3xl font-bold text-purple-600 mb-1">
+            <div className="text-3xl font-bold text-primary mb-1">
               ${(stats.revenue?.in_escrow || 0).toLocaleString()}
             </div>
             <p className="text-xs text-gray-500">Pending collaborations</p>

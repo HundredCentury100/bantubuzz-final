@@ -35,13 +35,13 @@ ReactDOM.createRoot(document.getElementById('root')).render(
                   toastOptions={{
                     duration: 4000,
                     style: {
-                      background: '#1F2937',
-                      color: '#F3F4F6',
+                      background: '#1F2937', // Brand color: dark (Navy)
+                      color: '#F3F4F6',      // Gray-100
                     },
                     success: {
                       iconTheme: {
-                        primary: '#ccdb53',
-                        secondary: '#1F2937',
+                        primary: '#ccdb53',   // Brand color: primary (Olive-Green)
+                        secondary: '#1F2937', // Brand color: dark (Navy)
                       },
                     },
                   }}

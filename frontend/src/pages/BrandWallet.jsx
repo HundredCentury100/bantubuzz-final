@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import Navbar from '../components/Navbar';
+import StatusBadge from '../components/admin/StatusBadge';
 
 export default function BrandWallet() {
   const navigate = useNavigate();
@@ -49,15 +50,6 @@ export default function BrandWallet() {
     });
   };
 
-  const getStatusColor = (status) => {
-    const colors = {
-      available: 'bg-green-100 text-green-800',
-      refund: 'bg-blue-100 text-blue-800',
-      credit: 'bg-primary/10 text-primary-dark',
-      used: 'bg-gray-100 text-gray-800'
-    };
-    return colors[status] || 'bg-gray-100 text-gray-800';
-  };
 
   if (loading) {
     return (
@@ -88,8 +80,8 @@ export default function BrandWallet() {
               Back to Dashboard
             </button>
           </div>
-          <h1 className="text-4xl font-bold text-dark mb-2">Brand Wallet</h1>
-          <p className="text-gray-600">Manage your refunds and credits</p>
+          <h1 className="text-4xl font-bold text-dark leading-tight mb-2">Brand Wallet</h1>
+          <p className="text-gray-600 leading-relaxed">Manage your refunds and credits</p>
         </div>
 
         {error && (
@@ -136,14 +128,14 @@ export default function BrandWallet() {
         </div>
 
         {/* Info Box */}
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-8">
+        <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 mb-8">
           <div className="flex items-start">
-            <svg className="w-5 h-5 text-blue-600 mr-3 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+            <svg className="w-5 h-5 text-primary-dark mr-3 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
               <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
             </svg>
             <div>
-              <p className="text-sm font-medium text-blue-900 mb-1">How Brand Wallet Works</p>
-              <ul className="text-sm text-blue-800 space-y-1">
+              <p className="text-sm font-medium text-primary-dark leading-snug mb-1">How Brand Wallet Works</p>
+              <ul className="text-sm text-dark leading-relaxed space-y-1">
                 <li>• Credits are automatically added when creators reject paid bookings</li>
                 <li>• Refunds are added when you cancel paid collaborations</li>
                 <li>• Use your balance for any future bookings or collaborations on the platform</li>
@@ -198,9 +190,7 @@ export default function BrandWallet() {
                             <p className="font-semibold text-primary-dark">
                               +{formatCurrency(tx.amount)}
                             </p>
-                            <span className={`text-xs px-2 py-1 rounded-full ${getStatusColor(tx.status)}`}>
-                              {tx.status}
-                            </span>
+                            <StatusBadge status={tx.status} />
                           </div>
                         </div>
                       ))}
@@ -243,9 +233,7 @@ export default function BrandWallet() {
                               +{formatCurrency(tx.amount)}
                             </td>
                             <td className="px-4 py-4 text-center">
-                              <span className={`text-xs px-2 py-1 rounded-full ${getStatusColor(tx.status)}`}>
-                                {tx.status}
-                              </span>
+                              <StatusBadge status={tx.status} />
                             </td>
                           </tr>
                         ))}

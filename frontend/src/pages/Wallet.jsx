@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import api from '../services/api';
 import Navbar from '../components/Navbar';
+import StatusBadge from '../components/admin/StatusBadge';
 
 export default function Wallet() {
   const navigate = useNavigate();
@@ -55,19 +56,6 @@ export default function Wallet() {
     });
   };
 
-  const getStatusColor = (status) => {
-    const colors = {
-      pending: 'bg-yellow-100 text-yellow-800',
-      processing: 'bg-blue-100 text-blue-800',
-      completed: 'bg-green-100 text-green-800',
-      failed: 'bg-red-100 text-red-800',
-      cancelled: 'bg-gray-100 text-gray-800',
-      pending_clearance: 'bg-orange-100 text-orange-800',
-      available: 'bg-green-100 text-green-800',
-      withdrawn: 'bg-gray-100 text-gray-800'
-    };
-    return colors[status] || 'bg-gray-100 text-gray-800';
-  };
 
   if (loading) {
     return (
@@ -98,8 +86,8 @@ export default function Wallet() {
               Back to Dashboard
             </button>
           </div>
-          <h1 className="text-4xl font-bold text-dark mb-2">My Wallet</h1>
-          <p className="text-gray-600">Manage your earnings and cashouts</p>
+          <h1 className="text-4xl font-bold text-dark leading-tight mb-2">My Wallet</h1>
+          <p className="text-gray-600 leading-relaxed">Manage your earnings and cashouts</p>
         </div>
 
         {error && (
@@ -207,9 +195,7 @@ export default function Wallet() {
                             <p className={`font-semibold ${tx.transaction_type === 'withdrawal' ? 'text-red-600' : 'text-primary-dark'}`}>
                               {tx.transaction_type === 'withdrawal' ? '-' : '+'}{formatCurrency(tx.amount)}
                             </p>
-                            <span className={`text-xs px-2 py-1 rounded-full ${getStatusColor(tx.status)}`}>
-                              {tx.status}
-                            </span>
+                            <StatusBadge status={tx.status} />
                           </div>
                         </div>
                       ))}
@@ -290,9 +276,7 @@ export default function Wallet() {
                               {tx.transaction_type === 'withdrawal' ? '-' : '+'}{formatCurrency(tx.amount)}
                             </td>
                             <td className="px-4 py-4 text-center">
-                              <span className={`text-xs px-2 py-1 rounded-full ${getStatusColor(tx.status)}`}>
-                                {tx.status}
-                              </span>
+                              <StatusBadge status={tx.status} />
                             </td>
                           </tr>
                         ))}
@@ -325,9 +309,7 @@ export default function Wallet() {
                           <div className="flex-1">
                             <div className="flex items-center gap-3 mb-2">
                               <p className="font-medium text-gray-900">Reference: {cashout.request_reference}</p>
-                              <span className={`text-xs px-2 py-1 rounded-full ${getStatusColor(cashout.status)}`}>
-                                {cashout.status}
-                              </span>
+                              <StatusBadge status={cashout.status} />
                             </div>
                             <p className="text-sm text-gray-600 mb-1">
                               Payment Method: {cashout.payment_method}
@@ -342,7 +324,7 @@ export default function Wallet() {
                             )}
                           </div>
                           <div className="text-right">
-                            <p className="text-2xl font-bold text-purple-600">{formatCurrency(cashout.amount)}</p>
+                            <p className="text-2xl font-bold text-primary-dark">{formatCurrency(cashout.amount)}</p>
                             {cashout.cashout_fee > 0 && (
                               <p className="text-sm text-gray-500">Fee: {formatCurrency(cashout.cashout_fee)}</p>
                             )}
@@ -353,7 +335,7 @@ export default function Wallet() {
                           <div className="mt-4 pt-4 border-t border-gray-200">
                             <Link
                               to={`/wallet/cashouts/${cashout.id}`}
-                              className="text-purple-600 hover:text-purple-700 text-sm font-medium"
+                              className="text-primary-dark hover:text-primary text-sm font-medium"
                             >
                               View Details →
                             </Link>

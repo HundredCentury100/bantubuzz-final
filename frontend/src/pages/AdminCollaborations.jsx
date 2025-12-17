@@ -9,6 +9,7 @@ import {
   rejectCancellation
 } from '../services/adminAPI';
 import AdminLayout from '../components/admin/AdminLayout';
+import StatusBadge from '../components/admin/StatusBadge';
 import {
   BanknotesIcon,
   CheckCircleIcon,
@@ -146,15 +147,6 @@ export default function AdminCollaborations() {
     });
   };
 
-  const getStatusColor = (status) => {
-    const colors = {
-      pending: 'bg-yellow-100 text-yellow-800',
-      in_progress: 'bg-blue-100 text-blue-800',
-      completed: 'bg-green-100 text-green-800',
-      cancelled: 'bg-red-100 text-red-800'
-    };
-    return colors[status] || 'bg-gray-100 text-gray-800';
-  };
 
   const hasCancellationRequest = (collab) => {
     return collab.cancellation_request && collab.cancellation_request.status === 'pending';
@@ -175,8 +167,8 @@ export default function AdminCollaborations() {
       <div className="space-y-6">
         {/* Header */}
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Collaboration Management</h1>
-          <p className="mt-2 text-gray-600">Monitor collaborations, manage payments, and handle cancellations</p>
+          <h1 className="text-3xl font-bold text-gray-900 leading-tight">Collaboration Management</h1>
+          <p className="text-gray-600 leading-relaxed mt-2">Monitor collaborations, manage payments, and handle cancellations</p>
         </div>
 
         {error && (
@@ -249,9 +241,7 @@ export default function AdminCollaborations() {
                         ${collab.amount?.toFixed(2) || '0.00'}
                       </td>
                       <td className="px-6 py-4">
-                        <span className={`px-2 py-1 text-xs rounded-full capitalize ${getStatusColor(collab.status)}`}>
-                          {collab.status?.replace('_', ' ')}
-                        </span>
+                        <StatusBadge status={collab.status} />
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-600">{formatDate(collab.created_at)}</td>
                       <td className="px-6 py-4 text-right text-sm">
@@ -260,7 +250,7 @@ export default function AdminCollaborations() {
                           <button
                             onClick={() => openPaymentModal(collab)}
                             disabled={actionLoading === collab.id}
-                            className="text-blue-600 hover:text-blue-900 disabled:opacity-50"
+                            className="text-primary-dark hover:text-primary disabled:opacity-50"
                             title="Edit Payment"
                           >
                             <PencilIcon className="h-5 w-5" />
@@ -326,7 +316,7 @@ export default function AdminCollaborations() {
           </div>
           <div className="bg-white rounded-lg shadow-md p-4">
             <p className="text-sm text-gray-600">In Progress</p>
-            <p className="text-2xl font-bold text-blue-600">
+            <p className="text-2xl font-bold text-primary-dark">
               {collaborations.filter(c => c.status === 'in_progress').length}
             </p>
           </div>
@@ -468,9 +458,7 @@ export default function AdminCollaborations() {
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Status
                   </label>
-                  <span className={`px-2 py-1 text-xs rounded-full capitalize ${getStatusColor(selectedCollab.status)}`}>
-                    {selectedCollab.status?.replace('_', ' ')}
-                  </span>
+                  <StatusBadge status={selectedCollab.status} />
                 </div>
                 <div className="col-span-2">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -581,7 +569,7 @@ export default function AdminCollaborations() {
                           </span>
                         </div>
                         {del.url && (
-                          <a href={del.url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline">
+                          <a href={del.url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary-dark hover:underline">
                             View Deliverable
                           </a>
                         )}
@@ -599,7 +587,7 @@ export default function AdminCollaborations() {
                           </span>
                         </div>
                         {del.url && (
-                          <a href={del.url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline">
+                          <a href={del.url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary-dark hover:underline">
                             View Deliverable
                           </a>
                         )}

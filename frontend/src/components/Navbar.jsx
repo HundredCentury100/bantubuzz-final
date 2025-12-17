@@ -179,7 +179,7 @@ const Navbar = () => {
                 </Link>
                 <Link
                   to="/register/brand"
-                  className="bg-gray-900 text-white px-5 py-2 rounded-full text-sm font-semibold hover:bg-gray-800 transition-colors"
+                  className="bg-dark text-white px-5 py-2 rounded-full text-sm font-semibold hover:bg-gray-800 transition-colors"
                 >
                   Join as Brand
                 </Link>
@@ -342,7 +342,7 @@ const Navbar = () => {
                           {({ active }) => (
                             <Link
                               to="/register/brand"
-                              className="bg-gray-900 text-white px-4 py-2 rounded-full text-sm font-semibold hover:bg-gray-800 transition-colors text-center block my-2"
+                              className="bg-dark text-white px-4 py-2 rounded-full text-sm font-semibold hover:bg-gray-800 transition-colors text-center block my-2"
                             >
                               Join as Brand
                             </Link>

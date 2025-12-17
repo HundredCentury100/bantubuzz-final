@@ -1,20 +1,35 @@
-const StatCard = ({ title, value, subtitle, icon: Icon, color = 'blue', onClick, loading }) => {
+/**
+ * StatCard Component
+ *
+ * Displays a statistic card with optional icon.
+ * Uses brand-compliant colors: 'primary' for active/info states, other colors for status.
+ *
+ * @param {Object} props
+ * @param {string} props.title - Card title
+ * @param {string|number} props.value - Main value to display
+ * @param {string} props.subtitle - Optional subtitle
+ * @param {Component} props.icon - Icon component
+ * @param {string} props.color - Color variant ('primary', 'green', 'yellow', 'red', 'purple')
+ * @param {Function} props.onClick - Optional click handler
+ * @param {boolean} props.loading - Loading state
+ */
+const StatCard = ({ title, value, subtitle, icon: Icon, color = 'primary', onClick, loading }) => {
+  // Color classes for card background and text
+  // Note: 'primary' (brand color) replaces 'blue' for info/active states
   const colorClasses = {
-    blue: 'text-blue-600 bg-blue-50',
-    green: 'text-green-600 bg-green-50',
-    yellow: 'text-yellow-600 bg-yellow-50',
-    red: 'text-red-600 bg-red-50',
-    purple: 'text-purple-600 bg-purple-50',
-    primary: 'text-primary bg-primary/10',
+    primary: 'text-primary-dark bg-primary/10',  // Brand color for info/active
+    green: 'text-green-600 bg-green-50',         // Success states
+    yellow: 'text-yellow-600 bg-yellow-50',      // Warning/pending states
+    red: 'text-red-600 bg-red-50',               // Error/failure states
+    purple: 'text-purple-600 bg-purple-50',      // Alternative states
   };
 
   const iconColorClasses = {
-    blue: 'text-blue-600',
+    primary: 'text-primary-dark',
     green: 'text-green-600',
     yellow: 'text-yellow-600',
     red: 'text-red-600',
     purple: 'text-purple-600',
-    primary: 'text-primary',
   };
 
   return (

@@ -122,8 +122,8 @@ export default function AdminUsers() {
       <div className="space-y-6">
         {/* Header */}
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">User Management</h1>
-          <p className="text-gray-600 mt-1">Manage creators, brands, and verify accounts</p>
+          <h1 className="text-3xl font-bold text-gray-900 leading-tight">User Management</h1>
+          <p className="text-gray-600 leading-relaxed mt-1">Manage creators, brands, and verify accounts</p>
         </div>
 
         {/* Filters */}

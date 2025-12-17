@@ -56,8 +56,8 @@ export default function AdminDashboard() {
       <div className="space-y-6">
         {/* Header */}
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Dashboard Overview</h1>
-          <p className="text-gray-600 mt-1">Welcome to the BantuBuzz Admin Panel</p>
+          <h1 className="text-3xl font-bold text-gray-900 leading-tight">Dashboard Overview</h1>
+          <p className="text-gray-600 leading-relaxed mt-1">Welcome to the BantuBuzz Admin Panel</p>
         </div>
 
         {/* User Statistics */}
@@ -69,7 +69,7 @@ export default function AdminDashboard() {
               value={stats?.users.total || 0}
               subtitle={`${stats?.users.new_this_week || 0} new this week`}
               icon={UsersIcon}
-              color="blue"
+              color="primary"
               loading={loading}
             />
             <StatCard
@@ -117,7 +117,7 @@ export default function AdminDashboard() {
               value={formatCurrency(stats?.revenue.this_month || 0)}
               subtitle="Current month revenue"
               icon={BanknotesIcon}
-              color="blue"
+              color="primary"
               loading={loading}
             />
             <StatCard
@@ -149,7 +149,7 @@ export default function AdminDashboard() {
                 title="Active"
                 value={stats?.collaborations.active || 0}
                 icon={BriefcaseIcon}
-                color="blue"
+                color="primary"
                 loading={loading}
               />
               <StatCard
@@ -196,7 +196,7 @@ export default function AdminDashboard() {
                 value={stats?.cashouts.approved_pending_processing || 0}
                 subtitle="Awaiting processing"
                 icon={BanknotesIcon}
-                color="blue"
+                color="primary"
                 loading={loading}
               />
               <StatCard

@@ -51,7 +51,7 @@ export default function AdminReviews() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
       </div>
     );
   }
@@ -127,7 +127,7 @@ export default function AdminReviews() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-white rounded-lg shadow-md p-4">
           <p className="text-sm text-gray-600">Total Reviews</p>
-          <p className="text-2xl font-bold text-purple-600">{reviews.length}</p>
+          <p className="text-2xl font-bold text-primary-dark">{reviews.length}</p>
         </div>
         <div className="bg-white rounded-lg shadow-md p-4">
           <p className="text-sm text-gray-600">Average Rating</p>

@@ -87,8 +87,8 @@ const CreatorDashboard = () => {
       <div className="container-custom section-padding">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-4xl font-bold text-dark mb-2">Creator Dashboard</h1>
-          <p className="text-gray-600">Welcome back! Here's your overview.</p>
+          <h1 className="text-4xl font-bold text-dark leading-tight mb-2">Creator Dashboard</h1>
+          <p className="text-gray-600 leading-relaxed">Welcome back! Here's your overview.</p>
         </div>
 
         {/* Profile Completion Alert */}
@@ -99,8 +99,8 @@ const CreatorDashboard = () => {
                 <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
               </svg>
               <div className="flex-1">
-                <h3 className="font-medium text-primary-dark">Complete Your Profile</h3>
-                <p className="text-sm text-primary-dark mt-1">
+                <h3 className="font-medium text-primary-dark leading-snug">Complete Your Profile</h3>
+                <p className="text-sm text-primary-dark leading-relaxed mt-1">
                   Fill out your profile to attract more brands and start earning!
                 </p>
                 <Link

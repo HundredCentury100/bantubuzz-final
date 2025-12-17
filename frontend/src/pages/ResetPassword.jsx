@@ -52,7 +52,7 @@ export default function ResetPassword() {
       { strength: 0, label: 'Too weak', color: 'bg-red-500' },
       { strength: 1, label: 'Weak', color: 'bg-orange-500' },
       { strength: 2, label: 'Fair', color: 'bg-yellow-500' },
-      { strength: 3, label: 'Good', color: 'bg-blue-500' },
+      { strength: 3, label: 'Good', color: 'bg-primary' },
       { strength: 4, label: 'Strong', color: 'bg-green-500' },
       { strength: 5, label: 'Very Strong', color: 'bg-green-600' },
     ];
@@ -63,16 +63,16 @@ export default function ResetPassword() {
   const passwordStrength = getPasswordStrength(password);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 py-12 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-light to-primary-light/50 py-12 px-4 sm:px-6 lg:px-8">
       <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8">
         <div className="text-center mb-8">
-          <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-blue-100 mb-4">
-            <svg className="h-8 w-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-primary/10 mb-4">
+            <svg className="h-8 w-8 text-primary-dark" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
             </svg>
           </div>
-          <h2 className="text-3xl font-bold text-gray-900 mb-2">Reset Password</h2>
-          <p className="text-gray-600">
+          <h2 className="text-3xl font-bold text-gray-900 leading-tight mb-2">Reset Password</h2>
+          <p className="text-gray-600 leading-relaxed">
             Enter your new password below.
           </p>
         </div>
@@ -100,7 +100,7 @@ export default function ResetPassword() {
                 })}
                 className={`w-full px-4 py-3 rounded-lg border ${
                   errors.password ? 'border-red-500' : 'border-gray-300'
-                } focus:ring-2 focus:ring-blue-500 focus:border-transparent transition pr-10`}
+                } focus:ring-2 focus:ring-primary focus:border-transparent transition pr-10`}
                 placeholder="Enter new password"
                 disabled={isLoading}
               />
@@ -163,7 +163,7 @@ export default function ResetPassword() {
                 })}
                 className={`w-full px-4 py-3 rounded-lg border ${
                   errors.confirmPassword ? 'border-red-500' : 'border-gray-300'
-                } focus:ring-2 focus:ring-blue-500 focus:border-transparent transition pr-10`}
+                } focus:ring-2 focus:ring-primary focus:border-transparent transition pr-10`}
                 placeholder="Confirm new password"
                 disabled={isLoading}
               />
@@ -192,10 +192,10 @@ export default function ResetPassword() {
           <button
             type="submit"
             disabled={isLoading}
-            className={`w-full flex justify-center py-3 px-4 rounded-lg text-white font-medium transition-colors ${
+            className={`w-full flex justify-center py-3 px-4 rounded-lg text-dark font-medium transition-colors ${
               isLoading
-                ? 'bg-blue-400 cursor-not-allowed'
-                : 'bg-blue-600 hover:bg-blue-700 active:bg-blue-800'
+                ? 'bg-primary/60 cursor-not-allowed'
+                : 'bg-primary hover:bg-primary-dark active:bg-primary-dark/90'
             }`}
           >
             {isLoading ? (
@@ -214,7 +214,7 @@ export default function ResetPassword() {
           <div className="text-center">
             <Link
               to="/login"
-              className="text-sm text-blue-600 hover:text-blue-700 font-medium"
+              className="text-sm text-primary-dark hover:text-primary font-medium"
             >
               Back to Login
             </Link>
@@ -222,9 +222,9 @@ export default function ResetPassword() {
         </form>
 
         <div className="mt-6 pt-6 border-t border-gray-200">
-          <p className="text-xs text-gray-500 text-center">
+          <p className="text-xs text-gray-500 text-center leading-relaxed">
             Need a new reset link?{' '}
-            <Link to="/forgot-password" className="text-blue-600 hover:text-blue-700 font-medium">
+            <Link to="/forgot-password" className="text-primary-dark hover:text-primary font-medium">
               Request again
             </Link>
           </p>

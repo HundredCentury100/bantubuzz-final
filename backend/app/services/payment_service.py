@@ -466,13 +466,12 @@ def check_payment_status(booking):
             payment_record.escrow_status = 'escrowed'
             payment_record.held_amount = booking.amount
 
-            # NEW: Auto-sync collaboration if exists
+            # Update collaboration payment status ONLY (NOT escrow)
             collaboration = Collaboration.query.filter_by(booking_id=booking.id).first()
             if collaboration:
                 collaboration.payment_status = 'paid'
-                collaboration.escrow_status = 'escrowed'
-                if collaboration.status == 'pending':
-                    collaboration.status = 'in_progress'  # Activate collaboration
+                # Do NOT set escrow_status - escrow only triggers on collaboration completion
+                # Do NOT change collaboration.status - brand controls workflow
 
             db.session.commit()
 
@@ -558,13 +557,12 @@ def process_payment_webhook(data):
                 booking.escrow_status = 'escrowed'
                 booking.escrowed_at = datetime.utcnow()
 
-                # NEW: Auto-sync collaboration if exists
+                # Update collaboration payment status ONLY (NOT escrow)
                 collaboration = Collaboration.query.filter_by(booking_id=booking.id).first()
                 if collaboration:
                     collaboration.payment_status = 'paid'
-                    collaboration.escrow_status = 'escrowed'
-                    if collaboration.status == 'pending':
-                        collaboration.status = 'in_progress'  # Activate collaboration
+                    # Do NOT set escrow_status - escrow only triggers on collaboration completion
+                    # Do NOT change collaboration.status - brand controls workflow
 
             db.session.commit()
             return True

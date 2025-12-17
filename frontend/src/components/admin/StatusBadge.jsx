@@ -1,48 +1,79 @@
-const StatusBadge = ({ status, type = 'default' }) => {
-  const statusConfig = {
-    // User statuses
-    verified: { color: 'green', label: 'Verified', icon: '✓' },
-    unverified: { color: 'yellow', label: 'Unverified', icon: '⚠' },
-    active: { color: 'green', label: 'Active', icon: '●' },
-    inactive: { color: 'red', label: 'Suspended', icon: '●' },
+import { getStatusClasses, getStatusLabel } from '../../config/statusColors';
 
-    // Cashout statuses
-    pending: { color: 'yellow', label: 'Pending', icon: '⏱' },
-    approved: { color: 'blue', label: 'Approved', icon: '✓' },
-    rejected: { color: 'red', label: 'Rejected', icon: '✗' },
-    completed: { color: 'green', label: 'Completed', icon: '✓' },
+/**
+ * StatusBadge Component
+ *
+ * Displays a colored badge for various status values across the platform.
+ * Now uses centralized status color configuration for consistency.
+ *
+ * @param {Object} props
+ * @param {string} props.status - Status value (e.g., 'pending', 'approved', 'in_progress')
+ * @param {string} props.type - Badge type (not currently used, kept for backward compatibility)
+ * @param {string} props.icon - Optional icon to display (overrides default)
+ * @param {boolean} props.showIcon - Whether to show icon (default: true)
+ *
+ * @example
+ * <StatusBadge status="pending" />
+ * <StatusBadge status="approved" icon="✅" />
+ * <StatusBadge status="in_progress" showIcon={false} />
+ */
+const StatusBadge = ({ status, type = 'default', icon, showIcon = true }) => {
+  // Default icons for common statuses
+  const defaultIcons = {
+    // Success states
+    verified: '✓',
+    active: '●',
+    approved: '✓',
+    completed: '✓',
+    paid: '$',
+    confirmed: '✓',
+    accepted: '✓',
+    released: '✓',
 
-    // Collaboration statuses
-    in_progress: { color: 'blue', label: 'In Progress', icon: '●' },
-    cancelled: { color: 'red', label: 'Cancelled', icon: '✗' },
+    // Pending/Warning states
+    unverified: '⚠',
+    pending: '⏱',
+    escrow: '$',
+    under_review: '👁',
+    reviewing: '👁',
+    verifying: '🔍',
 
-    // Payment statuses
-    paid: { color: 'green', label: 'Paid', icon: '$' },
-    released: { color: 'green', label: 'Released', icon: '✓' },
-    escrow: { color: 'yellow', label: 'Escrow', icon: '$' },
+    // In Progress states (Brand color)
+    in_progress: '●',
+    processing: '⚙',
 
-    // Default
-    default: { color: 'gray', label: status, icon: '' },
+    // Failure states
+    inactive: '●',
+    rejected: '✗',
+    cancelled: '✗',
+    failed: '✗',
+    declined: '✗',
+
+    // Revision states
+    revision_requested: '↩',
+
+    // Draft states
+    draft: '📝',
   };
 
-  const config = statusConfig[status?.toLowerCase()] || statusConfig.default;
+  // Normalize status for lookup
+  const normalizedStatus = status?.toLowerCase()?.replace(/\s+/g, '_');
 
-  const colorClasses = {
-    green: 'bg-green-100 text-green-800 border-green-200',
-    blue: 'bg-blue-100 text-blue-800 border-blue-200',
-    yellow: 'bg-yellow-100 text-yellow-800 border-yellow-200',
-    red: 'bg-red-100 text-red-800 border-red-200',
-    gray: 'bg-gray-100 text-gray-800 border-gray-200',
-  };
+  // Get label (either custom or auto-generated from status)
+  const label = getStatusLabel(status);
+
+  // Get icon (custom, default, or none)
+  const displayIcon = icon || (showIcon ? defaultIcons[normalizedStatus] : null);
+
+  // Get Tailwind classes from config
+  const classes = getStatusClasses(status, ['badge', 'text', 'border']);
 
   return (
     <span
-      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${
-        colorClasses[config.color]
-      }`}
+      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${classes}`}
     >
-      {config.icon && <span className="mr-1">{config.icon}</span>}
-      {config.label}
+      {displayIcon && <span className="mr-1">{displayIcon}</span>}
+      {label}
     </span>
   );
 };

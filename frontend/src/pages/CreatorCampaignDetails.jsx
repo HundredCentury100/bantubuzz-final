@@ -152,7 +152,7 @@ const CreatorCampaignDetails = () => {
             )}
 
             {hasApplied && (
-              <div className="px-6 py-3 bg-blue-100 text-blue-800 font-medium rounded-lg">
+              <div className="px-6 py-3 bg-primary/10 text-primary-dark font-medium rounded-lg">
                 Application Submitted
               </div>
             )}

@@ -122,7 +122,7 @@ export default function AdminPayments() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
       </div>
     );
   }
@@ -138,7 +138,7 @@ export default function AdminPayments() {
           </div>
           <button
             onClick={() => setShowAddModal(true)}
-            className="bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 transition flex items-center gap-2"
+            className="bg-primary text-dark px-6 py-3 rounded-lg hover:bg-primary-dark hover:text-white transition flex items-center gap-2"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -174,12 +174,12 @@ export default function AdminPayments() {
             </div>
             <div className="bg-white rounded-lg shadow-md p-6">
               <p className="text-sm text-gray-600">This Month</p>
-              <p className="text-3xl font-bold text-blue-600 mt-2">{statistics.month_count}</p>
+              <p className="text-3xl font-bold text-primary-dark mt-2">{statistics.month_count}</p>
               <p className="text-sm text-gray-500 mt-1">{formatCurrency(statistics.month_amount)}</p>
             </div>
             <div className="bg-white rounded-lg shadow-md p-6">
               <p className="text-sm text-gray-600">Total Verified</p>
-              <p className="text-3xl font-bold text-purple-600 mt-2">{statistics.total_verified_count}</p>
+              <p className="text-3xl font-bold text-primary mt-2">{statistics.total_verified_count}</p>
               <p className="text-sm text-gray-500 mt-1">{formatCurrency(statistics.total_verified_amount)}</p>
             </div>
           </div>
@@ -265,7 +265,7 @@ export default function AdminPayments() {
                   value={verifyData.amount}
                   onChange={(e) => setVerifyData({ ...verifyData, amount: e.target.value })}
                   step="0.01"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                   required
                 />
               </div>
@@ -275,7 +275,7 @@ export default function AdminPayments() {
                 <select
                   value={verifyData.payment_method}
                   onChange={(e) => setVerifyData({ ...verifyData, payment_method: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                   required
                 >
                   <option value="bank_transfer">Bank Transfer</option>
@@ -291,7 +291,7 @@ export default function AdminPayments() {
                   type="text"
                   value={verifyData.transaction_reference}
                   onChange={(e) => setVerifyData({ ...verifyData, transaction_reference: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                   placeholder="e.g., TXN123456"
                 />
               </div>
@@ -302,7 +302,7 @@ export default function AdminPayments() {
                   type="date"
                   value={verifyData.payment_date}
                   onChange={(e) => setVerifyData({ ...verifyData, payment_date: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                 />
               </div>
 
@@ -312,7 +312,7 @@ export default function AdminPayments() {
                   type="url"
                   value={verifyData.proof_url}
                   onChange={(e) => setVerifyData({ ...verifyData, proof_url: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                   placeholder="https://..."
                 />
               </div>
@@ -323,7 +323,7 @@ export default function AdminPayments() {
                   value={verifyData.notes}
                   onChange={(e) => setVerifyData({ ...verifyData, notes: e.target.value })}
                   rows={3}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                   placeholder="Any additional notes..."
                 />
               </div>
@@ -368,7 +368,7 @@ export default function AdminPayments() {
                   type="number"
                   value={addPaymentData.booking_id}
                   onChange={(e) => setAddPaymentData({ ...addPaymentData, booking_id: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                   placeholder="e.g., 123"
                   required
                 />
@@ -381,7 +381,7 @@ export default function AdminPayments() {
                   value={addPaymentData.amount}
                   onChange={(e) => setAddPaymentData({ ...addPaymentData, amount: e.target.value })}
                   step="0.01"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                   required
                 />
               </div>
@@ -391,7 +391,7 @@ export default function AdminPayments() {
                 <select
                   value={addPaymentData.payment_method}
                   onChange={(e) => setAddPaymentData({ ...addPaymentData, payment_method: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                   required
                 >
                   <option value="bank_transfer">Bank Transfer</option>
@@ -407,7 +407,7 @@ export default function AdminPayments() {
                   type="text"
                   value={addPaymentData.transaction_reference}
                   onChange={(e) => setAddPaymentData({ ...addPaymentData, transaction_reference: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                   placeholder="e.g., TXN123456"
                   required
                 />
@@ -419,7 +419,7 @@ export default function AdminPayments() {
                   type="date"
                   value={addPaymentData.payment_date}
                   onChange={(e) => setAddPaymentData({ ...addPaymentData, payment_date: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                   required
                 />
               </div>
@@ -430,7 +430,7 @@ export default function AdminPayments() {
                   type="url"
                   value={addPaymentData.proof_url}
                   onChange={(e) => setAddPaymentData({ ...addPaymentData, proof_url: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                   placeholder="https://..."
                 />
               </div>
@@ -441,7 +441,7 @@ export default function AdminPayments() {
                   value={addPaymentData.notes}
                   onChange={(e) => setAddPaymentData({ ...addPaymentData, notes: e.target.value })}
                   rows={3}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                   placeholder="Payment received directly from brand..."
                 />
               </div>
@@ -456,7 +456,7 @@ export default function AdminPayments() {
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition"
+                  className="flex-1 px-6 py-3 bg-primary text-dark rounded-lg hover:bg-primary-dark hover:text-white transition"
                 >
                   Add Payment
                 </button>

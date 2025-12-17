@@ -49,7 +49,7 @@ const Home = () => {
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-[#f5f5f0]">
+    <div className="min-h-screen flex flex-col bg-light">
       <SEO
         title="Home"
         description="Connect with top African creators and brands. BantuBuzz is Africa's premier platform for influencer marketing and brand collaborations."
@@ -424,22 +424,22 @@ const Home = () => {
 
               <div className="space-y-6">
                 <div>
-                  <h4 className="font-bold text-lg mb-2">Search Influencers</h4>
-                  <p className="text-primary">
+                  <h4 className="font-bold text-lg leading-snug mb-2">Search Influencers</h4>
+                  <p className="text-primary leading-relaxed">
                     Search thousands of vetted Instagram, TikTok, and YouTube influencers.
                   </p>
                 </div>
 
                 <div>
-                  <h4 className="font-bold text-lg mb-2">Purchase & Chat Securely</h4>
-                  <p className="text-primary">
+                  <h4 className="font-bold text-lg leading-snug mb-2">Purchase & Chat Securely</h4>
+                  <p className="text-primary leading-relaxed">
                     Safely purchase and communicate through Bantubuzz. We hold your payment until the work is completed.
                   </p>
                 </div>
 
                 <div>
-                  <h4 className="font-bold text-lg mb-2">Receive Quality Content</h4>
-                  <p className="text-primary">
+                  <h4 className="font-bold text-lg leading-snug mb-2">Receive Quality Content</h4>
+                  <p className="text-primary leading-relaxed">
                     Receive your high-quality content from influencers directly through the platform.
                   </p>
                 </div>

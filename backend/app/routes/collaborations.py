@@ -607,10 +607,20 @@ def complete_collaboration(collab_id):
         if collaboration.brand_id != brand.id:
             return jsonify({'error': 'Unauthorized'}), 403
 
+        # Check if payment has been made before allowing completion
+        if collaboration.payment_status != 'paid':
+            return jsonify({
+                'error': 'Cannot complete collaboration - payment not received',
+                'message': 'Please ensure payment is completed before marking collaboration as complete'
+            }), 400
+
         collaboration.status = 'completed'
         collaboration.actual_completion_date = datetime.utcnow()
         collaboration.progress_percentage = 100
         collaboration.updated_at = datetime.utcnow()
+
+        # Trigger escrow when brand completes collaboration
+        collaboration.escrow_status = 'escrowed'
 
         # Also mark the related booking as completed if it exists
         if collaboration.booking_id:
@@ -619,8 +629,24 @@ def complete_collaboration(collab_id):
             if booking and booking.status != 'completed':
                 booking.status = 'completed'
                 booking.completion_date = datetime.utcnow()
+                # Mark escrow on booking as well
+                booking.escrow_status = 'escrowed'
+                booking.escrowed_at = datetime.utcnow()
 
         db.session.commit()
+
+        # Release escrow to creator wallet with 24-hour countdown
+        try:
+            from app.services.payment_service import release_escrow_to_wallet
+            transaction = release_escrow_to_wallet(collaboration.id, platform_fee_percentage=15)
+
+            # Transaction created successfully with 24-hour countdown
+            print(f"Escrow released to wallet for collaboration {collaboration.id}. Transaction ID: {transaction.id}")
+        except Exception as e:
+            # Log error but don't fail the completion
+            print(f"Warning: Failed to release escrow to wallet: {str(e)}")
+            # We don't rollback here because the collaboration is still completed
+            # Admin can manually release escrow later if needed
 
         # Notify creator that collaboration is completed
         creator_user = User.query.get(collaboration.creator.user_id)

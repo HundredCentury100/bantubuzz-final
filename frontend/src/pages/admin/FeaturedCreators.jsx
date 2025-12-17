@@ -118,7 +118,7 @@ export default function AdminFeaturedCreators() {
                 </span>
               ))}
               {platforms.length > 0 && (
-                <span className="px-2 py-1 bg-blue-100 text-blue-700 text-xs rounded-full">
+                <span className="px-2 py-1 bg-primary/10 text-primary-dark text-xs rounded-full">
                   {platforms.map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(', ')}
                 </span>
               )}
@@ -150,8 +150,8 @@ export default function AdminFeaturedCreators() {
       <div className="space-y-6">
         {/* Header */}
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Featured Creators</h1>
-          <p className="text-gray-600 mt-1">Manage creators featured on the homepage</p>
+          <h1 className="text-3xl font-bold text-gray-900 leading-tight">Featured Creators</h1>
+          <p className="text-gray-600 leading-relaxed mt-1">Manage creators featured on the homepage</p>
         </div>
 
         {/* Filters */}
@@ -162,7 +162,7 @@ export default function AdminFeaturedCreators() {
               <select
                 value={featuredTypeFilter}
                 onChange={(e) => setFeaturedTypeFilter(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
               >
                 <option value="all">All Featured</option>
                 <option value="general">General Featured</option>
@@ -175,7 +175,7 @@ export default function AdminFeaturedCreators() {
               <select
                 value={platformFilter}
                 onChange={(e) => setPlatformFilter(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
               >
                 <option value="all">All Platforms</option>
                 <option value="tiktok">TikTok Creators Only</option>
@@ -310,7 +310,7 @@ export default function AdminFeaturedCreators() {
               <button
                 onClick={handleFeature}
                 disabled={actionLoading}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                className="px-4 py-2 bg-primary text-dark rounded-lg hover:bg-primary-dark hover:text-white disabled:opacity-50 transition-colors"
               >
                 {actionLoading ? 'Featuring...' : 'Feature Creator'}
               </button>
