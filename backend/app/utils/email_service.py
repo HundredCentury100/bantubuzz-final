@@ -175,8 +175,7 @@ def send_cashout_request_notification_to_admin(cashout):
                     <p>This is an automated notification from BantuBuzz</p>
                     <p>Please process this cashout request within 24-48 hours</p>
                     <p style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
-                        © 2025 BantuBuzz. All rights reserved.<br>
-                        <a href="https://bantubuzz.com" style="color: #7c3aed; text-decoration: none;">bantubuzz.com</a>
+                        © 2025 BantuBuzz. All rights reserved.
                     </p>
                 </div>
             </div>
@@ -217,10 +216,10 @@ def send_cashout_completed_notification(cashout, creator_email):
         <style>
             body {{ font-family: Arial, sans-serif; line-height: 1.6; color: #333; }}
             .container {{ max-width: 600px; margin: 0 auto; padding: 20px; }}
-            .header {{ background: linear-gradient(135deg, #10b981 0%, #34d399 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }}
+            .header {{ background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%); color: white; padding: 30px; text-align: center; border-radius: 10px 10px 0 0; }}
             .content {{ background: #f9fafb; padding: 30px; border-radius: 0 0 10px 10px; }}
             .success-icon {{ font-size: 60px; text-align: center; margin: 20px 0; }}
-            .amount {{ font-size: 32px; font-weight: bold; color: #10b981; text-align: center; margin: 20px 0; }}
+            .amount {{ font-size: 32px; font-weight: bold; color: #7c3aed; text-align: center; margin: 20px 0; }}
             .info-box {{ background: white; padding: 20px; border-radius: 8px; margin: 20px 0; }}
             .info-row {{ display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #e5e7eb; }}
             .info-row:last-child {{ border-bottom: none; }}
@@ -290,8 +289,7 @@ def send_cashout_completed_notification(cashout, creator_email):
                     <p>Thank you for being part of BantuBuzz!</p>
                     <p>If you have any questions, please contact support@bantubuzz.com</p>
                     <p style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
-                        © 2025 BantuBuzz. All rights reserved.<br>
-                        <a href="https://bantubuzz.com" style="color: #10b981; text-decoration: none;">bantubuzz.com</a>
+                        © 2025 BantuBuzz. All rights reserved.
                     </p>
                 </div>
             </div>
@@ -393,8 +391,7 @@ def send_payment_verified_notification(payment, creator_email):
                     <p>The payment is now held in escrow and will be released to your wallet once the work is completed and approved.</p>
                     <p>Questions? Contact support@bantubuzz.com</p>
                     <p style="margin-top: 20px; padding-top: 20px; border-top: 1px solid #e5e7eb;">
-                        © 2025 BantuBuzz. All rights reserved.<br>
-                        <a href="https://bantubuzz.com" style="color: #3b82f6; text-decoration: none;">bantubuzz.com</a>
+                        © 2025 BantuBuzz. All rights reserved.
                     </p>
                 </div>
             </div>

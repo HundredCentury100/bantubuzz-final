@@ -78,9 +78,6 @@ def send_otp_email(email, otp_code, purpose='registration'):
             <p style="color: #F3F4F6; margin: 0; font-size: 14px;">
                 © 2025 BantuBuzz. All rights reserved.
             </p>
-            <p style="color: #9CA3AF; margin: 5px 0 0 0; font-size: 12px;">
-                <a href="https://bantubuzz.com" style="color: #c8ff09; text-decoration: none;">bantubuzz.com</a>
-            </p>
         </div>
     </body>
     </html>
@@ -133,9 +130,6 @@ def send_verification_email(email, token):
         <div style="background-color: #1F2937; padding: 20px; text-align: center;">
             <p style="color: #F3F4F6; margin: 0; font-size: 14px;">
                 © 2025 BantuBuzz. All rights reserved.
-            </p>
-            <p style="color: #9CA3AF; margin: 5px 0 0 0; font-size: 12px;">
-                <a href="https://bantubuzz.com" style="color: #c8ff09; text-decoration: none;">bantubuzz.com</a>
             </p>
         </div>
     </body>
@@ -193,9 +187,6 @@ def send_password_reset_email(email, token):
         <div style="background-color: #1F2937; padding: 20px; text-align: center;">
             <p style="color: #F3F4F6; margin: 0; font-size: 14px;">
                 © 2025 BantuBuzz. All rights reserved.
-            </p>
-            <p style="color: #9CA3AF; margin: 5px 0 0 0; font-size: 12px;">
-                <a href="https://bantubuzz.com" style="color: #c8ff09; text-decoration: none;">bantubuzz.com</a>
             </p>
         </div>
     </body>
