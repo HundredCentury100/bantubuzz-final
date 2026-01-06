@@ -148,14 +148,9 @@ def upload_logo():
             db.session.commit()
 
             return jsonify({
-                'message': 'Logo uploaded and compressed successfully',
+                'message': 'Logo updated successfully',
                 'logo': image_data['medium'],
-                'logo_sizes': brand.logo_sizes,
-                'compression_stats': {
-                    'original_size_kb': image_data.get('original_size_kb', 0),
-                    'compressed_size_kb': image_data.get('compressed_size_kb', 0),
-                    'savings_percent': image_data.get('savings_percent', 0)
-                }
+                'logo_sizes': brand.logo_sizes
             }), 200
 
         except ValueError as e:

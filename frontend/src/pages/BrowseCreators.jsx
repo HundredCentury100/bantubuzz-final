@@ -142,11 +142,12 @@ const BrowseCreators = () => {
   const handleFilterChange = (key, value) => {
     setFilters(prev => ({ ...prev, [key]: value }));
     setPagination(prev => ({ ...prev, current_page: 1 }));
+    // Real-time filtering happens automatically via useEffect watching filters
   };
 
   const handleSearch = (e) => {
-    e.preventDefault();
-    fetchCreators();
+    if (e) e.preventDefault();
+    // Search is already triggered by useEffect, but this can be used for manual submit
   };
 
   const handlePageChange = (newPage) => {
@@ -183,10 +184,40 @@ const BrowseCreators = () => {
           <p className="text-gray-600">Find the perfect creator for your brand</p>
         </div>
 
-        {/* Filters */}
+        {/* Search Bar - Prominent */}
+        <div className="mb-6">
+          <div className="relative">
+            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
+              <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+            </div>
+            <input
+              type="text"
+              value={filters.search}
+              onChange={(e) => handleFilterChange('search', e.target.value)}
+              placeholder="Search creators by name, bio, or category..."
+              className="w-full pl-12 pr-4 py-4 text-lg border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all"
+            />
+            {filters.search && (
+              <button
+                onClick={() => handleFilterChange('search', '')}
+                className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 hover:text-gray-600"
+              >
+                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            )}
+          </div>
+          <p className="text-sm text-gray-500 mt-2">Search updates automatically as you type</p>
+        </div>
+
+        {/* Additional Filters */}
         <div className="card mb-8">
+          <h3 className="text-lg font-semibold text-dark mb-4">Filter Results</h3>
           <form onSubmit={handleSearch}>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {/* Category Filter */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -233,28 +264,7 @@ const BrowseCreators = () => {
                   ))}
                 </select>
               </div>
-
-              {/* Search */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Search
-                </label>
-                <input
-                  type="text"
-                  value={filters.search}
-                  onChange={(e) => handleFilterChange('search', e.target.value)}
-                  placeholder="Search creators..."
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                />
-              </div>
             </div>
-
-            <button
-              type="submit"
-              className="btn btn-primary w-full md:w-auto"
-            >
-              Apply Filters
-            </button>
           </form>
         </div>
 

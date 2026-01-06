@@ -54,6 +54,14 @@ import Wallet from './pages/Wallet';
 import CashoutRequest from './pages/CashoutRequest';
 import BrandWallet from './pages/BrandWallet';
 
+// Public Pages
+import About from './pages/About';
+import HowItWorks from './pages/HowItWorks';
+import SuccessStories from './pages/SuccessStories';
+import Contact from './pages/Contact';
+import PrivacyPolicy from './pages/PrivacyPolicy';
+import TermsOfService from './pages/TermsOfService';
+
 // Protected Route Component
 const ProtectedRoute = ({ children, requiredType }) => {
   const { isAuthenticated, user, loading } = useAuth();
@@ -473,6 +481,14 @@ function App() {
         }
       />
       <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
+
+      {/* Public Info Pages */}
+      <Route path="/about" element={<About />} />
+      <Route path="/how-it-works" element={<HowItWorks />} />
+      <Route path="/success-stories" element={<SuccessStories />} />
+      <Route path="/contact" element={<Contact />} />
+      <Route path="/privacy" element={<PrivacyPolicy />} />
+      <Route path="/terms" element={<TermsOfService />} />
 
       {/* 404 */}
       <Route path="*" element={<NotFound />} />

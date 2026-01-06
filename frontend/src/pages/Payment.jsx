@@ -141,7 +141,7 @@ const Payment = () => {
               <div className="flex justify-between items-center pb-4 border-b border-gray-200">
                 <span className="text-gray-600">Creator</span>
                 <span className="font-medium text-dark">
-                  {booking.creator?.user?.email?.split('@')[0] || 'N/A'}
+                  {booking.creator?.display_name || booking.creator?.username || 'N/A'}
                 </span>
               </div>
 

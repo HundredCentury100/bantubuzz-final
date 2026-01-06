@@ -81,18 +81,24 @@ export default function CashoutRequest() {
   const validateForm = () => {
     const amount = parseFloat(formData.amount);
 
+    // Check if wallet has sufficient balance first
+    if (wallet.available_balance < 10) {
+      setError('Insufficient funds to complete this request. Minimum cashout amount is $10.');
+      return false;
+    }
+
     if (!amount || amount <= 0) {
       setError('Please enter a valid amount');
       return false;
     }
 
-    if (amount > wallet.available_balance) {
-      setError(`Amount cannot exceed your available balance of ${formatCurrency(wallet.available_balance)}`);
+    if (amount < 10) {
+      setError('Minimum cashout amount is $10');
       return false;
     }
 
-    if (amount < 10) {
-      setError('Minimum cashout amount is $10');
+    if (amount > wallet.available_balance) {
+      setError(`Insufficient funds. Your available balance is ${formatCurrency(wallet.available_balance)}`);
       return false;
     }
 
@@ -277,6 +283,11 @@ export default function CashoutRequest() {
           <p className="text-sm opacity-90 mb-2">Available Balance</p>
           <p className="text-4xl font-bold">{formatCurrency(wallet?.available_balance)}</p>
           <p className="text-sm opacity-75 mt-2">Minimum withdrawal: $10.00</p>
+          {wallet?.available_balance < 10 && (
+            <div className="mt-3 bg-white/20 rounded-lg p-3">
+              <p className="text-sm font-medium">Insufficient funds for withdrawal</p>
+            </div>
+          )}
         </div>
 
         {/* Cashout Form */}
@@ -296,8 +307,8 @@ export default function CashoutRequest() {
                 onChange={handleInputChange}
                 step="0.01"
                 min="10"
-                max={wallet?.available_balance}
-                className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent"
+                disabled={wallet?.available_balance < 10}
+                className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-600 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed"
                 placeholder="0.00"
                 required
               />

@@ -235,12 +235,12 @@ const BrandDashboard = () => {
                         <div className="mx-auto mb-3 flex items-center justify-center">
                           <Avatar
                             src={creator.profile_picture}
-                            alt={creator.user?.email || 'Creator'}
+                            alt={creator.display_name || creator.username || 'Creator'}
                             size="lg"
                             type="user"
                           />
                         </div>
-                        <p className="font-medium text-dark text-sm mb-1">{creator.user?.email || 'Creator'}</p>
+                        <p className="font-medium text-dark text-sm mb-1">{creator.display_name || creator.username || 'Creator'}</p>
                         <p className="text-xs text-gray-500">{creator.follower_count?.toLocaleString() || 0} followers</p>
                       </div>
                     </Link>

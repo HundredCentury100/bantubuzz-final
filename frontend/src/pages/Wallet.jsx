@@ -29,9 +29,9 @@ export default function Wallet() {
       ]);
 
       setWallet(balanceRes.data.wallet);
-      setTransactions(transactionsRes.data.transactions);
-      setPendingClearance(pendingRes.data.pending_transactions);
-      setCashouts(cashoutsRes.data.cashouts);
+      setTransactions(transactionsRes.data.transactions || []);
+      setPendingClearance(pendingRes.data.transactions || []);
+      setCashouts(cashoutsRes.data.cashouts || []);
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to load wallet data');
     } finally {

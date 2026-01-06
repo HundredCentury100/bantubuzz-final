@@ -84,10 +84,10 @@ const Bookings = () => {
           </div>
 
           {/* Filter Tabs */}
-          <div className="flex gap-2 border-b border-gray-200">
+          <div className="flex gap-2 border-b border-gray-200 overflow-x-auto scrollbar-hide">
             <button
               onClick={() => setFilter('all')}
-              className={`px-4 py-2 font-medium transition-colors ${
+              className={`px-4 py-2 font-medium transition-colors whitespace-nowrap flex-shrink-0 ${
                 filter === 'all'
                   ? 'text-primary border-b-2 border-primary'
                   : 'text-gray-600 hover:text-gray-900'
@@ -97,7 +97,7 @@ const Bookings = () => {
             </button>
             <button
               onClick={() => setFilter('pending')}
-              className={`px-4 py-2 font-medium transition-colors ${
+              className={`px-4 py-2 font-medium transition-colors whitespace-nowrap flex-shrink-0 ${
                 filter === 'pending'
                   ? 'text-primary border-b-2 border-primary'
                   : 'text-gray-600 hover:text-gray-900'
@@ -107,7 +107,7 @@ const Bookings = () => {
             </button>
             <button
               onClick={() => setFilter('accepted')}
-              className={`px-4 py-2 font-medium transition-colors ${
+              className={`px-4 py-2 font-medium transition-colors whitespace-nowrap flex-shrink-0 ${
                 filter === 'accepted'
                   ? 'text-primary border-b-2 border-primary'
                   : 'text-gray-600 hover:text-gray-900'
@@ -117,7 +117,7 @@ const Bookings = () => {
             </button>
             <button
               onClick={() => setFilter('completed')}
-              className={`px-4 py-2 font-medium transition-colors ${
+              className={`px-4 py-2 font-medium transition-colors whitespace-nowrap flex-shrink-0 ${
                 filter === 'completed'
                   ? 'text-primary border-b-2 border-primary'
                   : 'text-gray-600 hover:text-gray-900'
@@ -156,8 +156,8 @@ const Bookings = () => {
         ) : (
           <div className="space-y-4">
             {filteredBookings.map((booking) => (
-              <div key={booking.id} className="bg-white rounded-lg shadow hover:shadow-lg transition-shadow p-6">
-                <div className="flex items-start justify-between">
+              <div key={booking.id} className="bg-white rounded-lg shadow hover:shadow-lg transition-shadow p-4 sm:p-6">
+                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
                   {/* Booking Info */}
                   <div className="flex-1">
                     <div className="flex items-start gap-4">
@@ -175,32 +175,32 @@ const Bookings = () => {
                         </h3>
                         <p className="text-gray-600 mb-3">
                           {isCreator
-                            ? `Brand: ${booking.brand?.company_name || booking.brand?.user?.email?.split('@')[0] || 'Unknown'}`
-                            : `Creator: ${booking.creator?.user?.email?.split('@')[0] || 'Unknown'}`}
+                            ? `Brand: ${booking.brand?.company_name || booking.brand?.display_name || 'Unknown'}`
+                            : `Creator: ${booking.creator?.display_name || booking.creator?.username || 'Unknown'}`}
                         </p>
 
-                        <div className="grid grid-cols-2 gap-4 text-sm">
-                          <div>
-                            <span className="text-gray-600">Booking Date:</span>
-                            <span className="ml-2 font-medium text-gray-900">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                          <div className="flex flex-col gap-1">
+                            <span className="text-gray-600">Booking Date</span>
+                            <span className="font-medium text-gray-900">
                               {new Date(booking.booking_date).toLocaleDateString()}
                             </span>
                           </div>
-                          <div>
-                            <span className="text-gray-600">Amount:</span>
-                            <span className="ml-2 font-medium text-gray-900">
+                          <div className="flex flex-col gap-1">
+                            <span className="text-gray-600">Amount</span>
+                            <span className="font-medium text-gray-900">
                               ${booking.amount?.toFixed(2) || '0.00'}
                             </span>
                           </div>
-                          <div>
-                            <span className="text-gray-600">Booking Status:</span>
-                            <span className={`ml-2 px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(booking.status)}`}>
+                          <div className="flex flex-col gap-1">
+                            <span className="text-gray-600">Status</span>
+                            <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium w-fit ${getStatusColor(booking.status)}`}>
                               {booking.status}
                             </span>
                           </div>
-                          <div>
-                            <span className="text-gray-600">Payment Status:</span>
-                            <span className={`ml-2 px-2 py-1 rounded-full text-xs font-medium ${getPaymentStatusColor(booking.payment_status)}`}>
+                          <div className="flex flex-col gap-1">
+                            <span className="text-gray-600">Payment</span>
+                            <span className={`inline-block px-3 py-1 rounded-full text-xs font-medium w-fit ${getPaymentStatusColor(booking.payment_status)}`}>
                               {booking.payment_status}
                             </span>
                           </div>
@@ -223,7 +223,7 @@ const Bookings = () => {
                   </div>
 
                   {/* Actions */}
-                  <div className="flex flex-col gap-2 ml-4">
+                  <div className="flex flex-col sm:flex-row sm:items-start gap-2 sm:ml-4 w-full sm:w-auto">
                     {isCreator ? (
                       // Creator Actions
                       <>

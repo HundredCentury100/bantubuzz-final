@@ -56,7 +56,13 @@ const CreatorProfileEdit = () => {
       const data = response.data;
       setProfile(data);
       setProfilePicture(data.profile_picture);
-      setGallery(data.gallery || []);
+
+      // Handle both old (array of strings) and new (array of objects) gallery formats
+      const galleryData = data.gallery_images || data.gallery || [];
+      const galleryPaths = galleryData.map(item =>
+        typeof item === 'string' ? item : item.medium || item.large || item.thumbnail
+      );
+      setGallery(galleryPaths);
 
       // Set form values
       setValue('username', data.username || '');
@@ -122,8 +128,10 @@ const CreatorProfileEdit = () => {
     setUploadingPicture(true);
     try {
       const response = await creatorsAPI.uploadProfilePicture(file);
-      setProfilePicture(response.data.profile_picture);
-      toast.success('Profile picture uploaded successfully!');
+      // Add timestamp to force browser cache refresh
+      const picturePath = response.data.profile_picture;
+      setProfilePicture(`${picturePath}?t=${Date.now()}`);
+      toast.success('Profile picture updated!');
     } catch (err) {
       toast.error(err.response?.data?.error || 'Failed to upload profile picture');
     } finally {
@@ -150,10 +158,18 @@ const CreatorProfileEdit = () => {
     setUploadingGallery(true);
     try {
       const response = await creatorsAPI.uploadGalleryImage(file);
-      setGallery(response.data.gallery);
-      toast.success('Gallery image uploaded successfully!');
+
+      // Backend returns gallery_images (new format) with objects containing sizes
+      // Extract the medium size for display compatibility
+      const galleryImages = response.data.gallery_images || [];
+      const galleryPaths = galleryImages.map(item =>
+        typeof item === 'string' ? item : item.medium || item.large || item.thumbnail
+      );
+      setGallery(galleryPaths);
+
+      toast.success('Portfolio image added successfully!');
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to upload gallery image');
+      toast.error(err.response?.data?.error || 'Failed to upload portfolio image');
     } finally {
       setUploadingGallery(false);
       // Reset the file input
@@ -165,10 +181,18 @@ const CreatorProfileEdit = () => {
     setDeletingGalleryIndex(index);
     try {
       const response = await creatorsAPI.deleteGalleryImage(index);
-      setGallery(response.data.gallery);
-      toast.success('Gallery image deleted successfully!');
+
+      // Backend returns both gallery and gallery_images
+      // Convert gallery_images to paths for display
+      const galleryImages = response.data.gallery_images || response.data.gallery || [];
+      const galleryPaths = galleryImages.map(item =>
+        typeof item === 'string' ? item : item.medium || item.large || item.thumbnail
+      );
+      setGallery(galleryPaths);
+
+      toast.success('Portfolio image removed successfully!');
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to delete gallery image');
+      toast.error(err.response?.data?.error || 'Failed to remove portfolio image');
     } finally {
       setDeletingGalleryIndex(null);
     }
@@ -410,7 +434,29 @@ const CreatorProfileEdit = () => {
                 {errors.username && (
                   <p className="mt-1 text-sm text-error">{errors.username.message}</p>
                 )}
-                <p className="text-xs text-gray-500 mt-1">This will be displayed instead of your email</p>
+                <div className="mt-1">
+                  <p className="text-xs text-gray-600 font-medium mb-1">Username requirements:</p>
+                  <ul className="text-xs text-gray-500 space-y-0.5 ml-4">
+                    <li className="flex items-center gap-1">
+                      <svg className="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                      3-20 characters long
+                    </li>
+                    <li className="flex items-center gap-1">
+                      <svg className="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                      Only letters, numbers, and underscores
+                    </li>
+                    <li className="flex items-center gap-1">
+                      <svg className="w-3 h-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                      </svg>
+                      No spaces or special characters
+                    </li>
+                  </ul>
+                </div>
               </div>
 
               {/* Bio */}

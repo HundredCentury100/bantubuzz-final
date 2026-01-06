@@ -1,0 +1,187 @@
+BUG TRACKING SHEET
+==================
+
+1. Mobile UI: Action Button Overlap
+   User Type: BRAND
+   Steps to Reproduce:
+   1. Open "My Bookings" on mobile.
+   2. View "Instagram Story Package."
+   Expected Result: Buttons should stack vertically or have enough margin to not touch text.
+   Actual Result: Buttons overlap the Package Title and Date text.
+
+2. Mobile UI: Save Button Cut Off
+   User Type: BRAND
+   Steps to Reproduce:
+   1. View a Creator Profile on mobile.
+   Expected Result: The "Save Creator" button should be fully visible and centered/aligned.
+   Actual Result: Button is partially cut off on the right edge of the screen.
+
+3. Mobile UI: Booking Status Collision
+   User Type: BRAND
+   Steps to Reproduce:
+   1. Open "My Bookings" on mobile.
+   Expected Result: Clear padding between the "Status:" label and the "pending" pill.
+   Actual Result: The word "Status:" is physically touching/overlapping the "pending" badge.
+
+4. Brand: Payment Summary Identity
+   User Type: BRAND
+   Steps to Reproduce:
+   1. View "Complete Payment" page.
+   Expected Result: Show the specific name of the creator being paid (e.g., "Thunzi").
+   Actual Result: Displays the generic database label "creator".
+
+5. Brand: My Bookings Identity
+   User Type: BRAND
+   Steps to Reproduce:
+   1. View the "My Bookings" list.
+   Expected Result: Each booking should list the specific creator's name.
+   Actual Result: Displays "Creator: creator" for all entries.
+
+6. Creator: Dashboard Campaign Sync
+   User Type: Creator
+   Steps to Reproduce:
+   1. Apply to a campaign.
+   2. Go to Dashboard.
+   Expected Result: A "Recent Activity" or "Applied" widget should show the update.
+   Actual Result: No record of the application appears on the dashboard.
+
+7. Creator: Messages "Failed to Load"
+   User Type: Creator
+   Steps to Reproduce:
+   1. Open "Messages" tab.
+   Expected Result: A list of all active brand conversations should appear.
+   Actual Result: Error: "Failed to load conversations."
+
+8. Creator: Messaging Connection Loop
+   User Type: Creator
+   Steps to Reproduce:
+   1. Open "Messages" tab.
+   Expected Result: Connect to the chat server and show "Online" status within 2 seconds.
+   Actual Result: Stuck on "Connecting..." indefinitely.
+
+9. Creator: Portfolio Upload Crash
+   User Type: Creator
+   Steps to Reproduce:
+   1. Select images and click "Save."
+   Expected Result: Show a loading spinner followed by a "Success" notification.
+   Actual Result: Screen goes completely blank (white).
+
+10. Creator: Portfolio Rendering
+    User Type: Creator
+    Steps to Reproduce:
+    1. Refresh profile after a successful upload.
+    Expected Result: Images should be visible in the portfolio grid.
+    Actual Result: Entry exists in the system, but images are invisible on the UI.
+
+11. Creator: Profile Header Name Error
+    User Type: Creator
+    Steps to Reproduce:
+    1. View public profile page.
+    Expected Result: The top header should show the creator's username.
+    Actual Result: Header displays the generic role name "Creator".
+
+12. Creator: Profile Picture Fail
+    User Type: Creator
+    Steps to Reproduce:
+    1. Upload photo in Settings.
+    2. Click Save.
+    Expected Result: The new photo should replace the grey placeholder immediately.
+    Actual Result: Remains a placeholder; no image shows.
+
+13. Creator: Instagram Icon Error
+    User Type: Creator
+    Steps to Reproduce:
+    1. View social section on profile.
+    Expected Result: Show the official color/logo for Instagram.
+    Actual Result: Shows a generic checkbox icon instead of the logo.
+
+14. Creator: Social Deep-Linking
+    User Type: Creator
+    Steps to Reproduce:
+    1. Click an Instagram/TikTok icon.
+    Expected Result: Open the specific creator's profile in that external app.
+    Actual Result: Opens the generic App Home screen (feed) instead.
+
+15. Creator: Booking Tabs Cut Off
+    User Type: Creator
+    Steps to Reproduce:
+    1. View "Booking Requests" on mobile.
+    Expected Result: All tabs (Pending, Accepted, Completed) should be reachable.
+    Actual Result: "Completed" tab is cut off on the right edge.
+
+16. Creator: Wallet Pending Blank
+    User Type: Creator
+    Steps to Reproduce:
+    1. Click "Pending" in Wallet.
+    Expected Result: List of upcoming payments and their release dates.
+    Actual Result: Displays a completely blank page.
+
+17. Creator: Cashout Logic Math Error
+    User Type: Creator
+    Steps to Reproduce:
+    1. Attempt to withdraw $10 with $0 balance.
+    Expected Result: Show error: "Insufficient funds to complete this request."
+    Actual Result: Error: "Min (10) must be less than max (0)."
+
+18. Creator: Search Filter Inactive
+    User Type: Creator
+    Steps to Reproduce:
+    1. Type a name in "Search by Creators".
+    Expected Result: The list should filter in real-time to show only that person.
+    Actual Result: Search bar does nothing; results do not update.
+
+19. Creator: Search Bar Location
+    User Type: Creator
+    Steps to Reproduce:
+    1. View Discovery page.
+    Expected Result: Search bar should be prominent at the top of the screen.
+    Actual Result: Hidden inside a secondary "Filters" menu.
+
+20. Creator: Username Validation UX
+    User Type: Creator
+    Steps to Reproduce:
+    1. Use an invalid character (space).
+    Expected Result: Show requirements (No spaces, etc.) while user is typing.
+    Actual Result: Rules only appear after clicking "Save."
+
+21. Global: "About Us" Footer Link
+    User Type: Global
+    Steps to Reproduce:
+    1. Click "About Us" in footer.
+    Expected Result: Navigate to the Company About page.
+    Actual Result: Page does not change.
+
+22. Global: "How It Works" Footer
+    User Type: Global
+    Steps to Reproduce:
+    1. Click "How It Works" in footer.
+    Expected Result: Navigate to the education/help page.
+    Actual Result: Redirects to a broken "/packages" page.
+
+23. Global: "Success Stories" Footer
+    User Type: Global
+    Steps to Reproduce:
+    1. Click "Success Stories."
+    Expected Result: Navigate to testimonials/case studies.
+    Actual Result: Page does not change.
+
+24. Global: "Contact" Footer
+    User Type: Global
+    Steps to Reproduce:
+    1. Click "Contact" in footer.
+    Expected Result: Navigate to the contact form.
+    Actual Result: Page does not change.
+
+25. Global: Legal Links
+    User Type: Global
+    Steps to Reproduce:
+    1. Click Privacy or Terms in footer.
+    Expected Result: Open the full legal text for the platform.
+    Actual Result: Page does not change.
+
+==================
+Total Bugs: 25
+Brand Issues: 5
+Creator Issues: 15
+Global Issues: 5
+==================

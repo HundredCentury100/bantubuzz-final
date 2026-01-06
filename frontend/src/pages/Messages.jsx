@@ -94,7 +94,16 @@ const Messages = () => {
       setConversations(response.data.conversations || []);
     } catch (error) {
       console.error('Error loading conversations:', error);
-      toast.error('Failed to load conversations');
+
+      // Check if it's a network error (messaging service unavailable)
+      if (error.code === 'ERR_NETWORK' || error.message.includes('Network Error')) {
+        toast.error('Unable to load messages. The messaging service is currently unavailable.');
+      } else {
+        toast.error('Unable to load conversations. Please try again later.');
+      }
+
+      // Set empty array so UI shows "No conversations" instead of staying in loading state
+      setConversations([]);
     } finally {
       setLoading(false);
     }
@@ -107,7 +116,17 @@ const Messages = () => {
       loadConversationMessages(conversation.id, response.data.messages || []);
     } catch (error) {
       console.error('Error loading conversation:', error);
-      toast.error('Failed to load messages');
+
+      // Still set the conversation so user can see the UI, just with empty messages
+      setSelectedConversation(conversation);
+      loadConversationMessages(conversation.id, []);
+
+      // Check if it's a network error
+      if (error.code === 'ERR_NETWORK' || error.message.includes('Network Error')) {
+        toast.error('Unable to load messages. The messaging service is currently unavailable.');
+      } else {
+        toast.error('Unable to load messages for this conversation.');
+      }
     }
   };
 
@@ -184,9 +203,10 @@ const Messages = () => {
       <div className="container-custom section-padding">
         <h1 className="text-4xl font-bold mb-8">Messages</h1>
 
-        {!isConnected && (
-          <div className="bg-primary/20 border border-primary text-primary-dark px-4 py-3 rounded-lg mb-6">
-            Connecting to messaging service...
+        {!isConnected && conversations.length > 0 && (
+          <div className="bg-primary/20 border border-primary text-primary-dark px-4 py-3 rounded-lg mb-6 flex items-center gap-2">
+            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-dark"></div>
+            <span>Loading your messages...</span>
           </div>
         )}
 

@@ -91,7 +91,7 @@ export const MessagingProvider = ({ children }) => {
 
       socketInstance.on('reconnect_failed', () => {
         console.error('❌ Failed to reconnect after maximum attempts');
-        toast.error('Unable to connect to messaging service. Please refresh the page.');
+        toast.error('Unable to load messages. Please refresh the page.');
       });
 
       socketInstance.on('authenticated', (data) => {
@@ -107,9 +107,9 @@ export const MessagingProvider = ({ children }) => {
             console.log('Token expired, attempting to refresh...');
             // The axios interceptor in messagingAPI.js should handle refresh
             // For now, show error to user
-            toast.error('Session expired. Please refresh the page.');
+            toast.error('Your session has expired. Please refresh the page.');
           } else {
-            toast.error('Failed to connect to messaging service');
+            toast.error('Unable to load messages');
           }
 
           // Disconnect the socket if auth failed
@@ -243,7 +243,7 @@ export const MessagingProvider = ({ children }) => {
   // Send a message
   const sendMessage = useCallback((receiverId, content, bookingId = null) => {
     if (!socketRef.current || !isConnected) {
-      toast.error('Not connected to messaging service');
+      toast.error('Unable to send message. Please check your connection.');
       return false;
     }
 

@@ -415,14 +415,9 @@ def upload_profile_picture():
             db.session.commit()
 
             return jsonify({
-                'message': 'Profile picture uploaded and compressed successfully',
+                'message': 'Profile picture updated successfully',
                 'profile_picture': image_data['medium'],
-                'profile_picture_sizes': creator.profile_picture_sizes,
-                'compression_stats': {
-                    'original_size_kb': image_data.get('original_size_kb', 0),
-                    'compressed_size_kb': image_data.get('compressed_size_kb', 0),
-                    'savings_percent': image_data.get('savings_percent', 0)
-                }
+                'profile_picture_sizes': creator.profile_picture_sizes
             }), 200
 
         except ValueError as e:
@@ -492,14 +487,9 @@ def upload_gallery_image():
             db.session.commit()
 
             return jsonify({
-                'message': 'Gallery image uploaded and compressed successfully',
+                'message': 'Portfolio image added successfully',
                 'gallery_item': gallery_item,
-                'gallery_images': creator.gallery_images,
-                'compression_stats': {
-                    'original_size_kb': image_data.get('original_size_kb', 0),
-                    'compressed_size_kb': image_data.get('compressed_size_kb', 0),
-                    'savings_percent': image_data.get('savings_percent', 0)
-                }
+                'gallery_images': creator.gallery_images
             }), 200
 
         except ValueError as e:
@@ -562,7 +552,7 @@ def delete_gallery_image(index):
         db.session.commit()
 
         return jsonify({
-            'message': 'Gallery image deleted successfully',
+            'message': 'Portfolio image removed successfully',
             'gallery': creator.gallery or [],
             'gallery_images': creator.gallery_images or []
         }), 200
