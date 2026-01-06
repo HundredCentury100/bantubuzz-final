@@ -524,3 +524,43 @@ def update_application_status(campaign_id, application_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
+
+
+@bp.route('/my-applications', methods=['GET'])
+@jwt_required()
+def get_my_applications():
+    """Get all campaign applications for the logged-in creator"""
+    try:
+        user_id = int(get_jwt_identity())
+        creator = CreatorProfile.query.filter_by(user_id=user_id).first()
+
+        if not creator:
+            return jsonify({'error': 'Creator profile not found'}), 404
+
+        # Get limit parameter for dashboard (default all applications)
+        limit = request.args.get('limit', type=int)
+        status_filter = request.args.get('status')
+
+        # Query applications with campaign details
+        query = CampaignApplication.query.filter_by(creator_id=creator.id)
+
+        if status_filter:
+            query = query.filter_by(status=status_filter)
+
+        query = query.order_by(CampaignApplication.applied_at.desc())
+
+        if limit:
+            query = query.limit(limit)
+
+        applications = query.all()
+
+        # Return applications with full campaign details
+        result = [app.to_dict(include_relations=True) for app in applications]
+
+        return jsonify({
+            'applications': result,
+            'count': len(result)
+        }), 200
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500

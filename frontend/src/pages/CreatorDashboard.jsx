@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { creatorsAPI, packagesAPI, bookingsAPI } from '../services/api';
+import { creatorsAPI, packagesAPI, bookingsAPI, campaignsAPI } from '../services/api';
 import Navbar from '../components/Navbar';
 import toast from 'react-hot-toast';
 
@@ -9,6 +9,7 @@ const CreatorDashboard = () => {
   const [profile, setProfile] = useState(null);
   const [packages, setPackages] = useState([]);
   const [bookings, setBookings] = useState([]);
+  const [applications, setApplications] = useState([]);
   const [stats, setStats] = useState({
     totalPackages: 0,
     activePackages: 0,
@@ -44,6 +45,11 @@ const CreatorDashboard = () => {
       const bookingsRes = await bookingsAPI.getMyBookings();
       const bks = bookingsRes.data.bookings || [];
       setBookings(bks.slice(0, 5)); // Show only 5 recent
+
+      // Fetch campaign applications
+      const applicationsRes = await campaignsAPI.getMyApplications({ limit: 5 });
+      const apps = applicationsRes.data.applications || [];
+      setApplications(apps);
 
       // Calculate stats
       const activePackages = pkgs.filter(p => p.is_active).length;
@@ -297,6 +303,76 @@ const CreatorDashboard = () => {
                       <p className="text-xs text-gray-500 mt-1">
                         {new Date(booking.created_at).toLocaleDateString()}
                       </p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Recent Campaign Applications */}
+            <div className="card">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-bold text-dark">Recent Campaign Applications</h2>
+                <Link to="/creator/campaigns" className="text-primary hover:text-primary-dark text-sm font-medium">
+                  View All
+                </Link>
+              </div>
+
+              {applications.length === 0 ? (
+                <div className="text-center py-8">
+                  <svg className="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  <h3 className="text-lg font-medium text-gray-700 mb-2">No applications yet</h3>
+                  <p className="text-gray-500 mb-4">Browse campaigns and apply to get started</p>
+                  <Link to="/creator/campaigns" className="btn btn-primary inline-block">
+                    Browse Campaigns
+                  </Link>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {applications.map((app) => (
+                    <div key={app.id} className="p-4 border border-gray-200 rounded-lg hover:border-primary transition-colors">
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex-1">
+                          <h3 className="font-bold text-dark mb-1">{app.campaign?.title || 'Campaign'}</h3>
+                          <p className="text-sm text-gray-600 mb-2">
+                            {app.campaign?.brand?.company_name || app.campaign?.brand?.display_name || 'Brand'}
+                          </p>
+                        </div>
+                        <span className={`px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap ml-2 ${
+                          app.status === 'pending' ? 'bg-primary text-white' :
+                          app.status === 'accepted' ? 'bg-green-100 text-green-800' :
+                          'bg-red-100 text-red-800'
+                        }`}>
+                          {app.status === 'pending' ? 'Under Review' :
+                           app.status === 'accepted' ? 'Accepted' : 'Not Selected'}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between text-sm">
+                        <div className="flex items-center gap-4 text-gray-600">
+                          <span className="flex items-center gap-1">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1" />
+                            </svg>
+                            ${app.proposed_price}
+                          </span>
+                          <span className="flex items-center gap-1">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                            </svg>
+                            {new Date(app.applied_at).toLocaleDateString()}
+                          </span>
+                        </div>
+                        {app.campaign?.id && (
+                          <Link
+                            to={`/creator/campaigns/${app.campaign.id}`}
+                            className="text-primary hover:text-primary-dark text-xs font-medium"
+                          >
+                            View Details →
+                          </Link>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>

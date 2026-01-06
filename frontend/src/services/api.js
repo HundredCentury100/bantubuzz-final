@@ -152,6 +152,7 @@ export const campaignsAPI = {
   // Creator Applications
   browseCampaigns: (params) => api.get('/campaigns/browse', { params }),
   applyToCampaign: (campaignId, data) => api.post(`/campaigns/${campaignId}/apply`, data),
+  getMyApplications: (params) => api.get('/campaigns/my-applications', { params }),
   getCampaignApplications: (campaignId) => api.get(`/campaigns/${campaignId}/applications`),
   getApplicationDetails: (campaignId, applicationId) => api.get(`/campaigns/${campaignId}/applications/${applicationId}`),
   updateApplicationStatus: (campaignId, applicationId, status) => api.patch(`/campaigns/${campaignId}/applications/${applicationId}`, { status }),
