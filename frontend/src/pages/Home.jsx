@@ -180,12 +180,12 @@ const Home = () => {
                         </span>
                       </div>
 
-                      {/* Send Message Button */}
+                      {/* View Profile Button */}
                       <Link
                         to={`/creators/${creator.id}`}
                         className="block w-full bg-dark text-white text-center py-3 rounded-full font-medium hover:bg-gray-800 transition-colors"
                       >
-                        Send message
+                        View profile
                       </Link>
                     </div>
                   </div>
@@ -263,12 +263,12 @@ const Home = () => {
                     </span>
                   </div>
 
-                  {/* Send Message Button */}
+                  {/* View Profile Button */}
                   <Link
                     to={`/creators/${creator.id}`}
                     className="block w-full bg-white text-dark text-center py-3 rounded-full font-medium hover:bg-gray-100 transition-colors"
                   >
-                    Send message
+                    View profile
                   </Link>
                 </div>
               </div>
@@ -330,12 +330,12 @@ const Home = () => {
                     </span>
                   </div>
 
-                  {/* Send Message Button */}
+                  {/* View Profile Button */}
                   <Link
                     to={`/creators/${creator.id}`}
                     className="block w-full bg-primary text-dark text-center py-3 rounded-full font-medium hover:bg-primary/90 transition-colors"
                   >
-                    Send message
+                    View profile
                   </Link>
                 </div>
               </div>
