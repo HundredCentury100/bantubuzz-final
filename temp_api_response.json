@@ -1,0 +1,70 @@
+{
+  "creators": [
+    {
+      "availability_status": "available",
+      "bio": "Professional content creator specializing in tech reviews, lifestyle content, and brand collaborations. 50K+ followers across platforms.",
+      "categories": [
+        "Technology",
+        "Reviews",
+        "Fashion & Beauty"
+      ],
+      "cheapest_package_price": 1.0,
+      "created_at": "2025-12-04T13:45:10.637213",
+      "display_name": "creativepro",
+      "engagement_rate": 4.5,
+      "follower_count": 50000,
+      "free_revisions": 2,
+      "gallery": [
+        "/uploads/profiles/creators/gallery/99ece534ed4f478a9c07ef69f7e36912.png",
+        "/uploads/profiles/creators/gallery/88fa5c7c645e4c8bab21ada709f7c920_medium.webp",
+        "/uploads/profiles/creators/gallery/91d5d749039e4120827948d9b3b6a226_medium.webp"
+      ],
+      "gallery_images": [
+        {
+          "compressed_size_kb": 47.01,
+          "id": "b2b58403-bdb5-426f-8638-bbc489cf9720",
+          "large": "/uploads/profiles/creators/gallery/91d5d749039e4120827948d9b3b6a226_large.webp",
+          "medium": "/uploads/profiles/creators/gallery/91d5d749039e4120827948d9b3b6a226_medium.webp",
+          "original_size_kb": 26.58,
+          "thumbnail": "/uploads/profiles/creators/gallery/91d5d749039e4120827948d9b3b6a226_thumbnail.webp",
+          "uploaded_at": "2026-01-07T13:39:24.055219"
+        }
+      ],
+      "id": 18,
+      "languages": [
+        "English"
+      ],
+      "location": "Harare, Zimbabwe",
+      "portfolio_url": "https://creativepro.demo",
+      "profile_picture": "/uploads/profiles/creators/46923508f46744f99efa9c2d77ca0a9c_medium.webp",
+      "profile_picture_sizes": {
+        "large": "/uploads/profiles/creators/46923508f46744f99efa9c2d77ca0a9c_large.webp",
+        "medium": "/uploads/profiles/creators/46923508f46744f99efa9c2d77ca0a9c_medium.webp",
+        "thumbnail": "/uploads/profiles/creators/46923508f46744f99efa9c2d77ca0a9c_thumbnail.webp"
+      },
+      "review_stats": {
+        "average_rating": 5.0,
+        "total_reviews": 1
+      },
+      "revision_fee": 0.0,
+      "social_links": {
+        "instagram": "https://instagram.com/creativepro",
+        "tiktok": "https://tiktok.com/@creativepro",
+        "twitter": "",
+        "youtube": "https://youtube.com/c/creativepro"
+      },
+      "success_stories": "",
+      "updated_at": "2026-01-07T13:39:42.429805",
+      "user": {
+        "id": 30,
+        "is_verified": true,
+        "user_type": "creator"
+      },
+      "user_id": 30,
+      "username": "creativepro"
+    }
+  ],
+  "current_page": 1,
+  "pages": 7,
+  "total": 7
+}

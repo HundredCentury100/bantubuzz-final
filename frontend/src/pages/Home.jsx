@@ -142,6 +142,7 @@ const Home = () => {
                         alt={creator.display_name || creator.username || 'Creator profile'}
                         className="w-full h-full"
                         objectFit="cover"
+                        eager={true}
                         showLoading={true}
                       />
                     </div>
@@ -236,6 +237,7 @@ const Home = () => {
                     alt={creator.display_name || creator.username || 'Creator profile'}
                     className="w-full h-full"
                     objectFit="cover"
+                    eager={true}
                     showLoading={true}
                   />
                 </div>
@@ -303,6 +305,7 @@ const Home = () => {
                     alt={creator.display_name || creator.username || 'Creator profile'}
                     className="w-full h-full"
                     objectFit="cover"
+                    eager={true}
                     showLoading={true}
                   />
                 </div>
