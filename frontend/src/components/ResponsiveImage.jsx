@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { BASE_URL } from '../services/api';
 
 /**
  * ResponsiveImage Component
@@ -63,9 +64,11 @@ export default function ResponsiveImage({
 
   // Legacy format: just render a simple img tag
   if (isLegacyFormat) {
+    // Prepend BASE_URL if path is relative
+    const imageSrc = sizes.startsWith('http') ? sizes : `${BASE_URL}${sizes}`;
     return (
       <img
-        src={sizes}
+        src={imageSrc}
         alt={alt}
         className={className}
         loading={eager ? 'eager' : 'lazy'}
@@ -88,8 +91,14 @@ export default function ResponsiveImage({
     );
   }
 
+  // Helper function to build full URL
+  const getFullUrl = (path) => {
+    if (!path) return null;
+    return path.startsWith('http') ? path : `${BASE_URL}${path}`;
+  };
+
   // Use best available size as fallback
-  const fallbackSrc = large || medium || thumbnail;
+  const fallbackSrc = getFullUrl(large || medium || thumbnail);
 
   const handleLoad = () => {
     setIsLoading(false);
@@ -114,7 +123,7 @@ export default function ResponsiveImage({
         {/* Desktop: Large (1024px+) */}
         {large && (
           <source
-            srcSet={large}
+            srcSet={getFullUrl(large)}
             media="(min-width: 1024px)"
             type="image/webp"
           />
@@ -123,7 +132,7 @@ export default function ResponsiveImage({
         {/* Tablet: Medium (640px - 1023px) */}
         {medium && (
           <source
-            srcSet={medium}
+            srcSet={getFullUrl(medium)}
             media="(min-width: 640px)"
             type="image/webp"
           />
@@ -132,7 +141,7 @@ export default function ResponsiveImage({
         {/* Mobile: Thumbnail (<640px) */}
         {thumbnail && (
           <source
-            srcSet={thumbnail}
+            srcSet={getFullUrl(thumbnail)}
             type="image/webp"
           />
         )}
