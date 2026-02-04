@@ -3,6 +3,9 @@ import { Link, useNavigate } from 'react-router-dom';
 import { packagesAPI } from '../services/api';
 import { toast } from 'react-hot-toast';
 import Avatar from '../components/Avatar';
+import Navbar from '../components/Navbar';
+import SEO from '../components/SEO';
+import { Search, X } from 'lucide-react';
 
 const CATEGORIES = [
   'Fashion & Beauty',
@@ -23,7 +26,12 @@ const BrowsePackages = () => {
     category: '',
     min_price: '',
     max_price: '',
-    search: ''
+    search: '',
+    platform: '',
+    languages: [],
+    follower_range: '',
+    min_rating: '',
+    price_range: ''
   });
   const [pagination, setPagination] = useState({
     current_page: 1,
@@ -46,10 +54,15 @@ const BrowsePackages = () => {
 
       // Remove empty filters
       Object.keys(params).forEach(key => {
-        if (params[key] === '' || params[key] === null) {
+        if (params[key] === '' || params[key] === null || (Array.isArray(params[key]) && params[key].length === 0)) {
           delete params[key];
         }
       });
+
+      // Handle languages array - send as comma-separated string
+      if (filters.languages && filters.languages.length > 0) {
+        params.languages = filters.languages.join(',');
+      }
 
       const response = await packagesAPI.getPackages(params);
       setPackages(response.data.packages);
@@ -76,8 +89,18 @@ const BrowsePackages = () => {
       category: '',
       min_price: '',
       max_price: '',
-      search: ''
+      search: '',
+      platform: '',
+      languages: [],
+      follower_range: '',
+      min_rating: '',
+      price_range: ''
     });
+  };
+
+  const handleSearch = () => {
+    // Trigger search by setting page to 1, which will trigger fetchPackages
+    setPagination(prev => ({ ...prev, current_page: 1 }));
   };
 
   const handlePageChange = (newPage) => {
@@ -86,13 +109,20 @@ const BrowsePackages = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-light">
+      <SEO
+        title="Browse Packages"
+        description="Discover and book collaboration packages from talented African creators. Find the perfect package for your brand needs."
+        keywords="browse packages, creator packages, influencer services, brand collaborations"
+      />
+      <Navbar />
+
+      <div className="container-custom section-padding">
         {/* Navigation */}
-        <div className="mb-6 flex items-center gap-4">
+        <div className="mb-6">
           <Link
             to="/brand/dashboard"
-            className="text-gray-600 hover:text-gray-900 flex items-center gap-2"
+            className="text-gray-600 hover:text-gray-900 flex items-center gap-2 w-fit"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
@@ -103,38 +133,37 @@ const BrowsePackages = () => {
 
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Browse Packages</h1>
-          <p className="mt-2 text-gray-600">
+          <h1 className="text-4xl font-bold text-dark mb-2">Browse Packages</h1>
+          <p className="text-gray-600">
             Discover and book collaboration packages from talented creators
           </p>
         </div>
 
-        {/* Filters */}
-        <div className="bg-white rounded-lg shadow p-6 mb-8">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
-            {/* Search */}
-            <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Search Packages
-              </label>
+        {/* Search and Filters */}
+        <div className="bg-white rounded-xl shadow-sm p-6 mb-8">
+          {/* Search Bar */}
+          <div className="mb-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
               <input
                 type="text"
+                placeholder="Search packages by title or description..."
                 value={filters.search}
                 onChange={(e) => handleFilterChange('search', e.target.value)}
-                placeholder="Search by title or description..."
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
               />
             </div>
+          </div>
 
-            {/* Category */}
+          {/* Filter Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {/* Category Filter */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Category
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
               <select
                 value={filters.category}
                 onChange={(e) => handleFilterChange('category', e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
               >
                 <option value="">All Categories</option>
                 {CATEGORIES.map(cat => (
@@ -143,37 +172,53 @@ const BrowsePackages = () => {
               </select>
             </div>
 
-            {/* Price Range */}
+            {/* Platform Filter */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Price Range
-              </label>
-              <div className="flex gap-2">
-                <input
-                  type="number"
-                  value={filters.min_price}
-                  onChange={(e) => handleFilterChange('min_price', e.target.value)}
-                  placeholder="Min"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                />
-                <input
-                  type="number"
-                  value={filters.max_price}
-                  onChange={(e) => handleFilterChange('max_price', e.target.value)}
-                  placeholder="Max"
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                />
-              </div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Platform</label>
+              <select
+                value={filters.platform}
+                onChange={(e) => handleFilterChange('platform', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+              >
+                <option value="">All Platforms</option>
+                <option value="Instagram">Instagram</option>
+                <option value="TikTok">TikTok</option>
+                <option value="YouTube">YouTube</option>
+                <option value="Facebook">Facebook</option>
+              </select>
+            </div>
+
+            {/* Price Range Filter */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Price Range</label>
+              <select
+                value={filters.price_range}
+                onChange={(e) => handleFilterChange('price_range', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+              >
+                <option value="">All Prices</option>
+                <option value="$0-$50">$0-$50</option>
+                <option value="$50-$100">$50-$100</option>
+                <option value="$100-$250">$100-$250</option>
+                <option value="$250-$500">$250-$500</option>
+                <option value="$500-$1000">$500-$1000</option>
+                <option value="$1000+">$1000+</option>
+              </select>
             </div>
           </div>
 
-          {/* Clear Filters */}
-          <button
-            onClick={clearFilters}
-            className="text-sm text-primary hover:text-primary-dark font-medium"
-          >
-            Clear all filters
-          </button>
+          {/* Clear Filters Button */}
+          {(filters.search || filters.category || filters.platform || filters.price_range) && (
+            <div className="mt-4 flex justify-end">
+              <button
+                onClick={clearFilters}
+                className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-gray-900 border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                <X size={16} />
+                Clear Filters
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Results Count */}

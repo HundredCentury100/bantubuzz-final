@@ -6,6 +6,7 @@ import Navbar from '../components/Navbar';
 import toast from 'react-hot-toast';
 import Avatar from '../components/Avatar';
 import SEO from '../components/SEO';
+import { Search, Filter, X } from 'lucide-react';
 
 const CATEGORIES = [
   'Fashion & Beauty',
@@ -41,7 +42,11 @@ const BrowseCreators = () => {
     location: '',
     min_followers: '',
     search: '',
-    platform: ''
+    platform: '',
+    languages: [],
+    follower_range: '',
+    min_rating: '',
+    price_range: ''
   });
   const [pagination, setPagination] = useState({
     current_page: 1,
@@ -83,8 +88,15 @@ const BrowseCreators = () => {
 
       // Remove empty filters
       Object.keys(params).forEach(key => {
-        if (params[key] === '') delete params[key];
+        if (params[key] === '' || (Array.isArray(params[key]) && params[key].length === 0)) {
+          delete params[key];
+        }
       });
+
+      // Handle languages array - send as comma-separated string
+      if (filters.languages && filters.languages.length > 0) {
+        params.languages = filters.languages.join(',');
+      }
 
       const response = await creatorsAPI.getCreators(params);
       setCreators(response.data.creators || []);
@@ -184,88 +196,113 @@ const BrowseCreators = () => {
           <p className="text-gray-600">Find the perfect creator for your brand</p>
         </div>
 
-        {/* Search Bar - Prominent */}
-        <div className="mb-6">
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-              <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
+        {/* Search and Filters */}
+        <div className="bg-white rounded-xl shadow-sm p-6 mb-8">
+          {/* Search Bar */}
+          <div className="mb-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+              <input
+                type="text"
+                placeholder="Search creators by name, bio, or category..."
+                value={filters.search}
+                onChange={(e) => handleFilterChange('search', e.target.value)}
+                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+              />
             </div>
-            <input
-              type="text"
-              value={filters.search}
-              onChange={(e) => handleFilterChange('search', e.target.value)}
-              placeholder="Search creators by name, bio, or category..."
-              className="w-full pl-12 pr-4 py-4 text-lg border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-primary transition-all"
-            />
-            {filters.search && (
-              <button
-                onClick={() => handleFilterChange('search', '')}
-                className="absolute inset-y-0 right-0 pr-4 flex items-center text-gray-400 hover:text-gray-600"
-              >
-                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            )}
           </div>
-          <p className="text-sm text-gray-500 mt-2">Search updates automatically as you type</p>
-        </div>
 
-        {/* Additional Filters */}
-        <div className="card mb-8">
-          <h3 className="text-lg font-semibold text-dark mb-4">Filter Results</h3>
-          <form onSubmit={handleSearch}>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {/* Category Filter */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Category
-                </label>
-                <select
-                  value={filters.category}
-                  onChange={(e) => handleFilterChange('category', e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                >
-                  <option value="">All Categories</option>
-                  {CATEGORIES.map(category => (
-                    <option key={category} value={category}>{category}</option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Location Filter */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Location
-                </label>
-                <input
-                  type="text"
-                  value={filters.location}
-                  onChange={(e) => handleFilterChange('location', e.target.value)}
-                  placeholder="e.g., Harare, Bulawayo"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                />
-              </div>
-
-              {/* Followers Filter */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Minimum Followers
-                </label>
-                <select
-                  value={filters.min_followers}
-                  onChange={(e) => handleFilterChange('min_followers', e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                >
-                  {FOLLOWER_RANGES.map(range => (
-                    <option key={range.label} value={range.value}>{range.label}</option>
-                  ))}
-                </select>
-              </div>
+          {/* Filter Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {/* Category Filter */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
+              <select
+                value={filters.category}
+                onChange={(e) => handleFilterChange('category', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+              >
+                <option value="">All Categories</option>
+                {CATEGORIES.map(cat => (
+                  <option key={cat} value={cat}>{cat}</option>
+                ))}
+              </select>
             </div>
-          </form>
+
+            {/* Platform Filter */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Platform</label>
+              <select
+                value={filters.platform}
+                onChange={(e) => handleFilterChange('platform', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+              >
+                <option value="">All Platforms</option>
+                <option value="Instagram">Instagram</option>
+                <option value="TikTok">TikTok</option>
+                <option value="YouTube">YouTube</option>
+                <option value="Facebook">Facebook</option>
+              </select>
+            </div>
+
+            {/* Followers Filter */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Followers</label>
+              <select
+                value={filters.follower_range}
+                onChange={(e) => handleFilterChange('follower_range', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+              >
+                <option value="">Any</option>
+                <option value="0-1K">0-1K</option>
+                <option value="1K-10K">1K-10K</option>
+                <option value="10K-50K">10K-50K</option>
+                <option value="50K-100K">50K-100K</option>
+                <option value="100K-500K">100K-500K</option>
+                <option value="500K+">500K+</option>
+              </select>
+            </div>
+
+            {/* Language Filter */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Language</label>
+              <select
+                value={filters.languages[0] || ''}
+                onChange={(e) => handleFilterChange('languages', e.target.value ? [e.target.value] : [])}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+              >
+                <option value="">All Languages</option>
+                <option value="English">English</option>
+                <option value="Shona">Shona</option>
+              </select>
+            </div>
+          </div>
+
+          {/* Clear Filters Button */}
+          {(filters.search || filters.category || filters.platform || filters.follower_range || filters.languages.length > 0) && (
+            <div className="mt-4 flex justify-end">
+              <button
+                onClick={() => {
+                  setFilters({
+                    category: '',
+                    location: '',
+                    min_followers: '',
+                    search: '',
+                    platform: '',
+                    languages: [],
+                    follower_range: '',
+                    min_rating: '',
+                    price_range: ''
+                  });
+                  setPagination(prev => ({ ...prev, current_page: 1 }));
+                }}
+                className="flex items-center gap-2 px-4 py-2 text-gray-600 hover:text-gray-900 border border-gray-300 rounded-lg hover:bg-gray-50"
+              >
+                <X size={16} />
+                Clear Filters
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Results Count */}
@@ -292,138 +329,64 @@ const BrowseCreators = () => {
         ) : (
           /* Creators Grid */
           <>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-8">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
               {creators.map((creator) => (
-                <div key={creator.id} className="bg-white rounded-lg shadow hover:shadow-lg transition-shadow overflow-hidden">
-                  {/* Creator Avatar - Full Width Image */}
-                  <div className="relative w-full h-64 bg-gradient-to-br from-primary/20 to-primary/5 overflow-hidden">
-                    {creator.profile_picture ? (
-                      <img
-                        src={`${BASE_URL}${creator.profile_picture}`}
-                        alt={creator.user?.email?.split('@')[0] || 'Creator'}
-                        className="w-full h-full object-cover object-top"
-                      />
-                    ) : (
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <svg className="w-24 h-24 text-primary/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                        </svg>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Content */}
-                  <div className="p-6">
-                    {/* Creator Info */}
-                    <h3 className="font-bold text-lg text-dark mb-1">
-                      {creator.user?.email?.split('@')[0] || 'Creator'}
-                    </h3>
-                    <p className="text-sm text-gray-500 mb-4">{creator.location || 'Location not set'}</p>
-
-                    {/* Stats */}
-                    <div className="grid grid-cols-3 gap-2 mb-4">
-                    <div className="text-center p-2 bg-light rounded">
-                      <p className="text-xs text-gray-600">Followers</p>
-                      <p className="font-bold text-dark text-sm">
-                        {creator.follower_count >= 1000
-                          ? `${(creator.follower_count / 1000).toFixed(1)}K`
-                          : creator.follower_count || 0}
-                      </p>
-                    </div>
-                    <div className="text-center p-2 bg-light rounded">
-                      <p className="text-xs text-gray-600">Engagement</p>
-                      <p className="font-bold text-dark text-sm">
-                        {creator.engagement_rate ? `${creator.engagement_rate.toFixed(1)}%` : 'N/A'}
-                      </p>
-                    </div>
-                    <div className="text-center p-2 bg-light rounded">
-                      <p className="text-xs text-gray-600">Rating</p>
-                      <div className="flex items-center justify-center gap-1">
-                        <svg className="w-4 h-4 text-primary-dark fill-current" viewBox="0 0 24 24">
-                          <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
-                        </svg>
-                        <p className="font-bold text-dark text-sm">
-                          {creator.review_stats?.average_rating || 0}
-                        </p>
-                      </div>
-                      <p className="text-xs text-gray-500">
-                        ({creator.review_stats?.total_reviews || 0})
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Categories */}
-                  {creator.categories && creator.categories.length > 0 && (
-                    <div className="mb-4">
-                      <div className="flex flex-wrap gap-1">
-                        {creator.categories.slice(0, 2).map((category, idx) => (
-                          <span
-                            key={idx}
-                            className="text-xs px-2 py-1 bg-primary/10 text-primary rounded"
-                          >
-                            {category}
-                          </span>
-                        ))}
-                        {creator.categories.length > 2 && (
-                          <span className="text-xs px-2 py-1 bg-primary-light/30 text-primary-dark rounded">
-                            +{creator.categories.length - 2}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                    {/* Bio */}
-                    {creator.bio && (
-                      <p className="text-sm text-gray-600 mb-4 line-clamp-2">
-                        {creator.bio}
-                      </p>
-                    )}
-
-                    {/* Availability Status */}
-                    <div className="mb-4">
-                      <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
-                        creator.availability_status === 'available' ? 'bg-primary text-primary-dark' :
-                        creator.availability_status === 'busy' ? 'bg-primary text-primary-dark' :
-                        'bg-red-100 text-red-800'
-                      }`}>
-                        <span className={`w-2 h-2 rounded-full mr-2 ${
-                          creator.availability_status === 'available' ? 'bg-primary' :
-                          creator.availability_status === 'busy' ? 'bg-primary' :
-                          'bg-red-600'
-                        }`}></span>
-                        {creator.availability_status || 'unavailable'}
-                      </span>
-                    </div>
-
-                    {/* Actions */}
-                    <div className="flex gap-2">
-                      <Link
-                        to={`/creators/${creator.id}`}
-                        className="flex-1 btn btn-primary text-center text-sm py-2"
-                      >
-                        View Profile
-                      </Link>
-                      {user?.user_type === 'brand' && (
-                        <button
-                          onClick={(e) => {
-                            e.preventDefault();
-                            handleSaveCreator(creator.id);
-                          }}
-                          className={`px-3 py-2 rounded-lg border transition-colors ${
-                            savedCreatorIds.has(creator.id)
-                              ? 'bg-primary text-white border-primary'
-                              : 'bg-white text-gray-600 border-gray-300 hover:border-primary hover:text-primary'
-                          }`}
-                          title={savedCreatorIds.has(creator.id) ? 'Unsave' : 'Save'}
-                        >
-                          <svg className="w-5 h-5" fill={savedCreatorIds.has(creator.id) ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
-                          </svg>
-                        </button>
+                <div
+                  key={creator.id}
+                  className="bg-primary p-4 rounded-3xl shadow-sm hover:shadow-md transition-shadow"
+                >
+                  {/* White Inner Container */}
+                  <div className="bg-white rounded-2xl overflow-hidden mb-4">
+                    {/* Image */}
+                    <div className="aspect-square overflow-hidden bg-gray-100">
+                      {creator.profile_picture ? (
+                        <img
+                          src={`${BASE_URL}${creator.profile_picture}`}
+                          alt={creator.display_name || creator.username || creator.user?.email?.split('@')[0] || 'Creator'}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <span className="text-gray-400 text-sm">No image</span>
+                        </div>
                       )}
                     </div>
                   </div>
+
+                  {/* Name and Followers - On Primary Background */}
+                  <div className="flex justify-between items-center mb-3">
+                    <h3 className="font-semibold text-gray-900">
+                      {creator.display_name || creator.username || creator.user?.email?.split('@')[0] || 'Creator'}
+                    </h3>
+                    <div className="text-right">
+                      <span className="text-lg font-bold text-gray-900">
+                        {creator.follower_count >= 1000000
+                          ? `${(creator.follower_count / 1000000).toFixed(0)}m`
+                          : creator.follower_count >= 1000
+                          ? `${(creator.follower_count / 1000).toFixed(0)}k`
+                          : creator.follower_count || 0}
+                      </span>
+                      <p className="text-xs text-gray-700">Followers</p>
+                    </div>
+                  </div>
+
+                  {/* Social Icon and Category - On Primary Background */}
+                  <div className="flex justify-between items-center mb-4">
+                    <svg className="w-5 h-5 text-gray-700" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
+                    </svg>
+                    <span className="text-xs px-3 py-1 border border-gray-700 rounded-full text-gray-900">
+                      {creator.categories?.[0] || 'Model'}
+                    </span>
+                  </div>
+
+                  {/* View Profile Button - White on Primary Background */}
+                  <Link
+                    to={`/creators/${creator.id}`}
+                    className="block w-full bg-white text-dark text-center py-3 rounded-full font-medium hover:bg-gray-100 transition-colors"
+                  >
+                    View profile
+                  </Link>
                 </div>
               ))}
             </div>

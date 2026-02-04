@@ -97,6 +97,13 @@ def get_creators():
         page = request.args.get('page', 1, type=int)
         per_page = request.args.get('per_page', 12, type=int)
 
+        # New filter parameters
+        languages = request.args.getlist('languages[]') or request.args.get('languages', '').split(',') if request.args.get('languages') else []
+        languages = [l for l in languages if l]  # Filter empty strings
+        follower_range = request.args.get('follower_range')
+        min_rating = request.args.get('min_rating', type=float)
+        price_range = request.args.get('price_range')
+
         # Build query
         query = CreatorProfile.query.join(User).filter(User.is_active == True)
 
@@ -110,45 +117,58 @@ def get_creators():
         if min_followers:
             query = query.filter(CreatorProfile.follower_count >= min_followers)
 
-        # Platform filter - search in social_links JSON for platform keys
+        # Platform filter - now uses platforms array
         if platform:
-            # Map common platform names to social_links keys
-            platform_map = {
-                'IG': 'instagram',
-                'Instagram': 'instagram',
-                'TikTok': 'tiktok',
-                'YouTube': 'youtube',
-                'Twitter': 'twitter',
-                'X': 'twitter',
-                'Facebook': 'facebook',
-                'LinkedIn': 'linkedin'
+            query = query.filter(CreatorProfile.platforms.contains([platform]))
+
+        # Languages filter
+        if languages:
+            # Filter creators who have at least one of the selected languages
+            query = query.filter(
+                or_(*[CreatorProfile.languages.contains([lang]) for lang in languages])
+            )
+
+        # Follower range filter
+        if follower_range:
+            follower_ranges = {
+                '0-1K': (0, 1000),
+                '1K-10K': (1000, 10000),
+                '10K-50K': (10000, 50000),
+                '50K-100K': (50000, 100000),
+                '100K-500K': (100000, 500000),
+                '500K+': (500000, None)
             }
-            platform_key = platform_map.get(platform, platform.lower())
-            # Filter creators who have this platform in their social_links
-            query = query.filter(
-                CreatorProfile.social_links.has_key(platform_key)
-            )
+            if follower_range in follower_ranges:
+                min_f, max_f = follower_ranges[follower_range]
+                if max_f is None:
+                    query = query.filter(CreatorProfile.follower_count >= min_f)
+                else:
+                    query = query.filter(
+                        and_(
+                            CreatorProfile.follower_count >= min_f,
+                            CreatorProfile.follower_count < max_f
+                        )
+                    )
 
-        if search:
-            query = query.filter(
-                or_(
-                    CreatorProfile.bio.ilike(f'%{search}%'),
-                    CreatorProfile.username.ilike(f'%{search}%'),
-                    User.email.ilike(f'%{search}%')
-                )
-            )
-
-        # Get all creators matching the filters (we'll sort them by reviews)
+        # Get all creators first, we'll filter by search and categories in Python
+        # This is because categories/bio/username need case-insensitive partial matching
         all_creators = query.all()
 
-        # If search term was provided, also do case-insensitive category matching in Python
+        # Apply search filter - check bio, username, email, AND categories
         if search:
             search_lower = search.lower()
             all_creators = [
                 c for c in all_creators
-                if any(search_lower in cat.lower() for cat in (c.categories or []))
-                or search_lower in (c.bio or '').lower()
-                or search_lower in (c.user.email or '').lower()
+                if (
+                    # Search in categories
+                    any(search_lower in cat.lower() for cat in (c.categories or []))
+                    # Search in bio
+                    or (c.bio and search_lower in c.bio.lower())
+                    # Search in username
+                    or (c.username and search_lower in c.username.lower())
+                    # Search in email
+                    or (c.user.email and search_lower in c.user.email.lower())
+                )
             ]
 
         # If category was provided but no exact match, try case-insensitive partial match
@@ -160,13 +180,31 @@ def get_creators():
             if min_followers:
                 query = query.filter(CreatorProfile.follower_count >= min_followers)
             if platform:
-                platform_map = {
-                    'IG': 'instagram', 'Instagram': 'instagram', 'TikTok': 'tiktok',
-                    'YouTube': 'youtube', 'Twitter': 'twitter', 'X': 'twitter',
-                    'Facebook': 'facebook', 'LinkedIn': 'linkedin'
+                query = query.filter(CreatorProfile.platforms.contains([platform]))
+            if languages:
+                query = query.filter(
+                    or_(*[CreatorProfile.languages.contains([lang]) for lang in languages])
+                )
+            if follower_range:
+                follower_ranges = {
+                    '0-1K': (0, 1000),
+                    '1K-10K': (1000, 10000),
+                    '10K-50K': (10000, 50000),
+                    '50K-100K': (50000, 100000),
+                    '100K-500K': (100000, 500000),
+                    '500K+': (500000, None)
                 }
-                platform_key = platform_map.get(platform, platform.lower())
-                query = query.filter(CreatorProfile.social_links.has_key(platform_key))
+                if follower_range in follower_ranges:
+                    min_f, max_f = follower_ranges[follower_range]
+                    if max_f is None:
+                        query = query.filter(CreatorProfile.follower_count >= min_f)
+                    else:
+                        query = query.filter(
+                            and_(
+                                CreatorProfile.follower_count >= min_f,
+                                CreatorProfile.follower_count < max_f
+                            )
+                        )
 
             all_creators = query.all()
             # Filter by category in Python (case-insensitive partial match)
@@ -204,6 +242,33 @@ def get_creators():
                 creator_dict['cheapest_package_price'] = None
 
             creators_with_stats.append(creator_dict)
+
+        # Apply rating filter
+        if min_rating:
+            creators_with_stats = [
+                c for c in creators_with_stats
+                if c['review_stats']['average_rating'] >= min_rating
+            ]
+
+        # Apply price range filter
+        if price_range:
+            price_ranges = {
+                '$0-$50': (0, 50),
+                '$50-$100': (50, 100),
+                '$100-$250': (100, 250),
+                '$250-$500': (250, 500),
+                '$500-$1000': (500, 1000),
+                '$1000+': (1000, None)
+            }
+            if price_range in price_ranges:
+                min_p, max_p = price_ranges[price_range]
+                creators_with_stats = [
+                    c for c in creators_with_stats
+                    if c['cheapest_package_price'] is not None and (
+                        (max_p is None and c['cheapest_package_price'] >= min_p) or
+                        (max_p is not None and min_p <= c['cheapest_package_price'] < max_p)
+                    )
+                ]
 
         # Sort by total reviews (descending), then by average rating (descending)
         creators_with_stats.sort(
@@ -329,6 +394,9 @@ def update_profile():
 
         if 'languages' in data:
             creator.languages = data['languages']
+
+        if 'platforms' in data:
+            creator.platforms = data['platforms']
 
         if 'availability_status' in data:
             if data['availability_status'] in ['available', 'busy', 'unavailable']:
