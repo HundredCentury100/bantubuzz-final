@@ -23,6 +23,8 @@ import Bookings from './pages/Bookings';
 import BookingDetails from './pages/BookingDetails';
 import Payment from './pages/Payment';
 import PaymentReturn from './pages/PaymentReturn';
+import RevisionPayment from './pages/RevisionPayment';
+import CampaignPayment from './pages/CampaignPayment';
 import Messages from './pages/Messages';
 import Campaigns from './pages/Campaigns';
 import CampaignForm from './pages/CampaignForm';
@@ -53,6 +55,13 @@ import AdminReviews from './pages/AdminReviews';
 import Wallet from './pages/Wallet';
 import CashoutRequest from './pages/CashoutRequest';
 import BrandWallet from './pages/BrandWallet';
+
+// Brief Pages
+import BrowseBriefs from './pages/BrowseBriefs';
+import BriefDetails from './pages/BriefDetails';
+import CreateBrief from './pages/CreateBrief';
+import ManageBriefs from './pages/ManageBriefs';
+import MyProposals from './pages/MyProposals';
 
 // Public Pages
 import About from './pages/About';
@@ -126,6 +135,7 @@ function App() {
       <Route path="/creators/:id" element={<CreatorProfile />} />
       <Route path="/packages" element={<Packages />} />
       <Route path="/packages/:id" element={<PackageDetails />} />
+      <Route path="/briefs/:id" element={<BriefDetails />} />
 
       {/* Auth Routes */}
       <Route
@@ -198,6 +208,14 @@ function App() {
         }
       />
       <Route
+        path="/creator/packages/:id/edit"
+        element={
+          <ProtectedRoute requiredType="creator">
+            <PackageForm />
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/creator/campaigns"
         element={
           <ProtectedRoute requiredType="creator">
@@ -210,6 +228,22 @@ function App() {
         element={
           <ProtectedRoute requiredType="creator">
             <CreatorCampaignDetails />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/creator/briefs"
+        element={
+          <ProtectedRoute requiredType="creator">
+            <BrowseBriefs />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/creator/proposals"
+        element={
+          <ProtectedRoute requiredType="creator">
+            <MyProposals />
           </ProtectedRoute>
         }
       />
@@ -234,6 +268,14 @@ function App() {
         element={
           <ProtectedRoute requiredType="creator">
             <Bookings />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/creator/collaborations/:id/review"
+        element={
+          <ProtectedRoute requiredType="creator">
+            <ReviewForm />
           </ProtectedRoute>
         }
       />
@@ -304,21 +346,23 @@ function App() {
         }
       />
       <Route
-        path="/browse/packages"
+        path="/brand/briefs"
         element={
           <ProtectedRoute requiredType="brand">
-            <BrowsePackages />
+            <ManageBriefs />
           </ProtectedRoute>
         }
       />
       <Route
-        path="/browse/creators"
+        path="/brand/briefs/create"
         element={
           <ProtectedRoute requiredType="brand">
-            <BrowseCreators />
+            <CreateBrief />
           </ProtectedRoute>
         }
       />
+      <Route path="/browse/packages" element={<BrowsePackages />} />
+      <Route path="/browse/creators" element={<BrowseCreators />} />
       <Route
         path="/brand/bookings"
         element={
@@ -348,6 +392,30 @@ function App() {
         element={
           <ProtectedRoute requiredType="brand">
             <ReviewForm />
+          </ProtectedRoute>
+      }
+      />
+      <Route
+        path="/brand/collaborations/:id/revision-payment"
+        element={
+          <ProtectedRoute requiredType="brand">
+            <RevisionPayment />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/brand/campaigns/payment/:bookingId"
+        element={
+          <ProtectedRoute requiredType="brand">
+            <CampaignPayment />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/brand/revision-payment/:bookingId"
+        element={
+          <ProtectedRoute requiredType="brand">
+            <RevisionPayment />
           </ProtectedRoute>
         }
       />
