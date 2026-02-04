@@ -213,7 +213,7 @@ const BrowseCreators = () => {
           </div>
 
           {/* Filter Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {/* Category Filter */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
@@ -276,10 +276,43 @@ const BrowseCreators = () => {
                 <option value="Shona">Shona</option>
               </select>
             </div>
+
+            {/* Price Range Filter */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Price Range</label>
+              <select
+                value={filters.price_range}
+                onChange={(e) => handleFilterChange('price_range', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+              >
+                <option value="">Any Price</option>
+                <option value="$0-$50">$0-$50</option>
+                <option value="$50-$100">$50-$100</option>
+                <option value="$100-$250">$100-$250</option>
+                <option value="$250-$500">$250-$500</option>
+                <option value="$500-$1000">$500-$1000</option>
+                <option value="$1000+">$1000+</option>
+              </select>
+            </div>
+
+            {/* Rating Filter */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Minimum Rating</label>
+              <select
+                value={filters.min_rating}
+                onChange={(e) => handleFilterChange('min_rating', e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+              >
+                <option value="">Any Rating</option>
+                <option value="4">4+ Stars</option>
+                <option value="3">3+ Stars</option>
+                <option value="2">2+ Stars</option>
+              </select>
+            </div>
           </div>
 
           {/* Clear Filters Button */}
-          {(filters.search || filters.category || filters.platform || filters.follower_range || filters.languages.length > 0) && (
+          {(filters.search || filters.category || filters.platform || filters.follower_range || filters.languages.length > 0 || filters.price_range || filters.min_rating) && (
             <div className="mt-4 flex justify-end">
               <button
                 onClick={() => {

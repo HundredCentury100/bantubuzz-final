@@ -21,7 +21,10 @@ const CampaignForm = () => {
     end_date: '',
     category: '',
     status: 'draft',
-    requirements: {}
+    requirements: {},
+    has_milestones: false,
+    milestone_pricing_type: 'total',
+    milestones: []
   });
 
   useEffect(() => {
@@ -70,10 +73,45 @@ const CampaignForm = () => {
   };
 
   const handleChange = (e) => {
-    const { name, value } = e.target;
+    const { name, value, type, checked } = e.target;
     setFormData(prev => ({
       ...prev,
-      [name]: value
+      [name]: type === 'checkbox' ? checked : value
+    }));
+  };
+
+  const addMilestone = () => {
+    setFormData(prev => ({
+      ...prev,
+      milestones: [
+        ...prev.milestones,
+        {
+          milestone_number: prev.milestones.length + 1,
+          title: '',
+          description: '',
+          duration_days: '',
+          price: ''
+        }
+      ]
+    }));
+  };
+
+  const removeMilestone = (index) => {
+    setFormData(prev => ({
+      ...prev,
+      milestones: prev.milestones.filter((_, i) => i !== index).map((m, i) => ({
+        ...m,
+        milestone_number: i + 1
+      }))
+    }));
+  };
+
+  const updateMilestone = (index, field, value) => {
+    setFormData(prev => ({
+      ...prev,
+      milestones: prev.milestones.map((m, i) =>
+        i === index ? { ...m, [field]: value } : m
+      )
     }));
   };
 
@@ -93,7 +131,12 @@ const CampaignForm = () => {
         ...formData,
         budget: parseFloat(formData.budget),
         start_date: new Date(formData.start_date).toISOString(),
-        end_date: new Date(formData.end_date).toISOString()
+        end_date: new Date(formData.end_date).toISOString(),
+        milestones: formData.has_milestones ? formData.milestones.map(m => ({
+          ...m,
+          duration_days: parseInt(m.duration_days),
+          price: formData.milestone_pricing_type === 'per_milestone' ? parseFloat(m.price) : null
+        })) : []
       };
 
       if (isEditMode) {
@@ -271,6 +314,113 @@ const CampaignForm = () => {
               className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
               placeholder="What do you want to achieve? (e.g., increase brand awareness, drive sales)"
             />
+          </div>
+
+          {/* Milestones Section */}
+          <div className="border-t pt-6">
+            <div className="flex items-center mb-4">
+              <input
+                type="checkbox"
+                id="has_milestones"
+                name="has_milestones"
+                checked={formData.has_milestones}
+                onChange={handleChange}
+                className="w-4 h-4 text-primary focus:ring-primary border-gray-300 rounded"
+              />
+              <label htmlFor="has_milestones" className="ml-2 text-sm font-medium text-gray-700">
+                Add milestones to track campaign progress
+              </label>
+            </div>
+
+            {formData.has_milestones && (
+              <div className="space-y-4 pl-6 border-l-2 border-primary">
+                {/* Pricing Type */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Milestone Pricing
+                  </label>
+                  <select
+                    name="milestone_pricing_type"
+                    value={formData.milestone_pricing_type}
+                    onChange={handleChange}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                  >
+                    <option value="total">Divide total budget evenly across milestones</option>
+                    <option value="per_milestone">Set custom price for each milestone</option>
+                  </select>
+                </div>
+
+                {/* Milestones */}
+                {formData.milestones.map((milestone, index) => (
+                  <div key={index} className="bg-gray-50 p-4 rounded-lg">
+                    <div className="flex justify-between items-center mb-3">
+                      <h4 className="font-medium text-gray-900">Milestone {milestone.milestone_number}</h4>
+                      {formData.milestones.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => removeMilestone(index)}
+                          className="text-red-600 hover:text-red-800 text-sm"
+                        >
+                          Remove
+                        </button>
+                      )}
+                    </div>
+
+                    <div className="space-y-3">
+                      <input
+                        type="text"
+                        placeholder="Milestone title"
+                        value={milestone.title}
+                        onChange={(e) => updateMilestone(index, 'title', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                        required
+                      />
+
+                      <textarea
+                        placeholder="Description (optional)"
+                        value={milestone.description}
+                        onChange={(e) => updateMilestone(index, 'description', e.target.value)}
+                        rows={2}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                      />
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <input
+                          type="number"
+                          placeholder="Duration (days)"
+                          value={milestone.duration_days}
+                          onChange={(e) => updateMilestone(index, 'duration_days', e.target.value)}
+                          min="1"
+                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                          required
+                        />
+
+                        {formData.milestone_pricing_type === 'per_milestone' && (
+                          <input
+                            type="number"
+                            placeholder="Price ($)"
+                            value={milestone.price}
+                            onChange={(e) => updateMilestone(index, 'price', e.target.value)}
+                            min="0"
+                            step="0.01"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                            required
+                          />
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+
+                <button
+                  type="button"
+                  onClick={addMilestone}
+                  className="w-full py-2 border-2 border-dashed border-gray-300 rounded-lg text-gray-600 hover:border-primary hover:text-primary transition-colors"
+                >
+                  + Add Milestone
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Status */}
