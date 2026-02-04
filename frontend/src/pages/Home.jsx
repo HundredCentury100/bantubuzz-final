@@ -39,7 +39,7 @@ const Home = () => {
     const params = new URLSearchParams();
     if (filters.category) params.append('category', filters.category);
     if (filters.platform) params.append('platform', filters.platform);
-    navigate(`/creators?${params.toString()}`);
+    navigate(`/browse/creators?${params.toString()}`);
   };
 
   const formatFollowers = (count) => {
@@ -77,13 +77,18 @@ const Home = () => {
                   <select
                     value={filters.platform}
                     onChange={(e) => setFilters(prev => ({ ...prev, platform: e.target.value }))}
-                    className="w-full text-primary text-sm bg-transparent border-none focus:outline-none cursor-pointer"
+                    className="w-full text-gray-700 text-sm bg-transparent border-none focus:outline-none cursor-pointer"
                   >
                     <option value="">Choose a platform</option>
-                    <option value="Instagram">Instagram</option>
+                    <option value="Facebook">Facebook</option>
                     <option value="TikTok">TikTok</option>
+                    <option value="Instagram">Instagram</option>
                     <option value="YouTube">YouTube</option>
                     <option value="Twitter">Twitter</option>
+                    <option value="LinkedIn">LinkedIn</option>
+                    <option value="Threads">Threads</option>
+                    <option value="Twitch">Twitch</option>
+                    <option value="UGC">UGC</option>
                   </select>
                 </div>
               </div>
@@ -95,7 +100,7 @@ const Home = () => {
                     value={filters.category}
                     onChange={(e) => setFilters(prev => ({ ...prev, category: e.target.value }))}
                     placeholder="Enter keywords, niches or categories"
-                    className="w-full text-primary text-sm bg-transparent border-none focus:outline-none placeholder-primary"
+                    className="w-full text-gray-700 text-sm bg-transparent border-none focus:outline-none placeholder-gray-500"
                   />
                 </div>
               </div>
@@ -116,7 +121,7 @@ const Home = () => {
           <div className="flex justify-between items-start mb-8">
             <div>
               <h2 className="text-3xl font-bold mb-1">Featured</h2>
-              <p className="text-primary">Hire Top Influencers across all Platforms</p>
+              <p className="text-gray-600">Hire Top Influencers across all Platforms</p>
             </div>
             <Link to="/creators" className="text-gray-900 font-medium hover:underline">
               See All
@@ -217,7 +222,7 @@ const Home = () => {
           <div className="flex justify-between items-start mb-8">
             <div>
               <h2 className="text-3xl font-bold mb-1">Instagram</h2>
-              <p className="text-primary">Hire Instagram influencers</p>
+              <p className="text-gray-600">Hire Instagram influencers</p>
             </div>
             <Link to="/creators?platform=Instagram" className="text-gray-900 font-medium hover:underline">
               See All
@@ -285,7 +290,7 @@ const Home = () => {
           <div className="flex justify-between items-start mb-8">
             <div>
               <h2 className="text-3xl font-bold mb-1">Tiktok</h2>
-              <p className="text-primary">Hire Titok influencers</p>
+              <p className="text-gray-600">Hire TikTok influencers</p>
             </div>
             <Link to="/creators?platform=TikTok" className="text-gray-900 font-medium hover:underline">
               See All
@@ -423,21 +428,21 @@ const Home = () => {
               <div className="space-y-6">
                 <div>
                   <h4 className="font-bold text-lg leading-snug mb-2">Search Influencers</h4>
-                  <p className="text-primary leading-relaxed">
+                  <p className="text-gray-700 leading-relaxed">
                     Search thousands of vetted Instagram, TikTok, and YouTube influencers.
                   </p>
                 </div>
 
                 <div>
                   <h4 className="font-bold text-lg leading-snug mb-2">Purchase & Chat Securely</h4>
-                  <p className="text-primary leading-relaxed">
+                  <p className="text-gray-700 leading-relaxed">
                     Safely purchase and communicate through Bantubuzz. We hold your payment until the work is completed.
                   </p>
                 </div>
 
                 <div>
                   <h4 className="font-bold text-lg leading-snug mb-2">Receive Quality Content</h4>
-                  <p className="text-primary leading-relaxed">
+                  <p className="text-gray-700 leading-relaxed">
                     Receive your high-quality content from influencers directly through the platform.
                   </p>
                 </div>
@@ -454,21 +459,21 @@ const Home = () => {
               <div className="space-y-6">
                 <div>
                   <h4 className="font-bold text-lg mb-2">Set Targeting</h4>
-                  <p className="text-primary">
+                  <p className="text-gray-700">
                     Specify demographics including niche, location and following size of the influencers you want to target.
                   </p>
                 </div>
 
                 <div>
                   <h4 className="font-bold text-lg mb-2">Post Campaign</h4>
-                  <p className="text-primary">
+                  <p className="text-gray-700">
                     Centralize your images, requirements, and more in a campaign brief sent to 170,000 influencers.
                   </p>
                 </div>
 
                 <div>
                   <h4 className="font-bold text-lg mb-2">Influencers Apply</h4>
-                  <p className="text-primary">
+                  <p className="text-gray-700">
                     Targeted influencers submit their pricing, and you choose who to collaborate with.
                   </p>
                 </div>
@@ -485,21 +490,21 @@ const Home = () => {
               <div className="space-y-6">
                 <div>
                   <h4 className="font-bold text-lg mb-2">One-Click Tracking</h4>
-                  <p className="text-primary">
+                  <p className="text-gray-700">
                     Track Instagram, TikTok, and YouTube content in real time from a single dashboard. Say goodbye to manual tracking and messy spreadsheets.
                   </p>
                 </div>
 
                 <div>
                   <h4 className="font-bold text-lg mb-2">Advanced Analytics & Reporting</h4>
-                  <p className="text-primary">
+                  <p className="text-gray-700">
                     Analyze content performance over time, including impressions, engagement and more. Organize performance by campaign and effortlessly build reports.
                   </p>
                 </div>
 
                 <div>
                   <h4 className="font-bold text-lg mb-2">Fully Automated</h4>
-                  <p className="text-primary">
+                  <p className="text-gray-700">
                     Metrics are updated every 24 hours, ensuring performance data is always up-to-date.
                   </p>
                 </div>
