@@ -126,6 +126,7 @@ def get_proposals():
         creator = CreatorProfile.query.filter_by(user_id=user_id).first()
 
         status = request.args.get('status')
+        brief_id = request.args.get('brief_id', type=int)
         page = request.args.get('page', 1, type=int)
         per_page = request.args.get('per_page', 10, type=int)
 
@@ -133,6 +134,9 @@ def get_proposals():
 
         if status:
             query = query.filter_by(status=status)
+
+        if brief_id:
+            query = query.filter_by(brief_id=brief_id)
 
         pagination = query.order_by(Proposal.created_at.desc()).paginate(
             page=page, per_page=per_page, error_out=False
