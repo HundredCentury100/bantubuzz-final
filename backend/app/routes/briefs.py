@@ -26,7 +26,7 @@ def create_brief():
         data = request.get_json()
 
         # Validate required fields
-        required = ['title', 'description', 'goal', 'platform', 'budget_min', 'budget_max',
+        required = ['title', 'description', 'goal', 'platforms', 'budget_min', 'budget_max',
                    'timeline_days', 'milestones']
         for field in required:
             if field not in data:
@@ -50,7 +50,7 @@ def create_brief():
             title=data['title'],
             description=data['description'],
             goal=data['goal'],
-            platform=data['platform'],
+            platforms=data['platforms'],
             budget_min=float(data['budget_min']),
             budget_max=float(data['budget_max']),
             timeline_days=int(data['timeline_days']),
@@ -216,8 +216,8 @@ def update_brief(brief_id):
             brief.description = data['description']
         if 'goal' in data:
             brief.goal = data['goal']
-        if 'platform' in data:
-            brief.platform = data['platform']
+        if 'platforms' in data:
+            brief.platforms = data['platforms']
         if 'budget_min' in data:
             brief.budget_min = float(data['budget_min'])
         if 'budget_max' in data:
