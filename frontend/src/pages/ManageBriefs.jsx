@@ -3,16 +3,13 @@ import Navbar from '../components/Navbar';
 import { Link, useNavigate } from 'react-router-dom';
 import { briefsAPI, proposalsAPI } from '../services/api';
 import {
-  Briefcase,
   Plus,
-  Loader,
   AlertCircle,
   Eye,
   Edit,
   Trash2,
   CheckCircle,
   XCircle,
-  Clock,
   FileText,
   DollarSign
 } from 'lucide-react';
@@ -173,8 +170,8 @@ const ManageBriefs = () => {
     return (
       <div className="min-h-screen bg-light">
         <Navbar />
-        <div className="container-custom section-padding flex justify-center items-center">
-          <Loader className="animate-spin text-primary" size={48} />
+        <div className="container-custom section-padding flex justify-center items-center py-20">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
         </div>
       </div>
     );
@@ -185,18 +182,37 @@ const ManageBriefs = () => {
       <Navbar />
       <div className="container-custom section-padding py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Navigation */}
+        <div className="mb-6 flex items-center gap-4 flex-wrap">
+          <Link
+            to="/brand/dashboard"
+            className="text-gray-600 hover:text-gray-900 flex items-center gap-2"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+            Back to Dashboard
+          </Link>
+          <button
+            onClick={() => navigate(-1)}
+            className="text-gray-600 hover:text-gray-900 flex items-center gap-2"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+            Back
+          </button>
+        </div>
+
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-8">
           <div>
-            <div className="flex items-center gap-3 mb-2">
-              <Briefcase className="text-primary" size={32} />
-              <h1 className="text-3xl font-bold text-gray-900">My Briefs</h1>
-            </div>
+            <h1 className="text-3xl md:text-4xl font-bold text-dark mb-2">My Briefs</h1>
             <p className="text-gray-600">Create and manage your project briefs</p>
           </div>
           <Link
             to="/brand/briefs/create"
-            className="flex items-center gap-2 px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors"
+            className="flex items-center justify-center gap-2 px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors w-full sm:w-auto"
           >
             <Plus size={20} />
             Create Brief
@@ -204,39 +220,39 @@ const ManageBriefs = () => {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <p className="text-sm text-gray-600 mb-1">Total Briefs</p>
-            <p className="text-3xl font-bold text-gray-900">{briefs.length}</p>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 mb-6">
+          <div className="bg-white rounded-xl shadow-sm p-4 md:p-6">
+            <p className="text-xs md:text-sm text-gray-600 mb-1">Total</p>
+            <p className="text-2xl md:text-3xl font-bold text-gray-900">{briefs.length}</p>
           </div>
-          <div className="bg-light rounded-lg shadow-sm p-6">
-            <p className="text-sm text-gray-600 mb-1">Drafts</p>
-            <p className="text-3xl font-bold text-gray-900">
+          <div className="bg-gray-50 rounded-xl shadow-sm p-4 md:p-6">
+            <p className="text-xs md:text-sm text-gray-600 mb-1">Drafts</p>
+            <p className="text-2xl md:text-3xl font-bold text-gray-900">
               {briefs.filter((b) => b.status === 'draft').length}
             </p>
           </div>
-          <div className="bg-green-50 rounded-lg shadow-sm p-6">
-            <p className="text-sm text-green-800 mb-1">Open</p>
-            <p className="text-3xl font-bold text-green-900">
+          <div className="bg-green-50 rounded-xl shadow-sm p-4 md:p-6">
+            <p className="text-xs md:text-sm text-green-800 mb-1">Open</p>
+            <p className="text-2xl md:text-3xl font-bold text-green-900">
               {briefs.filter((b) => b.status === 'open').length}
             </p>
           </div>
-          <div className="bg-red-50 rounded-lg shadow-sm p-6">
-            <p className="text-sm text-red-800 mb-1">Closed</p>
-            <p className="text-3xl font-bold text-red-900">
+          <div className="bg-red-50 rounded-xl shadow-sm p-4 md:p-6">
+            <p className="text-xs md:text-sm text-red-800 mb-1">Closed</p>
+            <p className="text-2xl md:text-3xl font-bold text-red-900">
               {briefs.filter((b) => b.status === 'closed').length}
             </p>
           </div>
         </div>
 
         {/* Filters */}
-        <div className="bg-white rounded-lg shadow-sm p-4 mb-6">
-          <div className="flex gap-2">
+        <div className="bg-white rounded-xl shadow-sm p-4 mb-6">
+          <div className="flex flex-wrap gap-2">
             {['all', 'draft', 'open', 'closed'].map((status) => (
               <button
                 key={status}
                 onClick={() => setStatusFilter(status)}
-                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                className={`px-4 py-2 rounded-lg font-medium transition-colors text-sm md:text-base ${
                   statusFilter === status
                     ? 'bg-primary text-white'
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -277,15 +293,15 @@ const ManageBriefs = () => {
                   return (
                     <div
                       key={brief.id}
-                      className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow p-6"
+                      className="bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow p-4 md:p-6"
                     >
                       {/* Header */}
-                      <div className="flex items-start justify-between mb-4">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3 mb-2">
-                            <h3 className="text-xl font-bold text-gray-900">{brief.title}</h3>
+                      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-4">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-2">
+                            <h3 className="text-lg md:text-xl font-bold text-gray-900 truncate">{brief.title}</h3>
                             <span
-                              className={`px-3 py-1 rounded-full text-xs font-medium ${statusBadge.color}`}
+                              className={`px-3 py-1 rounded-full text-xs font-medium w-fit ${statusBadge.color}`}
                             >
                               {statusBadge.text}
                             </span>
@@ -326,7 +342,7 @@ const ManageBriefs = () => {
                       </div>
 
                       {/* Actions */}
-                      <div className="flex flex-wrap gap-2 pt-4 border-t border-gray-200">
+                      <div className="flex flex-wrap gap-2 pt-4 border-t border-gray-200 text-sm md:text-base">
                         {brief.status === 'draft' && (
                           <>
                             <button
@@ -385,8 +401,10 @@ const ManageBriefs = () => {
                 })}
               </div>
             ) : (
-              <div className="bg-white rounded-lg shadow-sm p-12 text-center">
-                <Briefcase className="mx-auto text-gray-400 mb-4" size={64} />
+              <div className="bg-white rounded-xl shadow-sm p-8 md:p-12 text-center">
+                <svg className="w-16 h-16 md:w-20 md:h-20 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
                 <h3 className="text-xl font-semibold text-gray-900 mb-2">
                   {statusFilter === 'all' ? 'No briefs yet' : `No ${statusFilter} briefs`}
                 </h3>
@@ -476,7 +494,7 @@ const ManageBriefs = () => {
 
                 {loadingProposals ? (
                   <div className="flex justify-center py-12">
-                    <Loader className="animate-spin text-primary" size={48} />
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
                   </div>
                 ) : proposals.length > 0 ? (
                   <div className="space-y-4">
@@ -570,7 +588,9 @@ const ManageBriefs = () => {
                   </div>
                 ) : (
                   <div className="text-center py-12">
-                    <FileText className="mx-auto text-gray-400 mb-4" size={64} />
+                    <svg className="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
                     <p className="text-gray-600">No proposals received yet</p>
                   </div>
                 )}

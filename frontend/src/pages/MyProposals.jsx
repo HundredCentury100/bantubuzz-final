@@ -1,10 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import Navbar from '../components/Navbar';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { proposalsAPI } from '../services/api';
 import {
-  FileText,
-  Loader,
   AlertCircle,
   Check,
   X,
@@ -16,6 +14,7 @@ import {
 } from 'lucide-react';
 
 const MyProposals = () => {
+  const navigate = useNavigate();
   const [proposals, setProposals] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -80,8 +79,8 @@ const MyProposals = () => {
     return (
       <div className="min-h-screen bg-light">
         <Navbar />
-        <div className="container-custom section-padding flex justify-center items-center">
-          <Loader className="animate-spin text-primary" size={48} />
+        <div className="container-custom section-padding flex justify-center items-center py-20">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
         </div>
       </div>
     );
@@ -92,49 +91,68 @@ const MyProposals = () => {
       <Navbar />
       <div className="container-custom section-padding py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Navigation */}
+        <div className="mb-6 flex items-center gap-4 flex-wrap">
+          <Link
+            to="/creator/dashboard"
+            className="text-gray-600 hover:text-gray-900 flex items-center gap-2"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+            Back to Dashboard
+          </Link>
+          <button
+            onClick={() => navigate(-1)}
+            className="text-gray-600 hover:text-gray-900 flex items-center gap-2"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+            </svg>
+            Back
+          </button>
+        </div>
+
         {/* Header */}
         <div className="mb-8">
-          <div className="flex items-center gap-3 mb-4">
-            <FileText className="text-primary" size={32} />
-            <h1 className="text-3xl font-bold text-gray-900">My Proposals</h1>
-          </div>
+          <h1 className="text-3xl md:text-4xl font-bold text-dark mb-2">My Proposals</h1>
           <p className="text-gray-600">Track your submitted proposals and their status</p>
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
-          <div className="bg-white rounded-lg shadow-sm p-6">
-            <p className="text-sm text-gray-600 mb-1">Total Proposals</p>
-            <p className="text-3xl font-bold text-gray-900">{proposals.length}</p>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 mb-6">
+          <div className="bg-white rounded-xl shadow-sm p-4 md:p-6">
+            <p className="text-xs md:text-sm text-gray-600 mb-1">Total</p>
+            <p className="text-2xl md:text-3xl font-bold text-gray-900">{proposals.length}</p>
           </div>
-          <div className="bg-yellow-50 rounded-lg shadow-sm p-6">
-            <p className="text-sm text-yellow-800 mb-1">Pending</p>
-            <p className="text-3xl font-bold text-yellow-900">
+          <div className="bg-yellow-50 rounded-xl shadow-sm p-4 md:p-6">
+            <p className="text-xs md:text-sm text-yellow-800 mb-1">Pending</p>
+            <p className="text-2xl md:text-3xl font-bold text-yellow-900">
               {proposals.filter((p) => p.status === 'pending').length}
             </p>
           </div>
-          <div className="bg-green-50 rounded-lg shadow-sm p-6">
-            <p className="text-sm text-green-800 mb-1">Accepted</p>
-            <p className="text-3xl font-bold text-green-900">
+          <div className="bg-green-50 rounded-xl shadow-sm p-4 md:p-6">
+            <p className="text-xs md:text-sm text-green-800 mb-1">Accepted</p>
+            <p className="text-2xl md:text-3xl font-bold text-green-900">
               {proposals.filter((p) => p.status === 'accepted').length}
             </p>
           </div>
-          <div className="bg-red-50 rounded-lg shadow-sm p-6">
-            <p className="text-sm text-red-800 mb-1">Rejected</p>
-            <p className="text-3xl font-bold text-red-900">
+          <div className="bg-red-50 rounded-xl shadow-sm p-4 md:p-6">
+            <p className="text-xs md:text-sm text-red-800 mb-1">Rejected</p>
+            <p className="text-2xl md:text-3xl font-bold text-red-900">
               {proposals.filter((p) => p.status === 'rejected').length}
             </p>
           </div>
         </div>
 
         {/* Filters */}
-        <div className="bg-white rounded-lg shadow-sm p-4 mb-6">
-          <div className="flex gap-2">
+        <div className="bg-white rounded-xl shadow-sm p-4 mb-6">
+          <div className="flex flex-wrap gap-2">
             {['all', 'pending', 'accepted', 'rejected'].map((status) => (
               <button
                 key={status}
                 onClick={() => setStatusFilter(status)}
-                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                className={`px-4 py-2 rounded-lg font-medium transition-colors text-sm md:text-base ${
                   statusFilter === status
                     ? 'bg-primary text-white'
                     : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
@@ -175,15 +193,15 @@ const MyProposals = () => {
                   return (
                     <div
                       key={proposal.id}
-                      className="bg-white rounded-lg shadow-sm hover:shadow-md transition-shadow"
+                      className="bg-white rounded-xl shadow-sm hover:shadow-md transition-shadow"
                     >
-                      <div className="p-6">
+                      <div className="p-4 md:p-6">
                         {/* Header */}
-                        <div className="flex items-start justify-between mb-4">
-                          <div className="flex-1">
+                        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 mb-4">
+                          <div className="flex-1 min-w-0">
                             <Link
                               to={`/briefs/${proposal.brief_id}`}
-                              className="text-xl font-semibold text-gray-900 hover:text-primary transition-colors"
+                              className="text-lg md:text-xl font-semibold text-gray-900 hover:text-primary transition-colors block truncate"
                             >
                               {proposal.brief?.title}
                             </Link>
@@ -192,7 +210,7 @@ const MyProposals = () => {
                             </p>
                           </div>
                           <span
-                            className={`flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium ${statusBadge.color}`}
+                            className={`flex items-center gap-2 px-3 md:px-4 py-2 rounded-full text-sm font-medium w-fit ${statusBadge.color}`}
                           >
                             {statusBadge.icon}
                             {statusBadge.text}
@@ -203,20 +221,20 @@ const MyProposals = () => {
                         <p className="text-gray-700 mb-4 line-clamp-2">{proposal.message}</p>
 
                         {/* Details Grid */}
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4 mb-4">
                           <div className="flex items-center gap-2">
-                            <DollarSign className="text-green-600" size={20} />
-                            <div>
+                            <DollarSign className="text-green-600 flex-shrink-0" size={20} />
+                            <div className="min-w-0">
                               <p className="text-xs text-gray-500">Total Price</p>
-                              <p className="font-semibold text-gray-900">
+                              <p className="font-semibold text-gray-900 truncate">
                                 ${parseFloat(proposal.total_price).toFixed(2)}
                               </p>
                             </div>
                           </div>
 
                           <div className="flex items-center gap-2">
-                            <Award className="text-primary" size={20} />
-                            <div>
+                            <Award className="text-primary flex-shrink-0" size={20} />
+                            <div className="min-w-0">
                               <p className="text-xs text-gray-500">Milestones</p>
                               <p className="font-semibold text-gray-900">
                                 {proposal.milestones?.length || 0}
@@ -225,10 +243,10 @@ const MyProposals = () => {
                           </div>
 
                           <div className="flex items-center gap-2">
-                            <Calendar className="text-blue-600" size={20} />
-                            <div>
+                            <Calendar className="text-blue-600 flex-shrink-0" size={20} />
+                            <div className="min-w-0">
                               <p className="text-xs text-gray-500">Pricing Type</p>
-                              <p className="font-semibold text-gray-900">
+                              <p className="font-semibold text-gray-900 text-sm">
                                 {proposal.pricing_type === 'total'
                                   ? 'Evenly Divided'
                                   : 'Per Milestone'}
@@ -240,20 +258,20 @@ const MyProposals = () => {
                         {/* Milestones Summary */}
                         {proposal.milestones && proposal.milestones.length > 0 && (
                           <div className="border-t border-gray-200 pt-4">
-                            <h4 className="text-sm font-semibold text-gray-900 mb-2">
+                            <h4 className="text-sm font-semibold text-gray-900 mb-3">
                               Milestone Breakdown
                             </h4>
                             <div className="space-y-2">
                               {proposal.milestones.map((milestone, index) => (
                                 <div
                                   key={index}
-                                  className="flex items-center justify-between text-sm"
+                                  className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 text-sm"
                                 >
-                                  <span className="text-gray-700">
+                                  <span className="text-gray-700 font-medium">
                                     {milestone.milestone_number}. {milestone.title}
                                   </span>
-                                  <div className="flex items-center gap-4">
-                                    <span className="text-gray-500">
+                                  <div className="flex items-center gap-3 sm:gap-4">
+                                    <span className="text-gray-500 text-xs sm:text-sm">
                                       {milestone.duration_days} days
                                     </span>
                                     {milestone.price && (
@@ -309,8 +327,10 @@ const MyProposals = () => {
                 })}
               </div>
             ) : (
-              <div className="bg-white rounded-lg shadow-sm p-12 text-center">
-                <FileText className="mx-auto text-gray-400 mb-4" size={64} />
+              <div className="bg-white rounded-xl shadow-sm p-8 md:p-12 text-center">
+                <svg className="w-16 h-16 md:w-20 md:h-20 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
                 <h3 className="text-xl font-semibold text-gray-900 mb-2">
                   {statusFilter === 'all' ? 'No proposals yet' : `No ${statusFilter} proposals`}
                 </h3>
