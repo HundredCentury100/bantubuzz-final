@@ -30,7 +30,7 @@ with app.app_context():
                     THEN json_build_array(platform)::json
                     ELSE '[]'::json
                 END
-            WHERE platforms = '[]'::json OR platforms IS NULL
+            WHERE platforms IS NULL OR platforms::text = '[]'
         """))
         db.session.commit()
         print("✓ Data migrated")
