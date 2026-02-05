@@ -37,6 +37,7 @@ const BrowseCreators = () => {
   const [creators, setCreators] = useState([]);
   const [loading, setLoading] = useState(true);
   const [savedCreatorIds, setSavedCreatorIds] = useState(new Set());
+  const [showMoreFilters, setShowMoreFilters] = useState(false);
   const [filters, setFilters] = useState({
     category: '',
     location: '',
@@ -212,102 +213,226 @@ const BrowseCreators = () => {
             </div>
           </div>
 
-          {/* Filter Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {/* Category Filter */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
-              <select
-                value={filters.category}
-                onChange={(e) => handleFilterChange('category', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-              >
-                <option value="">All Categories</option>
-                {CATEGORIES.map(cat => (
-                  <option key={cat} value={cat}>{cat}</option>
-                ))}
-              </select>
+          {/* Filters - Responsive Layout */}
+          <div className="space-y-4">
+            {/* Desktop: All filters in one line */}
+            <div className="hidden lg:flex lg:flex-wrap lg:gap-4">
+              {/* Category Filter */}
+              <div className="flex-1 min-w-[150px]">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
+                <select
+                  value={filters.category}
+                  onChange={(e) => handleFilterChange('category', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                >
+                  <option value="">All Categories</option>
+                  {CATEGORIES.map(cat => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Platform Filter */}
+              <div className="flex-1 min-w-[150px]">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Platform</label>
+                <select
+                  value={filters.platform}
+                  onChange={(e) => handleFilterChange('platform', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                >
+                  <option value="">All Platforms</option>
+                  <option value="Instagram">Instagram</option>
+                  <option value="TikTok">TikTok</option>
+                  <option value="YouTube">YouTube</option>
+                  <option value="Facebook">Facebook</option>
+                </select>
+              </div>
+
+              {/* Followers Filter */}
+              <div className="flex-1 min-w-[150px]">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Followers</label>
+                <select
+                  value={filters.follower_range}
+                  onChange={(e) => handleFilterChange('follower_range', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                >
+                  <option value="">Any</option>
+                  <option value="0-1K">0-1K</option>
+                  <option value="1K-10K">1K-10K</option>
+                  <option value="10K-50K">10K-50K</option>
+                  <option value="50K-100K">50K-100K</option>
+                  <option value="100K-500K">100K-500K</option>
+                  <option value="500K+">500K+</option>
+                </select>
+              </div>
+
+              {/* Language Filter */}
+              <div className="flex-1 min-w-[150px]">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Language</label>
+                <select
+                  value={filters.languages[0] || ''}
+                  onChange={(e) => handleFilterChange('languages', e.target.value ? [e.target.value] : [])}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                >
+                  <option value="">All Languages</option>
+                  <option value="English">English</option>
+                  <option value="Shona">Shona</option>
+                </select>
+              </div>
+
+              {/* Price Range Filter */}
+              <div className="flex-1 min-w-[150px]">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Price Range</label>
+                <select
+                  value={filters.price_range}
+                  onChange={(e) => handleFilterChange('price_range', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                >
+                  <option value="">Any Price</option>
+                  <option value="$0-$50">$0-$50</option>
+                  <option value="$50-$100">$50-$100</option>
+                  <option value="$100-$250">$100-$250</option>
+                  <option value="$250-$500">$250-$500</option>
+                  <option value="$500-$1000">$500-$1000</option>
+                  <option value="$1000+">$1000+</option>
+                </select>
+              </div>
+
+              {/* Rating Filter */}
+              <div className="flex-1 min-w-[150px]">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Rating</label>
+                <select
+                  value={filters.min_rating}
+                  onChange={(e) => handleFilterChange('min_rating', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                >
+                  <option value="">Any Rating</option>
+                  <option value="4">4+ Stars</option>
+                  <option value="3">3+ Stars</option>
+                  <option value="2">2+ Stars</option>
+                </select>
+              </div>
             </div>
 
-            {/* Platform Filter */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Platform</label>
-              <select
-                value={filters.platform}
-                onChange={(e) => handleFilterChange('platform', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-              >
-                <option value="">All Platforms</option>
-                <option value="Instagram">Instagram</option>
-                <option value="TikTok">TikTok</option>
-                <option value="YouTube">YouTube</option>
-                <option value="Facebook">Facebook</option>
-              </select>
-            </div>
+            {/* Mobile: First filter visible, rest behind "More" button */}
+            <div className="lg:hidden">
+              {/* Always visible - Category Filter */}
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
+                <select
+                  value={filters.category}
+                  onChange={(e) => handleFilterChange('category', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                >
+                  <option value="">All Categories</option>
+                  {CATEGORIES.map(cat => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
+                </select>
+              </div>
 
-            {/* Followers Filter */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Followers</label>
-              <select
-                value={filters.follower_range}
-                onChange={(e) => handleFilterChange('follower_range', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+              {/* More Filters Toggle Button */}
+              <button
+                onClick={() => setShowMoreFilters(!showMoreFilters)}
+                className="flex items-center justify-center gap-2 w-full px-4 py-2 mb-4 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
               >
-                <option value="">Any</option>
-                <option value="0-1K">0-1K</option>
-                <option value="1K-10K">1K-10K</option>
-                <option value="10K-50K">10K-50K</option>
-                <option value="50K-100K">50K-100K</option>
-                <option value="100K-500K">100K-500K</option>
-                <option value="500K+">500K+</option>
-              </select>
-            </div>
+                <Filter size={18} />
+                {showMoreFilters ? 'Hide' : 'More'} Filters
+                <svg
+                  className={`w-4 h-4 transition-transform ${showMoreFilters ? 'rotate-180' : ''}`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
 
-            {/* Language Filter */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Language</label>
-              <select
-                value={filters.languages[0] || ''}
-                onChange={(e) => handleFilterChange('languages', e.target.value ? [e.target.value] : [])}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-              >
-                <option value="">All Languages</option>
-                <option value="English">English</option>
-                <option value="Shona">Shona</option>
-              </select>
-            </div>
+              {/* Additional Filters - Collapsed on mobile */}
+              {showMoreFilters && (
+                <div className="space-y-4">
+                  {/* Platform Filter */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Platform</label>
+                    <select
+                      value={filters.platform}
+                      onChange={(e) => handleFilterChange('platform', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                    >
+                      <option value="">All Platforms</option>
+                      <option value="Instagram">Instagram</option>
+                      <option value="TikTok">TikTok</option>
+                      <option value="YouTube">YouTube</option>
+                      <option value="Facebook">Facebook</option>
+                    </select>
+                  </div>
 
-            {/* Price Range Filter */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Price Range</label>
-              <select
-                value={filters.price_range}
-                onChange={(e) => handleFilterChange('price_range', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-              >
-                <option value="">Any Price</option>
-                <option value="$0-$50">$0-$50</option>
-                <option value="$50-$100">$50-$100</option>
-                <option value="$100-$250">$100-$250</option>
-                <option value="$250-$500">$250-$500</option>
-                <option value="$500-$1000">$500-$1000</option>
-                <option value="$1000+">$1000+</option>
-              </select>
-            </div>
+                  {/* Followers Filter */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Followers</label>
+                    <select
+                      value={filters.follower_range}
+                      onChange={(e) => handleFilterChange('follower_range', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                    >
+                      <option value="">Any</option>
+                      <option value="0-1K">0-1K</option>
+                      <option value="1K-10K">1K-10K</option>
+                      <option value="10K-50K">10K-50K</option>
+                      <option value="50K-100K">50K-100K</option>
+                      <option value="100K-500K">100K-500K</option>
+                      <option value="500K+">500K+</option>
+                    </select>
+                  </div>
 
-            {/* Rating Filter */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Minimum Rating</label>
-              <select
-                value={filters.min_rating}
-                onChange={(e) => handleFilterChange('min_rating', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-              >
-                <option value="">Any Rating</option>
-                <option value="4">4+ Stars</option>
-                <option value="3">3+ Stars</option>
-                <option value="2">2+ Stars</option>
-              </select>
+                  {/* Language Filter */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Language</label>
+                    <select
+                      value={filters.languages[0] || ''}
+                      onChange={(e) => handleFilterChange('languages', e.target.value ? [e.target.value] : [])}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                    >
+                      <option value="">All Languages</option>
+                      <option value="English">English</option>
+                      <option value="Shona">Shona</option>
+                    </select>
+                  </div>
+
+                  {/* Price Range Filter */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Price Range</label>
+                    <select
+                      value={filters.price_range}
+                      onChange={(e) => handleFilterChange('price_range', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                    >
+                      <option value="">Any Price</option>
+                      <option value="$0-$50">$0-$50</option>
+                      <option value="$50-$100">$50-$100</option>
+                      <option value="$100-$250">$100-$250</option>
+                      <option value="$250-$500">$250-$500</option>
+                      <option value="$500-$1000">$500-$1000</option>
+                      <option value="$1000+">$1000+</option>
+                    </select>
+                  </div>
+
+                  {/* Rating Filter */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Minimum Rating</label>
+                    <select
+                      value={filters.min_rating}
+                      onChange={(e) => handleFilterChange('min_rating', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                    >
+                      <option value="">Any Rating</option>
+                      <option value="4">4+ Stars</option>
+                      <option value="3">3+ Stars</option>
+                      <option value="2">2+ Stars</option>
+                    </select>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
