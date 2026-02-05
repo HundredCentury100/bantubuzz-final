@@ -15,7 +15,7 @@ const CreateBrief = () => {
     title: '',
     description: '',
     goal: '',
-    platform: '',
+    platforms: [],
     budget_min: '',
     budget_max: '',
     timeline_days: '',
@@ -63,6 +63,15 @@ const CreateBrief = () => {
       target_categories: prev.target_categories.includes(category)
         ? prev.target_categories.filter((c) => c !== category)
         : [...prev.target_categories, category],
+    }));
+  };
+
+  const handlePlatformToggle = (platform) => {
+    setFormData((prev) => ({
+      ...prev,
+      platforms: prev.platforms.includes(platform)
+        ? prev.platforms.filter((p) => p !== platform)
+        : [...prev.platforms, platform],
     }));
   };
 
@@ -283,20 +292,30 @@ const CreateBrief = () => {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Platform</label>
-                  <select
-                    name="platform"
-                    value={formData.platform}
-                    onChange={handleInputChange}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                  >
-                    <option value="">Select platform</option>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Platforms
+                  </label>
+                  <div className="flex flex-wrap gap-2">
                     {platforms.map((platform) => (
-                      <option key={platform} value={platform}>
+                      <button
+                        key={platform}
+                        type="button"
+                        onClick={() => handlePlatformToggle(platform)}
+                        className={`px-4 py-2 rounded-lg border transition-colors ${
+                          formData.platforms.includes(platform)
+                            ? 'bg-primary text-dark border-primary'
+                            : 'bg-white text-gray-700 border-gray-300 hover:border-primary'
+                        }`}
+                      >
                         {platform}
-                      </option>
+                      </button>
                     ))}
-                  </select>
+                  </div>
+                  {formData.platforms.length > 0 && (
+                    <p className="mt-2 text-sm text-gray-600">
+                      Selected: {formData.platforms.join(', ')}
+                    </p>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">

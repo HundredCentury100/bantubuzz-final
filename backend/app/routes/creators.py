@@ -91,11 +91,14 @@ def get_creators():
         category = request.args.get('category')
         location = request.args.get('location')
         min_followers = request.args.get('min_followers', type=int)
+        max_followers = request.args.get('max_followers', type=int)
+        min_price = request.args.get('min_price', type=float)
         max_price = request.args.get('max_price', type=float)
         search = request.args.get('search')
         platform = request.args.get('platform')
         page = request.args.get('page', 1, type=int)
         per_page = request.args.get('per_page', 12, type=int)
+        sort_by = request.args.get('sort_by', '')
 
         # New filter parameters
         languages = request.args.getlist('languages[]') or request.args.get('languages', '').split(',') if request.args.get('languages') else []
@@ -116,6 +119,9 @@ def get_creators():
 
         if min_followers:
             query = query.filter(CreatorProfile.follower_count >= min_followers)
+
+        if max_followers:
+            query = query.filter(CreatorProfile.follower_count <= max_followers)
 
         # Platform filter - now uses platforms array
         if platform:
@@ -179,6 +185,8 @@ def get_creators():
                 query = query.filter(CreatorProfile.location.ilike(f'%{location}%'))
             if min_followers:
                 query = query.filter(CreatorProfile.follower_count >= min_followers)
+            if max_followers:
+                query = query.filter(CreatorProfile.follower_count <= max_followers)
             if platform:
                 query = query.filter(CreatorProfile.platforms.contains([platform]))
             if languages:
@@ -250,7 +258,20 @@ def get_creators():
                 if c['review_stats']['average_rating'] >= min_rating
             ]
 
-        # Apply price range filter
+        # Apply min/max price filters
+        if min_price is not None:
+            creators_with_stats = [
+                c for c in creators_with_stats
+                if c['cheapest_package_price'] is not None and c['cheapest_package_price'] >= min_price
+            ]
+
+        if max_price is not None:
+            creators_with_stats = [
+                c for c in creators_with_stats
+                if c['cheapest_package_price'] is not None and c['cheapest_package_price'] <= max_price
+            ]
+
+        # Legacy price_range filter (kept for backward compatibility)
         if price_range:
             price_ranges = {
                 '$0-$50': (0, 50),
@@ -270,11 +291,28 @@ def get_creators():
                     )
                 ]
 
-        # Sort by total reviews (descending), then by average rating (descending)
-        creators_with_stats.sort(
-            key=lambda x: (x['review_stats']['total_reviews'], x['review_stats']['average_rating']),
-            reverse=True
-        )
+        # Apply sorting based on sort_by parameter
+        if sort_by == 'followers_desc':
+            creators_with_stats.sort(key=lambda x: x.get('follower_count', 0), reverse=True)
+        elif sort_by == 'followers_asc':
+            creators_with_stats.sort(key=lambda x: x.get('follower_count', 0), reverse=False)
+        elif sort_by == 'price_desc':
+            # Sort by price, but put None values at the end
+            creators_with_stats.sort(key=lambda x: (x['cheapest_package_price'] is None, x['cheapest_package_price'] or 0), reverse=True)
+        elif sort_by == 'price_asc':
+            # Sort by price, but put None values at the end
+            creators_with_stats.sort(key=lambda x: (x['cheapest_package_price'] is None, x['cheapest_package_price'] or float('inf')), reverse=False)
+        elif sort_by == 'rating_desc':
+            creators_with_stats.sort(key=lambda x: x['review_stats']['average_rating'], reverse=True)
+        elif sort_by == 'newest':
+            # Sort by created_at if available, otherwise use id as proxy
+            creators_with_stats.sort(key=lambda x: x.get('created_at', ''), reverse=True)
+        else:
+            # Default: Sort by total reviews (descending), then by average rating (descending)
+            creators_with_stats.sort(
+                key=lambda x: (x['review_stats']['total_reviews'], x['review_stats']['average_rating']),
+                reverse=True
+            )
 
         # Apply pagination manually after sorting
         total = len(creators_with_stats)

@@ -42,12 +42,14 @@ const BrowseCreators = () => {
     category: '',
     location: '',
     min_followers: '',
+    max_followers: '',
+    min_price: '',
+    max_price: '',
     search: '',
     platform: '',
     languages: [],
-    follower_range: '',
     min_rating: '',
-    price_range: ''
+    sort_by: ''
   });
   const [pagination, setPagination] = useState({
     current_page: 1,
@@ -248,22 +250,25 @@ const BrowseCreators = () => {
                 </select>
               </div>
 
-              {/* Followers Filter */}
+              {/* Followers Filter - Min/Max */}
               <div className="flex-1 min-w-[150px]">
                 <label className="block text-sm font-medium text-gray-700 mb-2">Followers</label>
-                <select
-                  value={filters.follower_range}
-                  onChange={(e) => handleFilterChange('follower_range', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                >
-                  <option value="">Any</option>
-                  <option value="0-1K">0-1K</option>
-                  <option value="1K-10K">1K-10K</option>
-                  <option value="10K-50K">10K-50K</option>
-                  <option value="50K-100K">50K-100K</option>
-                  <option value="100K-500K">100K-500K</option>
-                  <option value="500K+">500K+</option>
-                </select>
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    placeholder="Min"
+                    value={filters.min_followers}
+                    onChange={(e) => handleFilterChange('min_followers', e.target.value)}
+                    className="w-1/2 px-2 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm"
+                  />
+                  <input
+                    type="number"
+                    placeholder="Max"
+                    value={filters.max_followers}
+                    onChange={(e) => handleFilterChange('max_followers', e.target.value)}
+                    className="w-1/2 px-2 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm"
+                  />
+                </div>
               </div>
 
               {/* Language Filter */}
@@ -280,22 +285,25 @@ const BrowseCreators = () => {
                 </select>
               </div>
 
-              {/* Price Range Filter */}
+              {/* Price Range Filter - Min/Max */}
               <div className="flex-1 min-w-[150px]">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Price Range</label>
-                <select
-                  value={filters.price_range}
-                  onChange={(e) => handleFilterChange('price_range', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                >
-                  <option value="">Any Price</option>
-                  <option value="$0-$50">$0-$50</option>
-                  <option value="$50-$100">$50-$100</option>
-                  <option value="$100-$250">$100-$250</option>
-                  <option value="$250-$500">$250-$500</option>
-                  <option value="$500-$1000">$500-$1000</option>
-                  <option value="$1000+">$1000+</option>
-                </select>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Price Range ($)</label>
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    placeholder="Min"
+                    value={filters.min_price}
+                    onChange={(e) => handleFilterChange('min_price', e.target.value)}
+                    className="w-1/2 px-2 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm"
+                  />
+                  <input
+                    type="number"
+                    placeholder="Max"
+                    value={filters.max_price}
+                    onChange={(e) => handleFilterChange('max_price', e.target.value)}
+                    className="w-1/2 px-2 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm"
+                  />
+                </div>
               </div>
 
               {/* Rating Filter */}
@@ -310,6 +318,24 @@ const BrowseCreators = () => {
                   <option value="4">4+ Stars</option>
                   <option value="3">3+ Stars</option>
                   <option value="2">2+ Stars</option>
+                </select>
+              </div>
+
+              {/* Sort By */}
+              <div className="flex-1 min-w-[150px]">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Sort By</label>
+                <select
+                  value={filters.sort_by}
+                  onChange={(e) => handleFilterChange('sort_by', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                >
+                  <option value="">Relevance</option>
+                  <option value="followers_desc">Followers: High to Low</option>
+                  <option value="followers_asc">Followers: Low to High</option>
+                  <option value="price_desc">Price: High to Low</option>
+                  <option value="price_asc">Price: Low to High</option>
+                  <option value="rating_desc">Rating: High to Low</option>
+                  <option value="newest">Newest First</option>
                 </select>
               </div>
             </div>
@@ -367,22 +393,25 @@ const BrowseCreators = () => {
                     </select>
                   </div>
 
-                  {/* Followers Filter */}
+                  {/* Followers Filter - Min/Max */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Followers</label>
-                    <select
-                      value={filters.follower_range}
-                      onChange={(e) => handleFilterChange('follower_range', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                    >
-                      <option value="">Any</option>
-                      <option value="0-1K">0-1K</option>
-                      <option value="1K-10K">1K-10K</option>
-                      <option value="10K-50K">10K-50K</option>
-                      <option value="50K-100K">50K-100K</option>
-                      <option value="100K-500K">100K-500K</option>
-                      <option value="500K+">500K+</option>
-                    </select>
+                    <div className="flex gap-2">
+                      <input
+                        type="number"
+                        placeholder="Min"
+                        value={filters.min_followers}
+                        onChange={(e) => handleFilterChange('min_followers', e.target.value)}
+                        className="w-1/2 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                      />
+                      <input
+                        type="number"
+                        placeholder="Max"
+                        value={filters.max_followers}
+                        onChange={(e) => handleFilterChange('max_followers', e.target.value)}
+                        className="w-1/2 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                      />
+                    </div>
                   </div>
 
                   {/* Language Filter */}
@@ -399,22 +428,25 @@ const BrowseCreators = () => {
                     </select>
                   </div>
 
-                  {/* Price Range Filter */}
+                  {/* Price Range Filter - Min/Max */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Price Range</label>
-                    <select
-                      value={filters.price_range}
-                      onChange={(e) => handleFilterChange('price_range', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                    >
-                      <option value="">Any Price</option>
-                      <option value="$0-$50">$0-$50</option>
-                      <option value="$50-$100">$50-$100</option>
-                      <option value="$100-$250">$100-$250</option>
-                      <option value="$250-$500">$250-$500</option>
-                      <option value="$500-$1000">$500-$1000</option>
-                      <option value="$1000+">$1000+</option>
-                    </select>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Price Range ($)</label>
+                    <div className="flex gap-2">
+                      <input
+                        type="number"
+                        placeholder="Min"
+                        value={filters.min_price}
+                        onChange={(e) => handleFilterChange('min_price', e.target.value)}
+                        className="w-1/2 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                      />
+                      <input
+                        type="number"
+                        placeholder="Max"
+                        value={filters.max_price}
+                        onChange={(e) => handleFilterChange('max_price', e.target.value)}
+                        className="w-1/2 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                      />
+                    </div>
                   </div>
 
                   {/* Rating Filter */}
@@ -431,13 +463,31 @@ const BrowseCreators = () => {
                       <option value="2">2+ Stars</option>
                     </select>
                   </div>
+
+                  {/* Sort By */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Sort By</label>
+                    <select
+                      value={filters.sort_by}
+                      onChange={(e) => handleFilterChange('sort_by', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                    >
+                      <option value="">Relevance</option>
+                      <option value="followers_desc">Followers: High to Low</option>
+                      <option value="followers_asc">Followers: Low to High</option>
+                      <option value="price_desc">Price: High to Low</option>
+                      <option value="price_asc">Price: Low to High</option>
+                      <option value="rating_desc">Rating: High to Low</option>
+                      <option value="newest">Newest First</option>
+                    </select>
+                  </div>
                 </div>
               )}
             </div>
           </div>
 
           {/* Clear Filters Button */}
-          {(filters.search || filters.category || filters.platform || filters.follower_range || filters.languages.length > 0 || filters.price_range || filters.min_rating) && (
+          {(filters.search || filters.category || filters.platform || filters.min_followers || filters.max_followers || filters.languages.length > 0 || filters.min_price || filters.max_price || filters.min_rating || filters.sort_by) && (
             <div className="mt-4 flex justify-end">
               <button
                 onClick={() => {
@@ -445,12 +495,14 @@ const BrowseCreators = () => {
                     category: '',
                     location: '',
                     min_followers: '',
+                    max_followers: '',
+                    min_price: '',
+                    max_price: '',
                     search: '',
                     platform: '',
                     languages: [],
-                    follower_range: '',
                     min_rating: '',
-                    price_range: ''
+                    sort_by: ''
                   });
                   setPagination(prev => ({ ...prev, current_page: 1 }));
                 }}
