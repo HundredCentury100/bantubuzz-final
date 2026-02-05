@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { collaborationsAPI } from '../services/api';
 import { useAuth } from '../hooks/useAuth';
 import { useMessaging } from '../contexts/MessagingContext';
@@ -9,6 +9,7 @@ import toast from 'react-hot-toast';
 
 const CollaborationDetails = () => {
   const { id } = useParams();
+  const navigate = useNavigate();
   const { user } = useAuth();
   const [collaboration, setCollaboration] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -125,6 +126,48 @@ const CollaborationDetails = () => {
       return;
     }
 
+    // Check if this will be a paid revision
+    const willBePaid = totalRevisions >= freeRevisions;
+
+    if (willBePaid && revisionFee > 0) {
+      try {
+        setRequestingRevision(true);
+        // Call backend to create booking
+        const response = await collaborationsAPI.createRevisionBooking(id, {
+          deliverable_id: selectedDeliverableForRevision.id,
+          notes: revisionNotes,
+          fee: revisionFee
+        });
+
+        if (response.data.redirect_to_payment && response.data.booking_id) {
+          // Store revision context for after payment
+          localStorage.setItem('pending_revision_request', JSON.stringify({
+            collaboration_id: parseInt(id),
+            deliverable_id: selectedDeliverableForRevision.id,
+            deliverable_title: selectedDeliverableForRevision.title,
+            notes: revisionNotes,
+            fee: revisionFee,
+            booking_id: response.data.booking_id
+          }));
+
+          // Close modal and redirect to payment
+          setShowRevisionModal(false);
+          setRevisionNotes('');
+          setSelectedDeliverableForRevision(null);
+
+          toast.success('Redirecting to payment for revision fee...');
+          navigate(`/brand/revision-payment/${response.data.booking_id}`);
+        }
+      } catch (error) {
+        console.error('Error creating revision booking:', error);
+        toast.error('Failed to create revision booking');
+      } finally {
+        setRequestingRevision(false);
+      }
+      return;
+    }
+
+    // Free revision - proceed normally
     try {
       setRequestingRevision(true);
       const response = await collaborationsAPI.requestRevision(
@@ -133,16 +176,7 @@ const CollaborationDetails = () => {
         revisionNotes
       );
 
-      const revisionRequest = response.data.revision_request;
-      if (revisionRequest.is_paid) {
-        toast.success(
-          `Revision requested (Fee: $${revisionRequest.fee}). Creator will be notified.`,
-          { duration: 5000 }
-        );
-      } else {
-        toast.success('Revision requested. Creator will be notified.');
-      }
-
+      toast.success('Revision requested. Creator will be notified.');
       setShowRevisionModal(false);
       setRevisionNotes('');
       setSelectedDeliverableForRevision(null);
@@ -610,13 +644,13 @@ const CollaborationDetails = () => {
               <div className="flex items-center gap-3">
                 <Avatar
                   src={isBrand ? collaboration.creator?.profile_picture : collaboration.brand?.logo}
-                  alt={isBrand ? collaboration.creator?.user?.email?.split('@')[0] : collaboration.brand?.company_name}
+                  alt={isBrand ? (collaboration.creator?.display_name || collaboration.creator?.username || 'Creator') : collaboration.brand?.company_name}
                   size="lg"
                   type={isBrand ? 'user' : 'brand'}
                 />
                 <div>
                   <p className="font-medium text-gray-900">
-                    {isBrand ? collaboration.creator?.user?.email?.split('@')[0] : collaboration.brand?.company_name}
+                    {isBrand ? (collaboration.creator?.display_name || collaboration.creator?.username || 'Creator') : collaboration.brand?.company_name}
                   </p>
                   {isBrand && collaboration.creator?.follower_count && (
                     <p className="text-sm text-gray-600">
@@ -632,6 +666,22 @@ const CollaborationDetails = () => {
               <div className="bg-white rounded-lg shadow p-6">
                 <h3 className="text-lg font-bold text-gray-900 mb-4">Actions</h3>
                 <div className="space-y-3">
+                  {/* Send Message Button - Available for both creators and brands */}
+                  <Link
+                    to="/messages"
+                    state={{
+                      startConversationWith: {
+                        id: isBrand ? collaboration.creator?.user_id : collaboration.brand?.user_id,
+                        name: isBrand ? (collaboration.creator?.display_name || collaboration.creator?.username) : collaboration.brand?.company_name,
+                        type: isBrand ? 'creator' : 'brand'
+                      }
+                    }}
+                    className="block w-full px-4 py-3 bg-white border-2 border-primary text-primary hover:bg-primary hover:text-white font-medium rounded-lg transition-colors text-center"
+                  >
+                    Send Message
+                  </Link>
+
+                  {/* Mark as Completed Button - Only for brands */}
                   {isBrand && (
                     <button
                       onClick={handleComplete}
@@ -639,17 +689,6 @@ const CollaborationDetails = () => {
                     >
                       Mark as Completed
                     </button>
-                  )}
-                  <button
-                    onClick={handleCancel}
-                    className="w-full px-4 py-3 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg transition-colors"
-                  >
-                    {isBrand ? 'Request Cancellation' : 'Cancel Collaboration'}
-                  </button>
-                  {isBrand && (
-                    <p className="text-xs text-gray-500 text-center">
-                      Cancellation requests are reviewed by our support team
-                    </p>
                   )}
                 </div>
               </div>
@@ -665,6 +704,21 @@ const CollaborationDetails = () => {
                 >
                   Leave a Review
                 </Link>
+              </div>
+            )}
+
+            {/* Cancel Collaboration Link (Less Prominent) */}
+            {collaboration.status === 'in_progress' && isBrand && (
+              <div className="bg-white rounded-lg shadow p-6">
+                <button
+                  onClick={handleCancel}
+                  className="w-full text-sm text-gray-500 hover:text-red-600 underline transition-colors"
+                >
+                  Need Help? Request Cancellation
+                </button>
+                <p className="text-xs text-gray-400 mt-2 text-center">
+                  Reviewed by support team
+                </p>
               </div>
             )}
           </div>
