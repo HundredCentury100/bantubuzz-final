@@ -434,6 +434,195 @@ def request_revision(collab_id, deliverable_id):
         return jsonify({'error': str(e)}), 500
 
 
+@bp.route('/<int:collab_id>/revision/create-booking', methods=['POST'])
+@jwt_required()
+def create_revision_booking(collab_id):
+    """Create a booking for paid revision (brand only)"""
+    try:
+        user_id = int(get_jwt_identity())
+        brand = BrandProfile.query.filter_by(user_id=user_id).first()
+
+        if not brand:
+            return jsonify({'error': 'Brand profile not found'}), 404
+
+        collaboration = Collaboration.query.get(collab_id)
+        if not collaboration:
+            return jsonify({'error': 'Collaboration not found'}), 404
+
+        if collaboration.brand_id != brand.id:
+            return jsonify({'error': 'Unauthorized'}), 403
+
+        data = request.get_json()
+        deliverable_id = data.get('deliverable_id')
+        notes = data.get('notes')
+        fee = data.get('fee', 0)
+
+        if not deliverable_id or not notes:
+            return jsonify({'error': 'Deliverable ID and notes are required'}), 400
+
+        # Find the deliverable
+        draft_deliverables = collaboration.draft_deliverables or []
+        deliverable_found = False
+        deliverable_title = None
+
+        for d in draft_deliverables:
+            if d.get('id') == deliverable_id:
+                deliverable_found = True
+                deliverable_title = d['title']
+                break
+
+        if not deliverable_found:
+            return jsonify({'error': 'Deliverable not found'}), 404
+
+        # Create booking for revision fee
+        from app.models import Booking
+        booking = Booking(
+            brand_id=brand.id,
+            creator_id=collaboration.creator_id,
+            package_id=None,
+            campaign_id=None,
+            booking_type='paid_revision',
+            amount=float(fee),
+            total_price=float(fee),
+            status='pending',
+            payment_status='pending',
+            notes=f"Paid revision for deliverable: {deliverable_title}"
+        )
+        db.session.add(booking)
+        db.session.flush()  # Get the booking ID
+
+        # Store revision data in booking notes as JSON
+        import json
+        revision_data = {
+            'collaboration_id': collab_id,
+            'deliverable_id': deliverable_id,
+            'deliverable_title': deliverable_title,
+            'revision_notes': notes
+        }
+        booking.notes = json.dumps(revision_data)
+
+        db.session.commit()
+
+        return jsonify({
+            'message': 'Booking created for revision. Please proceed to payment.',
+            'booking_id': booking.id,
+            'redirect_to_payment': True
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        import traceback
+        print(f"ERROR in create_revision_booking: {str(e)}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@bp.route('/<int:collab_id>/revision/complete-payment', methods=['POST'])
+@jwt_required()
+def complete_revision_payment(collab_id):
+    """Complete revision payment and request the revision (brand only)"""
+    try:
+        user_id = int(get_jwt_identity())
+        brand = BrandProfile.query.filter_by(user_id=user_id).first()
+
+        if not brand:
+            return jsonify({'error': 'Brand profile not found'}), 404
+
+        collaboration = Collaboration.query.get(collab_id)
+        if not collaboration:
+            return jsonify({'error': 'Collaboration not found'}), 404
+
+        if collaboration.brand_id != brand.id:
+            return jsonify({'error': 'Unauthorized'}), 403
+
+        data = request.get_json()
+        booking_id = data.get('booking_id')
+
+        if not booking_id:
+            return jsonify({'error': 'Booking ID is required'}), 400
+
+        # Verify booking is paid
+        from app.models import Booking
+        booking = Booking.query.get(booking_id)
+        if not booking or booking.payment_status != 'verified':
+            return jsonify({'error': 'Payment not verified'}), 400
+
+        # Extract revision data from booking notes
+        import json
+        revision_data = json.loads(booking.notes)
+        deliverable_id = revision_data['deliverable_id']
+        revision_notes = revision_data['revision_notes']
+        deliverable_title = revision_data['deliverable_title']
+
+        # Now request the revision
+        draft_deliverables = collaboration.draft_deliverables or []
+
+        for d in draft_deliverables:
+            if d.get('id') == deliverable_id:
+                d['status'] = 'revision_requested'
+                d['revision_notes'] = revision_notes
+                d['revision_requested_at'] = datetime.utcnow().isoformat()
+                break
+
+        # Track revision request
+        creator = collaboration.creator
+        total_revisions = collaboration.total_revisions_used or 0
+
+        revision_request = {
+            'deliverable_id': deliverable_id,
+            'deliverable_title': deliverable_title,
+            'notes': revision_notes,
+            'requested_at': datetime.utcnow().isoformat(),
+            'is_paid': True,
+            'fee': booking.amount,
+            'booking_id': booking_id
+        }
+
+        if collaboration.revision_requests is None:
+            collaboration.revision_requests = []
+
+        collaboration.revision_requests.append(revision_request)
+        collaboration.total_revisions_used = total_revisions + 1
+        collaboration.paid_revisions = (collaboration.paid_revisions or 0) + 1
+
+        # Update last update
+        collaboration.last_update = f"Paid revision requested for: {deliverable_title}"
+        collaboration.last_update_date = datetime.utcnow()
+        collaboration.updated_at = datetime.utcnow()
+
+        # Mark the flags as modified for JSON fields
+        from sqlalchemy.orm.attributes import flag_modified
+        flag_modified(collaboration, 'draft_deliverables')
+        flag_modified(collaboration, 'revision_requests')
+
+        db.session.commit()
+
+        # Emit Socket.IO update
+        emit_collaboration_update(collaboration.id)
+
+        # Notify creator about revision request
+        creator_user = User.query.get(collaboration.creator.user_id)
+        if creator_user:
+            notify_collaboration_update(
+                user_id=creator_user.id,
+                collaboration_title=collaboration.title,
+                collaboration_id=collaboration.id,
+                update_message=f"Paid revision requested for '{deliverable_title}'"
+            )
+
+        return jsonify({
+            'message': 'Revision requested successfully after payment',
+            'collaboration': collaboration.to_dict()
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        import traceback
+        print(f"ERROR in complete_revision_payment: {str(e)}")
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
 @bp.route('/<int:collab_id>/deliverables/<int:deliverable_id>', methods=['PUT'])
 @jwt_required()
 def update_deliverable(collab_id, deliverable_id):
@@ -608,11 +797,45 @@ def complete_collaboration(collab_id):
             return jsonify({'error': 'Unauthorized'}), 403
 
         # Check if payment has been made before allowing completion
-        if collaboration.payment_status != 'paid':
-            return jsonify({
-                'error': 'Cannot complete collaboration - payment not received',
-                'message': 'Please ensure payment is completed before marking collaboration as complete'
-            }), 400
+        # For package-based collaborations, check booking payment status
+        if collaboration.booking_id:
+            from app.models import Booking, Payment
+            booking = Booking.query.get(collaboration.booking_id)
+            if not booking:
+                return jsonify({
+                    'error': 'Booking not found',
+                    'message': 'Associated booking not found for this collaboration'
+                }), 404
+
+            # Check payment exists and is paid
+            payment = Payment.query.filter_by(booking_id=booking.id).first()
+            if not payment:
+                return jsonify({
+                    'error': 'Cannot complete collaboration - no payment found',
+                    'message': 'Please ensure payment has been made before marking collaboration as complete'
+                }), 400
+
+            if payment.status not in ['paid', 'completed']:
+                return jsonify({
+                    'error': 'Cannot complete collaboration - payment not verified',
+                    'message': f'Payment status is "{payment.status}". Please ensure payment is completed before marking collaboration as complete'
+                }), 400
+
+            if booking.payment_status not in ['paid', 'verified']:
+                return jsonify({
+                    'error': 'Cannot complete collaboration - booking payment not verified',
+                    'message': f'Booking payment status is "{booking.payment_status}". Please ensure payment is verified before marking collaboration as complete'
+                }), 400
+
+        # For campaign-based collaborations, check Payment table
+        elif collaboration.collaboration_type == 'campaign':
+            from app.models import Payment
+            payment = Payment.query.filter_by(collaboration_id=collaboration.id).first()
+            if not payment or payment.status not in ['paid', 'completed']:
+                return jsonify({
+                    'error': 'Cannot complete collaboration - payment not received',
+                    'message': 'Please ensure payment is completed before marking collaboration as complete'
+                }), 400
 
         collaboration.status = 'completed'
         collaboration.actual_completion_date = datetime.utcnow()
