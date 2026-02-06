@@ -300,8 +300,56 @@ def approve_deliverable(collab_id, deliverable_id):
         # Auto-calculate progress
         collaboration.progress_percentage = collaboration.calculate_progress()
 
-        # Update last update
-        collaboration.last_update = f"Deliverable approved: {deliverable_to_approve['title']}"
+        # Auto-complete if progress reaches 100%
+        if collaboration.progress_percentage >= 100 and collaboration.status == 'in_progress':
+            collaboration.status = 'completed'
+            collaboration.actual_completion_date = datetime.utcnow()
+            collaboration.last_update = "Collaboration automatically completed (100% progress reached)"
+            collaboration.escrow_status = 'escrowed'
+
+            # Release escrow to creator wallet
+            if collaboration.booking_id:
+                from app.models import Booking
+                booking = Booking.query.get(collaboration.booking_id)
+                if booking and booking.status != 'completed':
+                    booking.status = 'completed'
+                    booking.completion_date = datetime.utcnow()
+                    booking.escrow_status = 'escrowed'
+                    booking.escrowed_at = datetime.utcnow()
+
+            # Release funds to wallet
+            try:
+                from app.services.payment_service import release_escrow_to_wallet
+                transaction = release_escrow_to_wallet(collaboration.id, platform_fee_percentage=15)
+                print(f"Auto-completion: Escrow released for collaboration {collaboration.id}. Transaction: {transaction.id}")
+            except Exception as e:
+                print(f"Warning: Failed to auto-release escrow: {str(e)}")
+
+            # Notify both parties
+            creator_user = User.query.get(collaboration.creator.user_id)
+            brand_user = User.query.get(collaboration.brand.user_id)
+
+            if creator_user:
+                notify_collaboration_status(
+                    user_id=creator_user.id,
+                    status='completed',
+                    collaboration_title=collaboration.title,
+                    collaboration_id=collaboration.id,
+                    user_type='creator'
+                )
+
+            if brand_user:
+                notify_collaboration_status(
+                    user_id=brand_user.id,
+                    status='completed',
+                    collaboration_title=collaboration.title,
+                    collaboration_id=collaboration.id,
+                    user_type='brand'
+                )
+        else:
+            # Normal update
+            collaboration.last_update = f"Deliverable approved: {deliverable_to_approve['title']}"
+
         collaboration.last_update_date = datetime.utcnow()
         collaboration.updated_at = datetime.utcnow()
 
@@ -807,24 +855,37 @@ def complete_collaboration(collab_id):
                     'message': 'Associated booking not found for this collaboration'
                 }), 404
 
-            # Check payment exists and is paid
-            payment = Payment.query.filter_by(booking_id=booking.id).first()
-            if not payment:
-                return jsonify({
-                    'error': 'Cannot complete collaboration - no payment found',
-                    'message': 'Please ensure payment has been made before marking collaboration as complete'
-                }), 400
-
-            if payment.status not in ['paid', 'completed']:
-                return jsonify({
-                    'error': 'Cannot complete collaboration - payment not verified',
-                    'message': f'Payment status is "{payment.status}". Please ensure payment is completed before marking collaboration as complete'
-                }), 400
-
+            # Check if booking payment is verified/paid
             if booking.payment_status not in ['paid', 'verified']:
                 return jsonify({
                     'error': 'Cannot complete collaboration - booking payment not verified',
                     'message': f'Booking payment status is "{booking.payment_status}". Please ensure payment is verified before marking collaboration as complete'
+                }), 400
+
+            # Check if Payment record exists - if not, create it retroactively for old bookings
+            payment = Payment.query.filter_by(booking_id=booking.id).first()
+            if not payment:
+                # Create Payment record for old bookings that were verified before Payment table existed
+                print(f"Creating retroactive Payment record for booking {booking.id}")
+                payment = Payment(
+                    booking_id=booking.id,
+                    user_id=brand.user_id,
+                    amount=booking.total_price if hasattr(booking, 'total_price') else booking.amount,
+                    payment_method=booking.payment_method or 'manual',
+                    payment_type='manual',
+                    status='completed',
+                    completed_at=booking.created_at,
+                    escrow_status='escrowed',
+                    held_amount=booking.total_price if hasattr(booking, 'total_price') else booking.amount
+                )
+                db.session.add(payment)
+                db.session.flush()  # Get the payment ID
+
+            # Ensure payment status is correct
+            if payment.status not in ['paid', 'completed']:
+                return jsonify({
+                    'error': 'Cannot complete collaboration - payment not completed',
+                    'message': f'Payment status is "{payment.status}". Please ensure payment is completed before marking collaboration as complete'
                 }), 400
 
         # For campaign-based collaborations, check Payment table
