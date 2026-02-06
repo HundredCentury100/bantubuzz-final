@@ -33,6 +33,10 @@ class CreatorProfile(db.Model):
     featured_order = db.Column(db.Integer, default=0)
     featured_since = db.Column(db.DateTime, nullable=True)
 
+    # Verification and badges
+    is_verified = db.Column(db.Boolean, default=False)  # Verified by platform with documents
+    verified_at = db.Column(db.DateTime, nullable=True)
+
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -40,6 +44,43 @@ class CreatorProfile(db.Model):
     packages = db.relationship('Package', backref='creator', lazy='dynamic', cascade='all, delete-orphan')
     bookings_as_creator = db.relationship('Booking', foreign_keys='Booking.creator_id', backref='creator', lazy='dynamic')
     saved_by_brands = db.relationship('SavedCreator', backref='creator', lazy='dynamic', cascade='all, delete-orphan')
+
+    def get_badges(self):
+        """
+        Calculate creator badges based on verification and performance
+        Returns list of up to 2 badges in priority order
+
+        Badge hierarchy:
+        1. Top Creator (5+ completed collaborations in last 30 days)
+        2. Verified Creator (platform verified with documents)
+        3. Creator (default badge for all creators)
+        """
+        from datetime import datetime, timedelta
+        from app.models import Collaboration
+
+        badges = []
+
+        # Check for Top Creator badge (highest priority)
+        thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+        completed_count = Collaboration.query.filter(
+            Collaboration.creator_id == self.id,
+            Collaboration.status == 'completed',
+            Collaboration.updated_at >= thirty_days_ago
+        ).count()
+
+        if completed_count >= 5:
+            badges.append('top_creator')
+
+        # Check for Verified Creator badge
+        if self.is_verified:
+            badges.append('verified_creator')
+
+        # Always include Creator badge if no other badges (everyone gets at least one)
+        if not badges:
+            badges.append('creator')
+
+        # Return maximum of 2 badges
+        return badges[:2]
 
     def to_dict(self, include_user=False, public_view=False):
         """
@@ -70,6 +111,8 @@ class CreatorProfile(db.Model):
             'gallery_images': self.gallery_images or [],
             'free_revisions': self.free_revisions or 2,
             'revision_fee': self.revision_fee or 0.0,
+            'is_verified': self.is_verified or False,
+            'badges': self.get_badges(),
             'created_at': self.created_at.isoformat(),
             'updated_at': self.updated_at.isoformat()
         }
