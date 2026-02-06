@@ -491,24 +491,20 @@ def verify_bank_transfer_payment(booking_id):
 
         elif booking.booking_type == 'brief':
             # For briefs: Create collaboration with milestones
-            # Find the accepted proposal
-            proposal = Proposal.query.filter_by(status='accepted').join(
-                Proposal.brief
-            ).filter_by(id=booking.notes.split(':')[-1].strip() if ':' in booking.notes else None).first()
+            # Find the accepted proposal by creator and brand
+            from app.models import Brief
+            proposal = None
 
-            # Better way: query by creator and amount
-            if not proposal:
-                from app.models import Brief
-                # Try to find proposal by matching creator and booking details
-                brief_query = Brief.query.filter_by(brand_id=booking.brand_id, status='closed')
-                for brief in brief_query.all():
-                    proposal = Proposal.query.filter_by(
-                        brief_id=brief.id,
-                        creator_id=booking.creator_id,
-                        status='accepted'
-                    ).first()
-                    if proposal:
-                        break
+            # Try to find proposal by matching creator and booking details
+            brief_query = Brief.query.filter_by(brand_id=booking.brand_id, status='closed')
+            for brief in brief_query.all():
+                proposal = Proposal.query.filter_by(
+                    brief_id=brief.id,
+                    creator_id=booking.creator_id,
+                    status='accepted'
+                ).first()
+                if proposal:
+                    break
 
             if not proposal:
                 db.session.rollback()

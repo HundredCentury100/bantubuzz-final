@@ -153,6 +153,7 @@ export default function AdminBookings() {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Brand</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Creator</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Payment Method</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Payment Status</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
@@ -163,7 +164,7 @@ export default function AdminBookings() {
             <tbody className="bg-white divide-y divide-gray-200">
               {bookings.length === 0 ? (
                 <tr>
-                  <td colSpan="10" className="px-6 py-8 text-center text-gray-500">
+                  <td colSpan="11" className="px-6 py-8 text-center text-gray-500">
                     No bookings found
                   </td>
                 </tr>
@@ -185,7 +186,10 @@ export default function AdminBookings() {
                             {booking.brand?.company_name?.charAt(0) || 'B'}
                           </div>
                         )}
-                        <span className="text-sm text-gray-900">{booking.brand?.company_name || `Brand ${booking.brand_id}`}</span>
+                        <div>
+                          <div className="text-sm font-medium text-gray-900">{booking.brand?.company_name || `Brand ${booking.brand_id}`}</div>
+                          <div className="text-xs text-gray-500">{booking.brand?.user?.email || 'N/A'}</div>
+                        </div>
                       </div>
                     </td>
                     <td className="px-6 py-4">
@@ -201,10 +205,18 @@ export default function AdminBookings() {
                             {(booking.creator?.display_name || booking.creator?.username || 'C').charAt(0).toUpperCase()}
                           </div>
                         )}
-                        <span className="text-sm text-gray-900">{booking.creator?.display_name || booking.creator?.username || `Creator ${booking.creator_id}`}</span>
+                        <div>
+                          <div className="text-sm font-medium text-gray-900">{booking.creator?.display_name || booking.creator?.username || `Creator ${booking.creator_id}`}</div>
+                          <div className="text-xs text-gray-500">{booking.creator?.user?.email || 'N/A'}</div>
+                        </div>
                       </div>
                     </td>
                     <td className="px-6 py-4 text-sm font-semibold text-gray-900">{formatCurrency(booking.total_price)}</td>
+                    <td className="px-6 py-4 text-sm text-gray-900">
+                      <span className="px-2 py-1 text-xs font-semibold rounded-full bg-indigo-100 text-indigo-800 capitalize">
+                        {booking.payment_category || booking.booking_type || 'package'}
+                      </span>
+                    </td>
                     <td className="px-6 py-4 text-sm text-gray-900">
                       <span className="capitalize">{booking.payment_method === 'bank_transfer' ? 'Bank Transfer' : 'Paynow'}</span>
                     </td>
