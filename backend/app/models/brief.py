@@ -54,6 +54,7 @@ class Brief(db.Model):
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,
             'closed_at': self.closed_at.isoformat() if self.closed_at else None,
+            'proposals_count': self.proposals.count(),  # Always include proposal count
         }
 
         if include_relations:
