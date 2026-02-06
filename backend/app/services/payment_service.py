@@ -575,3 +575,76 @@ def process_payment_webhook(data):
     except Exception as e:
         print(f"Webhook processing error: {str(e)}")
         return False
+
+
+def release_milestone_escrow(milestone_id, platform_fee_percentage=15):
+    """
+    Release escrow for a specific completed milestone to creator wallet
+    Only releases the portion allocated to this milestone
+    """
+    from app.models import CollaborationMilestone, Collaboration, Transaction, WalletTransaction
+    from datetime import timedelta
+
+    milestone = CollaborationMilestone.query.get(milestone_id)
+    if not milestone:
+        raise ValueError(f"Milestone {milestone_id} not found")
+
+    if milestone.status != 'completed':
+        raise ValueError("Milestone must be completed before releasing escrow")
+
+    collaboration = Collaboration.query.get(milestone.collaboration_id)
+    if not collaboration:
+        raise ValueError(f"Collaboration not found for milestone {milestone_id}")
+
+    # Check if wallet transaction already exists for this milestone
+    existing_transaction = WalletTransaction.query.filter_by(
+        milestone_id=milestone_id,
+        transaction_type='milestone_earning'
+    ).first()
+
+    if existing_transaction:
+        raise ValueError("Funds already released for this milestone")
+
+    # Calculate amounts
+    milestone_amount = float(milestone.price)
+    platform_fee = milestone_amount * (platform_fee_percentage / 100)
+    creator_amount = milestone_amount - platform_fee
+
+    # Get or create wallet
+    wallet = get_or_create_wallet(collaboration.creator.user_id)
+
+    # Create wallet transaction with 30-day release countdown
+    transaction = WalletTransaction(
+        wallet_id=wallet.id,
+        user_id=collaboration.creator.user_id,
+        transaction_type='milestone_earning',
+        amount=creator_amount,
+        status='pending_clearance',
+        clearance_required=True,
+        clearance_days=30,
+        completed_at=datetime.utcnow(),
+        available_at=(datetime.utcnow() + timedelta(days=30)),
+        collaboration_id=collaboration.id,
+        milestone_id=milestone.id,
+        gross_amount=milestone_amount,
+        platform_fee=platform_fee,
+        platform_fee_percentage=platform_fee_percentage,
+        net_amount=creator_amount,
+        description=f"Milestone payment: {milestone.title}",
+        transaction_metadata={
+            'milestone_title': milestone.title,
+            'milestone_number': milestone.milestone_number,
+            'collaboration_title': collaboration.title,
+            'brand_name': collaboration.brand.company_name if collaboration.brand else 'Unknown'
+        }
+    )
+    db.session.add(transaction)
+
+    # Update wallet pending clearance
+    wallet.pending_clearance = float(wallet.pending_clearance or 0) + creator_amount
+    wallet.total_earned = float(wallet.total_earned or 0) + creator_amount
+    wallet.updated_at = datetime.utcnow()
+
+    db.session.commit()
+
+    return transaction

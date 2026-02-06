@@ -210,12 +210,20 @@ export const collaborationsAPI = {
   getCollaboration: (id) => api.get(`/collaborations/${id}`),
   updateProgress: (id, data) => api.patch(`/collaborations/${id}/progress`, data),
 
-  // Deliverables
+  // Deliverables (for package-based collaborations)
   submitDeliverable: (id, data) => api.post(`/collaborations/${id}/deliverables`, data),
   submitDraftDeliverable: (id, data) => api.post(`/collaborations/${id}/deliverables/draft`, data),
   updateDraftDeliverable: (id, deliverableId, data) => api.put(`/collaborations/${id}/deliverables/${deliverableId}`, data),
   approveDeliverable: (id, deliverableId) => api.post(`/collaborations/${id}/deliverables/${deliverableId}/approve`),
   requestRevision: (id, deliverableId, notes) => api.post(`/collaborations/${id}/deliverables/${deliverableId}/request-revision`, { notes }),
+
+  // Milestone Deliverables (for brief/campaign collaborations)
+  submitMilestoneDeliverable: (collabId, milestoneId, data) =>
+    api.post(`/collaborations/${collabId}/milestones/${milestoneId}/deliverables`, data),
+  approveMilestoneDeliverable: (collabId, milestoneId, deliverableId) =>
+    api.post(`/collaborations/${collabId}/milestones/${milestoneId}/deliverables/${deliverableId}/approve`),
+  requestMilestoneRevision: (collabId, milestoneId, deliverableId, notes) =>
+    api.post(`/collaborations/${collabId}/milestones/${milestoneId}/deliverables/${deliverableId}/request-revision`, { notes }),
 
   // Paid Revision
   createRevisionBooking: (id, data) => api.post(`/collaborations/${id}/revision/create-booking`, data),
