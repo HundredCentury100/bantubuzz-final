@@ -88,6 +88,30 @@ const Navbar = () => {
                     Campaigns
                   </Link>
                 )}
+                {user?.user_type === 'brand' && (
+                  <Link
+                    to="/brand/manage-briefs"
+                    className="text-gray-700 hover:text-gray-900 transition-colors text-sm font-medium"
+                  >
+                    Briefs
+                  </Link>
+                )}
+                {user?.user_type === 'creator' && (
+                  <>
+                    <Link
+                      to="/browse-briefs"
+                      className="text-gray-700 hover:text-gray-900 transition-colors text-sm font-medium"
+                    >
+                      Briefs
+                    </Link>
+                    <Link
+                      to="/my-proposals"
+                      className="text-gray-700 hover:text-gray-900 transition-colors text-sm font-medium"
+                    >
+                      Proposals
+                    </Link>
+                  </>
+                )}
                 <Link
                   to={`/${user?.user_type}/collaborations`}
                   className="text-gray-700 hover:text-gray-900 transition-colors text-sm font-medium"
