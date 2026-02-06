@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { bookingsAPI } from '../services/api';
 import Navbar from '../components/Navbar';
+import Avatar from '../components/Avatar';
 import toast from 'react-hot-toast';
 
 const Bookings = () => {
@@ -161,12 +162,26 @@ const Bookings = () => {
                   {/* Booking Info */}
                   <div className="flex-1">
                     <div className="flex items-start gap-4">
-                      {/* Package/Creator Avatar */}
-                      <div className="w-16 h-16 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
-                        <span className="text-primary font-semibold text-xl">
-                          {booking.package?.title?.charAt(0).toUpperCase() || 'P'}
-                        </span>
-                      </div>
+                      {/* Creator/Brand Avatar */}
+                      {isCreator ? (
+                        booking.brand && (
+                          <Avatar
+                            src={booking.brand.logo}
+                            alt={booking.brand.company_name || 'Brand'}
+                            size="lg"
+                            type="brand"
+                          />
+                        )
+                      ) : (
+                        booking.creator && (
+                          <Avatar
+                            src={booking.creator.profile_picture}
+                            alt={booking.creator.username || 'Creator'}
+                            size="lg"
+                            type="user"
+                          />
+                        )
+                      )}
 
                       {/* Details */}
                       <div className="flex-1">
