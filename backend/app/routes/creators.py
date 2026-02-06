@@ -223,15 +223,10 @@ def get_creators():
             ]
 
         # Add review stats and cheapest package price
-        # IMPORTANT: Only include creators who have at least one active package
         creators_with_stats = []
         for creator in all_creators:
             # Get active packages for this creator
             packages = Package.query.filter_by(creator_id=creator.id, is_active=True).all()
-
-            # Skip creators without any active packages
-            if not packages:
-                continue
 
             creator_dict = creator.to_dict(include_user=True, public_view=True)
 
@@ -249,10 +244,14 @@ def get_creators():
                     'total_reviews': 0
                 }
 
-            # Get cheapest package price (we know packages exist here)
-            prices = [p.price for p in packages]
-            creator_dict['cheapest_package_price'] = min(prices)
-            creator_dict['total_packages'] = len(packages)
+            # Get cheapest package price if packages exist
+            if packages:
+                prices = [p.price for p in packages]
+                creator_dict['cheapest_package_price'] = min(prices)
+                creator_dict['total_packages'] = len(packages)
+            else:
+                creator_dict['cheapest_package_price'] = None
+                creator_dict['total_packages'] = 0
 
             creators_with_stats.append(creator_dict)
 
