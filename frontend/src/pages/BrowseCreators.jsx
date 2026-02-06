@@ -8,33 +8,12 @@ import Avatar from '../components/Avatar';
 import SEO from '../components/SEO';
 import { Search, Filter, X } from 'lucide-react';
 
-const CATEGORIES = [
-  'Fashion & Beauty',
-  'Lifestyle',
-  'Tech & Gaming',
-  'Food & Cooking',
-  'Travel',
-  'Fitness & Health',
-  'Business & Finance',
-  'Entertainment',
-  'Education',
-  'Art & Design'
-];
-
-const FOLLOWER_RANGES = [
-  { label: 'Any', value: '' },
-  { label: '1K+', value: 1000 },
-  { label: '10K+', value: 10000 },
-  { label: '50K+', value: 50000 },
-  { label: '100K+', value: 100000 },
-  { label: '500K+', value: 500000 }
-];
-
 const BrowseCreators = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { user } = useAuth();
   const [creators, setCreators] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [savedCreatorIds, setSavedCreatorIds] = useState(new Set());
   const [showMoreFilters, setShowMoreFilters] = useState(false);
@@ -74,11 +53,26 @@ const BrowseCreators = () => {
   }, []);
 
   useEffect(() => {
+    fetchCategories();
+  }, []);
+
+  useEffect(() => {
     fetchCreators();
     if (user?.user_type === 'brand') {
       fetchSavedCreators();
     }
   }, [pagination.current_page, filters]);
+
+  const fetchCategories = async () => {
+    try {
+      const response = await creatorsAPI.getCategories();
+      setCategories(response.data.categories || []);
+    } catch (error) {
+      console.error('Error fetching categories:', error);
+      // Fallback to empty array if fetch fails
+      setCategories([]);
+    }
+  };
 
   const fetchCreators = async () => {
     try {
@@ -228,7 +222,7 @@ const BrowseCreators = () => {
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                 >
                   <option value="">All Categories</option>
-                  {CATEGORIES.map(cat => (
+                  {categories.map(cat => (
                     <option key={cat} value={cat}>{cat}</option>
                   ))}
                 </select>
@@ -351,7 +345,7 @@ const BrowseCreators = () => {
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                 >
                   <option value="">All Categories</option>
-                  {CATEGORIES.map(cat => (
+                  {categories.map(cat => (
                     <option key={cat} value={cat}>{cat}</option>
                   ))}
                 </select>

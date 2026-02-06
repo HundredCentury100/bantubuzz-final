@@ -88,6 +88,7 @@ export const usersAPI = {
 // Creators API
 export const creatorsAPI = {
   getCreators: (params) => api.get('/creators', { params }),
+  getCategories: () => api.get('/creators/categories'),
   getCreator: (id) => api.get(`/creators/${id}`),
   getOwnProfile: () => api.get('/creators/profile'),
   updateProfile: (data) => api.put('/creators/profile', data),
@@ -156,6 +157,10 @@ export const campaignsAPI = {
   getCampaignApplications: (campaignId) => api.get(`/campaigns/${campaignId}/applications`),
   getApplicationDetails: (campaignId, applicationId) => api.get(`/campaigns/${campaignId}/applications/${applicationId}`),
   updateApplicationStatus: (campaignId, applicationId, status) => api.patch(`/campaigns/${campaignId}/applications/${applicationId}`, { status }),
+
+  // Payment Completion
+  completeApplicationPayment: (applicationId) => api.post(`/campaigns/applications/${applicationId}/complete-payment`),
+  completePackagePayment: (campaignId, packageId) => api.post(`/campaigns/${campaignId}/packages/${packageId}/complete-payment`),
 };
 
 // Bookings API
@@ -166,6 +171,16 @@ export const bookingsAPI = {
   createBooking: (data) => api.post('/bookings', data),
   updateBookingStatus: (id, status) => api.put(`/bookings/${id}/status`, { status }),
   getPaymentStatus: (id) => api.get(`/bookings/${id}/payment-status`),
+
+  // Proof of Payment
+  uploadProofOfPayment: (bookingId, formData) =>
+    api.post(`/bookings/${bookingId}/upload-pop`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    }),
+  downloadProofOfPayment: (bookingId) =>
+    api.get(`/bookings/${bookingId}/download-pop`, { responseType: 'blob' }),
+  verifyPayment: (bookingId) =>
+    api.post(`/bookings/${bookingId}/verify-payment`),
 };
 
 // Messages API
@@ -202,6 +217,10 @@ export const collaborationsAPI = {
   approveDeliverable: (id, deliverableId) => api.post(`/collaborations/${id}/deliverables/${deliverableId}/approve`),
   requestRevision: (id, deliverableId, notes) => api.post(`/collaborations/${id}/deliverables/${deliverableId}/request-revision`, { notes }),
 
+  // Paid Revision
+  createRevisionBooking: (id, data) => api.post(`/collaborations/${id}/revision/create-booking`, data),
+  completeRevisionPayment: (id, bookingId) => api.post(`/collaborations/${id}/revision/complete-payment`, { booking_id: bookingId }),
+
   // Collaboration actions
   completeCollaboration: (id) => api.patch(`/collaborations/${id}/complete`),
   cancelCollaboration: (id, reason) => api.patch(`/collaborations/${id}/cancel`, { reason }),
@@ -227,6 +246,67 @@ export const categoriesAPI = {
 export const brandWalletAPI = {
   getWallet: () => api.get('/brand/wallet'),
   getTransactions: (params) => api.get('/brand/wallet/transactions', { params }),
+};
+
+// Payments API
+export const paymentsAPI = {
+  createRevisionPayment: (data) => api.post('/payments/revision', data),
+  createCampaignPayment: (data) => api.post('/payments/campaign', data),
+  uploadCampaignProofOfPayment: (bookingId, formData) => api.post(`/payments/campaign/${bookingId}/upload-pop`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }),
+};
+
+// Briefs API
+export const briefsAPI = {
+  // Basic CRUD
+  getBriefs: (params) => api.get('/briefs', { params }),
+  getBrief: (id) => api.get(`/briefs/${id}`),
+  createBrief: (data) => api.post('/briefs', data),
+  updateBrief: (id, data) => api.patch(`/briefs/${id}`, data),
+  deleteBrief: (id) => api.delete(`/briefs/${id}`),
+
+  // Brief Actions
+  publishBrief: (id) => api.post(`/briefs/${id}/publish`),
+  closeBrief: (id) => api.post(`/briefs/${id}/close`),
+
+  // Proposals for Brief
+  getBriefProposals: (id) => api.get(`/briefs/${id}/proposals`),
+};
+
+// Proposals API
+export const proposalsAPI = {
+  // Basic CRUD
+  getProposals: (params) => api.get('/proposals', { params }),
+  getProposal: (id) => api.get(`/proposals/${id}`),
+  createProposal: (data) => api.post('/proposals', data),
+  updateProposal: (id, data) => api.patch(`/proposals/${id}`, data),
+  deleteProposal: (id) => api.delete(`/proposals/${id}`),
+
+  // Proposal Actions
+  acceptProposal: (id) => api.post(`/proposals/${id}/accept`),
+  rejectProposal: (id, reason) => api.post(`/proposals/${id}/reject`, { reason }),
+};
+
+// Milestones API
+export const milestonesAPI = {
+  // Get Milestones
+  getCollaborationMilestones: (collaborationId) => api.get(`/collaborations/${collaborationId}/milestones`),
+  getMilestone: (collaborationId, milestoneNumber) => api.get(`/collaborations/${collaborationId}/milestones/${milestoneNumber}`),
+
+  // Deliverable Submission
+  submitDeliverable: (collaborationId, milestoneNumber, data) =>
+    api.post(`/collaborations/${collaborationId}/milestones/${milestoneNumber}/deliverables`, data),
+  updateDeliverable: (collaborationId, milestoneNumber, deliverableId, data) =>
+    api.patch(`/collaborations/${collaborationId}/milestones/${milestoneNumber}/deliverables/${deliverableId}`, data),
+
+  // Milestone Actions
+  approveMilestone: (collaborationId, milestoneNumber) =>
+    api.post(`/collaborations/${collaborationId}/milestones/${milestoneNumber}/approve`),
+  approveDeliverable: (collaborationId, milestoneNumber, deliverableId) =>
+    api.post(`/collaborations/${collaborationId}/milestones/${milestoneNumber}/deliverables/${deliverableId}/approve`),
+  requestRevision: (collaborationId, milestoneNumber, data) =>
+    api.post(`/collaborations/${collaborationId}/milestones/${milestoneNumber}/request-revision`, data),
 };
 
 export default api;

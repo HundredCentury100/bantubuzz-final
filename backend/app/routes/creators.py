@@ -335,6 +335,30 @@ def get_creators():
         return jsonify({'error': str(e)}), 500
 
 
+@bp.route('/categories', methods=['GET'])
+def get_categories():
+    """Get all unique categories from creators"""
+    try:
+        # Query all creators and extract unique categories
+        creators = CreatorProfile.query.all()
+        categories_set = set()
+
+        for creator in creators:
+            if creator.categories:
+                for category in creator.categories:
+                    categories_set.add(category)
+
+        # Sort alphabetically
+        categories = sorted(list(categories_set))
+
+        return jsonify({
+            'categories': categories
+        }), 200
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @bp.route('/<int:creator_id>', methods=['GET'])
 def get_creator(creator_id):
     """Get a specific creator"""
