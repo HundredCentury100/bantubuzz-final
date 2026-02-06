@@ -3,18 +3,18 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { packagesAPI } from '../services/api';
 
-const CATEGORIES = [
-  'Social Media Marketing',
-  'Content Creation',
-  'UGC (User Generated Content)',
+const COLLABORATION_TYPES = [
   'Brand Endorsement',
-  'Event Hosting',
-  'Product Review',
+  'UGC (User Generated Content)',
   'Sponsored Post',
+  'Product Review',
+  'Social Media Takeover',
+  'Event Hosting',
+  'Affiliate Marketing',
   'Video Production',
   'Photography',
+  'Content Creation',
   'Influencer Campaign',
-  'Affiliate Marketing',
   'Other'
 ];
 
@@ -53,7 +53,7 @@ const PackageForm = () => {
       setValue('description', pkg.description);
       setValue('price', pkg.price);
       setValue('duration_days', pkg.duration_days);
-      setValue('category', pkg.category);
+      setValue('collaboration_type', pkg.collaboration_type || pkg.category); // Support both old and new
       setValue('is_active', pkg.is_active);
 
       // Set deliverables
@@ -81,7 +81,7 @@ const PackageForm = () => {
         description: data.description,
         price: parseFloat(data.price),
         duration_days: parseInt(data.duration_days),
-        category: data.category,
+        collaboration_type: data.collaboration_type,
         deliverables: validDeliverables,
         is_active: data.is_active
       };
@@ -245,25 +245,28 @@ const PackageForm = () => {
           </div>
         </div>
 
-        {/* Category */}
+        {/* Collaboration Type */}
         <div className="bg-white rounded-lg shadow-sm p-6">
           <label className="block text-sm font-semibold text-gray-700 mb-2">
-            Category *
+            Collaboration Type *
           </label>
           <select
-            {...register('category', { required: 'Category is required' })}
+            {...register('collaboration_type', { required: 'Collaboration type is required' })}
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
           >
-            <option value="">Select a category</option>
-            {CATEGORIES.map((cat) => (
-              <option key={cat} value={cat}>
-                {cat}
+            <option value="">Select collaboration type</option>
+            {COLLABORATION_TYPES.map((type) => (
+              <option key={type} value={type}>
+                {type}
               </option>
             ))}
           </select>
-          {errors.category && (
-            <p className="mt-1 text-sm text-red-600">{errors.category.message}</p>
+          {errors.collaboration_type && (
+            <p className="mt-1 text-sm text-red-600">{errors.collaboration_type.message}</p>
           )}
+          <p className="mt-2 text-sm text-gray-500">
+            Your niche/category can be set in your profile settings
+          </p>
         </div>
 
         {/* Deliverables */}

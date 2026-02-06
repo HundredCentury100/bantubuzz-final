@@ -4,6 +4,7 @@ import { creatorsAPI, brandsAPI, BASE_URL } from '../services/api';
 import { useAuth } from '../hooks/useAuth';
 import Navbar from '../components/Navbar';
 import ResponsiveImage from '../components/ResponsiveImage';
+import CreatorBadge from '../components/CreatorBadge';
 import toast from 'react-hot-toast';
 import Avatar from '../components/Avatar';
 
@@ -280,6 +281,16 @@ const Creators = () => {
                     <h3 className="font-bold text-lg text-dark mb-1">
                       {creator.display_name || creator.username || 'Creator'}
                     </h3>
+
+                    {/* Badges */}
+                    {creator.badges && creator.badges.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mb-2">
+                        {creator.badges.map((badge, idx) => (
+                          <CreatorBadge key={idx} badge={badge} size="sm" />
+                        ))}
+                      </div>
+                    )}
+
                     <p className="text-sm text-gray-500 mb-4">{creator.location || 'Location not set'}</p>
 
                     {/* Stats */}

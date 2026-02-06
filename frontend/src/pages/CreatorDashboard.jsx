@@ -120,6 +120,29 @@ const CreatorDashboard = () => {
           </div>
         )}
 
+        {/* No Packages Alert */}
+        {stats.totalPackages === 0 && profileComplete && (
+          <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+            <div className="flex items-start">
+              <svg className="w-5 h-5 text-yellow-600 mt-0.5 mr-3" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M10 2a8 8 0 100 16 8 8 0 000-16zm0 14a6 6 0 110-12 6 6 0 010 12zm-1-9h2v5H9V7zm0 6h2v2H9v-2z"/>
+              </svg>
+              <div className="flex-1">
+                <h3 className="font-medium text-yellow-900 leading-snug">Create Your First Package</h3>
+                <p className="text-sm text-yellow-800 leading-relaxed mt-1">
+                  You need at least one active package to appear in the browse creators page. Create a package to start receiving bookings from brands!
+                </p>
+                <Link
+                  to="/creator/packages"
+                  className="inline-block mt-3 px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors text-sm font-medium"
+                >
+                  Create Package
+                </Link>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
           {/* Total Packages */}
