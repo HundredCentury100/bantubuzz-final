@@ -9,6 +9,7 @@ import './index.css'
 import { AuthProvider } from './hooks/useAuth'
 import { NotificationProvider } from './contexts/NotificationContext'
 import { MessagingProvider } from './contexts/MessagingContext'
+import { CartProvider } from './contexts/CartContext'
 
 // Create a client for React Query
 const queryClient = new QueryClient({
@@ -27,9 +28,10 @@ ReactDOM.createRoot(document.getElementById('root')).render(
       <BrowserRouter>
         <QueryClientProvider client={queryClient}>
           <AuthProvider>
-            <NotificationProvider>
-              <MessagingProvider>
-                <App />
+            <CartProvider>
+              <NotificationProvider>
+                <MessagingProvider>
+                  <App />
                 <Toaster
                   position="top-right"
                   toastOptions={{
@@ -46,8 +48,9 @@ ReactDOM.createRoot(document.getElementById('root')).render(
                     },
                   }}
                 />
-              </MessagingProvider>
-            </NotificationProvider>
+                </MessagingProvider>
+              </NotificationProvider>
+            </CartProvider>
           </AuthProvider>
         </QueryClientProvider>
       </BrowserRouter>
