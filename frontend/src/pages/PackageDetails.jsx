@@ -79,7 +79,7 @@ const PackageDetails = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-light flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
       </div>
     );
@@ -87,10 +87,10 @@ const PackageDetails = () => {
 
   if (!pkg) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-light flex items-center justify-center">
         <div className="text-center">
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Package not found</h2>
-          <Link to="/browse/packages" className="text-primary hover:text-primary-dark">
+          <h2 className="text-2xl font-bold text-dark mb-2">Package not found</h2>
+          <Link to="/browse/packages" className="text-primary hover:text-primary/90 font-medium">
             Browse other packages
           </Link>
         </div>
@@ -99,7 +99,7 @@ const PackageDetails = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
+    <div className="min-h-screen bg-light py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Navigation */}
         <div className="mb-6 flex items-center gap-4">
@@ -124,7 +124,7 @@ const PackageDetails = () => {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Main Content */}
           <div className="lg:col-span-2">
-            <div className="bg-white rounded-lg shadow p-8">
+            <div className="bg-white rounded-3xl shadow-sm hover:shadow-md transition-shadow p-8">
               {/* Category Badge */}
               <span className="inline-block px-3 py-1 bg-primary/10 text-primary text-xs font-semibold rounded-full mb-4">
                 {pkg.category}
@@ -200,7 +200,7 @@ const PackageDetails = () => {
 
               {/* Creator's Other Info */}
               {pkg.creator && (
-                <div className="mb-8 bg-gray-50 rounded-lg p-6">
+                <div className="mb-8 bg-light rounded-2xl p-6">
                   <h2 className="text-xl font-semibold text-gray-900 mb-3">About the Creator</h2>
                   <p className="text-gray-600 mb-4">
                     {pkg.creator.bio || 'No bio available'}
@@ -218,7 +218,7 @@ const PackageDetails = () => {
 
           {/* Sidebar - Booking Card */}
           <div className="lg:col-span-1">
-            <div className="bg-white rounded-lg shadow p-6 sticky top-8">
+            <div className="bg-white rounded-3xl shadow-sm hover:shadow-md transition-shadow p-6 sticky top-8">
               <div className="mb-6">
                 <div className="flex items-baseline gap-2 mb-2">
                   <span className="text-4xl font-bold text-gray-900">${pkg.price}</span>
@@ -229,7 +229,7 @@ const PackageDetails = () => {
               <button
                 onClick={handleBookPackage}
                 disabled={bookingLoading || user?.user_type === 'creator'}
-                className="w-full bg-primary text-white py-3 rounded-lg font-semibold hover:bg-primary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed mb-4"
+                className="w-full bg-dark text-white py-3 rounded-full font-medium hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed mb-4"
               >
                 {bookingLoading ? 'Processing...' : 'Book Now'}
               </button>

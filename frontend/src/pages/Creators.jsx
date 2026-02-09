@@ -163,7 +163,7 @@ const Creators = () => {
         </div>
 
         {/* Filters */}
-        <div className="card mb-8">
+        <div className="bg-white rounded-3xl overflow-hidden shadow-sm hover:shadow-md transition-shadow mb-8 p-6">
           <form onSubmit={handleSearch}>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
               {/* Category Filter */}
@@ -174,7 +174,7 @@ const Creators = () => {
                 <select
                   value={filters.category}
                   onChange={(e) => handleFilterChange('category', e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-full focus:ring-2 focus:ring-primary focus:border-transparent"
                 >
                   <option value="">All Categories</option>
                   {CATEGORIES.map(category => (
@@ -193,7 +193,7 @@ const Creators = () => {
                   value={filters.location}
                   onChange={(e) => handleFilterChange('location', e.target.value)}
                   placeholder="e.g., Harare, Bulawayo"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-full focus:ring-2 focus:ring-primary focus:border-transparent"
                 />
               </div>
 
@@ -205,7 +205,7 @@ const Creators = () => {
                 <select
                   value={filters.min_followers}
                   onChange={(e) => handleFilterChange('min_followers', e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-full focus:ring-2 focus:ring-primary focus:border-transparent"
                 >
                   {FOLLOWER_RANGES.map(range => (
                     <option key={range.label} value={range.value}>{range.label}</option>
@@ -223,14 +223,14 @@ const Creators = () => {
                   value={filters.search}
                   onChange={(e) => handleFilterChange('search', e.target.value)}
                   placeholder="Search creators..."
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-full focus:ring-2 focus:ring-primary focus:border-transparent"
                 />
               </div>
             </div>
 
             <button
               type="submit"
-              className="btn btn-primary w-full md:w-auto"
+              className="bg-dark text-white py-3 px-6 rounded-full font-medium hover:bg-gray-800 transition-colors w-full md:w-auto"
             >
               Apply Filters
             </button>
@@ -251,7 +251,7 @@ const Creators = () => {
           </div>
         ) : creators.length === 0 ? (
           /* Empty State */
-          <div className="card text-center py-20">
+          <div className="bg-white rounded-3xl overflow-hidden shadow-sm hover:shadow-md transition-shadow text-center py-20 px-6">
             <svg className="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
             </svg>
@@ -263,19 +263,19 @@ const Creators = () => {
           <>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 mb-8">
               {creators.map((creator) => (
-                <div key={creator.id} className="bg-white rounded-lg shadow hover:shadow-lg transition-shadow overflow-hidden">
-                  {/* Creator Avatar - Full Width Image */}
-                  <div className="relative w-full h-64 bg-gradient-to-br from-primary/20 to-primary/5 overflow-hidden">
+                <div key={creator.id} className="bg-white rounded-3xl overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+                  {/* Creator Avatar - Full Width Image with m-4 spacing and rounded-2xl */}
+                  <div className="aspect-square m-4 rounded-2xl overflow-hidden bg-gray-100 relative">
                     <ResponsiveImage
                       sizes={creator.profile_picture_sizes || creator.profile_picture}
                       alt={creator.display_name || creator.username || 'Creator'}
-                      className="w-full h-64"
+                      className="w-full h-full"
                       objectFit="cover"
                       showLoading={true}
                     />
                     {/* Badge Overlays on Image */}
                     {creator.badges && creator.badges.length > 0 && (
-                      <div className="absolute top-3 left-3 flex flex-wrap gap-2">
+                      <div className="absolute top-2 left-2 flex flex-wrap gap-1.5">
                         {creator.badges.map((badge, idx) => (
                           <CreatorBadge key={idx} badge={badge} size="sm" variant="overlay" />
                         ))}
@@ -284,10 +284,10 @@ const Creators = () => {
                   </div>
 
                   {/* Content */}
-                  <div className="p-6">
+                  <div className="px-4 pb-4">
                     {/* Creator Info with Checkmark Icons */}
                     <div className="flex items-center gap-1.5 mb-1">
-                      <h3 className="font-bold text-lg text-dark">
+                      <h3 className="font-semibold text-gray-900">
                         {creator.display_name || creator.username || 'Creator'}
                       </h3>
                       {/* Checkmark Icons next to name */}
@@ -304,7 +304,7 @@ const Creators = () => {
 
                     {/* Stats */}
                     <div className="grid grid-cols-2 gap-2 mb-4">
-                    <div className="text-center p-2 bg-gray-50 rounded">
+                    <div className="text-center p-2 bg-light rounded-2xl">
                       <p className="text-xs text-gray-600">Followers</p>
                       <p className="font-bold text-dark text-sm">
                         {creator.follower_count >= 1000
@@ -312,10 +312,10 @@ const Creators = () => {
                           : creator.follower_count || 0}
                       </p>
                     </div>
-                    <div className="text-center p-2 bg-gray-50 rounded">
+                    <div className="text-center p-2 bg-light rounded-2xl">
                       <p className="text-xs text-gray-600">Rating</p>
                       <div className="flex items-center justify-center gap-1">
-                        <svg className="w-4 h-4 text-primary-dark fill-current" viewBox="0 0 24 24">
+                        <svg className="w-4 h-4 text-primary fill-current" viewBox="0 0 24 24">
                           <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
                         </svg>
                         <p className="font-bold text-dark text-sm">
@@ -335,13 +335,13 @@ const Creators = () => {
                         {creator.categories.slice(0, 2).map((category, idx) => (
                           <span
                             key={idx}
-                            className="text-xs px-2 py-1 bg-primary/10 text-primary rounded"
+                            className="text-xs px-3 py-1 border border-gray-300 rounded-full"
                           >
                             {category}
                           </span>
                         ))}
                         {creator.categories.length > 2 && (
-                          <span className="text-xs px-2 py-1 bg-gray-100 text-gray-600 rounded">
+                          <span className="text-xs px-3 py-1 border border-gray-300 rounded-full text-gray-600">
                             +{creator.categories.length - 2}
                           </span>
                         )}
@@ -358,15 +358,15 @@ const Creators = () => {
 
                     {/* Availability Status */}
                     <div className="mb-4">
-                      <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
-                        creator.availability_status === 'available' ? 'bg-primary text-primary-dark' :
-                        creator.availability_status === 'busy' ? 'bg-primary text-primary-dark' :
-                        'bg-red-100 text-red-800'
+                      <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border ${
+                        creator.availability_status === 'available' ? 'bg-green-50 text-green-700 border-green-200' :
+                        creator.availability_status === 'busy' ? 'bg-yellow-50 text-yellow-700 border-yellow-200' :
+                        'bg-red-50 text-red-700 border-red-200'
                       }`}>
                         <span className={`w-2 h-2 rounded-full mr-2 ${
-                          creator.availability_status === 'available' ? 'bg-primary' :
-                          creator.availability_status === 'busy' ? 'bg-primary' :
-                          'bg-red-600'
+                          creator.availability_status === 'available' ? 'bg-green-500' :
+                          creator.availability_status === 'busy' ? 'bg-yellow-500' :
+                          'bg-red-500'
                         }`}></span>
                         {creator.availability_status || 'unavailable'}
                       </span>
@@ -376,7 +376,7 @@ const Creators = () => {
                     <div className="flex gap-2">
                       <Link
                         to={`/creators/${creator.id}`}
-                        className="flex-1 btn btn-primary text-center text-sm py-2"
+                        className="flex-1 bg-dark text-white text-center py-3 rounded-full font-medium hover:bg-gray-800 transition-colors text-sm"
                       >
                         View Profile
                       </Link>
@@ -386,7 +386,7 @@ const Creators = () => {
                             e.preventDefault();
                             handleSaveCreator(creator.id);
                           }}
-                          className={`px-3 py-2 rounded-lg border transition-colors ${
+                          className={`px-3 py-2 rounded-full border transition-colors ${
                             savedCreatorIds.has(creator.id)
                               ? 'bg-primary text-white border-primary'
                               : 'bg-white text-gray-600 border-gray-300 hover:border-primary hover:text-primary'
@@ -410,7 +410,7 @@ const Creators = () => {
                 <button
                   onClick={() => handlePageChange(pagination.current_page - 1)}
                   disabled={pagination.current_page === 1}
-                  className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                  className="px-4 py-2 border border-gray-300 rounded-full disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 transition-colors"
                 >
                   Previous
                 </button>
@@ -428,9 +428,9 @@ const Creators = () => {
                         <button
                           key={pageNum}
                           onClick={() => handlePageChange(pageNum)}
-                          className={`px-4 py-2 border rounded-lg ${
+                          className={`px-4 py-2 border rounded-full transition-colors ${
                             pageNum === pagination.current_page
-                              ? 'bg-primary text-white border-primary'
+                              ? 'bg-primary text-dark border-primary font-medium'
                               : 'border-gray-300 hover:bg-gray-50'
                           }`}
                         >
@@ -450,7 +450,7 @@ const Creators = () => {
                 <button
                   onClick={() => handlePageChange(pagination.current_page + 1)}
                   disabled={pagination.current_page === pagination.total_pages}
-                  className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                  className="px-4 py-2 border border-gray-300 rounded-full disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 transition-colors"
                 >
                   Next
                 </button>
