@@ -99,13 +99,13 @@ const Navbar = () => {
                 {user?.user_type === 'creator' && (
                   <>
                     <Link
-                      to="/browse-briefs"
+                      to="/creator/briefs"
                       className="text-gray-700 hover:text-gray-900 transition-colors text-sm font-medium"
                     >
                       Briefs
                     </Link>
                     <Link
-                      to="/my-proposals"
+                      to="/creator/proposals"
                       className="text-gray-700 hover:text-gray-900 transition-colors text-sm font-medium"
                     >
                       Proposals
