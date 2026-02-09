@@ -273,23 +273,32 @@ const Creators = () => {
                       objectFit="cover"
                       showLoading={true}
                     />
+                    {/* Badge Overlays on Image */}
+                    {creator.badges && creator.badges.length > 0 && (
+                      <div className="absolute top-3 left-3 flex flex-wrap gap-2">
+                        {creator.badges.map((badge, idx) => (
+                          <CreatorBadge key={idx} badge={badge} size="sm" variant="overlay" />
+                        ))}
+                      </div>
+                    )}
                   </div>
 
                   {/* Content */}
                   <div className="p-6">
-                    {/* Creator Info */}
-                    <h3 className="font-bold text-lg text-dark mb-1">
-                      {creator.display_name || creator.username || 'Creator'}
-                    </h3>
-
-                    {/* Badges */}
-                    {creator.badges && creator.badges.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mb-2">
-                        {creator.badges.map((badge, idx) => (
-                          <CreatorBadge key={idx} badge={badge} size="sm" />
-                        ))}
-                      </div>
-                    )}
+                    {/* Creator Info with Checkmark Icons */}
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <h3 className="font-bold text-lg text-dark">
+                        {creator.display_name || creator.username || 'Creator'}
+                      </h3>
+                      {/* Checkmark Icons next to name */}
+                      {creator.badges && creator.badges.length > 0 && (
+                        <>
+                          {creator.badges.map((badge, idx) => (
+                            <CreatorBadge key={idx} badge={badge} size="sm" variant="icon" />
+                          ))}
+                        </>
+                      )}
+                    </div>
 
                     <p className="text-sm text-gray-500 mb-4">{creator.location || 'Location not set'}</p>
 

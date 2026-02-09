@@ -142,7 +142,7 @@ const Home = () => {
                     className="bg-white rounded-3xl overflow-hidden shadow-sm hover:shadow-md transition-shadow"
                   >
                     {/* Image */}
-                    <div className="aspect-square m-4 rounded-2xl overflow-hidden bg-gray-100">
+                    <div className="aspect-square m-4 rounded-2xl overflow-hidden bg-gray-100 relative">
                       <ResponsiveImage
                         sizes={creator.profile_picture_sizes || creator.profile_picture}
                         alt={creator.display_name || creator.username || 'Creator profile'}
@@ -151,6 +151,14 @@ const Home = () => {
                         eager={true}
                         showLoading={true}
                       />
+                      {/* Badge Overlays on Image */}
+                      {creator.badges && creator.badges.length > 0 && (
+                        <div className="absolute top-2 left-2 flex flex-wrap gap-1.5">
+                          {creator.badges.map((badge, idx) => (
+                            <CreatorBadge key={idx} badge={badge} size="sm" variant="overlay" />
+                          ))}
+                        </div>
+                      )}
                     </div>
 
                     {/* Content */}
@@ -158,15 +166,15 @@ const Home = () => {
                       {/* Name and Followers */}
                       <div className="flex justify-between items-start mb-3">
                         <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
+                          <div className="flex items-center gap-1.5 mb-1">
                             <h3 className="font-semibold text-gray-900">
                               {creator.display_name || creator.username || 'Creator'}
                             </h3>
-                            {/* Badges */}
+                            {/* Checkmark Icons next to name */}
                             {creator.badges && creator.badges.length > 0 && (
                               <>
                                 {creator.badges.map((badge, idx) => (
-                                  <CreatorBadge key={idx} badge={badge} size="sm" />
+                                  <CreatorBadge key={idx} badge={badge} size="sm" variant="icon" />
                                 ))}
                               </>
                             )}
@@ -249,7 +257,7 @@ const Home = () => {
                 className="bg-primary rounded-3xl overflow-hidden shadow-sm hover:shadow-md transition-shadow"
               >
                 {/* Image */}
-                <div className="aspect-square m-4 rounded-2xl overflow-hidden bg-white/20">
+                <div className="aspect-square m-4 rounded-2xl overflow-hidden bg-white/20 relative">
                   <ResponsiveImage
                     sizes={creator.profile_picture_sizes || creator.profile_picture}
                     alt={creator.display_name || creator.username || 'Creator profile'}
@@ -258,6 +266,14 @@ const Home = () => {
                     eager={true}
                     showLoading={true}
                   />
+                  {/* Badge Overlays on Image */}
+                  {creator.badges && creator.badges.length > 0 && (
+                    <div className="absolute top-2 left-2 flex flex-wrap gap-1.5">
+                      {creator.badges.map((badge, idx) => (
+                        <CreatorBadge key={idx} badge={badge} size="sm" variant="overlay" />
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 {/* Content */}
@@ -265,15 +281,15 @@ const Home = () => {
                   {/* Name and Followers */}
                   <div className="flex justify-between items-start mb-3">
                     <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
+                      <div className="flex items-center gap-1.5 mb-1">
                         <h3 className="font-semibold text-gray-900">
                           {creator.display_name || creator.username || 'Creator'}
                         </h3>
-                        {/* Badges */}
+                        {/* Checkmark Icons next to name */}
                         {creator.badges && creator.badges.length > 0 && (
                           <>
                             {creator.badges.map((badge, idx) => (
-                              <CreatorBadge key={idx} badge={badge} size="sm" />
+                              <CreatorBadge key={idx} badge={badge} size="sm" variant="icon" />
                             ))}
                           </>
                         )}
@@ -329,7 +345,7 @@ const Home = () => {
                 className="bg-white rounded-3xl overflow-hidden shadow-sm hover:shadow-md transition-shadow"
               >
                 {/* Image */}
-                <div className="aspect-square m-4 rounded-2xl overflow-hidden bg-gray-100">
+                <div className="aspect-square m-4 rounded-2xl overflow-hidden bg-gray-100 relative">
                   <ResponsiveImage
                     sizes={creator.profile_picture_sizes || creator.profile_picture}
                     alt={creator.display_name || creator.username || 'Creator profile'}
@@ -338,6 +354,14 @@ const Home = () => {
                     eager={true}
                     showLoading={true}
                   />
+                  {/* Badge Overlays on Image */}
+                  {creator.badges && creator.badges.length > 0 && (
+                    <div className="absolute top-2 left-2 flex flex-wrap gap-1.5">
+                      {creator.badges.map((badge, idx) => (
+                        <CreatorBadge key={idx} badge={badge} size="sm" variant="overlay" />
+                      ))}
+                    </div>
+                  )}
                 </div>
 
                 {/* Content */}
@@ -345,15 +369,15 @@ const Home = () => {
                   {/* Name and Followers */}
                   <div className="flex justify-between items-start mb-3">
                     <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
+                      <div className="flex items-center gap-1.5 mb-1">
                         <h3 className="font-semibold text-gray-900">
                           {creator.display_name || creator.username || 'Creator'}
                         </h3>
-                        {/* Badges */}
+                        {/* Checkmark Icons next to name */}
                         {creator.badges && creator.badges.length > 0 && (
                           <>
                             {creator.badges.map((badge, idx) => (
-                              <CreatorBadge key={idx} badge={badge} size="sm" />
+                              <CreatorBadge key={idx} badge={badge} size="sm" variant="icon" />
                             ))}
                           </>
                         )}
