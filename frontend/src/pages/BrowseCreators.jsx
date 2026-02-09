@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { creatorsAPI, brandsAPI, BASE_URL } from '../services/api';
 import { useAuth } from '../hooks/useAuth';
 import Navbar from '../components/Navbar';
+import CreatorBadge from '../components/CreatorBadge';
 import toast from 'react-hot-toast';
 import Avatar from '../components/Avatar';
 import SEO from '../components/SEO';
@@ -542,7 +543,7 @@ const BrowseCreators = () => {
                   {/* White Inner Container */}
                   <div className="bg-white rounded-2xl overflow-hidden mb-4">
                     {/* Image */}
-                    <div className="aspect-square overflow-hidden bg-gray-100">
+                    <div className="aspect-square overflow-hidden bg-gray-100 relative">
                       {creator.profile_picture ? (
                         <img
                           src={`${BASE_URL}${creator.profile_picture}`}
@@ -554,14 +555,32 @@ const BrowseCreators = () => {
                           <span className="text-gray-400 text-sm">No image</span>
                         </div>
                       )}
+                      {/* Badge Overlays on Image */}
+                      {creator.badges && creator.badges.length > 0 && (
+                        <div className="absolute top-2 left-2 flex flex-wrap gap-1.5">
+                          {creator.badges.map((badge, idx) => (
+                            <CreatorBadge key={idx} badge={badge} size="sm" variant="overlay" />
+                          ))}
+                        </div>
+                      )}
                     </div>
                   </div>
 
                   {/* Name and Followers - On Primary Background */}
                   <div className="flex justify-between items-center mb-3">
-                    <h3 className="font-semibold text-gray-900">
-                      {creator.display_name || creator.username || creator.user?.email?.split('@')[0] || 'Creator'}
-                    </h3>
+                    <div className="flex items-center gap-1.5">
+                      <h3 className="font-semibold text-gray-900">
+                        {creator.display_name || creator.username || creator.user?.email?.split('@')[0] || 'Creator'}
+                      </h3>
+                      {/* Checkmark Icons next to name */}
+                      {creator.badges && creator.badges.length > 0 && (
+                        <>
+                          {creator.badges.map((badge, idx) => (
+                            <CreatorBadge key={idx} badge={badge} size="sm" variant="icon" />
+                          ))}
+                        </>
+                      )}
+                    </div>
                     <div className="text-right">
                       <span className="text-lg font-bold text-gray-900">
                         {creator.follower_count >= 1000000
