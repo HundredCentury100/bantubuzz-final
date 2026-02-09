@@ -195,7 +195,7 @@ const BrowseCreators = () => {
         </div>
 
         {/* Search and Filters */}
-        <div className="bg-white rounded-xl shadow-sm p-6 mb-8">
+        <div className="bg-white rounded-3xl shadow-sm p-6 mb-8">
           {/* Search Bar */}
           <div className="mb-4">
             <div className="relative">
@@ -205,7 +205,7 @@ const BrowseCreators = () => {
                 placeholder="Search creators by name, bio, or category..."
                 value={filters.search}
                 onChange={(e) => handleFilterChange('search', e.target.value)}
-                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-full focus:ring-2 focus:ring-primary focus:border-transparent"
               />
             </div>
           </div>
@@ -220,7 +220,7 @@ const BrowseCreators = () => {
                 <select
                   value={filters.category}
                   onChange={(e) => handleFilterChange('category', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-full focus:ring-2 focus:ring-primary focus:border-transparent"
                 >
                   <option value="">All Categories</option>
                   {categories.map(cat => (
@@ -235,7 +235,7 @@ const BrowseCreators = () => {
                 <select
                   value={filters.platform}
                   onChange={(e) => handleFilterChange('platform', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-full focus:ring-2 focus:ring-primary focus:border-transparent"
                 >
                   <option value="">All Platforms</option>
                   <option value="Instagram">Instagram</option>
