@@ -21,13 +21,24 @@ const CreatorBadge = ({ badge, size = 'md', variant = 'full' }) => {
         };
       case 'verified_creator':
         return {
-          label: 'Verified Creator',
+          label: 'Verified',
           icon: (
             <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
               <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
             </svg>
           ),
           badgeBg: 'bg-blue-500',
+          textColor: 'text-gray-800'
+        };
+      case 'responds_fast':
+        return {
+          label: 'Responds Fast',
+          icon: (
+            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+            </svg>
+          ),
+          badgeBg: 'bg-green-500',
           textColor: 'text-gray-800'
         };
       default:
@@ -97,7 +108,7 @@ const CreatorBadge = ({ badge, size = 'md', variant = 'full' }) => {
 };
 
 CreatorBadge.propTypes = {
-  badge: PropTypes.oneOf(['creator', 'verified_creator', 'top_creator']).isRequired,
+  badge: PropTypes.oneOf(['creator', 'verified_creator', 'top_creator', 'responds_fast']).isRequired,
   size: PropTypes.oneOf(['sm', 'md', 'lg']),
   variant: PropTypes.oneOf(['full', 'icon', 'overlay'])
 };

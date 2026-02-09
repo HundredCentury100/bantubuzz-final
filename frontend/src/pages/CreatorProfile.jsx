@@ -262,7 +262,7 @@ const CreatorProfile = () => {
               </div>
 
               {/* Stats */}
-              <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
                 <div className="text-center p-3 bg-light rounded-lg">
                   <p className="text-2xl font-bold text-dark">
                     {creator.follower_count >= 1000
@@ -270,12 +270,6 @@ const CreatorProfile = () => {
                       : creator.follower_count || 0}
                   </p>
                   <p className="text-sm text-gray-600">Followers</p>
-                </div>
-                <div className="text-center p-3 bg-light rounded-lg">
-                  <p className="text-2xl font-bold text-dark">
-                    {creator.engagement_rate ? `${creator.engagement_rate.toFixed(1)}%` : 'N/A'}
-                  </p>
-                  <p className="text-sm text-gray-600">Engagement</p>
                 </div>
                 <div className="text-center p-3 bg-light rounded-lg">
                   <p className="text-2xl font-bold text-dark">{packages.length}</p>
@@ -294,17 +288,8 @@ const CreatorProfile = () => {
                     {reviews.length} {reviews.length === 1 ? 'Review' : 'Reviews'}
                   </p>
                 </div>
-                <div className="text-center p-3 bg-light rounded-lg">
-                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-medium ${
-                    creator.availability_status === 'available' ? 'bg-primary/10 text-primary-dark' :
-                    creator.availability_status === 'busy' ? 'bg-primary/20 text-primary-dark' :
-                    'bg-red-100 text-red-800'
-                  }`}>
-                    <span className={`w-2 h-2 rounded-full mr-2 ${
-                      creator.availability_status === 'available' ? 'bg-primary' :
-                      creator.availability_status === 'busy' ? 'bg-primary-light' :
-                      'bg-red-600'
-                    }`}></span>
+                <div className="text-center p-3 bg-light rounded-lg flex items-center justify-center">
+                  <span className="text-xs px-3 py-1 border border-gray-300 rounded-full text-gray-700 capitalize">
                     {creator.availability_status || 'unavailable'}
                   </span>
                 </div>
