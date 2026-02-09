@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import ResponsiveImage from '../components/ResponsiveImage';
+import CreatorBadge from '../components/CreatorBadge';
 import { creatorsAPI, BASE_URL } from '../services/api';
 import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import SEO from '../components/SEO';
@@ -123,7 +124,7 @@ const Home = () => {
               <h2 className="text-3xl font-bold mb-1">Featured</h2>
               <p className="text-gray-600">Hire Top Influencers across all Platforms</p>
             </div>
-            <Link to="/creators" className="text-gray-900 font-medium hover:underline">
+            <Link to="/browse/creators" className="text-gray-900 font-medium hover:underline">
               See All
             </Link>
           </div>
@@ -156,9 +157,21 @@ const Home = () => {
                     <div className="px-4 pb-4">
                       {/* Name and Followers */}
                       <div className="flex justify-between items-start mb-3">
-                        <h3 className="font-semibold text-gray-900">
-                          {creator.display_name || creator.username || 'Creator'}
-                        </h3>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <h3 className="font-semibold text-gray-900">
+                              {creator.display_name || creator.username || 'Creator'}
+                            </h3>
+                            {/* Badges */}
+                            {creator.badges && creator.badges.length > 0 && (
+                              <>
+                                {creator.badges.map((badge, idx) => (
+                                  <CreatorBadge key={idx} badge={badge} size="sm" />
+                                ))}
+                              </>
+                            )}
+                          </div>
+                        </div>
                         <div className="text-right">
                           <span className="text-lg font-bold">{formatFollowers(creator.follower_count)}</span>
                           <p className="text-xs text-gray-500">Followers</p>
@@ -224,7 +237,7 @@ const Home = () => {
               <h2 className="text-3xl font-bold mb-1">Instagram</h2>
               <p className="text-gray-600">Hire Instagram influencers</p>
             </div>
-            <Link to="/creators?platform=Instagram" className="text-gray-900 font-medium hover:underline">
+            <Link to="/browse/creators?platform=Instagram" className="text-gray-900 font-medium hover:underline">
               See All
             </Link>
           </div>
@@ -251,9 +264,21 @@ const Home = () => {
                 <div className="px-4 pb-4">
                   {/* Name and Followers */}
                   <div className="flex justify-between items-start mb-3">
-                    <h3 className="font-semibold text-gray-900">
-                      {creator.display_name || creator.username || 'Creator'}
-                    </h3>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h3 className="font-semibold text-gray-900">
+                          {creator.display_name || creator.username || 'Creator'}
+                        </h3>
+                        {/* Badges */}
+                        {creator.badges && creator.badges.length > 0 && (
+                          <>
+                            {creator.badges.map((badge, idx) => (
+                              <CreatorBadge key={idx} badge={badge} size="sm" />
+                            ))}
+                          </>
+                        )}
+                      </div>
+                    </div>
                     <div className="text-right">
                       <span className="text-lg font-bold">{formatFollowers(creator.follower_count)}</span>
                       <p className="text-xs text-gray-700">Followers</p>
@@ -292,7 +317,7 @@ const Home = () => {
               <h2 className="text-3xl font-bold mb-1">Tiktok</h2>
               <p className="text-gray-600">Hire TikTok influencers</p>
             </div>
-            <Link to="/creators?platform=TikTok" className="text-gray-900 font-medium hover:underline">
+            <Link to="/browse/creators?platform=TikTok" className="text-gray-900 font-medium hover:underline">
               See All
             </Link>
           </div>
@@ -319,9 +344,21 @@ const Home = () => {
                 <div className="px-4 pb-4">
                   {/* Name and Followers */}
                   <div className="flex justify-between items-start mb-3">
-                    <h3 className="font-semibold text-gray-900">
-                      {creator.display_name || creator.username || 'Creator'}
-                    </h3>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h3 className="font-semibold text-gray-900">
+                          {creator.display_name || creator.username || 'Creator'}
+                        </h3>
+                        {/* Badges */}
+                        {creator.badges && creator.badges.length > 0 && (
+                          <>
+                            {creator.badges.map((badge, idx) => (
+                              <CreatorBadge key={idx} badge={badge} size="sm" />
+                            ))}
+                          </>
+                        )}
+                      </div>
+                    </div>
                     <div className="text-right">
                       <span className="text-lg font-bold">{formatFollowers(creator.follower_count)}</span>
                       <p className="text-xs text-gray-500">Followers</p>
@@ -366,7 +403,7 @@ const Home = () => {
             ].map((category) => (
               <Link
                 key={category.name}
-                to={`/creators?category=${category.name}`}
+                to={`/browse/creators?category=${category.name}`}
                 className="relative aspect-[4/3] rounded-2xl overflow-hidden group bg-gradient-to-b hover:shadow-lg transition-shadow"
               >
                 <div className={`absolute inset-0 bg-gradient-to-b ${category.color}`}></div>
