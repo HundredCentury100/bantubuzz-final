@@ -10,6 +10,8 @@ import { AuthProvider } from './hooks/useAuth'
 import { NotificationProvider } from './contexts/NotificationContext'
 import { MessagingProvider } from './contexts/MessagingContext'
 import { CartProvider } from './contexts/CartContext'
+import CartButton from './components/cart/CartButton'
+import CartModal from './components/cart/CartModal'
 
 // Create a client for React Query
 const queryClient = new QueryClient({
@@ -32,6 +34,8 @@ ReactDOM.createRoot(document.getElementById('root')).render(
               <NotificationProvider>
                 <MessagingProvider>
                   <App />
+                  <CartButton />
+                  <CartModal />
                 <Toaster
                   position="top-right"
                   toastOptions={{

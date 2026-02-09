@@ -10,8 +10,6 @@ import {
   Cog6ToothIcon,
 } from '@heroicons/react/24/outline';
 import NotificationBell from './NotificationBell';
-import CartButton from './cart/CartButton';
-import CartModal from './cart/CartModal';
 import { messagingService } from '../services/messagingAPI';
 
 const Navbar = () => {
@@ -75,15 +73,12 @@ const Navbar = () => {
             {isAuthenticated ? (
               <div className="flex items-center space-x-6">
                 {user?.user_type === 'brand' && (
-                  <>
-                    <Link
-                      to="/brand/campaigns"
-                      className="text-gray-700 hover:text-gray-900 transition-colors text-sm font-medium"
-                    >
-                      Campaigns
-                    </Link>
-                    <CartButton />
-                  </>
+                  <Link
+                    to="/brand/campaigns"
+                    className="text-gray-700 hover:text-gray-900 transition-colors text-sm font-medium"
+                  >
+                    Campaigns
+                  </Link>
                 )}
                 {user?.user_type === 'creator' && (
                   <Link
@@ -386,9 +381,6 @@ const Navbar = () => {
           </div>
         </div>
       </div>
-
-      {/* Cart Modal */}
-      <CartModal />
     </nav>
   );
 };
