@@ -12,6 +12,9 @@ const Payment = () => {
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [paymentData, setPaymentData] = useState(null);
   const [checkingStatus, setCheckingStatus] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState('paynow');
+  const [proofFile, setProofFile] = useState(null);
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     fetchBooking();
@@ -44,6 +47,26 @@ const Payment = () => {
     }
   };
 
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      // Validate file size (5MB max)
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error('File size must be less than 5MB');
+        return;
+      }
+
+      // Validate file type
+      const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'application/pdf'];
+      if (!allowedTypes.includes(file.type)) {
+        toast.error('File must be JPG, PNG, GIF, or PDF');
+        return;
+      }
+
+      setProofFile(file);
+    }
+  };
+
   const handleProceedToPayment = () => {
     console.log('handleProceedToPayment called');
     console.log('paymentData:', paymentData);
@@ -56,6 +79,32 @@ const Payment = () => {
     } else {
       console.error('No payment redirect URL available');
       toast.error('Payment URL not available. Please contact support.');
+    }
+  };
+
+  const handleBankTransferPayment = async () => {
+    if (!proofFile) {
+      toast.error('Please upload proof of payment');
+      return;
+    }
+
+    try {
+      setUploading(true);
+      const formData = new FormData();
+      formData.append('file', proofFile);
+      formData.append('booking_id', id);
+
+      const response = await bookingsAPI.uploadProofOfPayment(id, formData);
+
+      if (response.data.success) {
+        toast.success('Proof of payment uploaded successfully. Awaiting admin verification.');
+        navigate('/brand/dashboard');
+      }
+    } catch (error) {
+      console.error('Upload error:', error);
+      toast.error(error.response?.data?.error || 'Failed to upload proof of payment');
+    } finally {
+      setUploading(false);
     }
   };
 
@@ -194,59 +243,144 @@ const Payment = () => {
           {/* Payment Actions */}
           {booking.payment_status !== 'paid' && (
             <div className="card">
-              <h2 className="text-xl font-bold text-dark mb-4">Payment Options</h2>
+              <h2 className="text-xl font-bold text-dark mb-4">Select Payment Method</h2>
 
-              <div className="space-y-4">
-                <div className="p-4 border border-gray-200 rounded-lg">
-                  <div className="flex items-start mb-3">
-                    <svg className="w-6 h-6 text-primary mr-3 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-                    </svg>
-                    <div className="flex-1">
-                      <h3 className="font-medium text-dark mb-1">Pay with Paynow</h3>
-                      <p className="text-sm text-gray-600 mb-3">
-                        Secure payment via EcoCash, OneMoney, Visa, or Mastercard
-                      </p>
-                      <button
-                        onClick={handleProceedToPayment}
-                        disabled={!paymentData?.redirect_url}
-                        className="btn btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        {!paymentData?.redirect_url ? 'Initializing Payment...' : 'Proceed to Payment'}
-                      </button>
-                      {!paymentData?.redirect_url && (
-                        <p className="text-sm text-gray-500 mt-2 text-center">
-                          Payment link is being generated...
-                        </p>
-                      )}
+              <div className="space-y-4 mb-6">
+                {/* Paynow Option */}
+                <label className="flex items-start p-4 border-2 rounded-lg cursor-pointer hover:border-primary transition-colors"
+                       style={{ borderColor: paymentMethod === 'paynow' ? '#F15A29' : '#e5e7eb' }}>
+                  <input
+                    type="radio"
+                    name="paymentMethod"
+                    value="paynow"
+                    checked={paymentMethod === 'paynow'}
+                    onChange={(e) => setPaymentMethod(e.target.value)}
+                    className="mt-1"
+                  />
+                  <div className="ml-3 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-dark">Paynow</span>
+                      <span className="text-xs bg-primary text-white px-2 py-1 rounded">Recommended</span>
                     </div>
+                    <p className="text-sm text-gray-600 mt-1">
+                      Pay instantly with EcoCash, OneMoney, Visa, or Mastercard
+                    </p>
+                  </div>
+                </label>
+
+                {/* Bank Transfer Option */}
+                <label className="flex items-start p-4 border-2 rounded-lg cursor-pointer hover:border-primary transition-colors"
+                       style={{ borderColor: paymentMethod === 'bank_transfer' ? '#F15A29' : '#e5e7eb' }}>
+                  <input
+                    type="radio"
+                    name="paymentMethod"
+                    value="bank_transfer"
+                    checked={paymentMethod === 'bank_transfer'}
+                    onChange={(e) => setPaymentMethod(e.target.value)}
+                    className="mt-1"
+                  />
+                  <div className="ml-3 flex-1">
+                    <span className="font-semibold text-dark">Bank Transfer</span>
+                    <p className="text-sm text-gray-600 mt-1">
+                      Transfer funds directly to our bank account. Requires admin verification.
+                    </p>
+                  </div>
+                </label>
+              </div>
+
+              {/* Bank Transfer Instructions */}
+              {paymentMethod === 'bank_transfer' && (
+                <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-6 mb-6">
+                  <h3 className="font-bold text-blue-900 mb-3 flex items-center gap-2">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    Bank Transfer Instructions
+                  </h3>
+                  <div className="space-y-2 text-sm text-blue-900">
+                    <p><strong>Bank Name:</strong> Example Bank</p>
+                    <p><strong>Account Name:</strong> BantuBuzz Platform</p>
+                    <p><strong>Account Number:</strong> 1234567890</p>
+                    <p><strong>Reference:</strong> BOOKING-{id}</p>
+                  </div>
+
+                  <div className="mt-4 pt-4 border-t border-blue-200">
+                    <label className="block text-sm font-medium text-blue-900 mb-2">
+                      Upload Proof of Payment *
+                    </label>
+                    <input
+                      type="file"
+                      onChange={handleFileChange}
+                      accept="image/*,.pdf"
+                      className="block w-full text-sm text-gray-900 border border-blue-300 rounded-lg cursor-pointer bg-white focus:outline-none"
+                    />
+                    <p className="text-xs text-blue-700 mt-2">
+                      Accepted formats: JPG, PNG, GIF, PDF (Max 5MB)
+                    </p>
+                    {proofFile && (
+                      <p className="text-sm text-blue-900 mt-2 flex items-center gap-2">
+                        <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                        </svg>
+                        {proofFile.name}
+                      </p>
+                    )}
                   </div>
                 </div>
+              )}
 
-                <div className="text-center">
-                  <p className="text-sm text-gray-600 mb-3">
-                    Already completed payment?
-                  </p>
-                  <button
-                    onClick={handleCheckPaymentStatus}
-                    disabled={checkingStatus}
-                    className="text-primary hover:text-primary-dark font-medium flex items-center gap-2 mx-auto"
-                  >
-                    {checkingStatus ? (
-                      <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
-                        Checking...
-                      </>
-                    ) : (
-                      <>
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                        </svg>
-                        Check Payment Status
-                      </>
-                    )}
-                  </button>
-                </div>
+              {/* Payment Button */}
+              <button
+                onClick={paymentMethod === 'paynow' ? handleProceedToPayment : handleBankTransferPayment}
+                disabled={(paymentMethod === 'paynow' && !paymentData?.redirect_url) || (paymentMethod === 'bank_transfer' && !proofFile) || uploading}
+                className="btn btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {uploading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                    Uploading...
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                    </svg>
+                    {paymentMethod === 'paynow'
+                      ? (!paymentData?.redirect_url ? 'Initializing Payment...' : 'Proceed to Payment')
+                      : 'Submit Payment'}
+                  </>
+                )}
+              </button>
+
+              {paymentMethod === 'paynow' && !paymentData?.redirect_url && (
+                <p className="text-sm text-gray-500 mt-2 text-center">
+                  Payment link is being generated...
+                </p>
+              )}
+
+              <div className="text-center mt-6">
+                <p className="text-sm text-gray-600 mb-3">
+                  Already completed payment?
+                </p>
+                <button
+                  onClick={handleCheckPaymentStatus}
+                  disabled={checkingStatus}
+                  className="text-primary hover:text-primary-dark font-medium flex items-center gap-2 mx-auto"
+                >
+                  {checkingStatus ? (
+                    <>
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+                      Checking...
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                      </svg>
+                      Check Payment Status
+                    </>
+                  )}
+                </button>
               </div>
             </div>
           )}
