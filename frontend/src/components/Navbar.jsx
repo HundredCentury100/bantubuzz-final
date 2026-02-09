@@ -58,7 +58,7 @@ const Navbar = () => {
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center space-x-10">
             <Link
-              to="/creators"
+              to="/browse/creators"
               className="text-gray-700 hover:text-gray-900 transition-colors text-sm font-medium"
             >
               Search
@@ -232,7 +232,7 @@ const Navbar = () => {
                     <Menu.Item>
                       {({ active }) => (
                         <Link
-                          to="/creators"
+                          to="/browse/creators"
                           className={`${
                             active ? 'bg-light' : ''
                           } block px-4 py-2 text-sm text-gray-700 rounded-lg`}
