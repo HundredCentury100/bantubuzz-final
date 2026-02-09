@@ -90,6 +90,23 @@ class CreatorProfile(db.Model):
             include_user: Include user object
             public_view: If True, exclude private info (email) from user object
         """
+        # Extract platforms from social_links if available
+        platforms = []
+        social_links = self.social_links or {}
+        platform_map = {
+            'instagram': 'Instagram',
+            'tiktok': 'TikTok',
+            'youtube': 'YouTube',
+            'facebook': 'Facebook',
+            'twitter': 'Twitter',
+            'linkedin': 'LinkedIn'
+        }
+
+        for key, value in social_links.items():
+            if value and value.strip():  # Only include if link exists
+                platform_name = platform_map.get(key.lower(), key.capitalize())
+                platforms.append(platform_name)
+
         data = {
             'id': self.id,
             'user_id': self.user_id,
@@ -106,6 +123,7 @@ class CreatorProfile(db.Model):
             'languages': self.languages or [],
             'availability_status': self.availability_status,
             'social_links': self.social_links or {},
+            'platforms': platforms,  # Extracted from social_links
             'success_stories': self.success_stories,
             'gallery': self.gallery or [],
             'gallery_images': self.gallery_images or [],
