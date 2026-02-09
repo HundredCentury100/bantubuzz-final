@@ -3,6 +3,8 @@ import { useLocation } from 'react-router-dom';
 import { useMessaging } from '../contexts/MessagingContext';
 import messagingService from '../services/messagingAPI';
 import Navbar from '../components/Navbar';
+import Avatar from '../components/Avatar';
+import { BASE_URL } from '../services/api';
 import toast from 'react-hot-toast';
 
 const Messages = () => {
@@ -238,16 +240,25 @@ const Messages = () => {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-3 flex-1 min-w-0">
                         <div className="relative">
-                          <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center text-primary font-semibold">
-                            {conversation.username?.[0]?.toUpperCase() || conversation.email?.[0]?.toUpperCase() || '?'}
-                          </div>
+                          {conversation.profile_picture ? (
+                            <img
+                              src={`${BASE_URL}${conversation.profile_picture}`}
+                              alt={conversation.display_name || conversation.username || conversation.company_name}
+                              className="w-12 h-12 rounded-full object-cover"
+                            />
+                          ) : (
+                            <Avatar
+                              name={conversation.display_name || conversation.username || conversation.company_name || conversation.email}
+                              size="md"
+                            />
+                          )}
                           {isUserOnline(conversation.id) && (
-                            <div className="absolute bottom-0 right-0 w-3 h-3 bg-primary rounded-full border-2 border-white"></div>
+                            <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
                           )}
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="font-semibold text-gray-900 truncate">
-                            {conversation.username || conversation.email || 'Unknown User'}
+                            {conversation.display_name || conversation.username || conversation.company_name || conversation.email || 'Unknown User'}
                           </p>
                           <p className="text-sm text-gray-500 truncate">
                             {conversation.last_message || 'No messages yet'}
@@ -274,16 +285,25 @@ const Messages = () => {
                 <div className="p-4 border-b border-gray-200 bg-light">
                   <div className="flex items-center space-x-3">
                     <div className="relative">
-                      <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center text-primary font-semibold">
-                        {selectedConversation.username?.[0]?.toUpperCase() || selectedConversation.email?.[0]?.toUpperCase() || '?'}
-                      </div>
+                      {selectedConversation.profile_picture ? (
+                        <img
+                          src={`${BASE_URL}${selectedConversation.profile_picture}`}
+                          alt={selectedConversation.display_name || selectedConversation.username || selectedConversation.company_name}
+                          className="w-10 h-10 rounded-full object-cover"
+                        />
+                      ) : (
+                        <Avatar
+                          name={selectedConversation.display_name || selectedConversation.username || selectedConversation.company_name || selectedConversation.email}
+                          size="sm"
+                        />
+                      )}
                       {isUserOnline(selectedConversation.id) && (
-                        <div className="absolute bottom-0 right-0 w-3 h-3 bg-primary rounded-full border-2 border-white"></div>
+                        <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
                       )}
                     </div>
                     <div>
                       <p className="font-semibold text-gray-900">
-                        {selectedConversation.username || selectedConversation.email || 'Unknown User'}
+                        {selectedConversation.display_name || selectedConversation.username || selectedConversation.company_name || selectedConversation.email || 'Unknown User'}
                       </p>
                       <p className="text-sm text-gray-500">
                         {isUserOnline(selectedConversation.id)
