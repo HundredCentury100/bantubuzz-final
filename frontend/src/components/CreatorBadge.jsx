@@ -12,25 +12,23 @@ const CreatorBadge = ({ badge, size = 'md' }) => {
         return {
           label: 'Top Creator',
           icon: (
-            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+            <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
               <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
             </svg>
           ),
-          bgColor: 'bg-yellow-500',
-          textColor: 'text-white',
-          borderColor: 'border-yellow-600'
+          badgeBg: 'bg-yellow-500',
+          textColor: 'text-gray-800'
         };
       case 'verified_creator':
         return {
-          label: 'Verified',
+          label: 'Verified Creator',
           icon: (
-            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+            <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
               <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
             </svg>
           ),
-          bgColor: 'bg-blue-500',
-          textColor: 'text-white',
-          borderColor: 'border-blue-600'
+          badgeBg: 'bg-blue-500',
+          textColor: 'text-gray-800'
         };
       default:
         return null;
@@ -41,19 +39,29 @@ const CreatorBadge = ({ badge, size = 'md' }) => {
   if (!config) return null;
 
   const sizeClasses = {
-    sm: 'text-xs px-2 py-0.5 gap-1',
-    md: 'text-xs px-2.5 py-1 gap-1',
-    lg: 'text-sm px-3 py-1.5 gap-1.5'
+    sm: 'text-xs',
+    md: 'text-sm',
+    lg: 'text-base'
+  };
+
+  const badgeSizeClasses = {
+    sm: 'w-5 h-5 p-1',
+    md: 'w-5 h-5 p-1',
+    lg: 'w-6 h-6 p-1.5'
   };
 
   return (
-    <span
-      className={`inline-flex items-center ${sizeClasses[size]} ${config.bgColor} ${config.textColor} rounded-full font-medium shadow-sm`}
-      title={config.label}
-    >
-      {config.icon}
-      <span>{config.label}</span>
-    </span>
+    <div className="inline-flex items-center gap-1.5">
+      <span
+        className={`inline-flex items-center justify-center ${badgeSizeClasses[size]} ${config.badgeBg} text-white rounded-full`}
+        title={config.label}
+      >
+        {config.icon}
+      </span>
+      <span className={`${sizeClasses[size]} ${config.textColor} font-medium`}>
+        {config.label}
+      </span>
+    </div>
   );
 };
 
