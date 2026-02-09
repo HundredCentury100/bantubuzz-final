@@ -303,19 +303,13 @@ const Creators = () => {
                     <p className="text-sm text-gray-500 mb-4">{creator.location || 'Location not set'}</p>
 
                     {/* Stats */}
-                    <div className="grid grid-cols-3 gap-2 mb-4">
+                    <div className="grid grid-cols-2 gap-2 mb-4">
                     <div className="text-center p-2 bg-gray-50 rounded">
                       <p className="text-xs text-gray-600">Followers</p>
                       <p className="font-bold text-dark text-sm">
                         {creator.follower_count >= 1000
                           ? `${(creator.follower_count / 1000).toFixed(1)}K`
                           : creator.follower_count || 0}
-                      </p>
-                    </div>
-                    <div className="text-center p-2 bg-gray-50 rounded">
-                      <p className="text-xs text-gray-600">Engagement</p>
-                      <p className="font-bold text-dark text-sm">
-                        {creator.engagement_rate ? `${creator.engagement_rate.toFixed(1)}%` : 'N/A'}
                       </p>
                     </div>
                     <div className="text-center p-2 bg-gray-50 rounded">

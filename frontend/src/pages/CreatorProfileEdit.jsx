@@ -70,7 +70,6 @@ const CreatorProfileEdit = () => {
       setValue('location', data.location || '');
       setValue('portfolio_url', data.portfolio_url || '');
       setValue('follower_count', data.follower_count || 0);
-      setValue('engagement_rate', data.engagement_rate || 0);
       setValue('categories', data.categories || []);
       setValue('languages', data.languages || []);
       setValue('availability_status', data.availability_status || 'available');
@@ -219,7 +218,6 @@ const CreatorProfileEdit = () => {
         location: data.location,
         portfolio_url: data.portfolio_url,
         follower_count: parseInt(data.follower_count) || 0,
-        engagement_rate: parseFloat(data.engagement_rate) || 0,
         categories: data.categories || [],
         languages: data.languages || [],
         availability_status: data.availability_status,
@@ -527,44 +525,22 @@ const CreatorProfileEdit = () => {
             <div className="card">
               <h2 className="text-xl font-bold text-dark mb-4">Social Media Stats</h2>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {/* Follower Count */}
-                <div>
-                  <label className="block text-sm font-medium text-dark mb-2">
-                    Total Followers
-                  </label>
-                  <input
-                    type="number"
-                    className="input"
-                    placeholder="10000"
-                    {...register('follower_count', {
-                      min: { value: 0, message: 'Cannot be negative' }
-                    })}
-                  />
-                  {errors.follower_count && (
-                    <p className="mt-1 text-sm text-error">{errors.follower_count.message}</p>
-                  )}
-                </div>
-
-                {/* Engagement Rate */}
-                <div>
-                  <label className="block text-sm font-medium text-dark mb-2">
-                    Engagement Rate (%)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.1"
-                    className="input"
-                    placeholder="5.2"
-                    {...register('engagement_rate', {
-                      min: { value: 0, message: 'Cannot be negative' },
-                      max: { value: 100, message: 'Cannot exceed 100%' }
-                    })}
-                  />
-                  {errors.engagement_rate && (
-                    <p className="mt-1 text-sm text-error">{errors.engagement_rate.message}</p>
-                  )}
-                </div>
+              {/* Follower Count */}
+              <div>
+                <label className="block text-sm font-medium text-dark mb-2">
+                  Total Followers
+                </label>
+                <input
+                  type="number"
+                  className="input"
+                  placeholder="10000"
+                  {...register('follower_count', {
+                    min: { value: 0, message: 'Cannot be negative' }
+                  })}
+                />
+                {errors.follower_count && (
+                  <p className="mt-1 text-sm text-error">{errors.follower_count.message}</p>
+                )}
               </div>
             </div>
 
