@@ -119,6 +119,22 @@ export default function AdminPayments() {
     });
   };
 
+  const getPaymentTypeDisplay = (payment) => {
+    const category = payment.payment_category || 'package';
+    const type = payment.booking_type || 'direct';
+
+    const types = {
+      'direct-package': 'Package Purchase',
+      'campaign_application-campaign': 'Campaign Application',
+      'campaign_package-package': 'Package Added to Campaign',
+      'direct-revision': 'Paid Revision',
+      'brief_proposal-brief': 'Brief Proposal'
+    };
+
+    const key = `${type}-${category}`;
+    return types[key] || 'Payment';
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -138,7 +154,7 @@ export default function AdminPayments() {
           </div>
           <button
             onClick={() => setShowAddModal(true)}
-            className="bg-primary text-dark px-6 py-3 rounded-lg hover:bg-primary-dark hover:text-white transition flex items-center gap-2"
+            className="bg-primary text-dark px-6 py-3 rounded-full hover:bg-primary-dark hover:text-white transition flex items-center gap-2"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -162,22 +178,22 @@ export default function AdminPayments() {
         {/* Statistics Cards */}
         {statistics && (
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-            <div className="bg-white rounded-lg shadow-md p-6">
+            <div className="bg-white rounded-3xl shadow-sm hover:shadow-md transition-shadow p-6">
               <p className="text-sm text-gray-600">Pending Verification</p>
               <p className="text-3xl font-bold text-yellow-600 mt-2">{statistics.pending_count}</p>
               <p className="text-sm text-gray-500 mt-1">{formatCurrency(statistics.pending_amount)}</p>
             </div>
-            <div className="bg-white rounded-lg shadow-md p-6">
+            <div className="bg-white rounded-3xl shadow-sm hover:shadow-md transition-shadow p-6">
               <p className="text-sm text-gray-600">Verified Today</p>
               <p className="text-3xl font-bold text-green-600 mt-2">{statistics.verified_today_count}</p>
               <p className="text-sm text-gray-500 mt-1">{formatCurrency(statistics.verified_today_amount)}</p>
             </div>
-            <div className="bg-white rounded-lg shadow-md p-6">
+            <div className="bg-white rounded-3xl shadow-sm hover:shadow-md transition-shadow p-6">
               <p className="text-sm text-gray-600">This Month</p>
               <p className="text-3xl font-bold text-primary-dark mt-2">{statistics.month_count}</p>
               <p className="text-sm text-gray-500 mt-1">{formatCurrency(statistics.month_amount)}</p>
             </div>
-            <div className="bg-white rounded-lg shadow-md p-6">
+            <div className="bg-white rounded-3xl shadow-sm hover:shadow-md transition-shadow p-6">
               <p className="text-sm text-gray-600">Total Verified</p>
               <p className="text-3xl font-bold text-primary mt-2">{statistics.total_verified_count}</p>
               <p className="text-sm text-gray-500 mt-1">{formatCurrency(statistics.total_verified_amount)}</p>
@@ -186,7 +202,7 @@ export default function AdminPayments() {
         )}
 
         {/* Pending Payments Table */}
-        <div className="bg-white rounded-lg shadow-md overflow-hidden">
+        <div className="bg-white rounded-3xl shadow-sm hover:shadow-md transition-shadow overflow-hidden">
           <div className="px-6 py-4 border-b border-gray-200">
             <h2 className="text-xl font-semibold text-gray-900">Pending Verifications</h2>
           </div>
@@ -203,8 +219,10 @@ export default function AdminPayments() {
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Booking ID</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ID</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Brand</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Creator</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Method</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Created</th>
@@ -215,20 +233,40 @@ export default function AdminPayments() {
                   {pendingPayments.map((payment) => (
                     <tr key={payment.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 text-sm font-medium text-gray-900">#{payment.booking_id}</td>
+                      <td className="px-6 py-4 text-sm">
+                        <span className="inline-flex px-3 py-1 rounded-full text-xs font-medium bg-primary/10 text-dark">
+                          {getPaymentTypeDisplay(payment)}
+                        </span>
+                      </td>
                       <td className="px-6 py-4 text-sm text-gray-900">
                         {payment.user_name || `User ${payment.user_id}`}
                         <br />
                         <span className="text-xs text-gray-500">{payment.user_email}</span>
                       </td>
+                      <td className="px-6 py-4 text-sm text-gray-900">
+                        {payment.creator_name || 'N/A'}
+                        <br />
+                        <span className="text-xs text-gray-500">{payment.creator_email || ''}</span>
+                      </td>
                       <td className="px-6 py-4 text-sm font-semibold text-gray-900">{formatCurrency(payment.amount)}</td>
                       <td className="px-6 py-4 text-sm text-gray-600 capitalize">{payment.payment_method || 'manual'}</td>
                       <td className="px-6 py-4 text-sm text-gray-600">{formatDate(payment.created_at)}</td>
-                      <td className="px-6 py-4 text-center">
+                      <td className="px-6 py-4 text-center space-x-2">
+                        {payment.payment_proof_url && (
+                          <a
+                            href={payment.payment_proof_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-block bg-blue-600 text-white px-3 py-1.5 rounded-full hover:bg-blue-700 transition text-xs mr-2"
+                          >
+                            Download POP
+                          </a>
+                        )}
                         <button
                           onClick={() => handleVerifyClick(payment)}
-                          className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 transition text-sm"
+                          className="bg-green-600 text-white px-4 py-2 rounded-full hover:bg-green-700 transition text-sm"
                         >
-                          Verify Payment
+                          Verify
                         </button>
                       </td>
                     </tr>
@@ -332,13 +370,13 @@ export default function AdminPayments() {
                 <button
                   type="button"
                   onClick={() => setShowVerifyModal(false)}
-                  className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition"
+                  className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-full hover:bg-gray-50 transition"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
+                  className="flex-1 px-6 py-3 bg-green-600 text-white rounded-full hover:bg-green-700 transition"
                 >
                   Verify Payment
                 </button>
@@ -450,13 +488,13 @@ export default function AdminPayments() {
                 <button
                   type="button"
                   onClick={() => setShowAddModal(false)}
-                  className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition"
+                  className="flex-1 px-6 py-3 border border-gray-300 text-gray-700 rounded-full hover:bg-gray-50 transition"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="flex-1 px-6 py-3 bg-primary text-dark rounded-lg hover:bg-primary-dark hover:text-white transition"
+                  className="flex-1 px-6 py-3 bg-primary text-dark rounded-full hover:bg-primary-dark hover:text-white transition"
                 >
                   Add Payment
                 </button>

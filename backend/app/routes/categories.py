@@ -1,11 +1,11 @@
 """
-Public categories and niches routes
+Public categories routes
 No authentication required - accessible to all users
 """
 
 from flask import Blueprint, jsonify, request
 from app import db
-from app.models import Category, Niche
+from app.models import Category
 
 bp = Blueprint('categories', __name__)
 
@@ -17,15 +17,13 @@ def get_categories():
     Public endpoint - no authentication required
     """
     try:
-        include_niches = request.args.get('include_niches', 'false') == 'true'
-
         # Only return active categories
         categories = Category.query.filter_by(is_active=True).order_by(
-            Category.display_order, Category.name
+            Category.name
         ).all()
 
         return jsonify({
-            'categories': [cat.to_dict(include_niches=include_niches) for cat in categories]
+            'categories': [cat.to_dict() for cat in categories]
         }), 200
 
     except Exception as e:
@@ -43,7 +41,7 @@ def get_category(category_id):
         if not category:
             return jsonify({'error': 'Category not found'}), 404
 
-        return jsonify(category.to_dict(include_niches=True)), 200
+        return jsonify(category.to_dict()), 200
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -60,55 +58,7 @@ def get_category_by_slug(slug):
         if not category:
             return jsonify({'error': 'Category not found'}), 404
 
-        return jsonify(category.to_dict(include_niches=True)), 200
-
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-
-@bp.route('/<int:category_id>/niches', methods=['GET'])
-def get_category_niches(category_id):
-    """
-    Get all niches for a specific category
-    Public endpoint
-    """
-    try:
-        category = Category.query.filter_by(id=category_id, is_active=True).first()
-        if not category:
-            return jsonify({'error': 'Category not found'}), 404
-
-        niches = Niche.query.filter_by(
-            category_id=category_id,
-            is_active=True
-        ).order_by(Niche.name).all()
-
-        return jsonify({
-            'niches': [niche.to_dict() for niche in niches]
-        }), 200
-
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-
-@bp.route('/niches', methods=['GET'])
-def get_all_niches():
-    """
-    Get all active niches (optionally filtered by category)
-    Public endpoint
-    """
-    try:
-        category_id = request.args.get('category_id', type=int)
-
-        query = Niche.query.filter_by(is_active=True)
-
-        if category_id:
-            query = query.filter_by(category_id=category_id)
-
-        niches = query.order_by(Niche.name).all()
-
-        return jsonify({
-            'niches': [niche.to_dict(include_category=True) for niche in niches]
-        }), 200
+        return jsonify(category.to_dict()), 200
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500

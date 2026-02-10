@@ -6,19 +6,7 @@ import { useAuth } from '../hooks/useAuth';
 import Navbar from '../components/Navbar';
 import toast from 'react-hot-toast';
 import { PLATFORMS, ZIMBABWE_LANGUAGES, COUNTRIES } from '../constants/options';
-
-const CATEGORIES = [
-  'Fashion & Beauty',
-  'Lifestyle',
-  'Tech & Gaming',
-  'Food & Cooking',
-  'Travel',
-  'Fitness & Health',
-  'Business & Finance',
-  'Entertainment',
-  'Education',
-  'Art & Design'
-];
+import axios from 'axios';
 
 const CreatorProfileEdit = () => {
   const navigate = useNavigate();
@@ -33,6 +21,7 @@ const CreatorProfileEdit = () => {
   const [gallery, setGallery] = useState([]);
   const [uploadingGallery, setUploadingGallery] = useState(false);
   const [deletingGalleryIndex, setDeletingGalleryIndex] = useState(null);
+  const [categories, setCategories] = useState([]);
 
   const {
     register,
@@ -48,7 +37,21 @@ const CreatorProfileEdit = () => {
 
   useEffect(() => {
     fetchProfile();
+    fetchCategories();
   }, []);
+
+  const fetchCategories = async () => {
+    try {
+      const response = await axios.get(`${BASE_URL}/api/categories`);
+      // Extract category names from the response
+      const categoryNames = response.data.categories.map(cat => cat.name);
+      setCategories(categoryNames);
+    } catch (err) {
+      console.error('Failed to load categories:', err);
+      // Fallback to empty array if categories fail to load
+      setCategories([]);
+    }
+  };
 
   const fetchProfile = async () => {
     try {
@@ -705,24 +708,28 @@ const CreatorProfileEdit = () => {
               <h2 className="text-xl font-bold text-dark mb-4">Categories</h2>
               <p className="text-sm text-gray-600 mb-4">Select the categories that best describe your content</p>
 
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-                {CATEGORIES.map((category) => (
-                  <button
-                    key={category}
-                    type="button"
-                    onClick={() => toggleCategory(category)}
-                    className={`
-                      px-4 py-2 rounded-lg border-2 text-sm font-medium transition-all
-                      ${selectedCategories.includes(category)
-                        ? 'border-primary bg-primary text-dark'
-                        : 'border-gray-300 bg-white text-gray-700 hover:border-primary'
-                      }
-                    `}
-                  >
-                    {category}
-                  </button>
-                ))}
-              </div>
+              {categories.length === 0 ? (
+                <div className="text-center py-4 text-gray-500">Loading categories...</div>
+              ) : (
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  {categories.map((category) => (
+                    <button
+                      key={category}
+                      type="button"
+                      onClick={() => toggleCategory(category)}
+                      className={`
+                        px-4 py-2 rounded-lg border-2 text-sm font-medium transition-all
+                        ${selectedCategories.includes(category)
+                          ? 'border-primary bg-primary text-dark'
+                          : 'border-gray-300 bg-white text-gray-700 hover:border-primary'
+                        }
+                      `}
+                    >
+                      {category}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Platforms */}
