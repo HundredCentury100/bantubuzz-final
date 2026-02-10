@@ -99,7 +99,24 @@ const CampaignDetails = () => {
     }
   };
 
-  const handleUpdateApplication = async (applicationId, status) => {
+  const handleUpdateApplication = async (applicationId, status, application) => {
+    if (status === 'accepted') {
+      // Redirect to payment page for acceptance
+      const app = applications.find(a => a.id === applicationId) || application;
+      localStorage.setItem('payment_context', JSON.stringify({
+        application_id: applicationId,
+        campaign_id: id,
+        creator_id: app.creator_id,
+        type: 'campaign_application',
+        amount: app.proposed_price,
+        payment_category: 'campaign',
+        booking_type: 'campaign_application'
+      }));
+      navigate(`/brand/payment/campaign-application/${id}`);
+      return;
+    }
+
+    // For rejection, proceed normally
     try {
       await campaignsAPI.updateApplicationStatus(id, applicationId, status);
       toast.success(`Application ${status}`);
@@ -431,7 +448,7 @@ const CampaignDetails = () => {
                         {app.status === 'pending' && (
                           <div className="flex gap-3 pt-4 border-t border-gray-200">
                             <button
-                              onClick={() => handleUpdateApplication(app.id, 'accepted')}
+                              onClick={() => handleUpdateApplication(app.id, 'accepted', app)}
                               className="flex-1 px-6 py-3 bg-primary hover:bg-primary text-white font-medium rounded-lg transition-colors flex items-center justify-center gap-2"
                             >
                               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
