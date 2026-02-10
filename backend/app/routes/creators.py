@@ -458,6 +458,12 @@ def update_profile():
         if 'location' in data:
             creator.location = data['location']
 
+        if 'city' in data:
+            creator.city = data['city']
+
+        if 'country' in data:
+            creator.country = data['country']
+
         if 'languages' in data:
             creator.languages = data['languages']
 

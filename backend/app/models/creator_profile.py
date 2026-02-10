@@ -16,7 +16,10 @@ class CreatorProfile(db.Model):
     follower_count = db.Column(db.Integer, default=0)
     engagement_rate = db.Column(db.Float, default=0.0)
     location = db.Column(db.String(100))
+    city = db.Column(db.String(100))  # City/Town
+    country = db.Column(db.String(2))  # 2-letter country code (e.g., ZW, ZA)
     languages = db.Column(db.JSON, default=list)
+    platforms = db.Column(db.JSON, default=list)  # List of platforms: ['Instagram', 'TikTok', ...]
     availability_status = db.Column(db.String(20), default='available')  # available, busy, unavailable
     social_links = db.Column(db.JSON, default=dict)  # {platform: url}
     success_stories = db.Column(db.Text)
@@ -90,23 +93,6 @@ class CreatorProfile(db.Model):
             include_user: Include user object
             public_view: If True, exclude private info (email) from user object
         """
-        # Extract platforms from social_links if available
-        platforms = []
-        social_links = self.social_links or {}
-        platform_map = {
-            'instagram': 'Instagram',
-            'tiktok': 'TikTok',
-            'youtube': 'YouTube',
-            'facebook': 'Facebook',
-            'twitter': 'Twitter',
-            'linkedin': 'LinkedIn'
-        }
-
-        for key, value in social_links.items():
-            if value and value.strip():  # Only include if link exists
-                platform_name = platform_map.get(key.lower(), key.capitalize())
-                platforms.append(platform_name)
-
         data = {
             'id': self.id,
             'user_id': self.user_id,
@@ -120,10 +106,12 @@ class CreatorProfile(db.Model):
             'follower_count': self.follower_count,
             'engagement_rate': self.engagement_rate,
             'location': self.location,
+            'city': self.city,
+            'country': self.country,
             'languages': self.languages or [],
+            'platforms': self.platforms or [],  # Platforms selected by creator
             'availability_status': self.availability_status,
             'social_links': self.social_links or {},
-            'platforms': platforms,  # Extracted from social_links
             'success_stories': self.success_stories,
             'gallery': self.gallery or [],
             'gallery_images': self.gallery_images or [],
