@@ -54,16 +54,21 @@ class CreatorProfile(db.Model):
         Returns list of up to 2 badges in priority order
 
         Badge hierarchy:
-        1. Top Creator (5+ completed collaborations in last 30 days)
-        2. Verified Creator (platform verified with documents)
-        3. Creator (default badge for all creators)
+        1. Top Creator (5+ completed collaborations in last 30 days) - If top creator, don't show verified
+        2. Responds Fast (avg response time < 2 hours in last 30 days, min 5 conversations)
+        3. Verified Creator (platform verified with documents)
+        4. Creator (default badge for all creators)
+
+        Note: Top Creator badge implies verification, so we don't show verified badge separately for top creators
         """
         from datetime import datetime, timedelta
         from app.models import Collaboration
+        from sqlalchemy import func, and_
 
         badges = []
+        is_top_creator = False
 
-        # Check for Top Creator badge (highest priority)
+        # Check for Top Creator badge (highest priority - all top creators are verified)
         thirty_days_ago = datetime.utcnow() - timedelta(days=30)
         completed_count = Collaboration.query.filter(
             Collaboration.creator_id == self.id,
@@ -73,9 +78,41 @@ class CreatorProfile(db.Model):
 
         if completed_count >= 5:
             badges.append('top_creator')
+            is_top_creator = True
 
-        # Check for Verified Creator badge
-        if self.is_verified:
+        # Check for Responds Fast badge (fast response time in messaging)
+        try:
+            from app.models import Message
+
+            # Get messages where creator responded to brands in last 30 days
+            creator_responses = db.session.query(
+                func.extract('epoch', Message.created_at - func.lag(Message.created_at).over(
+                    partition_by=Message.booking_id,
+                    order_by=Message.created_at
+                )).label('response_time')
+            ).filter(
+                Message.sender_id == self.user_id,
+                Message.created_at >= thirty_days_ago
+            ).subquery()
+
+            avg_response = db.session.query(
+                func.avg(creator_responses.c.response_time)
+            ).scalar()
+
+            message_count = Message.query.filter(
+                Message.sender_id == self.user_id,
+                Message.created_at >= thirty_days_ago
+            ).count()
+
+            # Responds fast if avg response < 2 hours (7200 seconds) and has at least 5 messages
+            if avg_response and message_count >= 5 and avg_response < 7200:
+                badges.append('responds_fast')
+        except:
+            pass  # Skip if messaging table doesn't exist or query fails
+
+        # Check for Verified Creator badge (only if NOT top creator)
+        # Top creators are always verified, so we don't show verified badge separately
+        if self.is_verified and not is_top_creator:
             badges.append('verified_creator')
 
         # Always include Creator badge if no other badges (everyone gets at least one)
