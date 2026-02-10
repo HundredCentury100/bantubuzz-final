@@ -112,7 +112,7 @@ const CampaignDetails = () => {
         payment_category: 'campaign',
         booking_type: 'campaign_application'
       }));
-      navigate(`/brand/payment/campaign-application/${id}`);
+      navigate(`/brand/campaigns/payment/${id}`);
       return;
     }
 
