@@ -178,7 +178,7 @@ const Payment = () => {
           </div>
 
           {/* Booking Summary Card */}
-          <div className="card mb-6">
+          <div className="bg-white rounded-3xl shadow-sm p-6 mb-6">
             <h2 className="text-xl font-bold text-dark mb-4">Booking Summary</h2>
 
             <div className="space-y-4">
@@ -220,7 +220,7 @@ const Payment = () => {
 
           {/* Payment Status Card */}
           {booking.payment_status && (
-            <div className="card mb-6">
+            <div className="bg-white rounded-3xl shadow-sm p-6 mb-6">
               <h2 className="text-xl font-bold text-dark mb-4">Payment Status</h2>
               <div className="flex items-center justify-between">
                 <span className="text-gray-600">Current Status</span>
@@ -242,12 +242,12 @@ const Payment = () => {
 
           {/* Payment Actions */}
           {booking.payment_status !== 'paid' && (
-            <div className="card">
+            <div className="bg-white rounded-3xl shadow-sm p-6">
               <h2 className="text-xl font-bold text-dark mb-4">Select Payment Method</h2>
 
               <div className="space-y-4 mb-6">
                 {/* Paynow Option */}
-                <label className="flex items-start p-4 border-2 rounded-lg cursor-pointer hover:border-primary transition-colors"
+                <label className="flex items-start p-4 border-2 rounded-3xl cursor-pointer hover:border-primary transition-colors"
                        style={{ borderColor: paymentMethod === 'paynow' ? '#F15A29' : '#e5e7eb' }}>
                   <input
                     type="radio"
@@ -260,7 +260,7 @@ const Payment = () => {
                   <div className="ml-3 flex-1">
                     <div className="flex items-center gap-2">
                       <span className="font-semibold text-dark">Paynow</span>
-                      <span className="text-xs bg-primary text-white px-2 py-1 rounded">Recommended</span>
+                      <span className="text-xs bg-primary text-white px-2 py-1 rounded-full">Recommended</span>
                     </div>
                     <p className="text-sm text-gray-600 mt-1">
                       Pay instantly with EcoCash, OneMoney, Visa, or Mastercard
@@ -269,7 +269,7 @@ const Payment = () => {
                 </label>
 
                 {/* Bank Transfer Option */}
-                <label className="flex items-start p-4 border-2 rounded-lg cursor-pointer hover:border-primary transition-colors"
+                <label className="flex items-start p-4 border-2 rounded-3xl cursor-pointer hover:border-primary transition-colors"
                        style={{ borderColor: paymentMethod === 'bank_transfer' ? '#F15A29' : '#e5e7eb' }}>
                   <input
                     type="radio"
@@ -290,7 +290,7 @@ const Payment = () => {
 
               {/* Bank Transfer Instructions */}
               {paymentMethod === 'bank_transfer' && (
-                <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-6 mb-6">
+                <div className="bg-blue-50 border-2 border-blue-200 rounded-3xl p-6 mb-6">
                   <h3 className="font-bold text-blue-900 mb-3 flex items-center gap-2">
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -312,7 +312,7 @@ const Payment = () => {
                       type="file"
                       onChange={handleFileChange}
                       accept="image/*,.pdf"
-                      className="block w-full text-sm text-gray-900 border border-blue-300 rounded-lg cursor-pointer bg-white focus:outline-none"
+                      className="block w-full text-sm text-gray-900 border border-blue-300 rounded-full cursor-pointer bg-white focus:outline-none px-4 py-2"
                     />
                     <p className="text-xs text-blue-700 mt-2">
                       Accepted formats: JPG, PNG, GIF, PDF (Max 5MB)
@@ -333,7 +333,7 @@ const Payment = () => {
               <button
                 onClick={paymentMethod === 'paynow' ? handleProceedToPayment : handleBankTransferPayment}
                 disabled={(paymentMethod === 'paynow' && !paymentData?.redirect_url) || (paymentMethod === 'bank_transfer' && !proofFile) || uploading}
-                className="btn btn-primary w-full disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                className="bg-primary hover:bg-primary-dark text-white font-medium px-6 py-3 rounded-full w-full disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-colors"
               >
                 {uploading ? (
                   <>
@@ -387,7 +387,7 @@ const Payment = () => {
 
           {/* Payment Complete */}
           {booking.payment_status === 'paid' && (
-            <div className="card text-center">
+            <div className="bg-white rounded-3xl shadow-sm p-6 text-center">
               <div className="w-16 h-16 bg-primary rounded-full mx-auto mb-4 flex items-center justify-center">
                 <svg className="w-10 h-10 text-primary-dark" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
@@ -397,14 +397,14 @@ const Payment = () => {
               <p className="text-gray-600 mb-6">
                 Your booking has been confirmed and the creator has been notified.
               </p>
-              <Link to="/brand/dashboard" className="btn btn-primary">
+              <Link to="/brand/dashboard" className="bg-primary hover:bg-primary-dark text-white font-medium px-6 py-3 rounded-full inline-block transition-colors">
                 Go to Dashboard
               </Link>
             </div>
           )}
 
           {/* Security Notice */}
-          <div className="mt-6 p-4 bg-primary/10 border border-primary rounded-lg">
+          <div className="mt-6 p-4 bg-primary/10 border border-primary rounded-3xl">
             <div className="flex items-start">
               <svg className="w-5 h-5 text-primary-dark mr-3 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />

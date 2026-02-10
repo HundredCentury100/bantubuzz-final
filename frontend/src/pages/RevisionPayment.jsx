@@ -146,11 +146,11 @@ const RevisionPayment = () => {
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="bg-white rounded-lg shadow-lg p-6">
+        <div className="bg-white rounded-3xl shadow-sm p-6">
           <h1 className="text-2xl font-bold text-gray-900 mb-6">Pay for Revision Request</h1>
 
           {/* Revision Details */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+          <div className="bg-blue-50 border border-blue-200 rounded-3xl p-4 mb-6">
             <h2 className="font-semibold text-blue-900 mb-2">Revision Details</h2>
             <div className="space-y-1 text-sm text-blue-800">
               <p><span className="font-medium">Deliverable:</span> {revisionData.deliverable_title}</p>
@@ -167,7 +167,8 @@ const RevisionPayment = () => {
               Select Payment Method
             </label>
             <div className="space-y-3">
-              <label className="flex items-center p-4 border-2 border-gray-200 rounded-lg cursor-pointer hover:border-primary transition-colors">
+              <label className="flex items-center p-4 border-2 rounded-3xl cursor-pointer hover:border-primary transition-colors"
+                     style={{ borderColor: paymentMethod === 'paynow' ? '#F15A29' : '#e5e7eb' }}>
                 <input
                   type="radio"
                   name="paymentMethod"
@@ -177,12 +178,16 @@ const RevisionPayment = () => {
                   className="h-4 w-4 text-primary focus:ring-primary"
                 />
                 <div className="ml-3 flex-1">
-                  <p className="font-medium text-gray-900">Paynow (Instant)</p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-medium text-gray-900">Paynow (Instant)</p>
+                    <span className="text-xs bg-primary text-white px-2 py-1 rounded-full">Recommended</span>
+                  </div>
                   <p className="text-sm text-gray-500">Pay with Ecocash, Onemoney, or Visa</p>
                 </div>
               </label>
 
-              <label className="flex items-center p-4 border-2 border-gray-200 rounded-lg cursor-pointer hover:border-primary transition-colors">
+              <label className="flex items-center p-4 border-2 rounded-3xl cursor-pointer hover:border-primary transition-colors"
+                     style={{ borderColor: paymentMethod === 'bank_transfer' ? '#F15A29' : '#e5e7eb' }}>
                 <input
                   type="radio"
                   name="paymentMethod"
@@ -201,7 +206,7 @@ const RevisionPayment = () => {
 
           {/* Bank Transfer Instructions */}
           {paymentMethod === 'bank_transfer' && (
-            <div className="mb-6 bg-gray-50 border border-gray-200 rounded-lg p-4">
+            <div className="mb-6 bg-gray-50 border border-gray-200 rounded-3xl p-4">
               <h3 className="font-semibold text-gray-900 mb-3">Bank Transfer Instructions</h3>
               <div className="text-sm text-gray-700 space-y-2">
                 <p><span className="font-medium">Bank:</span> ZB Bank</p>
@@ -219,10 +224,10 @@ const RevisionPayment = () => {
                   type="file"
                   accept="image/*,.pdf"
                   onChange={handleProofUpload}
-                  className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-white hover:file:bg-primary-dark"
+                  className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary file:text-white hover:file:bg-primary-dark"
                 />
                 {proofFile && (
-                  <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded-lg">
+                  <div className="mt-2 p-2 bg-green-50 border border-green-200 rounded-3xl">
                     <p className="text-sm text-green-700">✓ File selected: {proofFile.name}</p>
                     <p className="text-xs text-green-600">Click "Pay" button below to submit</p>
                   </div>
@@ -236,7 +241,7 @@ const RevisionPayment = () => {
             <button
               onClick={handlePayment}
               disabled={processing || (paymentMethod === 'bank_transfer' && !proofFile)}
-              className="flex-1 px-6 py-3 bg-primary hover:bg-primary-dark text-white font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex-1 px-6 py-3 bg-primary hover:bg-primary-dark text-white font-medium rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {processing ? 'Processing...' : `Pay $${revisionData.fee}`}
             </button>
@@ -246,7 +251,7 @@ const RevisionPayment = () => {
                 navigate(`/brand/collaborations/${revisionData.collaboration_id}`);
               }}
               disabled={processing}
-              className="px-6 py-3 border-2 border-gray-300 hover:border-gray-400 text-gray-700 font-medium rounded-lg transition-colors"
+              className="px-6 py-3 border-2 border-gray-300 hover:border-gray-400 text-gray-700 font-medium rounded-full transition-colors"
             >
               Cancel
             </button>
