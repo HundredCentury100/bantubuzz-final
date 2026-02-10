@@ -70,18 +70,30 @@ const CampaignDetails = () => {
   const categories = ['all', ...new Set(availablePackages.map(pkg => pkg.category).filter(Boolean))];
 
   const handleAddPackage = async (packageId) => {
-    try {
-      await campaignsAPI.addPackageToCampaign(id, packageId);
-      toast.success('Package added to campaign');
-      setShowAddPackageModal(false);
-      setSelectedPackage('');
-      setSearchQuery('');
-      setCategoryFilter('all');
-      fetchCampaignData();
-    } catch (error) {
-      console.error('Error adding package:', error);
-      toast.error(error.response?.data?.error || 'Failed to add package');
+    // Find the package details
+    const pkg = availablePackages.find(p => p.id === packageId);
+    if (!pkg) {
+      toast.error('Package not found');
+      return;
     }
+
+    // Store payment context and redirect to payment page
+    localStorage.setItem('payment_context', JSON.stringify({
+      package_id: packageId,
+      campaign_id: id,
+      creator_id: pkg.creator_id || pkg.creator?.id,
+      type: 'campaign_package',
+      amount: pkg.price,
+      payment_category: 'package',
+      booking_type: 'campaign_package'
+    }));
+
+    // Close modal and navigate to payment
+    setShowAddPackageModal(false);
+    setSelectedPackage('');
+    setSearchQuery('');
+    setCategoryFilter('all');
+    navigate(`/brand/campaigns/payment/${id}`);
   };
 
   const handleRemovePackage = async (packageId) => {
