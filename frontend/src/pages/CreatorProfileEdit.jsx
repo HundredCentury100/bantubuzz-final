@@ -5,6 +5,7 @@ import { creatorsAPI, BASE_URL } from '../services/api';
 import { useAuth } from '../hooks/useAuth';
 import Navbar from '../components/Navbar';
 import toast from 'react-hot-toast';
+import { PLATFORMS, ZIMBABWE_LANGUAGES, COUNTRIES } from '../constants/options';
 
 const CATEGORIES = [
   'Fashion & Beauty',
@@ -18,8 +19,6 @@ const CATEGORIES = [
   'Education',
   'Art & Design'
 ];
-
-const LANGUAGES = ['English', 'Shona', 'Ndebele', 'French', 'Portuguese'];
 
 const CreatorProfileEdit = () => {
   const navigate = useNavigate();
@@ -45,6 +44,7 @@ const CreatorProfileEdit = () => {
 
   const selectedCategories = watch('categories') || [];
   const selectedLanguages = watch('languages') || [];
+  const selectedPlatforms = watch('platforms') || [];
 
   useEffect(() => {
     fetchProfile();
@@ -68,10 +68,13 @@ const CreatorProfileEdit = () => {
       setValue('username', data.username || '');
       setValue('bio', data.bio || '');
       setValue('location', data.location || '');
+      setValue('city', data.city || '');
+      setValue('country', data.country || 'ZW');
       setValue('portfolio_url', data.portfolio_url || '');
       setValue('follower_count', data.follower_count || 0);
       setValue('categories', data.categories || []);
       setValue('languages', data.languages || []);
+      setValue('platforms', data.platforms || []);
       setValue('availability_status', data.availability_status || 'available');
       setValue('success_stories', data.success_stories || '');
 
@@ -106,6 +109,14 @@ const CreatorProfileEdit = () => {
       ? current.filter(l => l !== language)
       : [...current, language];
     setValue('languages', updated);
+  };
+
+  const togglePlatform = (platform) => {
+    const current = selectedPlatforms || [];
+    const updated = current.includes(platform)
+      ? current.filter(p => p !== platform)
+      : [...current, platform];
+    setValue('platforms', updated);
   };
 
   const handlePictureUpload = async (e) => {
@@ -216,10 +227,13 @@ const CreatorProfileEdit = () => {
         username: data.username || null,
         bio: data.bio,
         location: data.location,
+        city: data.city,
+        country: data.country,
         portfolio_url: data.portfolio_url,
         follower_count: parseInt(data.follower_count) || 0,
         categories: data.categories || [],
         languages: data.languages || [],
+        platforms: data.platforms || [],
         availability_status: data.availability_status,
         social_links: socialLinks,
         success_stories: data.success_stories,
@@ -479,17 +493,37 @@ const CreatorProfileEdit = () => {
                 )}
               </div>
 
-              {/* Location */}
-              <div className="mb-6">
-                <label className="block text-sm font-medium text-dark mb-2">
-                  Location
-                </label>
-                <input
-                  type="text"
-                  className="input"
-                  placeholder="Harare, Zimbabwe"
-                  {...register('location')}
-                />
+              {/* City and Country */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                {/* City */}
+                <div>
+                  <label className="block text-sm font-medium text-dark mb-2">
+                    City/Town
+                  </label>
+                  <input
+                    type="text"
+                    className="input"
+                    placeholder="Harare"
+                    {...register('city')}
+                  />
+                </div>
+
+                {/* Country */}
+                <div>
+                  <label className="block text-sm font-medium text-dark mb-2">
+                    Country
+                  </label>
+                  <select
+                    className="input"
+                    {...register('country')}
+                  >
+                    {COUNTRIES.map((country) => (
+                      <option key={country.code} value={country.code}>
+                        {country.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
               {/* Portfolio URL */}
@@ -691,19 +725,44 @@ const CreatorProfileEdit = () => {
               </div>
             </div>
 
+            {/* Platforms */}
+            <div className="card">
+              <h2 className="text-xl font-bold text-dark mb-4">Platforms</h2>
+              <p className="text-sm text-gray-600 mb-4">Select platforms you create content on</p>
+
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {PLATFORMS.map((platform) => (
+                  <button
+                    key={platform}
+                    type="button"
+                    onClick={() => togglePlatform(platform)}
+                    className={`
+                      px-4 py-2 rounded-full border-2 text-sm font-medium transition-all
+                      ${selectedPlatforms.includes(platform)
+                        ? 'border-primary bg-primary text-dark'
+                        : 'border-gray-300 bg-white text-gray-700 hover:border-primary'
+                      }
+                    `}
+                  >
+                    {platform}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {/* Languages */}
             <div className="card">
               <h2 className="text-xl font-bold text-dark mb-4">Languages</h2>
               <p className="text-sm text-gray-600 mb-4">Select languages you create content in</p>
 
-              <div className="flex flex-wrap gap-3">
-                {LANGUAGES.map((language) => (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                {ZIMBABWE_LANGUAGES.map((language) => (
                   <button
                     key={language}
                     type="button"
                     onClick={() => toggleLanguage(language)}
                     className={`
-                      px-4 py-2 rounded-lg border-2 text-sm font-medium transition-all
+                      px-4 py-2 rounded-full border-2 text-sm font-medium transition-all
                       ${selectedLanguages.includes(language)
                         ? 'border-primary bg-primary text-dark'
                         : 'border-gray-300 bg-white text-gray-700 hover:border-primary'

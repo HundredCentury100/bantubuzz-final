@@ -8,6 +8,7 @@ import toast from 'react-hot-toast';
 import Avatar from '../components/Avatar';
 import SEO from '../components/SEO';
 import { Search, Filter, X } from 'lucide-react';
+import { ZIMBABWE_LANGUAGES } from '../constants/options';
 
 const BrowseCreators = () => {
   const navigate = useNavigate();
@@ -275,8 +276,9 @@ const BrowseCreators = () => {
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                 >
                   <option value="">All Languages</option>
-                  <option value="English">English</option>
-                  <option value="Shona">Shona</option>
+                  {ZIMBABWE_LANGUAGES.map((language) => (
+                    <option key={language} value={language}>{language}</option>
+                  ))}
                 </select>
               </div>
 
@@ -418,8 +420,9 @@ const BrowseCreators = () => {
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                     >
                       <option value="">All Languages</option>
-                      <option value="English">English</option>
-                      <option value="Shona">Shona</option>
+                      {ZIMBABWE_LANGUAGES.map((language) => (
+                        <option key={language} value={language}>{language}</option>
+                      ))}
                     </select>
                   </div>
 
