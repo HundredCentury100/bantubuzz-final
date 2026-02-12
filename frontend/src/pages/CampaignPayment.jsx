@@ -187,10 +187,7 @@ const CampaignPayment = () => {
                 className="mt-1"
               />
               <div className="ml-3 flex-1">
-                <div className="flex items-center gap-2">
-                  <span className="font-semibold text-gray-900">Paynow</span>
-                  <span className="text-xs bg-primary text-white px-2 py-1 rounded-full">Recommended</span>
-                </div>
+                <span className="font-semibold text-gray-900">Paynow</span>
                 <p className="text-sm text-gray-600 mt-1">
                   Pay instantly with Ecocash or Onemoney. You'll be redirected to complete the payment.
                 </p>

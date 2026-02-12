@@ -114,8 +114,15 @@ const RevisionPayment = () => {
         );
 
         if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || 'Upload failed');
+          let errorMessage = 'Upload failed';
+          try {
+            const errorData = await response.json();
+            errorMessage = errorData.error || errorMessage;
+          } catch (e) {
+            // If response isn't JSON, use status text
+            errorMessage = `Upload failed: ${response.statusText || response.status}`;
+          }
+          throw new Error(errorMessage);
         }
 
         // Clear localStorage
@@ -178,10 +185,7 @@ const RevisionPayment = () => {
                   className="h-4 w-4 text-primary focus:ring-primary"
                 />
                 <div className="ml-3 flex-1">
-                  <div className="flex items-center gap-2">
-                    <p className="font-medium text-gray-900">Paynow (Instant)</p>
-                    <span className="text-xs bg-primary text-white px-2 py-1 rounded-full">Recommended</span>
-                  </div>
+                  <p className="font-medium text-gray-900">Paynow (Instant)</p>
                   <p className="text-sm text-gray-500">Pay with Ecocash, Onemoney, or Visa</p>
                 </div>
               </label>
