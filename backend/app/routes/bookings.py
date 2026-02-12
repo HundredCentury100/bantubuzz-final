@@ -359,6 +359,7 @@ def upload_proof_of_payment(booking_id):
         db.session.commit()
 
         return jsonify({
+            'success': True,
             'message': 'Proof of payment uploaded successfully',
             'filename': filename,
             'status': 'Pending admin verification'
