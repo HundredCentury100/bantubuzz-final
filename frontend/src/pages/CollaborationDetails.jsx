@@ -3,6 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { collaborationsAPI } from '../services/api';
 import { useAuth } from '../hooks/useAuth';
 import { useMessaging } from '../contexts/MessagingContext';
+import useAutoRefresh from '../hooks/useAutoRefresh';
 import Navbar from '../components/Navbar';
 import Avatar from '../components/Avatar';
 import toast from 'react-hot-toast';
@@ -35,6 +36,13 @@ const CollaborationDetails = () => {
   useEffect(() => {
     fetchCollaboration();
   }, [id]);
+
+  // Auto-refresh collaboration data every 30 seconds (fallback for when WebSocket is not connected)
+  useAutoRefresh(() => {
+    if (!loading) {
+      fetchCollaboration();
+    }
+  }, 30000, !!collaboration); // Only enable when collaboration is loaded
 
   // Real-time updates via Socket.IO
   useEffect(() => {
