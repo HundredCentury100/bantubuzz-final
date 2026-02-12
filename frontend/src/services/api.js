@@ -318,4 +318,23 @@ export const milestonesAPI = {
     api.post(`/collaborations/${collaborationId}/milestones/${milestoneNumber}/request-revision`, data),
 };
 
+// Custom Packages API
+export const customPackagesAPI = {
+  // Brand endpoints
+  createRequest: (data) => api.post('/custom-packages/requests', data),
+  getMyRequests: () => api.get('/custom-packages/requests/my-requests'),
+  acceptOffer: (offerId) => api.post(`/custom-packages/offers/${offerId}/accept`),
+  declineOffer: (offerId, data) => api.post(`/custom-packages/offers/${offerId}/decline`, data),
+  getBrandOffers: (brandId) => api.get(`/custom-packages/offers/brand/${brandId}`),
+
+  // Creator endpoints
+  getReceivedRequests: () => api.get('/custom-packages/requests/received'),
+  createOffer: (data) => api.post('/custom-packages/offers', data),
+  getMyOffers: () => api.get('/custom-packages/offers/my-offers'),
+
+  // Shared endpoints
+  getRequest: (requestId) => api.get(`/custom-packages/requests/${requestId}`),
+  getOffer: (offerId) => api.get(`/custom-packages/offers/${offerId}`),
+};
+
 export default api;

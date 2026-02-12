@@ -7,6 +7,7 @@ import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import ReviewCard from '../components/ReviewCard';
 import CreatorBadge from '../components/CreatorBadge';
+import CustomPackageRequestModal from '../components/CustomPackageRequestModal';
 import SEO from '../components/SEO';
 import toast from 'react-hot-toast';
 
@@ -23,6 +24,7 @@ const CreatorProfile = () => {
   const [reviewsLoading, setReviewsLoading] = useState(true);
   const [isSaved, setIsSaved] = useState(false);
   const [selectedImage, setSelectedImage] = useState(null);
+  const [showCustomRequestModal, setShowCustomRequestModal] = useState(false);
 
   useEffect(() => {
     fetchCreatorData();
@@ -509,6 +511,32 @@ const CreatorProfile = () => {
               ))}
             </div>
           )}
+
+          {/* Custom Package Request Option */}
+          {user?.user_type === 'brand' && (
+            <div className="mt-8 p-6 border-2 border-dashed border-primary rounded-lg text-center bg-primary/5">
+              <div className="max-w-2xl mx-auto">
+                <svg className="w-12 h-12 text-primary mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+                </svg>
+                <h3 className="text-xl font-bold text-dark mb-2">
+                  Need a Custom Package?
+                </h3>
+                <p className="text-gray-600 mb-4">
+                  Don't see what you're looking for? Tell {creator.display_name || creator.username} what you need, and they'll create a custom offer tailored just for you.
+                </p>
+                <button
+                  onClick={() => setShowCustomRequestModal(true)}
+                  className="btn btn-primary inline-flex items-center gap-2"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                  </svg>
+                  Request Custom Package
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Gallery Section */}
@@ -698,6 +726,18 @@ const CreatorProfile = () => {
       </div>
 
       <Footer />
+
+      {/* Custom Package Request Modal */}
+      {showCustomRequestModal && (
+        <CustomPackageRequestModal
+          creatorId={creator.id}
+          creatorName={creator.display_name || creator.username}
+          onClose={() => setShowCustomRequestModal(false)}
+          onSuccess={() => {
+            toast.success('Your custom package request has been sent! The creator will respond with an offer.');
+          }}
+        />
+      )}
     </div>
   );
 };

@@ -15,6 +15,8 @@ from .category import Category, Niche
 from .wallet import Wallet, WalletTransaction
 from .payment import Payment, PaymentVerification
 from .cashout import CashoutRequest
+from .custom_package_request import CustomPackageRequest
+from .custom_package_offer import CustomPackageOffer
 
 __all__ = [
     'User',
@@ -37,5 +39,7 @@ __all__ = [
     'WalletTransaction',
     'Payment',
     'PaymentVerification',
-    'CashoutRequest'
+    'CashoutRequest',
+    'CustomPackageRequest',
+    'CustomPackageOffer'
 ]
