@@ -37,6 +37,11 @@ const Payment = () => {
         if (storedPayment) {
           console.log('Payment data from localStorage:', storedPayment); // Debug log
           setPaymentData(JSON.parse(storedPayment));
+        } else {
+          // No payment data found, initiate payment if PayNow is selected and payment not complete
+          if (response.data.payment_status !== 'paid' && paymentMethod === 'paynow') {
+            await initiatePayment();
+          }
         }
       }
     } catch (error) {
@@ -44,6 +49,33 @@ const Payment = () => {
       toast.error('Failed to load booking details');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const initiatePayment = async () => {
+    try {
+      setPaymentLoading(true);
+      const response = await bookingsAPI.initiatePayment(id);
+
+      if (response.data.success) {
+        const paymentInfo = {
+          redirect_url: response.data.redirect_url,
+          payment_url: response.data.payment_url,
+          poll_url: response.data.poll_url,
+          payment_reference: response.data.payment_reference
+        };
+
+        setPaymentData(paymentInfo);
+        // Store in localStorage for persistence
+        localStorage.setItem(`payment_${id}`, JSON.stringify(paymentInfo));
+      } else {
+        toast.error(response.data.message || 'Failed to initialize payment');
+      }
+    } catch (error) {
+      console.error('Error initiating payment:', error);
+      toast.error(error.response?.data?.message || error.response?.data?.error || 'Failed to initialize payment');
+    } finally {
+      setPaymentLoading(false);
     }
   };
 

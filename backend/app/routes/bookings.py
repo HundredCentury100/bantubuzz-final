@@ -224,6 +224,56 @@ def update_booking_status(booking_id):
         return jsonify({'error': str(e)}), 500
 
 
+@bp.route('/<int:booking_id>/initiate-payment', methods=['POST'])
+@jwt_required()
+def initiate_booking_payment(booking_id):
+    """Initiate Paynow payment for a booking"""
+    try:
+        user_id = int(get_jwt_identity())
+        user = User.query.get(user_id)
+        booking = Booking.query.get(booking_id)
+
+        if not booking:
+            return jsonify({'error': 'Booking not found'}), 404
+
+        # Check if user is authorized (brand who made the booking)
+        brand = BrandProfile.query.filter_by(user_id=user_id).first()
+        if not brand or booking.brand_id != brand.id:
+            return jsonify({'error': 'Unauthorized'}), 403
+
+        # Check if payment already exists
+        if booking.payment_status == 'paid':
+            return jsonify({'error': 'Booking already paid'}), 400
+
+        # Get package title for payment description
+        package = Package.query.get(booking.package_id)
+        package_title = package.title if package else f'Booking {booking_id}'
+
+        # Initiate payment
+        payment_result = initiate_payment(booking, user.email, package_title)
+
+        if payment_result['success']:
+            return jsonify({
+                'success': True,
+                'payment_url': payment_result['redirect_url'],
+                'redirect_url': payment_result['redirect_url'],
+                'poll_url': payment_result['poll_url'],
+                'payment_reference': payment_result.get('payment_reference')
+            }), 200
+        else:
+            return jsonify({
+                'success': False,
+                'error': payment_result.get('error', 'Payment initiation failed'),
+                'message': payment_result.get('message', 'Unknown error')
+            }), 400
+
+    except Exception as e:
+        import traceback
+        error_trace = traceback.format_exc()
+        print(f"Error initiating payment: {error_trace}")
+        return jsonify({'error': str(e)}), 500
+
+
 @bp.route('/<int:booking_id>/payment-status', methods=['GET'])
 @jwt_required()
 def get_payment_status(booking_id):

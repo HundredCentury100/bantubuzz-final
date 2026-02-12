@@ -171,6 +171,7 @@ export const bookingsAPI = {
   createBooking: (data) => api.post('/bookings', data),
   updateBookingStatus: (id, status) => api.put(`/bookings/${id}/status`, { status }),
   getPaymentStatus: (id) => api.get(`/bookings/${id}/payment-status`),
+  initiatePayment: (bookingId) => api.post(`/bookings/${bookingId}/initiate-payment`),
 
   // Proof of Payment
   uploadProofOfPayment: (bookingId, formData) =>
