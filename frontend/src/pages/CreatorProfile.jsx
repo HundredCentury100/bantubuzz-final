@@ -167,7 +167,7 @@ const CreatorProfile = () => {
         {/* Navigation */}
         <div className="mb-6 flex items-center gap-4">
           <Link
-            to={user?.user_type === 'brand' ? '/browse/creators' : '/creators'}
+            to="/browse/creators"
             className="text-gray-600 hover:text-gray-900 flex items-center gap-2"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -207,18 +207,48 @@ const CreatorProfile = () => {
 
             {/* Creator Info */}
             <div className="flex-1">
-              <div className="flex items-start justify-between mb-4">
-                <div>
+              <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-4">
+                <div className="flex-1">
                   <h1 className="text-3xl font-bold text-dark mb-2">
                     {creator.display_name || creator.username || 'Creator'}
                   </h1>
 
                   {/* Badges */}
                   {creator.badges && creator.badges.length > 0 && (
-                    <div className="flex flex-wrap gap-2 mb-3">
-                      {creator.badges.map((badge, idx) => (
-                        <CreatorBadge key={idx} badge={badge} size="md" />
-                      ))}
+                    <div className="mb-3">
+                      <div className="flex flex-wrap gap-2 mb-2">
+                        {creator.badges.map((badge, idx) => (
+                          <CreatorBadge key={idx} badge={badge} size="md" />
+                        ))}
+                      </div>
+
+                      {/* Badge Explanations - Mobile Responsive */}
+                      <div className="mt-2 space-y-2">
+                        {creator.badges.includes('top_creator') && (
+                          <div className="flex items-start gap-2 text-xs sm:text-sm text-gray-600">
+                            <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-primary mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                            </svg>
+                            <span className="leading-snug"><strong className="font-semibold">Top Creator:</strong> 5+ collaborations in last 30 days with high ratings</span>
+                          </div>
+                        )}
+                        {creator.badges.includes('responds_fast') && (
+                          <div className="flex items-start gap-2 text-xs sm:text-sm text-gray-600">
+                            <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-green-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                            </svg>
+                            <span className="leading-snug"><strong className="font-semibold">Responds Fast:</strong> Typically replies within 2 hours</span>
+                          </div>
+                        )}
+                        {creator.badges.includes('verified_creator') && (
+                          <div className="flex items-start gap-2 text-xs sm:text-sm text-gray-600">
+                            <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                            </svg>
+                            <span className="leading-snug"><strong className="font-semibold">Verified Creator:</strong> Identity verified by BantuBuzz</span>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   )}
 
@@ -231,13 +261,13 @@ const CreatorProfile = () => {
                   </p>
                 </div>
 
-                {/* Actions */}
+                {/* Actions - Desktop: Side by side on right, Mobile: Stacked below badges */}
                 {user?.user_type === 'brand' && (
-                  <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                  <div className="flex flex-col gap-3 w-full md:w-auto md:flex-row md:gap-2 md:flex-shrink-0">
                     <Link
                       to="/messages"
                       state={{ startConversationWith: { id: creator.user_id, email: creator.user?.email } }}
-                      className="px-6 py-3 rounded-full border border-primary bg-primary text-white hover:bg-primary/90 transition-colors flex items-center justify-center gap-2 whitespace-nowrap font-medium"
+                      className="px-6 py-3 rounded-full border border-primary bg-primary text-white hover:bg-primary/90 transition-colors flex items-center justify-center gap-2 whitespace-nowrap font-medium w-full md:w-auto"
                     >
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
@@ -246,7 +276,7 @@ const CreatorProfile = () => {
                     </Link>
                     <button
                       onClick={handleSaveCreator}
-                      className={`px-6 py-3 rounded-full border transition-colors flex items-center justify-center gap-2 whitespace-nowrap font-medium ${
+                      className={`px-6 py-3 rounded-full border transition-colors flex items-center justify-center gap-2 whitespace-nowrap font-medium w-full md:w-auto ${
                         isSaved
                           ? 'bg-primary text-white border-primary'
                           : 'bg-white text-gray-600 border-gray-300 hover:border-primary hover:text-primary'

@@ -111,8 +111,11 @@ def get_creators():
         query = CreatorProfile.query.join(User).filter(User.is_active == True)
 
         # Apply filters
+        # For JSON array fields in PostgreSQL, we need to use the @> operator
+        # SQLAlchemy provides this through the op() method
         if category:
-            query = query.filter(CreatorProfile.categories.contains([category]))
+            # Check if the JSON array contains the category
+            query = query.filter(func.cast(CreatorProfile.categories, db.Text).contains(category))
 
         if location:
             query = query.filter(CreatorProfile.location.ilike(f'%{location}%'))
@@ -125,13 +128,14 @@ def get_creators():
 
         # Platform filter - now uses platforms array
         if platform:
-            query = query.filter(CreatorProfile.platforms.contains([platform]))
+            # Check if the JSON array contains the platform
+            query = query.filter(func.cast(CreatorProfile.platforms, db.Text).contains(platform))
 
         # Languages filter
         if languages:
             # Filter creators who have at least one of the selected languages
             query = query.filter(
-                or_(*[CreatorProfile.languages.contains([lang]) for lang in languages])
+                or_(*[func.cast(CreatorProfile.languages, db.Text).contains(lang) for lang in languages])
             )
 
         # Follower range filter
@@ -188,10 +192,10 @@ def get_creators():
             if max_followers:
                 query = query.filter(CreatorProfile.follower_count <= max_followers)
             if platform:
-                query = query.filter(CreatorProfile.platforms.contains([platform]))
+                query = query.filter(func.cast(CreatorProfile.platforms, db.Text).contains(platform))
             if languages:
                 query = query.filter(
-                    or_(*[CreatorProfile.languages.contains([lang]) for lang in languages])
+                    or_(*[func.cast(CreatorProfile.languages, db.Text).contains(lang) for lang in languages])
                 )
             if follower_range:
                 follower_ranges = {

@@ -442,7 +442,7 @@ const CreateBrief = () => {
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Target Locations
                   </label>
-                  <div className="flex gap-2 mb-2">
+                  <div className="flex flex-col sm:flex-row gap-2 mb-2">
                     <input
                       type="text"
                       value={locationInput}
@@ -454,7 +454,7 @@ const CreateBrief = () => {
                     <button
                       type="button"
                       onClick={addLocation}
-                      className="btn btn-primary"
+                      className="btn btn-primary w-full sm:w-auto"
                     >
                       Add
                     </button>
@@ -575,7 +575,7 @@ const CreateBrief = () => {
                         </div>
                         <div className="space-y-2">
                           {milestone.expected_deliverables.map((deliverable, dIndex) => (
-                            <div key={dIndex} className="flex gap-2">
+                            <div key={dIndex} className="flex flex-col sm:flex-row gap-2">
                               <input
                                 type="text"
                                 value={deliverable}
@@ -588,7 +588,7 @@ const CreateBrief = () => {
                                 <button
                                   type="button"
                                   onClick={() => removeDeliverable(index, dIndex)}
-                                  className="text-error hover:text-error/80"
+                                  className="text-error hover:text-error/80 text-sm px-3 py-2 w-full sm:w-auto border border-error/30 rounded-lg hover:bg-error/10 transition-colors"
                                 >
                                   Remove
                                 </button>
