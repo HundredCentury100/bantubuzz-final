@@ -24,6 +24,7 @@ const Messages = () => {
   const [selectedConversation, setSelectedConversation] = useState(null);
   const [messageText, setMessageText] = useState('');
   const [loading, setLoading] = useState(true);
+  const [showMobileChat, setShowMobileChat] = useState(false); // Mobile chat view state
   const messagesEndRef = useRef(null);
   const typingTimeoutRef = useRef(null);
 
@@ -114,6 +115,7 @@ const Messages = () => {
   const loadConversation = async (conversation) => {
     try {
       setSelectedConversation(conversation);
+      setShowMobileChat(true); // Show chat view on mobile
       const response = await messagingService.getConversation(conversation.id);
       loadConversationMessages(conversation.id, response.data.messages || []);
     } catch (error) {
@@ -121,6 +123,7 @@ const Messages = () => {
 
       // Still set the conversation so user can see the UI, just with empty messages
       setSelectedConversation(conversation);
+      setShowMobileChat(true); // Show chat view on mobile
       loadConversationMessages(conversation.id, []);
 
       // Check if it's a network error
@@ -130,6 +133,11 @@ const Messages = () => {
         toast.error('Unable to load messages for this conversation.');
       }
     }
+  };
+
+  const handleBackToConversations = () => {
+    setShowMobileChat(false);
+    setSelectedConversation(null);
   };
 
   const handleSendMessage = (e) => {
@@ -203,7 +211,8 @@ const Messages = () => {
     <div className="min-h-screen bg-light">
       <Navbar />
       <div className="container-custom section-padding">
-        <h1 className="text-4xl font-bold mb-8">Messages</h1>
+        {/* Hide title on mobile when chat is open */}
+        <h1 className={`text-4xl font-bold mb-8 ${showMobileChat ? 'hidden lg:block' : 'block'}`}>Messages</h1>
 
         {!isConnected && conversations.length > 0 && (
           <div className="bg-primary/20 border border-primary text-primary-dark px-4 py-3 rounded-lg mb-6 flex items-center gap-2">
@@ -213,8 +222,8 @@ const Messages = () => {
         )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-250px)]">
-          {/* Conversations List */}
-          <div className="lg:col-span-1 bg-white rounded-lg shadow-md overflow-hidden">
+          {/* Conversations List - Hidden on mobile when chat is open */}
+          <div className={`lg:col-span-1 bg-white rounded-lg shadow-md overflow-hidden ${showMobileChat ? 'hidden lg:block' : 'block'}`}>
             <div className="p-4 border-b border-gray-200">
               <h2 className="text-xl font-semibold">Conversations</h2>
             </div>
@@ -277,13 +286,22 @@ const Messages = () => {
             </div>
           </div>
 
-          {/* Message Thread */}
-          <div className="lg:col-span-2 bg-white rounded-lg shadow-md overflow-hidden flex flex-col">
+          {/* Message Thread - Full screen on mobile when chat is open */}
+          <div className={`lg:col-span-2 bg-white rounded-lg shadow-md overflow-hidden flex flex-col ${!showMobileChat && !selectedConversation ? 'hidden lg:flex' : 'block lg:flex'}`}>
             {selectedConversation ? (
               <>
                 {/* Conversation Header */}
                 <div className="p-4 border-b border-gray-200 bg-light">
                   <div className="flex items-center space-x-3">
+                    {/* Back button - Only visible on mobile */}
+                    <button
+                      onClick={handleBackToConversations}
+                      className="lg:hidden text-gray-600 hover:text-gray-900 mr-2"
+                    >
+                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                      </svg>
+                    </button>
                     <div className="relative">
                       {selectedConversation.profile_picture ? (
                         <img
