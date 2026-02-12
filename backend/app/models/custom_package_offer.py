@@ -8,6 +8,7 @@ class CustomPackageOffer(db.Model):
     request_id = db.Column(db.Integer, db.ForeignKey('custom_package_requests.id'), nullable=False)
     creator_id = db.Column(db.Integer, db.ForeignKey('creator_profiles.id'), nullable=False)
     brand_id = db.Column(db.Integer, db.ForeignKey('brand_profiles.id'), nullable=False)
+    booking_id = db.Column(db.Integer, db.ForeignKey('bookings.id'), nullable=True)  # Set when offer is accepted
 
     title = db.Column(db.String(255), nullable=False)
     description = db.Column(db.Text, nullable=False)
@@ -37,6 +38,7 @@ class CustomPackageOffer(db.Model):
             'request_id': self.request_id,
             'creator_id': self.creator_id,
             'brand_id': self.brand_id,
+            'booking_id': self.booking_id,
             'creator': {
                 'id': self.creator.id,
                 'username': self.creator.username,

@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from app import db
-from app.models import CustomPackageRequest, CustomPackageOffer, BrandProfile, CreatorProfile, User
+from app.models import CustomPackageRequest, CustomPackageOffer, BrandProfile, CreatorProfile, User, Booking
 from datetime import datetime
 
 bp = Blueprint('custom_packages', __name__, url_prefix='/api/custom-packages')
@@ -132,12 +132,35 @@ def accept_offer(offer_id):
         # Update request status
         offer.request.status = 'accepted'
 
+        # Create booking from custom offer
+        booking = Booking(
+            package_id=None,  # No package for custom offers
+            campaign_id=None,
+            creator_id=offer.creator_id,
+            brand_id=offer.brand_id,
+            status='pending',  # Will be 'accepted' after payment
+            amount=float(offer.price),
+            total_price=float(offer.price),
+            payment_status='pending',
+            payment_method=None,  # Will be set on payment page
+            booking_type='custom_package',
+            payment_category='custom_package',
+            notes=f"Custom Package: {offer.title}\n\nDeliverables:\n" + "\n".join([f"- {d}" for d in offer.deliverables])
+        )
+
+        db.session.add(booking)
+        db.session.flush()  # Get booking ID
+
+        # Store booking_id in offer for reference
+        offer.booking_id = booking.id
+
         db.session.commit()
 
         return jsonify({
             'success': True,
             'message': 'Offer accepted successfully',
-            'offer': offer.to_dict()
+            'offer': offer.to_dict(),
+            'booking': booking.to_dict()
         }), 200
 
     except Exception as e:

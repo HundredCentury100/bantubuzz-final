@@ -19,15 +19,21 @@ const CustomPackageOfferCard = ({ offer, onUpdate }) => {
       const response = await customPackagesAPI.acceptOffer(offer.id);
 
       if (response.data.success) {
-        toast.success('Offer accepted! Proceeding to payment...');
+        toast.success('Offer accepted! Redirecting to payment...');
         onUpdate && onUpdate();
 
-        // Navigate to payment page with custom offer
-        // TODO: Create booking from custom offer and redirect to payment
-        // For now, just show success
-        setTimeout(() => {
-          navigate('/brand/dashboard');
-        }, 1500);
+        // Redirect to payment page with the booking ID
+        const bookingId = response.data.booking?.id;
+        if (bookingId) {
+          setTimeout(() => {
+            navigate(`/payment/${bookingId}`);
+          }, 1000);
+        } else {
+          toast.error('Booking created but ID not found');
+          setTimeout(() => {
+            navigate('/brand/dashboard');
+          }, 1500);
+        }
       }
     } catch (error) {
       console.error('Error accepting offer:', error);
