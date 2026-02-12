@@ -30,7 +30,7 @@ class CustomPackageRequest(db.Model):
             'brand': {
                 'id': self.brand.id,
                 'company_name': self.brand.company_name,
-                'profile_picture': self.brand.profile_picture,
+                'logo': self.brand.logo,
                 'user_id': self.brand.user_id
             } if self.brand else None,
             'creator': {
