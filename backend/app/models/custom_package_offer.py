@@ -42,7 +42,6 @@ class CustomPackageOffer(db.Model):
             'creator': {
                 'id': self.creator.id,
                 'username': self.creator.username,
-                'display_name': self.creator.display_name,
                 'profile_picture': self.creator.profile_picture,
                 'user_id': self.creator.user_id
             } if self.creator else None,
