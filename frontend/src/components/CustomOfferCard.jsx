@@ -94,9 +94,8 @@ const CustomOfferCard = ({ message, isOwnMessage, currentUserId }) => {
     return null;
   }
 
-  // Check if brand can accept/decline (they're the receiver and offer is pending)
-  const isBrand = offerData.brand_id && message.receiver_id === currentUserId;
-  const canInteract = isBrand && offerData.status === 'pending';
+  // Show buttons for receiver when pending (simple WhatsApp approach)
+  const canInteract = !isOwnMessage && offerData.status === 'pending';
 
   return (
     <>
@@ -177,22 +176,22 @@ const CustomOfferCard = ({ message, isOwnMessage, currentUserId }) => {
                 </span>
               </div>
 
-              {/* Action Buttons - Only show for brand when offer is pending */}
+              {/* Action Buttons - Show for receiver when pending */}
               {canInteract && (
-                <div className="flex flex-col sm:flex-row gap-2">
+                <div className="flex flex-col sm:flex-row gap-3">
                   <button
                     onClick={handleAccept}
                     disabled={actionLoading}
-                    className="flex-1 btn btn-primary py-2.5 disabled:opacity-50"
+                    className="flex-1 bg-success hover:bg-success/90 text-white font-bold py-3 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {actionLoading ? 'Processing...' : 'Accept & Pay'}
+                    {actionLoading ? '⏳ Processing...' : '✅ Accept & Pay'}
                   </button>
                   <button
                     onClick={() => setShowDeclineModal(true)}
                     disabled={actionLoading}
-                    className="flex-1 px-4 py-2.5 border-2 border-error text-error rounded-lg hover:bg-error/10 transition-colors font-medium disabled:opacity-50"
+                    className="flex-1 bg-error hover:bg-error/90 text-white font-bold py-3 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    Decline
+                    ❌ Decline
                   </button>
                 </div>
               )}

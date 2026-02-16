@@ -105,14 +105,14 @@ const CustomRequestCard = ({ message, isOwnMessage, currentUserId }) => {
             </span>
           </div>
 
-          {/* Create Offer Button - Only show for creator when request is pending */}
-          {!isOwnMessage && requestData.status === 'pending' && message.receiver_id === currentUserId && (
+          {/* Create Offer Button - Show for creator (not sender) when pending */}
+          {!isOwnMessage && requestData.status === 'pending' && (
             <div className="border-t pt-3 mt-3">
               <button
                 onClick={() => setShowOfferModal(true)}
-                className="w-full btn btn-primary py-2.5"
+                className="w-full bg-success hover:bg-success/90 text-white font-medium py-3 rounded-lg transition-colors"
               >
-                Create Custom Offer
+                💼 Create Custom Offer
               </button>
             </div>
           )}
