@@ -4,8 +4,7 @@ import { useMessaging } from '../contexts/MessagingContext';
 import messagingService from '../services/messagingAPI';
 import Navbar from '../components/Navbar';
 import Avatar from '../components/Avatar';
-import CustomRequestCard from '../components/CustomRequestCard';
-import CustomOfferCard from '../components/CustomOfferCard';
+import CustomPackageMessage from '../components/CustomPackageMessage';
 import { BASE_URL } from '../services/api';
 import toast from 'react-hot-toast';
 
@@ -344,42 +343,15 @@ const Messages = () => {
                     conversationMessages.map((message, index) => {
                       const isOwnMessage = message.sender_id === currentUserId;
 
-                      // Render greeting message with dark navy background
-                      if (message.message_type === 'greeting') {
+                      // Render custom package (request or offer) - navy blue unified card
+                      if (message.message_type === 'custom_request' || message.message_type === 'custom_offer') {
                         return (
-                          <div key={message.id || index} className="my-4">
-                            <div className="bg-[#1F2937] text-white rounded-lg px-6 py-4 shadow-lg max-w-[85%] mx-auto">
-                              <p className="text-center whitespace-pre-wrap leading-relaxed">
-                                {message.content}
-                              </p>
-                            </div>
-                          </div>
-                        );
-                      }
-
-                      // Render custom package request card
-                      if (message.message_type === 'custom_request') {
-                        return (
-                          <div key={message.id || index} className="my-4">
-                            <CustomRequestCard
-                              message={message}
-                              isOwnMessage={isOwnMessage}
-                              currentUserId={currentUserId}
-                            />
-                          </div>
-                        );
-                      }
-
-                      // Render custom package offer card
-                      if (message.message_type === 'custom_offer') {
-                        return (
-                          <div key={message.id || index} className="my-4">
-                            <CustomOfferCard
-                              message={message}
-                              isOwnMessage={isOwnMessage}
-                              currentUserId={currentUserId}
-                            />
-                          </div>
+                          <CustomPackageMessage
+                            key={message.id || index}
+                            message={message}
+                            isOwnMessage={isOwnMessage}
+                            currentUserId={currentUserId}
+                          />
                         );
                       }
 
