@@ -734,7 +734,7 @@ const CreatorProfile = () => {
           creatorName={creator.display_name || creator.username}
           onClose={() => setShowCustomRequestModal(false)}
           onSuccess={() => {
-            toast.success('Your custom package request has been sent! The creator will respond with an offer.');
+            toast.success('Your custom package request has been sent! Check your notifications for the creator\'s response.');
           }}
         />
       )}
