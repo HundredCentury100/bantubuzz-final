@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from app import db
-from app.models import CustomPackageRequest, CustomPackageOffer, BrandProfile, CreatorProfile, User, Booking
+from app.models import CustomPackageRequest, CustomPackageOffer, BrandProfile, CreatorProfile, User, Booking, Notification
 from datetime import datetime
 
 bp = Blueprint('custom_packages', __name__, url_prefix='/api/custom-packages')
@@ -57,10 +57,19 @@ def create_custom_request():
         )
 
         db.session.add(custom_request)
-        db.session.commit()
+        db.session.flush()  # Get request ID
 
-        # TODO: Send message notification to creator
-        # This will be handled in the messaging service
+        # Create notification for creator
+        notification = Notification(
+            user_id=creator.user_id,
+            type='custom_package_request',
+            title='New Custom Package Request',
+            message=f'{brand.company_name} has requested a custom package from you. Budget: ${budget}',
+            action_url=f'/creator/custom-requests/{custom_request.id}'
+        )
+        db.session.add(notification)
+
+        db.session.commit()
 
         return jsonify({
             'success': True,
@@ -154,6 +163,17 @@ def accept_offer(offer_id):
         # Store booking_id in offer for reference
         offer.booking_id = booking.id
 
+        # Create notification for creator
+        creator = CreatorProfile.query.get(offer.creator_id)
+        notification = Notification(
+            user_id=creator.user_id,
+            type='custom_package_accepted',
+            title='Custom Package Offer Accepted!',
+            message=f'{brand.company_name} has accepted your custom package offer for ${offer.price}. Waiting for payment.',
+            action_url=f'/creator/bookings/{booking.id}'
+        )
+        db.session.add(notification)
+
         db.session.commit()
 
         return jsonify({
@@ -200,6 +220,18 @@ def decline_offer(offer_id):
 
         # Update request back to pending so creator can send another offer
         offer.request.status = 'pending'
+
+        # Create notification for creator
+        creator = CreatorProfile.query.get(offer.creator_id)
+        reason_text = f' Reason: {reason}' if reason else ''
+        notification = Notification(
+            user_id=creator.user_id,
+            type='custom_package_declined',
+            title='Custom Package Offer Declined',
+            message=f'{brand.company_name} has declined your custom package offer.{reason_text}',
+            action_url=f'/creator/custom-requests/{offer.request_id}'
+        )
+        db.session.add(notification)
 
         db.session.commit()
 
@@ -309,14 +341,22 @@ def create_custom_offer():
         )
 
         db.session.add(offer)
+        db.session.flush()  # Get offer ID
 
         # Update request status
         custom_request.status = 'offer_sent'
 
-        db.session.commit()
+        # Create notification for brand
+        notification = Notification(
+            user_id=custom_request.brand.user_id,
+            type='custom_package_offer',
+            title='New Custom Package Offer',
+            message=f'{creator.username} has sent you a custom package offer: {title}. Price: ${price}',
+            action_url=f'/brand/custom-offers/{offer.id}'
+        )
+        db.session.add(notification)
 
-        # TODO: Send message notification to brand
-        # This will be handled in the messaging service
+        db.session.commit()
 
         return jsonify({
             'success': True,
