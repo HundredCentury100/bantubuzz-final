@@ -4,6 +4,8 @@ import { useMessaging } from '../contexts/MessagingContext';
 import messagingService from '../services/messagingAPI';
 import Navbar from '../components/Navbar';
 import Avatar from '../components/Avatar';
+import CustomRequestCard from '../components/CustomRequestCard';
+import CustomOfferCard from '../components/CustomOfferCard';
 import { BASE_URL } from '../services/api';
 import toast from 'react-hot-toast';
 
@@ -341,6 +343,30 @@ const Messages = () => {
                   ) : (
                     conversationMessages.map((message, index) => {
                       const isOwnMessage = message.sender_id === currentUserId;
+
+                      // Render custom package request card
+                      if (message.message_type === 'custom_request') {
+                        return (
+                          <div key={message.id || index} className="my-4">
+                            <CustomRequestCard message={message} isOwnMessage={isOwnMessage} />
+                          </div>
+                        );
+                      }
+
+                      // Render custom package offer card
+                      if (message.message_type === 'custom_offer') {
+                        return (
+                          <div key={message.id || index} className="my-4">
+                            <CustomOfferCard
+                              message={message}
+                              isOwnMessage={isOwnMessage}
+                              currentUserId={currentUserId}
+                            />
+                          </div>
+                        );
+                      }
+
+                      // Render regular text message
                       return (
                         <div
                           key={message.id || index}
