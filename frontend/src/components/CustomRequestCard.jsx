@@ -1,9 +1,11 @@
 import { useState, useEffect } from 'react';
 import { customPackagesAPI } from '../services/api';
+import CustomOfferModal from './CustomOfferModal';
 
-const CustomRequestCard = ({ message, isOwnMessage }) => {
+const CustomRequestCard = ({ message, isOwnMessage, currentUserId }) => {
   const [requestData, setRequestData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [showOfferModal, setShowOfferModal] = useState(false);
 
   useEffect(() => {
     if (message.custom_request_id) {
@@ -102,8 +104,33 @@ const CustomRequestCard = ({ message, isOwnMessage }) => {
               {new Date(requestData.created_at).toLocaleDateString()}
             </span>
           </div>
+
+          {/* Create Offer Button - Only show for creator when request is pending */}
+          {!isOwnMessage && requestData.status === 'pending' && message.receiver_id === currentUserId && (
+            <div className="border-t pt-3 mt-3">
+              <button
+                onClick={() => setShowOfferModal(true)}
+                className="w-full btn btn-primary py-2.5"
+              >
+                Create Custom Offer
+              </button>
+            </div>
+          )}
         </div>
       </div>
+
+      {/* Offer Modal */}
+      {showOfferModal && (
+        <CustomOfferModal
+          requestId={requestData.id}
+          requestData={requestData}
+          onClose={() => setShowOfferModal(false)}
+          onSuccess={() => {
+            setShowOfferModal(false);
+            loadRequestData(); // Reload to update status
+          }}
+        />
+      )}
     </div>
   );
 };

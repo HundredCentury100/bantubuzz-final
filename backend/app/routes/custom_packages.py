@@ -69,12 +69,23 @@ def create_custom_request():
         )
         db.session.add(notification)
 
+        # Create professional greeting message first
+        greeting_message = Message(
+            sender_id=brand.user_id,
+            receiver_id=creator.user_id,
+            message_type='greeting',
+            content=f"Hi {creator.username},\n\nThis is {brand.company_name}. Kindly browse through my custom package request below.",
+            is_read=False
+        )
+        db.session.add(greeting_message)
+        db.session.flush()  # Ensure greeting is created first
+
         # Create message thread with custom request
         message_content = f"Custom Package Request\n\nBudget: ${budget}\n\nExpected Deliverables:\n" + "\n".join([f"• {d}" for d in expected_deliverables])
         if additional_notes:
             message_content += f"\n\nAdditional Notes:\n{additional_notes}"
 
-        message = Message(
+        request_message = Message(
             sender_id=brand.user_id,
             receiver_id=creator.user_id,
             custom_request_id=custom_request.id,
@@ -82,7 +93,7 @@ def create_custom_request():
             content=message_content,
             is_read=False
         )
-        db.session.add(message)
+        db.session.add(request_message)
 
         db.session.commit()
 

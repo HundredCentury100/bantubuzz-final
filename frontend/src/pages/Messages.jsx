@@ -344,11 +344,28 @@ const Messages = () => {
                     conversationMessages.map((message, index) => {
                       const isOwnMessage = message.sender_id === currentUserId;
 
+                      // Render greeting message with dark navy background
+                      if (message.message_type === 'greeting') {
+                        return (
+                          <div key={message.id || index} className="my-4">
+                            <div className="bg-[#1F2937] text-white rounded-lg px-6 py-4 shadow-lg max-w-[85%] mx-auto">
+                              <p className="text-center whitespace-pre-wrap leading-relaxed">
+                                {message.content}
+                              </p>
+                            </div>
+                          </div>
+                        );
+                      }
+
                       // Render custom package request card
                       if (message.message_type === 'custom_request') {
                         return (
                           <div key={message.id || index} className="my-4">
-                            <CustomRequestCard message={message} isOwnMessage={isOwnMessage} />
+                            <CustomRequestCard
+                              message={message}
+                              isOwnMessage={isOwnMessage}
+                              currentUserId={currentUserId}
+                            />
                           </div>
                         );
                       }
