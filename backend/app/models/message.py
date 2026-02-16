@@ -9,6 +9,9 @@ class Message(db.Model):
     sender_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     receiver_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     booking_id = db.Column(db.Integer, db.ForeignKey('bookings.id'), nullable=True)
+    custom_request_id = db.Column(db.Integer, db.ForeignKey('custom_package_requests.id'), nullable=True)
+    custom_offer_id = db.Column(db.Integer, db.ForeignKey('custom_package_offers.id'), nullable=True)
+    message_type = db.Column(db.String(20), default='text')  # text, custom_request, custom_offer
     content = db.Column(db.Text, nullable=False)
     is_read = db.Column(db.Boolean, default=False)
     attachment_url = db.Column(db.String(255))
@@ -21,6 +24,9 @@ class Message(db.Model):
             'sender_id': self.sender_id,
             'receiver_id': self.receiver_id,
             'booking_id': self.booking_id,
+            'custom_request_id': self.custom_request_id,
+            'custom_offer_id': self.custom_offer_id,
+            'message_type': self.message_type,
             'content': self.content,
             'is_read': self.is_read,
             'attachment_url': self.attachment_url,

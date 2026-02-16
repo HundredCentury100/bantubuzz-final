@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from app import db
-from app.models import CustomPackageRequest, CustomPackageOffer, BrandProfile, CreatorProfile, User, Booking, Notification
+from app.models import CustomPackageRequest, CustomPackageOffer, BrandProfile, CreatorProfile, User, Booking, Notification, Message
 from datetime import datetime
 
 bp = Blueprint('custom_packages', __name__, url_prefix='/api/custom-packages')
@@ -65,9 +65,24 @@ def create_custom_request():
             type='custom_package_request',
             title='New Custom Package Request',
             message=f'{brand.company_name} has requested a custom package from you. Budget: ${budget}',
-            action_url=f'/creator/custom-requests/{custom_request.id}'
+            action_url=f'/messages'
         )
         db.session.add(notification)
+
+        # Create message thread with custom request
+        message_content = f"Custom Package Request\n\nBudget: ${budget}\n\nExpected Deliverables:\n" + "\n".join([f"• {d}" for d in expected_deliverables])
+        if additional_notes:
+            message_content += f"\n\nAdditional Notes:\n{additional_notes}"
+
+        message = Message(
+            sender_id=brand.user_id,
+            receiver_id=creator.user_id,
+            custom_request_id=custom_request.id,
+            message_type='custom_request',
+            content=message_content,
+            is_read=False
+        )
+        db.session.add(message)
 
         db.session.commit()
 
@@ -352,9 +367,22 @@ def create_custom_offer():
             type='custom_package_offer',
             title='New Custom Package Offer',
             message=f'{creator.username} has sent you a custom package offer: {title}. Price: ${price}',
-            action_url=f'/brand/custom-offers/{offer.id}'
+            action_url=f'/messages'
         )
         db.session.add(notification)
+
+        # Create message with custom offer
+        message_content = f"Custom Package Offer: {title}\n\n{description}\n\nPrice: ${price}\nDelivery Time: {delivery_time_days} days\nRevisions Allowed: {revisions_allowed}\n\nDeliverables:\n" + "\n".join([f"• {d}" for d in deliverables])
+
+        message = Message(
+            sender_id=creator.user_id,
+            receiver_id=custom_request.brand.user_id,
+            custom_offer_id=offer.id,
+            message_type='custom_offer',
+            content=message_content,
+            is_read=False
+        )
+        db.session.add(message)
 
         db.session.commit()
 
