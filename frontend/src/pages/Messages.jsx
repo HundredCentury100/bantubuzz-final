@@ -26,6 +26,7 @@ const Messages = () => {
   const [messageText, setMessageText] = useState('');
   const [loading, setLoading] = useState(true);
   const [showMobileChat, setShowMobileChat] = useState(false); // Mobile chat view state
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false); // Desktop sidebar toggle
   const messagesEndRef = useRef(null);
   const typingTimeoutRef = useRef(null);
 
@@ -222,11 +223,24 @@ const Messages = () => {
           </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-250px)]">
-          {/* Conversations List - Hidden on mobile when chat is open */}
-          <div className={`lg:col-span-1 bg-white rounded-lg shadow-md overflow-hidden ${showMobileChat ? 'hidden lg:block' : 'block'}`}>
-            <div className="p-4 border-b border-gray-200">
-              <h2 className="text-xl font-semibold">Conversations</h2>
+        <div className="flex gap-4 h-[calc(100vh-200px)]">
+          {/* Conversations List - Collapsible sidebar */}
+          <div className={`bg-white rounded-lg shadow-md overflow-hidden transition-all duration-300 ${showMobileChat ? 'hidden lg:block' : 'block'} ${sidebarCollapsed ? 'lg:w-16' : 'lg:w-56'} w-full lg:flex-shrink-0`}>
+            <div className="p-3 border-b border-gray-200 flex items-center justify-between">
+              {!sidebarCollapsed && <h2 className="text-lg font-semibold">Conversations</h2>}
+              <button
+                onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+                className="hidden lg:block p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  {sidebarCollapsed ? (
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7-7 7M5 5l7 7-7 7" />
+                  ) : (
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+                  )}
+                </svg>
+              </button>
             </div>
 
             <div className="overflow-y-auto h-full">
@@ -243,52 +257,77 @@ const Messages = () => {
                   <div
                     key={conversation.id}
                     onClick={() => loadConversation(conversation)}
-                    className={`p-4 border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition ${
+                    className={`p-2.5 border-b border-gray-100 cursor-pointer hover:bg-gray-50 transition ${
                       selectedConversation?.id === conversation.id ? 'bg-primary/10' : ''
-                    }`}
+                    } ${sidebarCollapsed ? 'flex justify-center' : ''}`}
                   >
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-3 flex-1 min-w-0">
-                        <div className="relative">
-                          {conversation.profile_picture ? (
-                            <img
-                              src={`${BASE_URL}${conversation.profile_picture}`}
-                              alt={conversation.display_name || conversation.username || conversation.company_name}
-                              className="w-12 h-12 rounded-full object-cover"
-                            />
-                          ) : (
-                            <Avatar
-                              name={conversation.display_name || conversation.username || conversation.company_name || conversation.email}
-                              size="md"
-                            />
-                          )}
-                          {isUserOnline(conversation.id) && (
-                            <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-gray-900 truncate">
-                            {conversation.display_name || conversation.username || conversation.company_name || conversation.email || 'Unknown User'}
-                          </p>
-                          <p className="text-sm text-gray-500 truncate">
-                            {conversation.last_message || 'No messages yet'}
-                          </p>
-                        </div>
+                    {sidebarCollapsed ? (
+                      <div className="relative">
+                        {conversation.profile_picture ? (
+                          <img
+                            src={`${BASE_URL}${conversation.profile_picture}`}
+                            alt={conversation.display_name || conversation.username || conversation.company_name}
+                            className="w-12 h-12 rounded-full object-cover"
+                          />
+                        ) : (
+                          <Avatar
+                            name={conversation.display_name || conversation.username || conversation.company_name || conversation.email}
+                            size="md"
+                          />
+                        )}
+                        {isUserOnline(conversation.id) && (
+                          <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
+                        )}
+                        {conversation.unread_count > 0 && (
+                          <div className="absolute -top-1 -right-1 bg-primary text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                            {parseInt(conversation.unread_count, 10) > 9 ? '9+' : conversation.unread_count}
+                          </div>
+                        )}
                       </div>
-                      {conversation.unread_count > 0 && (
-                        <div className="ml-2 bg-primary text-white text-xs font-bold rounded-full min-w-6 h-6 px-2 flex items-center justify-center flex-shrink-0">
-                          {parseInt(conversation.unread_count, 10)}
+                    ) : (
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-2 flex-1 min-w-0">
+                          <div className="relative">
+                            {conversation.profile_picture ? (
+                              <img
+                                src={`${BASE_URL}${conversation.profile_picture}`}
+                                alt={conversation.display_name || conversation.username || conversation.company_name}
+                                className="w-10 h-10 rounded-full object-cover"
+                              />
+                            ) : (
+                              <Avatar
+                                name={conversation.display_name || conversation.username || conversation.company_name || conversation.email}
+                                size="sm"
+                              />
+                            )}
+                            {isUserOnline(conversation.id) && (
+                              <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-white"></div>
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-sm text-gray-900 truncate">
+                              {conversation.display_name || conversation.username || conversation.company_name || conversation.email || 'Unknown User'}
+                            </p>
+                            <p className="text-xs text-gray-500 truncate">
+                              {conversation.last_message || 'No messages yet'}
+                            </p>
+                          </div>
                         </div>
-                      )}
-                    </div>
+                        {conversation.unread_count > 0 && (
+                          <div className="ml-2 bg-primary text-white text-xs font-bold rounded-full min-w-6 h-6 px-2 flex items-center justify-center flex-shrink-0">
+                            {parseInt(conversation.unread_count, 10)}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 ))
               )}
             </div>
           </div>
 
-          {/* Message Thread - Full screen on mobile when chat is open */}
-          <div className={`lg:col-span-2 bg-white rounded-lg shadow-md overflow-hidden flex flex-col ${!showMobileChat && !selectedConversation ? 'hidden lg:flex' : 'block lg:flex'}`}>
+          {/* Message Thread - Takes remaining space */}
+          <div className={`flex-1 bg-white rounded-lg shadow-md overflow-hidden flex flex-col ${!showMobileChat && !selectedConversation ? 'hidden lg:flex' : 'flex'}`}>
             {selectedConversation ? (
               <>
                 {/* Conversation Header */}

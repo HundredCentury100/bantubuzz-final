@@ -132,7 +132,7 @@ export const MessagingProvider = ({ children }) => {
         playNotificationSound();
 
         // Show toast notification
-        toast(`New message from ${message.sender.email}`, {
+        toast(`New message from ${message.sender.name || message.sender.email}`, {
           duration: 3000,
         });
       });

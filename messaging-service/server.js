@@ -117,9 +117,18 @@ io.on('connection', (socket) => {
 
       // Fetch the complete message with sender info
       const fetchQuery = `
-        SELECT m.*, u.email as sender_email, u.user_type as sender_type
+        SELECT m.*,
+               u.email as sender_email,
+               u.user_type as sender_type,
+               CASE
+                 WHEN u.user_type = 'brand' THEN bp.company_name
+                 WHEN u.user_type = 'creator' THEN cpr.username
+                 ELSE NULL
+               END as sender_name
         FROM messages m
         JOIN users u ON m.sender_id = u.id
+        LEFT JOIN brand_profiles bp ON bp.user_id = u.id AND u.user_type = 'brand'
+        LEFT JOIN creator_profiles cpr ON cpr.user_id = u.id AND u.user_type = 'creator'
         WHERE m.id = $1
       `;
 
@@ -131,12 +140,17 @@ io.on('connection', (socket) => {
         sender_id: message.sender_id,
         receiver_id: message.receiver_id,
         booking_id: message.booking_id,
+        custom_request_id: message.custom_request_id,
+        custom_offer_id: message.custom_offer_id,
+        message_type: message.message_type || 'text',
         content: message.content,
         is_read: message.is_read,
+        attachment_url: message.attachment_url,
         created_at: message.created_at,
         sender: {
           email: message.sender_email,
-          user_type: message.sender_type
+          user_type: message.sender_type,
+          name: message.sender_name
         }
       };
 
@@ -240,11 +254,27 @@ app.get('/api/conversations/:userId', async (req, res) => {
 
     const query = `
       SELECT m.*,
-             sender.email as sender_email, sender.user_type as sender_type,
-             receiver.email as receiver_email, receiver.user_type as receiver_type
+             sender.email as sender_email,
+             sender.user_type as sender_type,
+             CASE
+               WHEN sender.user_type = 'brand' THEN sender_bp.company_name
+               WHEN sender.user_type = 'creator' THEN sender_cp.username
+               ELSE NULL
+             END as sender_name,
+             receiver.email as receiver_email,
+             receiver.user_type as receiver_type,
+             CASE
+               WHEN receiver.user_type = 'brand' THEN receiver_bp.company_name
+               WHEN receiver.user_type = 'creator' THEN receiver_cp.username
+               ELSE NULL
+             END as receiver_name
       FROM messages m
       JOIN users sender ON m.sender_id = sender.id
       JOIN users receiver ON m.receiver_id = receiver.id
+      LEFT JOIN brand_profiles sender_bp ON sender_bp.user_id = sender.id AND sender.user_type = 'brand'
+      LEFT JOIN creator_profiles sender_cp ON sender_cp.user_id = sender.id AND sender.user_type = 'creator'
+      LEFT JOIN brand_profiles receiver_bp ON receiver_bp.user_id = receiver.id AND receiver.user_type = 'brand'
+      LEFT JOIN creator_profiles receiver_cp ON receiver_cp.user_id = receiver.id AND receiver.user_type = 'creator'
       WHERE (m.sender_id = $1 AND m.receiver_id = $2)
          OR (m.sender_id = $2 AND m.receiver_id = $1)
       ORDER BY m.created_at DESC
@@ -259,16 +289,22 @@ app.get('/api/conversations/:userId', async (req, res) => {
       sender_id: m.sender_id,
       receiver_id: m.receiver_id,
       booking_id: m.booking_id,
+      custom_request_id: m.custom_request_id,
+      custom_offer_id: m.custom_offer_id,
+      message_type: m.message_type || 'text',
       content: m.content,
       is_read: m.is_read,
+      attachment_url: m.attachment_url,
       created_at: m.created_at,
       sender: {
         email: m.sender_email,
-        user_type: m.sender_type
+        user_type: m.sender_type,
+        name: m.sender_name
       },
       receiver: {
         email: m.receiver_email,
-        user_type: m.receiver_type
+        user_type: m.receiver_type,
+        name: m.receiver_name
       }
     }));
 
@@ -306,6 +342,25 @@ app.get('/api/conversations', async (req, res) => {
         cp.other_user_id as id,
         u.email as email,
         u.user_type as user_type,
+        CASE
+          WHEN u.user_type = 'brand' THEN bp.company_name
+          WHEN u.user_type = 'creator' THEN cpr.username
+          ELSE NULL
+        END as display_name,
+        CASE
+          WHEN u.user_type = 'brand' THEN bp.company_name
+          WHEN u.user_type = 'creator' THEN cpr.username
+          ELSE NULL
+        END as username,
+        CASE
+          WHEN u.user_type = 'brand' THEN bp.company_name
+          ELSE NULL
+        END as company_name,
+        CASE
+          WHEN u.user_type = 'brand' THEN bp.logo
+          WHEN u.user_type = 'creator' THEN cpr.profile_picture
+          ELSE NULL
+        END as profile_picture,
         (SELECT content FROM messages
          WHERE (sender_id = $1 AND receiver_id = cp.other_user_id)
             OR (sender_id = cp.other_user_id AND receiver_id = $1)
@@ -318,6 +373,8 @@ app.get('/api/conversations', async (req, res) => {
          WHERE sender_id = cp.other_user_id AND receiver_id = $1 AND is_read = false) as unread_count
       FROM conversation_partners cp
       JOIN users u ON u.id = cp.other_user_id
+      LEFT JOIN brand_profiles bp ON bp.user_id = u.id AND u.user_type = 'brand'
+      LEFT JOIN creator_profiles cpr ON cpr.user_id = u.id AND u.user_type = 'creator'
       ORDER BY last_message_time DESC
     `;
 
@@ -326,6 +383,38 @@ app.get('/api/conversations', async (req, res) => {
   } catch (error) {
     console.error('Error in get conversations:', error);
     res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Internal endpoint for Flask backend to broadcast messages via WebSocket
+app.post('/api/internal/broadcast-message', async (req, res) => {
+  try {
+    const messageData = req.body;
+
+    if (!messageData || !messageData.sender_id || !messageData.receiver_id) {
+      return res.status(400).json({ error: 'Invalid message data' });
+    }
+
+    console.log('📢 Broadcasting message via internal API:', messageData.id);
+
+    // Send to receiver
+    const receiverSocketId = activeUsers.get(messageData.receiver_id.toString());
+    if (receiverSocketId) {
+      io.to(receiverSocketId).emit('new_message', messageData);
+      console.log(`  ✓ Sent to receiver ${messageData.receiver_id}`);
+    }
+
+    // Send confirmation to sender
+    const senderSocketId = activeUsers.get(messageData.sender_id.toString());
+    if (senderSocketId) {
+      io.to(senderSocketId).emit('message_sent', messageData);
+      console.log(`  ✓ Sent confirmation to sender ${messageData.sender_id}`);
+    }
+
+    res.json({ success: true, message: 'Message broadcast successfully' });
+  } catch (error) {
+    console.error('Error broadcasting message:', error);
+    res.status(500).json({ error: 'Failed to broadcast message' });
   }
 });
 

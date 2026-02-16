@@ -2,6 +2,7 @@ from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from app import db
 from app.models import CustomPackageRequest, CustomPackageOffer, BrandProfile, CreatorProfile, User, Booking, Notification, Message
+from app.utils.websocket_helper import emit_message_to_websocket
 from datetime import datetime
 
 bp = Blueprint('custom_packages', __name__, url_prefix='/api/custom-packages')
@@ -83,6 +84,9 @@ def create_custom_request():
         db.session.add(request_message)
 
         db.session.commit()
+
+        # Broadcast message via WebSocket for real-time delivery
+        emit_message_to_websocket(request_message, db.session)
 
         return jsonify({
             'success': True,
@@ -383,6 +387,9 @@ def create_custom_offer():
         db.session.add(message)
 
         db.session.commit()
+
+        # Broadcast message via WebSocket for real-time delivery
+        emit_message_to_websocket(message, db.session)
 
         return jsonify({
             'success': True,

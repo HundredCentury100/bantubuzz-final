@@ -45,7 +45,7 @@ const CustomPackageMessage = ({ message, isOwnMessage, currentUserId }) => {
         toast.success('Offer accepted! Redirecting to payment...');
         const bookingId = response.data.booking?.id;
         if (bookingId) {
-          setTimeout(() => navigate(`/payment/${bookingId}`), 1000);
+          setTimeout(() => navigate(`/bookings/${bookingId}/payment`), 1000);
         }
       }
     } catch (error) {
@@ -89,35 +89,35 @@ const CustomPackageMessage = ({ message, isOwnMessage, currentUserId }) => {
 
   return (
     <>
-      <div className="bg-[#1F2937] text-white rounded-lg shadow-lg max-w-[90%] mx-auto my-4 overflow-hidden">
+      <div className="bg-[#1F2937] text-white rounded-lg shadow-md max-w-[70%] mx-auto my-2 overflow-hidden">
         {/* Greeting */}
-        <div className="px-6 py-4 text-center border-b border-white/10">
-          <p className="text-sm leading-relaxed">{message.content}</p>
+        <div className="px-3 py-2 text-center border-b border-white/10">
+          <p className="text-xs leading-relaxed">{message.content}</p>
         </div>
 
         {/* REQUEST CARD */}
         {isRequest && (
-          <div className="p-6 space-y-4">
-            <div className="flex items-center gap-2 mb-3">
-              <svg className="w-6 h-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="p-3 space-y-2">
+            <div className="flex items-center gap-1.5 mb-2">
+              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
               </svg>
-              <h3 className="text-xl font-bold">Custom Package Request</h3>
+              <h3 className="text-sm font-bold">Custom Package Request</h3>
             </div>
 
             {/* Budget */}
-            <div className="bg-white/10 rounded-lg p-4 flex justify-between items-center">
-              <span className="text-sm opacity-90">Budget</span>
-              <span className="text-2xl font-bold text-primary">${parseFloat(data.budget).toFixed(2)}</span>
+            <div className="bg-white/10 rounded-md p-2 flex justify-between items-center">
+              <span className="text-xs opacity-90">Budget</span>
+              <span className="text-lg font-bold text-white">${parseFloat(data.budget).toFixed(2)}</span>
             </div>
 
             {/* Deliverables */}
             <div>
-              <h4 className="text-sm font-semibold opacity-90 mb-2">Expected Deliverables:</h4>
-              <ul className="space-y-2">
+              <h4 className="text-xs font-semibold opacity-90 mb-1">Expected Deliverables:</h4>
+              <ul className="space-y-1">
                 {data.expected_deliverables.map((item, idx) => (
-                  <li key={idx} className="flex items-start gap-2 text-sm">
-                    <span className="text-primary mt-0.5">✓</span>
+                  <li key={idx} className="flex items-start gap-1.5 text-xs">
+                    <span className="text-white mt-0.5">✓</span>
                     <span>{item}</span>
                   </li>
                 ))}
@@ -126,9 +126,9 @@ const CustomPackageMessage = ({ message, isOwnMessage, currentUserId }) => {
 
             {/* Notes */}
             {data.additional_notes && (
-              <div className="bg-white/5 rounded-lg p-3">
-                <h4 className="text-xs font-semibold opacity-75 mb-1">Additional Notes:</h4>
-                <p className="text-sm opacity-90">{data.additional_notes}</p>
+              <div className="bg-white/5 rounded-md p-2">
+                <h4 className="text-xs font-semibold opacity-75 mb-0.5">Additional Notes:</h4>
+                <p className="text-xs opacity-90">{data.additional_notes}</p>
               </div>
             )}
 
@@ -136,9 +136,9 @@ const CustomPackageMessage = ({ message, isOwnMessage, currentUserId }) => {
             {!isOwnMessage && data.status === 'pending' && (
               <button
                 onClick={() => setShowOfferModal(true)}
-                className="w-full bg-success hover:bg-success/90 text-white font-bold py-3 rounded-lg transition-colors mt-4"
+                className="w-full bg-primary hover:bg-primary/90 text-dark font-bold py-3 px-4 rounded-lg transition-all transform hover:scale-105 mt-2 text-sm shadow-lg"
               >
-                💼 Create Custom Offer
+                💼 Create Your Custom Offer
               </button>
             )}
           </div>
@@ -146,44 +146,44 @@ const CustomPackageMessage = ({ message, isOwnMessage, currentUserId }) => {
 
         {/* OFFER CARD */}
         {isOffer && (
-          <div className="p-6 space-y-4">
-            <div className="flex items-center gap-2 mb-3">
-              <svg className="w-6 h-6 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="p-3 space-y-2">
+            <div className="flex items-center gap-1.5 mb-2">
+              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
               </svg>
-              <h3 className="text-xl font-bold text-success">Custom Package Offer</h3>
+              <h3 className="text-sm font-bold">Custom Package Offer</h3>
             </div>
 
-            <h4 className="text-2xl font-bold">{data.title}</h4>
-            <p className="text-sm opacity-90 leading-relaxed">{data.description}</p>
+            <h4 className="text-base font-bold">{data.title}</h4>
+            <p className="text-xs opacity-90 leading-relaxed">{data.description}</p>
 
             {/* Price & Delivery Grid */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="bg-white/10 rounded-lg p-3 text-center">
-                <p className="text-xs opacity-75 mb-1">Price</p>
-                <p className="text-2xl font-bold text-success">${parseFloat(data.price).toFixed(2)}</p>
+            <div className="grid grid-cols-2 gap-2">
+              <div className="bg-white/10 rounded-md p-2 text-center">
+                <p className="text-xs opacity-75 mb-0.5">Price</p>
+                <p className="text-lg font-bold text-white">${parseFloat(data.price).toFixed(2)}</p>
               </div>
-              <div className="bg-white/10 rounded-lg p-3 text-center">
-                <p className="text-xs opacity-75 mb-1">Delivery</p>
-                <p className="text-xl font-bold">{data.delivery_time_days} days</p>
+              <div className="bg-white/10 rounded-md p-2 text-center">
+                <p className="text-xs opacity-75 mb-0.5">Delivery</p>
+                <p className="text-sm font-bold">{data.delivery_time_days} days</p>
               </div>
             </div>
 
             {/* Deliverables */}
             <div>
-              <h5 className="text-sm font-semibold opacity-90 mb-2">Deliverables:</h5>
-              <ul className="space-y-2">
+              <h5 className="text-xs font-semibold opacity-90 mb-1">Deliverables:</h5>
+              <ul className="space-y-1">
                 {data.deliverables.map((item, idx) => (
-                  <li key={idx} className="flex items-start gap-2 text-sm">
-                    <span className="text-success mt-0.5">✓</span>
+                  <li key={idx} className="flex items-start gap-1.5 text-xs">
+                    <span className="text-white mt-0.5">✓</span>
                     <span>{item}</span>
                   </li>
                 ))}
               </ul>
             </div>
 
-            <div className="flex items-center gap-2 text-sm opacity-75 bg-white/5 p-2 rounded">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div className="flex items-center gap-1.5 text-xs opacity-75 bg-white/5 p-1.5 rounded">
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
               </svg>
               <span>{data.revisions_allowed} revision{data.revisions_allowed !== 1 ? 's' : ''} included</span>
@@ -191,20 +191,23 @@ const CustomPackageMessage = ({ message, isOwnMessage, currentUserId }) => {
 
             {/* ACCEPT/DECLINE BUTTONS - For brand */}
             {!isOwnMessage && data.status === 'pending' && (
-              <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-white/10">
+              <div className="flex flex-col items-center gap-3 pt-3 border-t border-white/10">
+                {/* Prominent Accept Button - Encourages action */}
                 <button
                   onClick={handleAcceptOffer}
                   disabled={actionLoading}
-                  className="flex-1 bg-success hover:bg-success/90 text-white font-bold py-3 rounded-lg transition-colors disabled:opacity-50"
+                  className="w-full bg-primary hover:bg-primary/90 text-dark font-bold py-3 px-4 rounded-lg transition-all transform hover:scale-105 disabled:opacity-50 text-sm shadow-lg"
                 >
-                  {actionLoading ? '⏳ Processing...' : '✅ Accept & Pay'}
+                  {actionLoading ? 'Processing...' : '✓ Accept & Proceed to Payment'}
                 </button>
+
+                {/* Subtle Decline Link - Discourages action */}
                 <button
                   onClick={() => setShowDeclineModal(true)}
                   disabled={actionLoading}
-                  className="flex-1 bg-error hover:bg-error/90 text-white font-bold py-3 rounded-lg transition-colors disabled:opacity-50"
+                  className="text-xs text-gray-400 hover:text-gray-300 underline transition-colors disabled:opacity-50"
                 >
-                  ❌ Decline
+                  Don't like this package?
                 </button>
               </div>
             )}
