@@ -11,13 +11,10 @@ const CreatorBadge = ({ badge, size = 'md', variant = 'full' }) => {
       case 'top_creator':
         return {
           label: 'Top Creator',
-          icon: (
-            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-            </svg>
-          ),
-          badgeBg: 'bg-yellow-500',
-          textColor: 'text-gray-800'
+          image: '/assets/badges/top-creator.png',
+          pillBg: 'bg-yellow-400',
+          textColor: 'text-white',
+          badgeBg: 'bg-yellow-400'
         };
       case 'verified_creator':
         return {
@@ -27,19 +24,17 @@ const CreatorBadge = ({ badge, size = 'md', variant = 'full' }) => {
               <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
             </svg>
           ),
-          badgeBg: 'bg-blue-500',
-          textColor: 'text-gray-800'
+          pillBg: 'bg-blue-500',
+          textColor: 'text-white',
+          badgeBg: 'bg-blue-500'
         };
       case 'responds_fast':
         return {
           label: 'Responds Fast',
-          icon: (
-            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
-            </svg>
-          ),
-          badgeBg: 'bg-green-500',
-          textColor: 'text-gray-800'
+          image: '/assets/badges/responds-fast.png',
+          pillBg: 'bg-green-500',
+          textColor: 'text-white',
+          badgeBg: 'bg-green-500'
         };
       default:
         return null;
@@ -49,58 +44,80 @@ const CreatorBadge = ({ badge, size = 'md', variant = 'full' }) => {
   const config = getBadgeConfig(badge);
   if (!config) return null;
 
-  // Icon only variant (for display next to username)
-  if (variant === 'icon') {
-    const iconSizeClasses = {
-      sm: 'w-4 h-4',
-      md: 'w-4 h-4',
-      lg: 'w-5 h-5'
-    };
+  const iconSizeClasses = {
+    sm: 'w-3.5 h-3.5',
+    md: 'w-4 h-4',
+    lg: 'w-5 h-5'
+  };
 
-    return (
-      <span
-        className={`inline-flex items-center justify-center ${iconSizeClasses[size]} ${config.badgeBg} text-white rounded-full p-0.5`}
-        title={config.label}
-      >
-        {config.icon}
-      </span>
-    );
-  }
+  const textSizeClasses = {
+    sm: 'text-xs',
+    md: 'text-xs',
+    lg: 'text-sm'
+  };
 
-  // Overlay variant (for image overlay)
+  // Overlay variant - colored pill with white image + white text (matches screenshot)
   if (variant === 'overlay') {
     return (
-      <span
-        className={`inline-flex items-center px-2 py-1 ${config.badgeBg} text-white text-xs font-medium rounded-md`}
-        title={config.label}
-      >
-        {config.label}
-      </span>
+      <div className={`inline-flex items-center gap-1 ${config.pillBg} px-2 py-1 rounded-full shadow-sm`}>
+        {config.image ? (
+          <img
+            src={config.image}
+            alt={config.label}
+            className={`${iconSizeClasses[size]} object-contain brightness-0 invert`}
+            title={config.label}
+          />
+        ) : (
+          <span className="inline-flex items-center justify-center text-white">
+            {config.icon}
+          </span>
+        )}
+        <span className={`${textSizeClasses[size]} text-white font-semibold`}>
+          {config.label}
+        </span>
+      </div>
     );
   }
 
-  // Full variant (icon + text) - default
-  const sizeClasses = {
-    sm: 'text-xs',
-    md: 'text-sm',
-    lg: 'text-base'
-  };
+  // Icon variant (inline next to username)
+  if (variant === 'icon') {
+    return (
+      <div className={`inline-flex items-center gap-1 ${config.pillBg} px-2 py-0.5 rounded-full`}>
+        {config.image ? (
+          <img
+            src={config.image}
+            alt={config.label}
+            className={`${iconSizeClasses[size]} object-contain brightness-0 invert`}
+            title={config.label}
+          />
+        ) : (
+          <span className="inline-flex items-center justify-center text-white">
+            {config.icon}
+          </span>
+        )}
+        <span className={`${textSizeClasses[size]} text-white font-semibold`}>
+          {config.label}
+        </span>
+      </div>
+    );
+  }
 
-  const badgeSizeClasses = {
-    sm: 'w-5 h-5 p-1',
-    md: 'w-5 h-5 p-1',
-    lg: 'w-6 h-6 p-1.5'
-  };
-
+  // Full variant - default
   return (
-    <div className="inline-flex items-center gap-1.5">
-      <span
-        className={`inline-flex items-center justify-center ${badgeSizeClasses[size]} ${config.badgeBg} text-white rounded-full`}
-        title={config.label}
-      >
-        {config.icon}
-      </span>
-      <span className={`${sizeClasses[size]} ${config.textColor} font-medium`}>
+    <div className={`inline-flex items-center gap-1 ${config.pillBg} px-2.5 py-1 rounded-full`}>
+      {config.image ? (
+        <img
+          src={config.image}
+          alt={config.label}
+          className={`${iconSizeClasses[size]} object-contain brightness-0 invert`}
+          title={config.label}
+        />
+      ) : (
+        <span className="inline-flex items-center justify-center text-white">
+          {config.icon}
+        </span>
+      )}
+      <span className={`${textSizeClasses[size]} text-white font-semibold`}>
         {config.label}
       </span>
     </div>

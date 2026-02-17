@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
-import ResponsiveImage from '../components/ResponsiveImage';
 import CreatorBadge from '../components/CreatorBadge';
 import { creatorsAPI, BASE_URL } from '../services/api';
 import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
@@ -25,7 +24,7 @@ const Home = () => {
   const fetchFeaturedCreators = async () => {
     try {
       setLoading(true);
-      const response = await creatorsAPI.getCreators({ per_page: 8 });
+      const response = await creatorsAPI.getCreators({ per_page: 12 });
       const creators = response.data.creators || [];
       setFeaturedCreators(creators);
     } catch (error) {
@@ -50,6 +49,173 @@ const Home = () => {
     return count;
   };
 
+  // Creator Card Component
+  const CreatorCard = ({ creator, bgColor = 'white' }) => (
+    <div className={`bg-${bgColor} rounded-3xl overflow-hidden shadow-sm hover:shadow-md transition-shadow flex-shrink-0`}>
+      {/* Image */}
+      <div className="aspect-square m-4 rounded-2xl overflow-hidden bg-gray-100 relative">
+        {creator.profile_picture ? (
+          <img
+            src={`${BASE_URL}${creator.profile_picture}`}
+            alt={creator.display_name || creator.username || 'Creator profile'}
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center">
+            <span className="text-gray-400 text-sm">No image</span>
+          </div>
+        )}
+        {/* Badge Overlays on Image */}
+        {creator.badges && creator.badges.length > 0 && (
+          <div className="absolute top-2 left-2 flex flex-wrap gap-1.5">
+            {creator.badges.map((badge, idx) => (
+              <CreatorBadge key={idx} badge={badge} size="md" variant="overlay" />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Content */}
+      <div className="px-4 pb-4">
+        {/* Name and Followers */}
+        <div className="flex justify-between items-start mb-2">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-1.5 mb-1">
+              <h3 className="font-semibold text-gray-900 truncate">
+                {creator.display_name || creator.username || 'Creator'}
+              </h3>
+            </div>
+          </div>
+          <div className="text-right ml-2">
+            <span className="text-lg font-bold text-gray-900">{formatFollowers(creator.follower_count)}</span>
+            <p className={`text-xs ${bgColor === 'primary' ? 'text-gray-700' : 'text-gray-500'}`}>Followers</p>
+          </div>
+        </div>
+
+        {/* Location */}
+        {(creator.city || creator.country || creator.location) && (
+          <div className={`flex items-center gap-1 mb-3 text-xs ${bgColor === 'primary' ? 'text-gray-700' : 'text-gray-600'}`}>
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+            <span>
+              {creator.city && creator.country
+                ? `${creator.city}, ${creator.country}`
+                : creator.location || creator.city || creator.country}
+            </span>
+          </div>
+        )}
+
+        {/* Platform Icons and Category */}
+        <div className="flex justify-between items-center mb-4">
+          {/* Platform Icons */}
+          <div className="flex gap-2">
+            {creator.platforms && creator.platforms.length > 0 ? (
+              creator.platforms.slice(0, 3).map((platform) => {
+                // Platform-specific icons and colors
+                const platformConfig = {
+                  Instagram: {
+                    icon: <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>,
+                    color: 'text-pink-600'
+                  },
+                  TikTok: {
+                    icon: <path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-5.2 1.74 2.89 2.89 0 012.31-4.64 2.93 2.93 0 01.88.13V9.4a6.84 6.84 0 00-1-.05A6.33 6.33 0 005 20.1a6.34 6.34 0 0010.86-4.43v-7a8.16 8.16 0 004.77 1.52v-3.4a4.85 4.85 0 01-1-.1z"/>,
+                    color: 'text-gray-900'
+                  },
+                  YouTube: {
+                    icon: <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>,
+                    color: 'text-red-600'
+                  },
+                  Facebook: {
+                    icon: <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>,
+                    color: 'text-blue-600'
+                  },
+                  Twitter: {
+                    icon: <path d="M23.953 4.57a10 10 0 01-2.825.775 4.958 4.958 0 002.163-2.723c-.951.555-2.005.959-3.127 1.184a4.92 4.92 0 00-8.384 4.482C7.69 8.095 4.067 6.13 1.64 3.162a4.822 4.822 0 00-.666 2.475c0 1.71.87 3.213 2.188 4.096a4.904 4.904 0 01-2.228-.616v.06a4.923 4.923 0 003.946 4.827 4.996 4.996 0 01-2.212.085 4.936 4.936 0 004.604 3.417 9.867 9.867 0 01-6.102 2.105c-.39 0-.779-.023-1.17-.067a13.995 13.995 0 007.557 2.209c9.053 0 13.998-7.496 13.998-13.985 0-.21 0-.42-.015-.63A9.935 9.935 0 0024 4.59z"/>,
+                    color: 'text-blue-400'
+                  },
+                  LinkedIn: {
+                    icon: <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>,
+                    color: 'text-blue-700'
+                  }
+                };
+
+                const config = platformConfig[platform] || platformConfig.Instagram;
+
+                return (
+                  <svg
+                    key={platform}
+                    className={`w-4 h-4 ${config.color}`}
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                    title={platform}
+                  >
+                    {config.icon}
+                  </svg>
+                );
+              })
+            ) : (
+              <svg className="w-4 h-4 text-gray-400" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
+              </svg>
+            )}
+          </div>
+          <span className={`text-xs px-3 py-1 border ${bgColor === 'primary' ? 'border-gray-700' : 'border-gray-300'} rounded-full text-gray-900`}>
+            {creator.categories?.[0] || 'Lifestyle'}
+          </span>
+        </div>
+
+        {/* View Profile Button */}
+        <Link
+          to={`/creators/${creator.id}`}
+          className={`block w-full ${
+            bgColor === 'primary'
+              ? 'bg-white text-dark hover:bg-gray-100'
+              : 'bg-dark text-white hover:bg-gray-800'
+          } text-center py-3 rounded-full font-medium transition-colors`}
+        >
+          View profile
+        </Link>
+      </div>
+    </div>
+  );
+
+  // Platform Section Component
+  const PlatformSection = ({ title, subtitle, linkTo, bgColor = 'white', creators }) => (
+    <section className="py-12 px-6 lg:px-12 xl:px-20">
+      <div className="w-full">
+        <div className="flex justify-between items-start mb-8">
+          <div>
+            <h2 className="text-3xl font-bold mb-1">{title}</h2>
+            <p className="text-gray-600">{subtitle}</p>
+          </div>
+          <Link to={linkTo} className="text-gray-900 font-medium hover:underline">
+            See All
+          </Link>
+        </div>
+
+        {/* Desktop: Grid */}
+        <div className="hidden lg:grid grid-cols-4 gap-6">
+          {creators.slice(0, 4).map((creator, idx) => (
+            <CreatorCard key={`${title}-${creator.id}-${idx}`} creator={creator} bgColor={bgColor} />
+          ))}
+        </div>
+
+        {/* Mobile/Tablet: Horizontal Scroll */}
+        <div className="lg:hidden overflow-x-auto scrollbar-hide -mx-6 px-6">
+          <div className="flex gap-4 pb-2">
+            {creators.slice(0, 8).map((creator, idx) => (
+              <div key={`${title}-mobile-${creator.id}-${idx}`} className="w-[280px] flex-shrink-0">
+                <CreatorCard creator={creator} bgColor={bgColor} />
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+
   return (
     <div className="min-h-screen flex flex-col bg-light">
       <SEO
@@ -71,347 +237,139 @@ const Home = () => {
 
           {/* Search Bar */}
           <form onSubmit={handleSearch} className="max-w-4xl mx-auto">
-            <div className="bg-white rounded-full shadow-lg flex items-center p-2 pl-8">
-              <div className="flex-1 flex items-center border-r border-gray-200 pr-4">
-                <div className="w-full">
-                  <label className="block text-left text-sm font-semibold text-gray-900">Platform</label>
-                  <select
-                    value={filters.platform}
-                    onChange={(e) => setFilters(prev => ({ ...prev, platform: e.target.value }))}
-                    className="w-full text-gray-700 text-sm bg-transparent border-none focus:outline-none cursor-pointer"
-                  >
-                    <option value="">Choose a platform</option>
-                    <option value="Facebook">Facebook</option>
-                    <option value="TikTok">TikTok</option>
-                    <option value="Instagram">Instagram</option>
-                    <option value="YouTube">YouTube</option>
-                    <option value="Twitter">Twitter</option>
-                    <option value="LinkedIn">LinkedIn</option>
-                    <option value="Threads">Threads</option>
-                    <option value="Twitch">Twitch</option>
-                    <option value="UGC">UGC</option>
-                  </select>
+            {/* Desktop: Horizontal Layout */}
+            <div className="hidden md:block">
+              <div className="bg-white rounded-full shadow-lg flex items-center p-2 pl-8">
+                <div className="flex-1 flex items-center border-r border-gray-200 pr-4">
+                  <div className="w-full">
+                    <label className="block text-left text-sm font-semibold text-gray-900">Platform</label>
+                    <select
+                      value={filters.platform}
+                      onChange={(e) => setFilters(prev => ({ ...prev, platform: e.target.value }))}
+                      className="w-full text-gray-700 text-sm bg-transparent border-none focus:outline-none cursor-pointer"
+                    >
+                      <option value="">Choose a platform</option>
+                      <option value="Facebook">Facebook</option>
+                      <option value="TikTok">TikTok</option>
+                      <option value="Instagram">Instagram</option>
+                      <option value="YouTube">YouTube</option>
+                      <option value="Twitter">Twitter</option>
+                      <option value="LinkedIn">LinkedIn</option>
+                      <option value="Threads">Threads</option>
+                      <option value="Twitch">Twitch</option>
+                      <option value="UGC">UGC</option>
+                    </select>
+                  </div>
                 </div>
-              </div>
-              <div className="flex-1 flex items-center pl-4">
-                <div className="w-full">
-                  <label className="block text-left text-sm font-semibold text-gray-900">Category</label>
-                  <input
-                    type="text"
-                    value={filters.category}
-                    onChange={(e) => setFilters(prev => ({ ...prev, category: e.target.value }))}
-                    placeholder="Enter keywords, niches or categories"
-                    className="w-full text-gray-700 text-sm bg-transparent border-none focus:outline-none placeholder-gray-500"
-                  />
+                <div className="flex-1 flex items-center pl-4">
+                  <div className="w-full">
+                    <label className="block text-left text-sm font-semibold text-gray-900">Category</label>
+                    <input
+                      type="text"
+                      value={filters.category}
+                      onChange={(e) => setFilters(prev => ({ ...prev, category: e.target.value }))}
+                      placeholder="Enter keywords, niches or categories"
+                      className="w-full text-gray-700 text-sm bg-transparent border-none focus:outline-none placeholder-gray-500"
+                    />
+                  </div>
                 </div>
+                <button
+                  type="submit"
+                  className="bg-primary hover:bg-primary/90 text-dark p-4 rounded-full transition-colors ml-2"
+                >
+                  <MagnifyingGlassIcon className="w-6 h-6" />
+                </button>
               </div>
+            </div>
+
+            {/* Mobile: Vertical Stacked Layout */}
+            <div className="md:hidden space-y-3">
+              <div className="bg-white rounded-2xl shadow-lg p-4">
+                <label className="block text-left text-sm font-semibold text-gray-900 mb-2">Platform</label>
+                <select
+                  value={filters.platform}
+                  onChange={(e) => setFilters(prev => ({ ...prev, platform: e.target.value }))}
+                  className="w-full text-gray-700 text-sm bg-transparent border-none focus:outline-none cursor-pointer py-2"
+                >
+                  <option value="">Choose a platform</option>
+                  <option value="Facebook">Facebook</option>
+                  <option value="TikTok">TikTok</option>
+                  <option value="Instagram">Instagram</option>
+                  <option value="YouTube">YouTube</option>
+                  <option value="Twitter">Twitter</option>
+                  <option value="LinkedIn">LinkedIn</option>
+                  <option value="Threads">Threads</option>
+                  <option value="Twitch">Twitch</option>
+                  <option value="UGC">UGC</option>
+                </select>
+              </div>
+
+              <div className="bg-white rounded-2xl shadow-lg p-4">
+                <label className="block text-left text-sm font-semibold text-gray-900 mb-2">Category</label>
+                <input
+                  type="text"
+                  value={filters.category}
+                  onChange={(e) => setFilters(prev => ({ ...prev, category: e.target.value }))}
+                  placeholder="Enter keywords, niches or categories"
+                  className="w-full text-gray-700 text-sm bg-transparent border-none focus:outline-none placeholder-gray-500 py-2"
+                />
+              </div>
+
               <button
                 type="submit"
-                className="bg-primary hover:bg-primary/90 text-dark p-4 rounded-full transition-colors ml-2"
+                className="w-full bg-dark text-white py-4 rounded-2xl font-semibold hover:bg-gray-800 transition-colors flex items-center justify-center gap-2"
               >
-                <MagnifyingGlassIcon className="w-6 h-6" />
+                <MagnifyingGlassIcon className="w-5 h-5" />
+                <span>Search</span>
               </button>
             </div>
           </form>
         </div>
       </section>
 
-      {/* Featured Section */}
-      <section className="py-12 px-6 lg:px-12 xl:px-20">
-        <div className="w-full">
-          <div className="flex justify-between items-start mb-8">
-            <div>
-              <h2 className="text-3xl font-bold mb-1">Featured</h2>
-              <p className="text-gray-600">Hire Top Influencers across all Platforms</p>
-            </div>
-            <Link to="/browse/creators" className="text-gray-900 font-medium hover:underline">
-              See All
-            </Link>
-          </div>
-
-          {loading ? (
-            <div className="flex justify-center items-center py-20">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-            </div>
-          ) : (
-            <>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-                {featuredCreators.slice(0, 4).map((creator) => (
-                  <div
-                    key={creator.id}
-                    className="bg-white rounded-3xl overflow-hidden shadow-sm hover:shadow-md transition-shadow"
-                  >
-                    {/* Image */}
-                    <div className="aspect-square m-4 rounded-2xl overflow-hidden bg-gray-100 relative">
-                      <ResponsiveImage
-                        sizes={creator.profile_picture_sizes || creator.profile_picture}
-                        alt={creator.display_name || creator.username || 'Creator profile'}
-                        className="w-full h-full"
-                        objectFit="cover"
-                        eager={true}
-                        showLoading={true}
-                      />
-                      {/* Badge Overlays on Image */}
-                      {creator.badges && creator.badges.length > 0 && (
-                        <div className="absolute top-2 left-2 flex flex-wrap gap-1.5">
-                          {creator.badges.map((badge, idx) => (
-                            <CreatorBadge key={idx} badge={badge} size="sm" variant="overlay" />
-                          ))}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Content */}
-                    <div className="px-4 pb-4">
-                      {/* Name and Followers */}
-                      <div className="flex justify-between items-start mb-3">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-1.5 mb-1">
-                            <h3 className="font-semibold text-gray-900">
-                              {creator.display_name || creator.username || 'Creator'}
-                            </h3>
-                            {/* Checkmark Icons next to name */}
-                            {creator.badges && creator.badges.length > 0 && (
-                              <>
-                                {creator.badges.map((badge, idx) => (
-                                  <CreatorBadge key={idx} badge={badge} size="sm" variant="icon" />
-                                ))}
-                              </>
-                            )}
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <span className="text-lg font-bold">{formatFollowers(creator.follower_count)}</span>
-                          <p className="text-xs text-gray-500">Followers</p>
-                        </div>
-                      </div>
-
-                      {/* Social Icons and Category */}
-                      <div className="flex justify-between items-center mb-4">
-                        <div className="flex gap-2">
-                          {/* Instagram */}
-                          <svg className="w-4 h-4 text-gray-600" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
-                          </svg>
-                          {/* TikTok */}
-                          <svg className="w-4 h-4 text-gray-600" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/>
-                          </svg>
-                          {/* YouTube */}
-                          <svg className="w-4 h-4 text-gray-600" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
-                          </svg>
-                        </div>
-                        <span className="text-xs px-3 py-1 border border-gray-300 rounded-full">
-                          {creator.categories?.[0] || 'Lifestyle'}
-                        </span>
-                      </div>
-
-                      {/* View Profile Button */}
-                      <Link
-                        to={`/creators/${creator.id}`}
-                        className="block w-full bg-dark text-white text-center py-3 rounded-full font-medium hover:bg-gray-800 transition-colors"
-                      >
-                        View profile
-                      </Link>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Navigation Arrows */}
-              <div className="flex justify-center mt-8 gap-1">
-                <button className="p-3 bg-dark text-white rounded-l-lg hover:bg-gray-800 transition-colors">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                  </svg>
-                </button>
-                <button className="p-3 bg-dark text-white rounded-r-lg hover:bg-gray-800 transition-colors">
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </button>
-              </div>
-            </>
-          )}
+      {loading ? (
+        <div className="flex justify-center items-center py-20">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
         </div>
-      </section>
+      ) : (
+        <>
+          {/* Featured Section */}
+          <PlatformSection
+            title="Featured"
+            subtitle="Hire Top Influencers across all Platforms"
+            linkTo="/browse/creators"
+            bgColor="white"
+            creators={featuredCreators}
+          />
 
-      {/* Instagram Section */}
-      <section className="py-12 px-6 lg:px-12 xl:px-20">
-        <div className="w-full">
-          <div className="flex justify-between items-start mb-8">
-            <div>
-              <h2 className="text-3xl font-bold mb-1">Instagram</h2>
-              <p className="text-gray-600">Hire Instagram influencers</p>
-            </div>
-            <Link to="/browse/creators?platform=Instagram" className="text-gray-900 font-medium hover:underline">
-              See All
-            </Link>
-          </div>
+          {/* Facebook Section */}
+          <PlatformSection
+            title="Facebook"
+            subtitle="Hire Facebook influencers"
+            linkTo="/browse/creators?platform=Facebook"
+            bgColor="primary"
+            creators={featuredCreators}
+          />
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {featuredCreators.slice(0, 4).map((creator) => (
-              <div
-                key={`ig-${creator.id}`}
-                className="bg-primary rounded-3xl overflow-hidden shadow-sm hover:shadow-md transition-shadow"
-              >
-                {/* Image */}
-                <div className="aspect-square m-4 rounded-2xl overflow-hidden bg-white/20 relative">
-                  <ResponsiveImage
-                    sizes={creator.profile_picture_sizes || creator.profile_picture}
-                    alt={creator.display_name || creator.username || 'Creator profile'}
-                    className="w-full h-full"
-                    objectFit="cover"
-                    eager={true}
-                    showLoading={true}
-                  />
-                  {/* Badge Overlays on Image */}
-                  {creator.badges && creator.badges.length > 0 && (
-                    <div className="absolute top-2 left-2 flex flex-wrap gap-1.5">
-                      {creator.badges.map((badge, idx) => (
-                        <CreatorBadge key={idx} badge={badge} size="sm" variant="overlay" />
-                      ))}
-                    </div>
-                  )}
-                </div>
+          {/* Instagram Section */}
+          <PlatformSection
+            title="Instagram"
+            subtitle="Hire Instagram influencers"
+            linkTo="/browse/creators?platform=Instagram"
+            bgColor="primary"
+            creators={featuredCreators}
+          />
 
-                {/* Content */}
-                <div className="px-4 pb-4">
-                  {/* Name and Followers */}
-                  <div className="flex justify-between items-start mb-3">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-1.5 mb-1">
-                        <h3 className="font-semibold text-gray-900">
-                          {creator.display_name || creator.username || 'Creator'}
-                        </h3>
-                        {/* Checkmark Icons next to name */}
-                        {creator.badges && creator.badges.length > 0 && (
-                          <>
-                            {creator.badges.map((badge, idx) => (
-                              <CreatorBadge key={idx} badge={badge} size="sm" variant="icon" />
-                            ))}
-                          </>
-                        )}
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <span className="text-lg font-bold">{formatFollowers(creator.follower_count)}</span>
-                      <p className="text-xs text-gray-700">Followers</p>
-                    </div>
-                  </div>
-
-                  {/* Social Icon and Category */}
-                  <div className="flex justify-between items-center mb-4">
-                    <svg className="w-4 h-4 text-gray-700" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
-                    </svg>
-                    <span className="text-xs px-3 py-1 border border-gray-700 rounded-full text-gray-900">
-                      {creator.categories?.[0] || 'Model'}
-                    </span>
-                  </div>
-
-                  {/* View Profile Button */}
-                  <Link
-                    to={`/creators/${creator.id}`}
-                    className="block w-full bg-white text-dark text-center py-3 rounded-full font-medium hover:bg-gray-100 transition-colors"
-                  >
-                    View profile
-                  </Link>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* TikTok Section */}
-      <section className="py-12 px-6 lg:px-12 xl:px-20">
-        <div className="w-full">
-          <div className="flex justify-between items-start mb-8">
-            <div>
-              <h2 className="text-3xl font-bold mb-1">Tiktok</h2>
-              <p className="text-gray-600">Hire TikTok influencers</p>
-            </div>
-            <Link to="/browse/creators?platform=TikTok" className="text-gray-900 font-medium hover:underline">
-              See All
-            </Link>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {featuredCreators.slice(0, 4).map((creator) => (
-              <div
-                key={`tt-${creator.id}`}
-                className="bg-white rounded-3xl overflow-hidden shadow-sm hover:shadow-md transition-shadow"
-              >
-                {/* Image */}
-                <div className="aspect-square m-4 rounded-2xl overflow-hidden bg-gray-100 relative">
-                  <ResponsiveImage
-                    sizes={creator.profile_picture_sizes || creator.profile_picture}
-                    alt={creator.display_name || creator.username || 'Creator profile'}
-                    className="w-full h-full"
-                    objectFit="cover"
-                    eager={true}
-                    showLoading={true}
-                  />
-                  {/* Badge Overlays on Image */}
-                  {creator.badges && creator.badges.length > 0 && (
-                    <div className="absolute top-2 left-2 flex flex-wrap gap-1.5">
-                      {creator.badges.map((badge, idx) => (
-                        <CreatorBadge key={idx} badge={badge} size="sm" variant="overlay" />
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Content */}
-                <div className="px-4 pb-4">
-                  {/* Name and Followers */}
-                  <div className="flex justify-between items-start mb-3">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-1.5 mb-1">
-                        <h3 className="font-semibold text-gray-900">
-                          {creator.display_name || creator.username || 'Creator'}
-                        </h3>
-                        {/* Checkmark Icons next to name */}
-                        {creator.badges && creator.badges.length > 0 && (
-                          <>
-                            {creator.badges.map((badge, idx) => (
-                              <CreatorBadge key={idx} badge={badge} size="sm" variant="icon" />
-                            ))}
-                          </>
-                        )}
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <span className="text-lg font-bold">{formatFollowers(creator.follower_count)}</span>
-                      <p className="text-xs text-gray-500">Followers</p>
-                    </div>
-                  </div>
-
-                  {/* Social Icon and Category */}
-                  <div className="flex justify-between items-center mb-4">
-                    <svg className="w-4 h-4 text-gray-600" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M19.59 6.69a4.83 4.83 0 0 1-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 0 1-5.2 1.74 2.89 2.89 0 0 1 2.31-4.64 2.93 2.93 0 0 1 .88.13V9.4a6.84 6.84 0 0 0-1-.05A6.33 6.33 0 0 0 5 20.1a6.34 6.34 0 0 0 10.86-4.43v-7a8.16 8.16 0 0 0 4.77 1.52v-3.4a4.85 4.85 0 0 1-1-.1z"/>
-                    </svg>
-                    <span className="text-xs px-3 py-1 border border-gray-300 rounded-full">
-                      {creator.categories?.[0] || 'Travel'}
-                    </span>
-                  </div>
-
-                  {/* View Profile Button */}
-                  <Link
-                    to={`/creators/${creator.id}`}
-                    className="block w-full bg-primary text-dark text-center py-3 rounded-full font-medium hover:bg-primary/90 transition-colors"
-                  >
-                    View profile
-                  </Link>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+          {/* TikTok Section */}
+          <PlatformSection
+            title="TikTok"
+            subtitle="Hire TikTok influencers"
+            linkTo="/browse/creators?platform=TikTok"
+            bgColor="white"
+            creators={featuredCreators}
+          />
+        </>
+      )}
 
       {/* Categories Section */}
       <section className="py-12 px-6 lg:px-12 xl:px-20">

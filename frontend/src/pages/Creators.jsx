@@ -277,7 +277,7 @@ const Creators = () => {
                     {creator.badges && creator.badges.length > 0 && (
                       <div className="absolute top-2 left-2 flex flex-wrap gap-1.5">
                         {creator.badges.map((badge, idx) => (
-                          <CreatorBadge key={idx} badge={badge} size="sm" variant="overlay" />
+                          <CreatorBadge key={idx} badge={badge} size="md" variant="overlay" />
                         ))}
                       </div>
                     )}
@@ -290,14 +290,6 @@ const Creators = () => {
                       <h3 className="font-semibold text-gray-900">
                         {creator.display_name || creator.username || 'Creator'}
                       </h3>
-                      {/* Checkmark Icons next to name */}
-                      {creator.badges && creator.badges.length > 0 && (
-                        <>
-                          {creator.badges.map((badge, idx) => (
-                            <CreatorBadge key={idx} badge={badge} size="sm" variant="icon" />
-                          ))}
-                        </>
-                      )}
                     </div>
 
                     <p className="text-sm text-gray-500 mb-4">{creator.location || 'Location not set'}</p>
