@@ -9,7 +9,7 @@ class User(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     email = db.Column(db.String(120), unique=True, nullable=False, index=True)
-    password_hash = db.Column(db.String(255), nullable=False)
+    password_hash = db.Column(db.String(255), nullable=True)  # Nullable for Google OAuth users
     user_type = db.Column(db.String(20), nullable=False)  # 'creator', 'brand', or 'admin'
     is_verified = db.Column(db.Boolean, default=False)
     is_active = db.Column(db.Boolean, default=True)
@@ -19,6 +19,11 @@ class User(db.Model):
     reset_token = db.Column(db.String(100), unique=True)
     reset_token_expires = db.Column(db.DateTime)
     last_login = db.Column(db.DateTime)
+    # Google OAuth fields
+    google_oauth_id = db.Column(db.String(255), unique=True, nullable=True)
+    google_profile_picture = db.Column(db.String(500), nullable=True)
+    # Phone number
+    phone_number = db.Column(db.String(20), nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -29,10 +34,13 @@ class User(db.Model):
     received_messages = db.relationship('Message', foreign_keys='Message.receiver_id', backref='receiver', lazy='dynamic')
     notifications = db.relationship('Notification', backref='user', lazy='dynamic', cascade='all, delete-orphan')
 
-    def __init__(self, email, password, user_type):
+    def __init__(self, email, user_type, password=None, google_oauth_id=None, google_profile_picture=None):
         self.email = email.lower()
-        self.set_password(password)
+        if password:
+            self.set_password(password)
         self.user_type = user_type
+        self.google_oauth_id = google_oauth_id
+        self.google_profile_picture = google_profile_picture
         self.verification_token = secrets.token_urlsafe(32)
 
     def set_password(self, password):
@@ -68,6 +76,9 @@ class User(db.Model):
             'is_active': self.is_active,
             'is_admin': self.is_admin,
             'admin_role': self.admin_role,
+            'phone_number': self.phone_number,
+            'has_google_oauth': bool(self.google_oauth_id),
+            'google_profile_picture': self.google_profile_picture,
             'last_login': self.last_login.isoformat() if self.last_login else None,
             'created_at': self.created_at.isoformat(),
             'updated_at': self.updated_at.isoformat()

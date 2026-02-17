@@ -2,12 +2,16 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { authAPI } from '../services/api';
+import { useAuth } from '../hooks/useAuth';
+import { GoogleLogin } from '@react-oauth/google';
 import Navbar from '../components/Navbar';
 import SEO from '../components/SEO';
 
 const RegisterCreator = () => {
   const navigate = useNavigate();
+  const { googleLoginCreator } = useAuth();
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const [error, setError] = useState('');
   const {
     register,
@@ -57,6 +61,50 @@ const RegisterCreator = () => {
             <div className="text-center mb-8">
               <h1 className="text-3xl font-bold text-dark mb-2">Join as a Creator</h1>
               <p className="text-gray-600">Start earning from your influence</p>
+            </div>
+
+            {/* Google Sign Up - Quick Option */}
+            <div className="mb-6">
+              <p className="text-center text-sm text-gray-500 mb-3">Sign up quickly with Google</p>
+              <div className="flex justify-center">
+                {googleLoading ? (
+                  <div className="flex items-center justify-center py-2">
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary mr-2"></div>
+                    <span className="text-sm text-gray-600">Connecting to Google...</span>
+                  </div>
+                ) : (
+                  <GoogleLogin
+                    onSuccess={async (credentialResponse) => {
+                      setGoogleLoading(true);
+                      setError('');
+                      try {
+                        await googleLoginCreator(credentialResponse.credential);
+                      } catch (err) {
+                        setError(err.response?.data?.error || 'Google sign-up failed');
+                      } finally {
+                        setGoogleLoading(false);
+                      }
+                    }}
+                    onError={() => {
+                      setGoogleLoading(false);
+                      setError('Google sign-up failed. Please try again.');
+                    }}
+                    useOneTap={false}
+                    text="signup_with"
+                    shape="rectangular"
+                    theme="outline"
+                    width="300"
+                  />
+                )}
+              </div>
+              <div className="relative my-6">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-gray-200"></div>
+                </div>
+                <div className="relative flex justify-center text-sm">
+                  <span className="px-3 bg-white text-gray-500">Or sign up with email</span>
+                </div>
+              </div>
             </div>
 
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">

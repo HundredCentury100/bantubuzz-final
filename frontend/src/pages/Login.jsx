@@ -2,12 +2,14 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { useAuth } from '../hooks/useAuth';
+import { GoogleLogin } from '@react-oauth/google';
 import Navbar from '../components/Navbar';
 import SEO from '../components/SEO';
 
 const Login = () => {
-  const { login } = useAuth();
+  const { login, googleLoginCreator } = useAuth();
   const [loading, setLoading] = useState(false);
+  const [googleLoading, setGoogleLoading] = useState(false);
   const {
     register,
     handleSubmit,
@@ -111,8 +113,42 @@ const Login = () => {
               </button>
             </form>
 
+            {/* Google Sign In for Creators */}
+            <div className="mt-6 pt-6 border-t border-gray-200">
+              <p className="text-center text-sm text-gray-500 mb-4">
+                Creator? Sign in with Google
+              </p>
+              <div className="flex justify-center">
+                {googleLoading ? (
+                  <div className="flex items-center justify-center py-2">
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary mr-2"></div>
+                    <span className="text-sm text-gray-600">Signing in...</span>
+                  </div>
+                ) : (
+                  <GoogleLogin
+                    onSuccess={async (credentialResponse) => {
+                      setGoogleLoading(true);
+                      try {
+                        await googleLoginCreator(credentialResponse.credential);
+                      } finally {
+                        setGoogleLoading(false);
+                      }
+                    }}
+                    onError={() => {
+                      setGoogleLoading(false);
+                    }}
+                    useOneTap={false}
+                    text="signin_with"
+                    shape="rectangular"
+                    theme="outline"
+                    width="300"
+                  />
+                )}
+              </div>
+            </div>
+
             {/* Sign Up Links */}
-            <div className="mt-8 pt-6 border-t border-gray-200">
+            <div className="mt-6 pt-6 border-t border-gray-200">
               <p className="text-center text-sm text-gray-600 mb-4">
                 Don't have an account?
               </p>

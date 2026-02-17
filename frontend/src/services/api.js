@@ -77,6 +77,9 @@ export const authAPI = {
   resendOTP: (data) => api.post('/auth/resend-otp', data),
   forgotPassword: (email) => api.post('/auth/forgot-password', { email }),
   resetPassword: (token, password) => api.post(`/auth/reset-password/${token}`, { password }),
+  // Google OAuth
+  googleCreatorAuth: (credential) => api.post('/auth/google/creator', { credential }),
+  googleCompleteProfile: (data) => api.post('/auth/google/complete-profile', data),
 };
 
 // Users API

@@ -113,6 +113,67 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  const googleLoginCreator = async (credential) => {
+    try {
+      const response = await authAPI.googleCreatorAuth(credential);
+      const data = response.data;
+
+      if (data.needs_profile_completion) {
+        // New Google user - store temp token and redirect to profile completion
+        localStorage.setItem('access_token', data.temp_token);
+        localStorage.setItem('google_signup_pending', 'true');
+        localStorage.setItem('user', JSON.stringify(data.user));
+        setUser(data.user);
+        navigate('/register/creator/complete-profile', {
+          state: {
+            googleName: data.google_name,
+            googleEmail: data.google_email
+          }
+        });
+      } else {
+        // Existing user - full login
+        const { access_token, refresh_token, user: userData, profile: profileData } = data;
+        localStorage.setItem('access_token', access_token);
+        localStorage.setItem('refresh_token', refresh_token);
+        localStorage.setItem('user', JSON.stringify(userData));
+        localStorage.setItem('profile', JSON.stringify(profileData));
+        localStorage.removeItem('google_signup_pending');
+        setUser(userData);
+        setProfile(profileData);
+        toast.success('Signed in with Google!');
+        navigate('/creator/dashboard');
+      }
+      return data;
+    } catch (error) {
+      const message = error.response?.data?.error || 'Google sign-in failed';
+      toast.error(message);
+      throw error;
+    }
+  };
+
+  const googleCompleteProfile = async (formData) => {
+    try {
+      const response = await authAPI.googleCompleteProfile(formData);
+      const { access_token, refresh_token, user: userData, profile: profileData } = response.data;
+
+      localStorage.setItem('access_token', access_token);
+      localStorage.setItem('refresh_token', refresh_token);
+      localStorage.setItem('user', JSON.stringify(userData));
+      localStorage.setItem('profile', JSON.stringify(profileData));
+      localStorage.removeItem('google_signup_pending');
+
+      setUser(userData);
+      setProfile(profileData);
+      toast.success('Profile created successfully! Welcome to BantuBuzz!');
+      navigate('/creator/dashboard');
+      return response.data;
+    } catch (error) {
+      const message = error.response?.data?.error || 'Failed to complete profile';
+      toast.error(message);
+      throw error;
+    }
+  };
+
   const logout = () => {
     authAPI.logout().catch(() => {
       // Ignore errors on logout
@@ -144,6 +205,8 @@ export const AuthProvider = ({ children }) => {
     registerCreator,
     registerBrand,
     updateProfile,
+    googleLoginCreator,
+    googleCompleteProfile,
     isAuthenticated: !!user,
     isCreator: user?.user_type === 'creator',
     isBrand: user?.user_type === 'brand',

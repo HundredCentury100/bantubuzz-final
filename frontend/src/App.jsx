@@ -37,6 +37,7 @@ import ReviewForm from './pages/ReviewForm';
 import NotFound from './pages/NotFound';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
+import GoogleProfileComplete from './pages/GoogleProfileComplete';
 
 // Admin Pages
 import AdminLogin from './pages/AdminLogin';
@@ -165,6 +166,7 @@ function App() {
       <Route path="/verify-otp" element={<VerifyOTP />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password/:token" element={<ResetPassword />} />
+      <Route path="/register/creator/complete-profile" element={<GoogleProfileComplete />} />
 
       {/* Creator Protected Routes */}
       <Route

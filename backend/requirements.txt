@@ -21,6 +21,7 @@ Pillow==10.1.0
 gunicorn==21.2.0
 simple-websocket==1.0.0
 Werkzeug==3.0.1
+google-auth==2.48.0
 
 # Note: psycopg2-binary removed for easier installation
 # If you need PostgreSQL support, run:

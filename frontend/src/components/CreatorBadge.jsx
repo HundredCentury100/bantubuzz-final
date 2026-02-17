@@ -44,22 +44,28 @@ const CreatorBadge = ({ badge, size = 'md', variant = 'full' }) => {
   const config = getBadgeConfig(badge);
   if (!config) return null;
 
+  const isTopCreator = badge === 'top_creator';
+
   const iconSizeClasses = {
-    sm: 'w-3.5 h-3.5',
-    md: 'w-4 h-4',
-    lg: 'w-5 h-5'
+    sm: isTopCreator ? 'w-4 h-4' : 'w-3.5 h-3.5',
+    md: isTopCreator ? 'w-5 h-5' : 'w-4 h-4',
+    lg: isTopCreator ? 'w-6 h-6' : 'w-5 h-5'
   };
 
   const textSizeClasses = {
-    sm: 'text-xs',
-    md: 'text-xs',
-    lg: 'text-sm'
+    sm: isTopCreator ? 'text-xs' : 'text-xs',
+    md: isTopCreator ? 'text-sm' : 'text-xs',
+    lg: isTopCreator ? 'text-base' : 'text-sm'
   };
+
+  const overlayPadding = isTopCreator ? 'px-3 py-1.5' : 'px-2 py-1';
+  const overlayFont = isTopCreator ? 'font-bold' : 'font-semibold';
+  const overlayShadow = isTopCreator ? 'shadow-md' : 'shadow-sm';
 
   // Overlay variant - colored pill with white image + white text (matches screenshot)
   if (variant === 'overlay') {
     return (
-      <div className={`inline-flex items-center gap-1 ${config.pillBg} px-2 py-1 rounded-full shadow-sm`}>
+      <div className={`inline-flex items-center gap-1.5 ${config.pillBg} ${overlayPadding} rounded-full ${overlayShadow}`}>
         {config.image ? (
           <img
             src={config.image}
@@ -72,7 +78,7 @@ const CreatorBadge = ({ badge, size = 'md', variant = 'full' }) => {
             {config.icon}
           </span>
         )}
-        <span className={`${textSizeClasses[size]} text-white font-semibold`}>
+        <span className={`${textSizeClasses[size]} text-white ${overlayFont}`}>
           {config.label}
         </span>
       </div>
