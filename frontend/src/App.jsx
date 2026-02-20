@@ -22,6 +22,7 @@ import BrowseCreators from './pages/BrowseCreators';
 import Bookings from './pages/Bookings';
 import BookingDetails from './pages/BookingDetails';
 import Payment from './pages/Payment';
+import CartCheckout from './pages/CartCheckout';
 import PaymentReturn from './pages/PaymentReturn';
 import RevisionPayment from './pages/RevisionPayment';
 import CampaignPayment from './pages/CampaignPayment';
@@ -43,6 +44,13 @@ import GoogleProfileComplete from './pages/GoogleProfileComplete';
 import AdminLogin from './pages/AdminLogin';
 import AdminDashboard from './pages/admin/Dashboard';
 import AdminUsers from './pages/admin/Users';
+import AdminUserProfile from './pages/admin/UserProfile';
+import VerificationQueue from './pages/admin/VerificationQueue';
+import AdminActivity from './pages/admin/Activity';
+import AdminDisputes from './pages/admin/Disputes';
+import AdminReports from './pages/admin/Reports';
+import RaiseDispute from './pages/RaiseDispute';
+import DisputeStatus from './pages/DisputeStatus';
 import AdminCashouts from './pages/admin/Cashouts';
 import AdminFeaturedCreators from './pages/admin/FeaturedCreators';
 import AdminCategories from './pages/AdminCategories';
@@ -430,6 +438,14 @@ function App() {
         }
       />
       <Route
+        path="/checkout"
+        element={
+          <ProtectedRoute requiredType="brand">
+            <CartCheckout />
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/bookings/:id/payment"
         element={
           <ProtectedRoute requiredType="brand">
@@ -440,6 +456,32 @@ function App() {
       <Route
         path="/payment/return"
         element={<PaymentReturn />}
+      />
+
+      {/* Dispute Routes */}
+      <Route
+        path="/disputes"
+        element={
+          <ProtectedRoute>
+            <DisputeStatus />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/disputes/raise"
+        element={
+          <ProtectedRoute>
+            <RaiseDispute />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/disputes/raise/:collaborationId"
+        element={
+          <ProtectedRoute>
+            <RaiseDispute />
+          </ProtectedRoute>
+        }
       />
 
       {/* Common Protected Routes */}
@@ -483,6 +525,46 @@ function App() {
         element={
           <AdminRoute>
             <AdminUsers />
+          </AdminRoute>
+        }
+      />
+      <Route
+        path="/admin/users/:id"
+        element={
+          <AdminRoute>
+            <AdminUserProfile />
+          </AdminRoute>
+        }
+      />
+      <Route
+        path="/admin/verification"
+        element={
+          <AdminRoute>
+            <VerificationQueue />
+          </AdminRoute>
+        }
+      />
+      <Route
+        path="/admin/activity"
+        element={
+          <AdminRoute>
+            <AdminActivity />
+          </AdminRoute>
+        }
+      />
+      <Route
+        path="/admin/disputes"
+        element={
+          <AdminRoute>
+            <AdminDisputes />
+          </AdminRoute>
+        }
+      />
+      <Route
+        path="/admin/reports"
+        element={
+          <AdminRoute>
+            <AdminReports />
           </AdminRoute>
         }
       />

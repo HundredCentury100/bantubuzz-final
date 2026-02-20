@@ -23,5 +23,8 @@ from . import cashouts
 from . import collaborations
 from . import featured
 from . import categories_management
+from . import activity
+from . import disputes
+from . import reports
 
 __all__ = ['bp']

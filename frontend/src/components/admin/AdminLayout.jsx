@@ -11,6 +11,11 @@ import {
   Bars3Icon,
   XMarkIcon,
   ArrowRightOnRectangleIcon,
+  CalendarDaysIcon,
+  ShieldCheckIcon,
+  BoltIcon,
+  ScaleIcon,
+  ChartBarIcon,
 } from '@heroicons/react/24/outline';
 
 const AdminLayout = ({ children }) => {
@@ -22,6 +27,11 @@ const AdminLayout = ({ children }) => {
   const navigation = [
     { name: 'Dashboard', href: '/admin/dashboard', icon: HomeIcon },
     { name: 'Users', href: '/admin/users', icon: UsersIcon },
+    { name: 'Verification Queue', href: '/admin/verification', icon: ShieldCheckIcon },
+    { name: 'Activity Feed', href: '/admin/activity', icon: BoltIcon },
+    { name: 'Disputes', href: '/admin/disputes', icon: ScaleIcon },
+    { name: 'Reports', href: '/admin/reports', icon: ChartBarIcon },
+    { name: 'Bookings', href: '/admin/bookings', icon: CalendarDaysIcon },
     { name: 'Cashouts', href: '/admin/cashouts', icon: BanknotesIcon },
     { name: 'Collaborations', href: '/admin/collaborations', icon: BriefcaseIcon },
     { name: 'Categories', href: '/admin/categories', icon: FolderIcon },
