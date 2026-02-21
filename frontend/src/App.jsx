@@ -79,6 +79,7 @@ import HowItWorks from './pages/HowItWorks';
 import SuccessStories from './pages/SuccessStories';
 import Contact from './pages/Contact';
 import Pricing from './pages/Pricing';
+import SubscriptionManage from './pages/SubscriptionManage';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfService from './pages/TermsOfService';
 
@@ -652,6 +653,16 @@ function App() {
       <Route path="/pricing" element={<Pricing />} />
       <Route path="/privacy" element={<PrivacyPolicy />} />
       <Route path="/terms" element={<TermsOfService />} />
+
+      {/* Subscription Management */}
+      <Route
+        path="/subscription/manage"
+        element={
+          <ProtectedRoute>
+            <SubscriptionManage />
+          </ProtectedRoute>
+        }
+      />
 
       {/* 404 */}
       <Route path="*" element={<NotFound />} />

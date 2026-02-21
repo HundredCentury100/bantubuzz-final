@@ -1,15 +1,19 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { creatorsAPI, packagesAPI, bookingsAPI, campaignsAPI } from '../services/api';
+import api from '../services/api';
 import Navbar from '../components/Navbar';
 import toast from 'react-hot-toast';
+import { SparklesIcon, RocketLaunchIcon, BuildingOfficeIcon, ArrowUpIcon } from '@heroicons/react/24/outline';
 
 const CreatorDashboard = () => {
   const location = useLocation();
+  const authUser = JSON.parse(localStorage.getItem('user') || '{}');
   const [profile, setProfile] = useState(null);
   const [packages, setPackages] = useState([]);
   const [bookings, setBookings] = useState([]);
   const [applications, setApplications] = useState([]);
+  const [subscription, setSubscription] = useState(null);
   const [stats, setStats] = useState({
     totalPackages: 0,
     activePackages: 0,
@@ -35,6 +39,15 @@ const CreatorDashboard = () => {
       // Fetch profile
       const profileRes = await creatorsAPI.getOwnProfile();
       setProfile(profileRes.data);
+
+      // Fetch subscription
+      try {
+        const subsRes = await api.get('/api/subscriptions/my-subscription');
+        setSubscription(subsRes.data.data);
+      } catch (error) {
+        console.error('Error fetching subscription:', error);
+        // Don't fail dashboard load if subscription fails
+      }
 
       // Fetch packages
       const packagesRes = await packagesAPI.getMyPackages();
@@ -91,11 +104,76 @@ const CreatorDashboard = () => {
       <Navbar />
 
       <div className="container-custom section-padding">
+        {/* Subscription Tier Badge */}
+        {subscription && subscription.plan && (
+          <div className={`mb-6 p-4 rounded-xl border-2 ${
+            subscription.plan.slug === 'agency' ? 'bg-gradient-to-r from-purple-50 to-pink-50 border-purple-200' :
+            subscription.plan.slug === 'pro' ? 'bg-gradient-to-r from-yellow-50 to-primary/10 border-primary' :
+            subscription.plan.slug === 'starter' ? 'bg-gradient-to-r from-blue-50 to-blue-100 border-blue-200' :
+            'bg-gray-50 border-gray-200'
+          }`}>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                {subscription.plan.slug === 'starter' && <SparklesIcon className="h-6 w-6 text-blue-600" />}
+                {subscription.plan.slug === 'pro' && <RocketLaunchIcon className="h-6 w-6 text-primary-dark" />}
+                {subscription.plan.slug === 'agency' && <BuildingOfficeIcon className="h-6 w-6 text-purple-600" />}
+                <div>
+                  <h3 className="font-bold text-gray-900">
+                    {subscription.plan.name} Plan
+                    {subscription.status === 'active' && (
+                      <span className="ml-2 text-xs px-2 py-1 bg-green-100 text-green-800 rounded-full">Active</span>
+                    )}
+                  </h3>
+                  <p className="text-sm text-gray-600">
+                    {subscription.plan.max_packages === -1 ? 'Unlimited' : subscription.plan.max_packages} packages • {' '}
+                    {subscription.plan.max_bookings_per_month === -1 ? 'Unlimited' : subscription.plan.max_bookings_per_month} bookings/month
+                  </p>
+                </div>
+              </div>
+              {subscription.plan.slug !== 'agency' && (
+                <Link
+                  to="/subscription/manage"
+                  className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium"
+                >
+                  <ArrowUpIcon className="h-4 w-4" />
+                  Upgrade
+                </Link>
+              )}
+              {subscription.plan.slug === 'agency' && (
+                <Link
+                  to="/subscription/manage"
+                  className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium"
+                >
+                  Manage
+                </Link>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-4xl font-bold text-dark leading-tight mb-2">Creator Dashboard</h1>
           <p className="text-gray-600 leading-relaxed">Welcome back! Here's your overview.</p>
         </div>
+
+        {/* Suspension Banner */}
+        {authUser.is_active === false && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-400 rounded-lg">
+            <div className="flex items-start gap-3">
+              <svg className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+              </svg>
+              <div>
+                <h3 className="font-semibold text-red-800">Your account has been suspended</h3>
+                <p className="text-sm text-red-700 mt-1">
+                  Your account is currently inactive. You may not receive new bookings or appear in search results.
+                  Please contact <a href="mailto:support@bantubuzz.com" className="underline font-medium">support@bantubuzz.com</a> if you believe this is an error.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Profile Completion Alert */}
         {!profileComplete && (
