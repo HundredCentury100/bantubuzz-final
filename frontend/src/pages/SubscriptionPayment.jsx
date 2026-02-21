@@ -34,7 +34,7 @@ const SubscriptionPayment = () => {
   const fetchSubscription = async () => {
     try {
       setLoading(true);
-      const response = await api.get(`/api/subscriptions/my-subscription`);
+      const response = await api.get(`/subscriptions/my-subscription`);
 
       if (response.data.success && response.data.data.has_subscription) {
         setSubscription(response.data.data.subscription);
@@ -116,7 +116,7 @@ const SubscriptionPayment = () => {
 
     try {
       setCheckingStatus(true);
-      const response = await api.get(`/api/subscriptions/subscription/${subId}/payment-status`);
+      const response = await api.get(`/subscriptions/subscription/${subId}/payment-status`);
 
       if (response.data.success && response.data.data.payment.paid) {
         toast.success('Payment confirmed! Your subscription is now active.');

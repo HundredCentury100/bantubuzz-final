@@ -40,8 +40,8 @@ export default function SubscriptionManage() {
     try {
       setLoading(true);
       const [subsRes, plansRes] = await Promise.all([
-        api.get('/api/subscriptions/my-subscription'),
-        api.get('/api/subscriptions/plans'),
+        api.get('/subscriptions/my-subscription'),
+        api.get('/subscriptions/plans'),
       ]);
 
       setCurrentSubscription(subsRes.data.data);
@@ -61,7 +61,7 @@ export default function SubscriptionManage() {
 
       // For free plan, subscribe immediately
       if (plan.slug === 'free' || (plan.price_monthly === 0 && plan.price_yearly === 0)) {
-        const res = await api.post('/api/subscriptions/subscribe', {
+        const res = await api.post('/subscriptions/subscribe', {
           plan_id: planId,
           billing_cycle: billingCycle
         });
@@ -74,7 +74,7 @@ export default function SubscriptionManage() {
       }
 
       // For paid plans, initiate payment
-      const res = await api.post('/api/subscriptions/subscribe', {
+      const res = await api.post('/subscriptions/subscribe', {
         plan_id: planId,
         billing_cycle: billingCycle
       });
@@ -111,7 +111,7 @@ export default function SubscriptionManage() {
       const plan = plans.find(p => p.id === planId);
 
       // Call upgrade endpoint
-      const res = await api.put('/api/subscriptions/upgrade', {
+      const res = await api.put('/subscriptions/upgrade', {
         new_plan_id: planId,
         billing_cycle: billingCycle
       });
@@ -156,7 +156,7 @@ export default function SubscriptionManage() {
 
     try {
       setActionLoading(true);
-      const res = await api.put('/api/subscriptions/cancel');
+      const res = await api.put('/subscriptions/cancel');
 
       if (res.data.success) {
         toast.success('Subscription cancelled. Access continues until end of billing period.');
@@ -173,7 +173,7 @@ export default function SubscriptionManage() {
   const handleReactivate = async () => {
     try {
       setActionLoading(true);
-      const res = await api.put('/api/subscriptions/reactivate');
+      const res = await api.put('/subscriptions/reactivate');
 
       if (res.data.success) {
         toast.success('Subscription reactivated!');

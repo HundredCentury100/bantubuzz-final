@@ -42,7 +42,7 @@ const BrandDashboard = () => {
 
       // Fetch subscription
       try {
-        const subsRes = await api.get('/api/subscriptions/my-subscription');
+        const subsRes = await api.get('/subscriptions/my-subscription');
         setSubscription(subsRes.data.data);
       } catch (error) {
         console.error('Error fetching subscription:', error);
@@ -384,6 +384,18 @@ const BrandDashboard = () => {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
                     </svg>
                     <span className="font-medium text-dark">Edit Profile</span>
+                  </div>
+                </Link>
+
+                <Link
+                  to="/subscription/manage"
+                  className="block p-3 border border-gray-200 rounded-lg hover:border-primary hover:bg-primary/5 transition-colors"
+                >
+                  <div className="flex items-center">
+                    <svg className="w-5 h-5 text-primary mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                    </svg>
+                    <span className="font-medium text-dark">Manage Subscription</span>
                   </div>
                 </Link>
 

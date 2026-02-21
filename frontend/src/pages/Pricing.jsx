@@ -26,7 +26,7 @@ export default function Pricing() {
 
   const fetchPlans = async () => {
     try {
-      const res = await api.get('/api/subscriptions/plans');
+      const res = await api.get('/subscriptions/plans');
       setPlans(res.data.data);
     } catch (error) {
       console.error('Error fetching plans:', error);

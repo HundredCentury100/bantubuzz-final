@@ -42,7 +42,7 @@ const CreatorDashboard = () => {
 
       // Fetch subscription
       try {
-        const subsRes = await api.get('/api/subscriptions/my-subscription');
+        const subsRes = await api.get('/subscriptions/my-subscription');
         setSubscription(subsRes.data.data);
       } catch (error) {
         console.error('Error fetching subscription:', error);
@@ -496,6 +496,18 @@ const CreatorDashboard = () => {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                     </svg>
                     <span className="font-medium text-dark">Edit Profile</span>
+                  </div>
+                </Link>
+
+                <Link
+                  to="/subscription/manage"
+                  className="block p-3 border border-gray-200 rounded-lg hover:border-primary hover:bg-primary/5 transition-colors"
+                >
+                  <div className="flex items-center">
+                    <svg className="w-5 h-5 text-primary mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                    </svg>
+                    <span className="font-medium text-dark">Manage Subscription</span>
                   </div>
                 </Link>
 
