@@ -80,6 +80,8 @@ import SuccessStories from './pages/SuccessStories';
 import Contact from './pages/Contact';
 import Pricing from './pages/Pricing';
 import SubscriptionManage from './pages/SubscriptionManage';
+import SubscriptionPayment from './pages/SubscriptionPayment';
+import SubscriptionPaymentReturn from './pages/SubscriptionPaymentReturn';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfService from './pages/TermsOfService';
 
@@ -662,6 +664,18 @@ function App() {
             <SubscriptionManage />
           </ProtectedRoute>
         }
+      />
+      <Route
+        path="/subscription/payment"
+        element={
+          <ProtectedRoute>
+            <SubscriptionPayment />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/subscription/payment/return"
+        element={<SubscriptionPaymentReturn />}
       />
 
       {/* 404 */}

@@ -29,6 +29,7 @@ class Subscription(db.Model):
     # Payment Info
     payment_method = db.Column(db.String(30))  # paynow, bank_transfer, stripe, paypal, etc.
     payment_reference = db.Column(db.String(100))  # External payment ID
+    paynow_poll_url = db.Column(db.Text, nullable=True)  # Paynow polling URL
     last_payment_date = db.Column(db.DateTime, nullable=True)
     next_payment_date = db.Column(db.DateTime, nullable=True)
     last_payment_amount = db.Column(db.Float, nullable=True)

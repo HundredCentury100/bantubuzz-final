@@ -6,6 +6,7 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 from datetime import datetime
 from app import db
 from app.models import User, Subscription, SubscriptionPlan
+from app.services.payment_service import initiate_subscription_payment, check_subscription_payment_status
 
 bp = Blueprint('subscriptions', __name__)
 
@@ -81,17 +82,16 @@ def get_my_subscription():
 @jwt_required()
 def subscribe():
     """
-    Subscribe user to a plan
-    Body: { plan_id: int, billing_cycle: 'monthly'|'yearly', payment_method: string, payment_reference: string }
+    Subscribe user to a plan with Paynow payment
+    Body: { plan_id: int, billing_cycle: 'monthly'|'yearly' }
     """
     try:
         user_id = get_jwt_identity()
+        user = User.query.get(user_id)
         data = request.get_json()
 
         plan_id = data.get('plan_id')
         billing_cycle = data.get('billing_cycle', 'monthly')
-        payment_method = data.get('payment_method')
-        payment_reference = data.get('payment_reference')
 
         if not plan_id:
             return jsonify({'success': False, 'error': 'plan_id is required'}), 400
@@ -110,35 +110,69 @@ def subscribe():
                 'error': 'You already have an active subscription. Cancel it first or upgrade instead.'
             }), 400
 
-        # Create new subscription
+        # For free plan, activate immediately without payment
+        if plan.slug == 'free' or (plan.price_monthly == 0 and plan.price_yearly == 0):
+            subscription = Subscription(
+                user_id=user_id,
+                plan_id=plan_id,
+                status='active',
+                billing_cycle=billing_cycle,
+                payment_method='free'
+            )
+            subscription.set_billing_period(billing_cycle)
+            subscription.last_payment_date = datetime.utcnow()
+            db.session.add(subscription)
+            db.session.commit()
+
+            return jsonify({
+                'success': True,
+                'message': f'Successfully subscribed to {plan.name} plan',
+                'data': subscription.to_dict()
+            }), 201
+
+        # For paid plans, create subscription with pending status and initiate payment
         subscription = Subscription(
             user_id=user_id,
             plan_id=plan_id,
-            status='active',
-            billing_cycle=billing_cycle,
-            payment_method=payment_method,
-            payment_reference=payment_reference
+            status='pending',  # Will activate after payment
+            billing_cycle=billing_cycle
         )
-
-        # Set billing period and payment dates
         subscription.set_billing_period(billing_cycle)
 
-        # Record payment
-        if billing_cycle == 'yearly':
-            subscription.last_payment_amount = plan.price_yearly
-        else:
-            subscription.last_payment_amount = plan.price_monthly
-
-        subscription.last_payment_date = datetime.utcnow()
-
         db.session.add(subscription)
-        db.session.commit()
+        db.session.flush()  # Get subscription ID without committing
 
-        return jsonify({
-            'success': True,
-            'message': f'Successfully subscribed to {plan.name} plan',
-            'data': subscription.to_dict()
-        }), 201
+        # Calculate amount based on billing cycle
+        amount = plan.price_yearly if billing_cycle == 'yearly' else plan.price_monthly
+
+        # Initiate Paynow payment
+        payment_result = initiate_subscription_payment(
+            subscription=subscription,
+            user_email=user.email,
+            plan_name=plan.name,
+            amount=amount,
+            billing_cycle=billing_cycle
+        )
+
+        if payment_result['success']:
+            db.session.commit()
+            return jsonify({
+                'success': True,
+                'message': 'Payment initiated successfully',
+                'data': {
+                    'subscription_id': subscription.id,
+                    'redirect_url': payment_result['redirect_url'],
+                    'poll_url': payment_result['poll_url'],
+                    'payment_reference': payment_result['payment_reference']
+                }
+            }), 201
+        else:
+            db.session.rollback()
+            return jsonify({
+                'success': False,
+                'error': payment_result.get('error', 'Payment initialization failed'),
+                'message': payment_result.get('message', 'Unknown error')
+            }), 400
 
     except Exception as e:
         db.session.rollback()
@@ -353,5 +387,42 @@ def check_subscription_limits():
         return jsonify({
             'success': False,
             'error': 'Failed to check limits',
+            'message': str(e)
+        }), 500
+
+
+@bp.route('/subscription/<int:subscription_id>/payment-status', methods=['GET'])
+@jwt_required()
+def check_payment_status_endpoint(subscription_id):
+    """
+    Check payment status for a subscription
+    """
+    try:
+        user_id = get_jwt_identity()
+
+        subscription = Subscription.query.get_or_404(subscription_id)
+
+        # Verify ownership
+        if subscription.user_id != user_id:
+            return jsonify({
+                'success': False,
+                'error': 'Unauthorized'
+            }), 403
+
+        # Check payment status
+        payment_status = check_subscription_payment_status(subscription)
+
+        return jsonify({
+            'success': True,
+            'data': {
+                'subscription': subscription.to_dict(),
+                'payment': payment_status
+            }
+        }), 200
+
+    except Exception as e:
+        return jsonify({
+            'success': False,
+            'error': 'Failed to check payment status',
             'message': str(e)
         }), 500

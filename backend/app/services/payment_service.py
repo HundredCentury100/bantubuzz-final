@@ -352,28 +352,31 @@ def initiate_payment(booking, user_email, package_title):
             poll_url = response.poll_url
             redirect_url = response.redirect_url
 
-            # Update booking with Paynow reference
-            booking.payment_reference = f'PAYNOW-{response.hash}'
+            # Update booking with Paynow reference (if booking has this attribute)
+            if hasattr(booking, 'payment_reference'):
+                booking.payment_reference = f'PAYNOW-{response.hash}'
 
-            # Create or update payment record
-            payment_record = Payment.query.filter_by(booking_id=booking.id).first()
-            if not payment_record:
-                payment_record = Payment(
-                    booking_id=booking.id,
-                    user_id=booking.brand.user_id,
-                    amount=booking.amount,
-                    payment_method='paynow',
-                    payment_type='automated',
-                    status='pending',
-                    escrow_status='pending'
-                )
-                db.session.add(payment_record)
+            # Create or update payment record (only for real DB bookings with integer IDs)
+            payment_hash = str(response.hash) if response.hash and response.hash is not True else poll_url.split('guid=')[-1] if '?guid=' in poll_url else None
 
-            payment_record.paynow_poll_url = poll_url
-            # response.hash might be boolean True instead of string, so convert it
-            payment_hash = str(response.hash) if response.hash and response.hash != True else poll_url.split('guid=')[-1] if '?guid=' in poll_url else None
-            payment_record.paynow_reference = payment_hash
-            payment_record.external_reference = f'BOOKING-{booking.id}'
+            booking_id_int = booking.id if isinstance(booking.id, int) else None
+            if booking_id_int:
+                payment_record = Payment.query.filter_by(booking_id=booking_id_int).first()
+                if not payment_record:
+                    payment_record = Payment(
+                        booking_id=booking_id_int,
+                        user_id=booking.brand.user_id,
+                        amount=booking.amount,
+                        payment_method='paynow',
+                        payment_type='automated',
+                        status='pending',
+                        escrow_status='pending'
+                    )
+                    db.session.add(payment_record)
+
+                payment_record.paynow_poll_url = poll_url
+                payment_record.paynow_reference = payment_hash
+                payment_record.external_reference = f'BOOKING-{booking_id_int}'
 
             db.session.commit()
 
@@ -648,3 +651,162 @@ def release_milestone_escrow(milestone_id, platform_fee_percentage=15):
     db.session.commit()
 
     return transaction
+
+
+def initiate_subscription_payment(subscription, user_email, plan_name, amount, billing_cycle):
+    """Initiate Paynow payment for subscription"""
+    import os
+    from paynow import Paynow
+    from flask import current_app
+
+    # Get Paynow credentials from environment
+    try:
+        integration_id = current_app.config.get('PAYNOW_INTEGRATION_ID') or os.getenv('PAYNOW_INTEGRATION_ID')
+        integration_key = current_app.config.get('PAYNOW_INTEGRATION_KEY') or os.getenv('PAYNOW_INTEGRATION_KEY')
+        return_url = current_app.config.get('PAYNOW_RETURN_URL') or os.getenv('PAYNOW_RETURN_URL')
+        result_url = current_app.config.get('PAYNOW_RESULT_URL') or os.getenv('PAYNOW_RESULT_URL')
+    except RuntimeError:
+        integration_id = os.getenv('PAYNOW_INTEGRATION_ID')
+        integration_key = os.getenv('PAYNOW_INTEGRATION_KEY')
+        return_url = os.getenv('PAYNOW_RETURN_URL')
+        result_url = os.getenv('PAYNOW_RESULT_URL')
+
+    # Initialize Paynow
+    paynow = Paynow(
+        integration_id=integration_id,
+        integration_key=integration_key,
+        return_url=return_url,
+        result_url=result_url
+    )
+
+    try:
+        # Create payment
+        payment_ref = f'SUB-{subscription.id}-{datetime.utcnow().strftime("%Y%m%d%H%M%S")}'
+        payment = paynow.create_payment(payment_ref, user_email)
+
+        # Add items to the payment
+        description = f'{plan_name} Subscription - {billing_cycle.capitalize()}'
+        payment.add(description, amount)
+
+        # Send payment to Paynow
+        response = paynow.send(payment)
+
+        if response.success:
+            # Get poll URL for checking payment status
+            poll_url = response.poll_url
+            redirect_url = response.redirect_url
+            payment_hash = str(response.hash) if response.hash and response.hash is not True else poll_url.split('guid=')[-1] if '?guid=' in poll_url else None
+
+            # Store payment reference in subscription
+            subscription.payment_method = 'paynow'
+            subscription.payment_reference = payment_hash
+            subscription.paynow_poll_url = poll_url
+
+            db.session.commit()
+
+            return {
+                'success': True,
+                'message': 'Payment initiated successfully',
+                'redirect_url': redirect_url,
+                'poll_url': poll_url,
+                'payment_reference': payment_hash
+            }
+        else:
+            # Get error details
+            error_msg = 'Unknown error'
+            if hasattr(response, 'errors') and response.errors:
+                error_msg = str(response.errors)
+            elif hasattr(response, 'status') and response.status:
+                error_msg = f"Paynow Status: {response.status}"
+
+            return {
+                'success': False,
+                'error': 'Failed to initiate payment',
+                'message': error_msg,
+                'paynow_status': getattr(response, 'status', None)
+            }
+
+    except Exception as e:
+        return {
+            'success': False,
+            'error': 'Payment initialization failed',
+            'message': str(e)
+        }
+
+
+def check_subscription_payment_status(subscription):
+    """Check Paynow payment status for subscription"""
+    import os
+    from paynow import Paynow
+    from flask import current_app
+
+    # Check if subscription payment is already confirmed
+    if subscription.status == 'active' and subscription.last_payment_date:
+        return {
+            'status': 'paid',
+            'paid': True,
+            'message': 'Payment already confirmed'
+        }
+
+    if not subscription.paynow_poll_url:
+        return {
+            'status': 'pending',
+            'paid': False,
+            'message': 'No payment initiated'
+        }
+
+    try:
+        # Get Paynow credentials
+        try:
+            integration_id = current_app.config.get('PAYNOW_INTEGRATION_ID') or os.getenv('PAYNOW_INTEGRATION_ID')
+            integration_key = current_app.config.get('PAYNOW_INTEGRATION_KEY') or os.getenv('PAYNOW_INTEGRATION_KEY')
+            return_url = current_app.config.get('PAYNOW_RETURN_URL') or os.getenv('PAYNOW_RETURN_URL')
+            result_url = current_app.config.get('PAYNOW_RESULT_URL') or os.getenv('PAYNOW_RESULT_URL')
+        except RuntimeError:
+            integration_id = os.getenv('PAYNOW_INTEGRATION_ID')
+            integration_key = os.getenv('PAYNOW_INTEGRATION_KEY')
+            return_url = os.getenv('PAYNOW_RETURN_URL')
+            result_url = os.getenv('PAYNOW_RESULT_URL')
+
+        # Initialize Paynow
+        paynow = Paynow(
+            integration_id=integration_id,
+            integration_key=integration_key,
+            return_url=return_url,
+            result_url=result_url
+        )
+
+        # Check status from Paynow
+        status = paynow.check_transaction_status(subscription.paynow_poll_url)
+
+        if status.paid:
+            # Activate subscription
+            subscription.status = 'active'
+            subscription.last_payment_date = datetime.utcnow()
+            subscription.last_payment_amount = subscription.plan.price_monthly if subscription.billing_cycle == 'monthly' else subscription.plan.price_yearly
+
+            # Set billing period if not already set
+            if not subscription.current_period_end:
+                subscription.set_billing_period(subscription.billing_cycle)
+
+            db.session.commit()
+
+            return {
+                'status': 'paid',
+                'paid': True,
+                'message': 'Payment confirmed and subscription activated'
+            }
+        else:
+            return {
+                'status': status.status if hasattr(status, 'status') else 'pending',
+                'paid': False,
+                'message': 'Payment not yet completed'
+            }
+
+    except Exception as e:
+        print(f"Error checking subscription payment status: {str(e)}")
+        return {
+            'status': 'pending',
+            'paid': False,
+            'message': f'Error checking status: {str(e)}'
+        }

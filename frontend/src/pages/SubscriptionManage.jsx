@@ -55,26 +55,47 @@ export default function SubscriptionManage() {
   };
 
   const handleSubscribe = async (planId) => {
-    // For demo purposes, we'll use a mock payment reference
-    // In production, this would integrate with Paynow or other payment gateway
-    const confirmSubscribe = window.confirm(
-      'This will subscribe you to the selected plan. In production, you would be redirected to payment.'
-    );
-
-    if (!confirmSubscribe) return;
-
     try {
       setActionLoading(true);
+      const plan = plans.find(p => p.id === planId);
+
+      // For free plan, subscribe immediately
+      if (plan.slug === 'free' || (plan.price_monthly === 0 && plan.price_yearly === 0)) {
+        const res = await api.post('/api/subscriptions/subscribe', {
+          plan_id: planId,
+          billing_cycle: billingCycle
+        });
+
+        if (res.data.success) {
+          toast.success('Successfully subscribed to Free plan!');
+          await fetchData();
+        }
+        return;
+      }
+
+      // For paid plans, initiate payment
       const res = await api.post('/api/subscriptions/subscribe', {
         plan_id: planId,
-        billing_cycle: billingCycle,
-        payment_method: 'paynow', // Mock for now
-        payment_reference: `DEMO-${Date.now()}`, // Mock reference
+        billing_cycle: billingCycle
       });
 
-      if (res.data.success) {
-        toast.success('Successfully subscribed!');
-        await fetchData(); // Refresh subscription data
+      if (res.data.success && res.data.data) {
+        // Store subscription ID in localStorage
+        localStorage.setItem('lastSubscriptionId', res.data.data.subscription_id);
+
+        // Navigate to payment page with payment data
+        navigate('/subscription/payment', {
+          state: {
+            paymentData: {
+              subscription_id: res.data.data.subscription_id,
+              redirect_url: res.data.data.redirect_url,
+              poll_url: res.data.data.poll_url,
+              payment_reference: res.data.data.payment_reference
+            },
+            plan: plan,
+            billingCycle: billingCycle
+          }
+        });
       }
     } catch (error) {
       console.error('Error subscribing:', error);
@@ -85,24 +106,38 @@ export default function SubscriptionManage() {
   };
 
   const handleUpgrade = async (planId) => {
-    const confirmUpgrade = window.confirm(
-      'This will upgrade/change your subscription plan. In production, you would be redirected to payment.'
-    );
-
-    if (!confirmUpgrade) return;
-
     try {
       setActionLoading(true);
+      const plan = plans.find(p => p.id === planId);
+
+      // Call upgrade endpoint
       const res = await api.put('/api/subscriptions/upgrade', {
         new_plan_id: planId,
-        billing_cycle: billingCycle,
-        payment_method: 'paynow',
-        payment_reference: `UPGRADE-${Date.now()}`,
+        billing_cycle: billingCycle
       });
 
-      if (res.data.success) {
-        toast.success('Successfully upgraded subscription!');
-        await fetchData();
+      if (res.data.success && res.data.data) {
+        // If there's payment data (for paid plans), redirect to payment
+        if (res.data.data.redirect_url) {
+          localStorage.setItem('lastSubscriptionId', currentSubscription.id);
+
+          navigate('/subscription/payment', {
+            state: {
+              paymentData: {
+                subscription_id: currentSubscription.id,
+                redirect_url: res.data.data.redirect_url,
+                poll_url: res.data.data.poll_url,
+                payment_reference: res.data.data.payment_reference
+              },
+              plan: plan,
+              billingCycle: billingCycle
+            }
+          });
+        } else {
+          // Free upgrade without payment
+          toast.success('Successfully upgraded subscription!');
+          await fetchData();
+        }
       }
     } catch (error) {
       console.error('Error upgrading:', error);
