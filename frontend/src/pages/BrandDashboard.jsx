@@ -107,11 +107,11 @@ const BrandDashboard = () => {
             subscription.plan.slug === 'starter' ? 'bg-gradient-to-r from-blue-50 to-blue-100 border-blue-200' :
             'bg-gray-50 border-gray-200'
           }`}>
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div className="flex items-center gap-3">
-                {subscription.plan.slug === 'starter' && <SparklesIcon className="h-6 w-6 text-blue-600" />}
-                {subscription.plan.slug === 'pro' && <RocketLaunchIcon className="h-6 w-6 text-primary-dark" />}
-                {subscription.plan.slug === 'agency' && <BuildingOfficeIcon className="h-6 w-6 text-purple-600" />}
+                {subscription.plan.slug === 'starter' && <SparklesIcon className="h-6 w-6 text-blue-600 flex-shrink-0" />}
+                {subscription.plan.slug === 'pro' && <RocketLaunchIcon className="h-6 w-6 text-primary-dark flex-shrink-0" />}
+                {subscription.plan.slug === 'agency' && <BuildingOfficeIcon className="h-6 w-6 text-purple-600 flex-shrink-0" />}
                 <div>
                   <h3 className="font-bold text-gray-900">
                     {subscription.plan.name} Plan
@@ -128,7 +128,7 @@ const BrandDashboard = () => {
               {subscription.plan.slug !== 'agency' && (
                 <Link
                   to="/subscription/manage"
-                  className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium"
+                  className="flex items-center justify-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium whitespace-nowrap"
                 >
                   <ArrowUpIcon className="h-4 w-4" />
                   Upgrade
@@ -137,7 +137,7 @@ const BrandDashboard = () => {
               {subscription.plan.slug === 'agency' && (
                 <Link
                   to="/subscription/manage"
-                  className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium"
+                  className="px-4 py-2 text-center bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium whitespace-nowrap"
                 >
                   Manage
                 </Link>

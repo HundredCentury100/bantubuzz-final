@@ -134,7 +134,7 @@ export default function Pricing() {
                 <div
                   key={plan.id}
                   className={`relative bg-white rounded-2xl shadow-lg overflow-hidden ${
-                    isPopular ? 'ring-2 ring-primary transform scale-105' : ''
+                    isPopular ? 'ring-2 ring-primary lg:transform lg:scale-105' : ''
                   }`}
                 >
                   {/* Popular Badge */}
