@@ -57,18 +57,23 @@ const Navbar = () => {
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center space-x-10">
-            <Link
-              to="/browse/creators"
-              className="text-gray-700 hover:text-gray-900 transition-colors text-sm font-medium"
-            >
-              Search
-            </Link>
-            <Link
-              to="/how-it-works"
-              className="text-gray-700 hover:text-gray-900 transition-colors text-sm font-medium"
-            >
-              How It Works
-            </Link>
+            {/* Show Search and How It Works only for non-creators or unauthenticated users */}
+            {(!isAuthenticated || user?.user_type !== 'creator') && (
+              <>
+                <Link
+                  to="/browse/creators"
+                  className="text-gray-700 hover:text-gray-900 transition-colors text-sm font-medium"
+                >
+                  Search
+                </Link>
+                <Link
+                  to="/how-it-works"
+                  className="text-gray-700 hover:text-gray-900 transition-colors text-sm font-medium"
+                >
+                  How It Works
+                </Link>
+              </>
+            )}
             <Link
               to="/pricing"
               className="text-gray-700 hover:text-gray-900 transition-colors text-sm font-medium"
@@ -96,7 +101,7 @@ const Navbar = () => {
                 )}
                 {user?.user_type === 'brand' && (
                   <Link
-                    to="/brand/manage-briefs"
+                    to="/brand/briefs"
                     className="text-gray-700 hover:text-gray-900 transition-colors text-sm font-medium"
                   >
                     Briefs
@@ -136,12 +141,20 @@ const Navbar = () => {
                   )}
                 </Link>
                 {user?.user_type === 'creator' && (
-                  <Link
-                    to="/wallet"
-                    className="text-gray-700 hover:text-gray-900 transition-colors text-sm font-medium"
-                  >
-                    Wallet
-                  </Link>
+                  <>
+                    <Link
+                      to="/wallet"
+                      className="text-gray-700 hover:text-gray-900 transition-colors text-sm font-medium"
+                    >
+                      Wallet
+                    </Link>
+                    <Link
+                      to="/subscription/manage"
+                      className="text-gray-700 hover:text-gray-900 transition-colors text-sm font-medium"
+                    >
+                      Subscription
+                    </Link>
+                  </>
                 )}
 
                 {/* Notification Bell */}
@@ -235,30 +248,35 @@ const Navbar = () => {
               >
                 <Menu.Items className="absolute right-0 mt-2 w-56 origin-top-right bg-white rounded-lg shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
                   <div className="p-2">
-                    <Menu.Item>
-                      {({ active }) => (
-                        <Link
-                          to="/browse/creators"
-                          className={`${
-                            active ? 'bg-light' : ''
-                          } block px-4 py-2 text-sm text-gray-700 rounded-lg`}
-                        >
-                          Search
-                        </Link>
-                      )}
-                    </Menu.Item>
-                    <Menu.Item>
-                      {({ active }) => (
-                        <Link
-                          to="/how-it-works"
-                          className={`${
-                            active ? 'bg-light' : ''
-                          } block px-4 py-2 text-sm text-gray-700 rounded-lg`}
-                        >
-                          How It Works
-                        </Link>
-                      )}
-                    </Menu.Item>
+                    {/* Show Search and How It Works only for non-creators or unauthenticated users */}
+                    {(!isAuthenticated || user?.user_type !== 'creator') && (
+                      <>
+                        <Menu.Item>
+                          {({ active }) => (
+                            <Link
+                              to="/browse/creators"
+                              className={`${
+                                active ? 'bg-light' : ''
+                              } block px-4 py-2 text-sm text-gray-700 rounded-lg`}
+                            >
+                              Search
+                            </Link>
+                          )}
+                        </Menu.Item>
+                        <Menu.Item>
+                          {({ active }) => (
+                            <Link
+                              to="/how-it-works"
+                              className={`${
+                                active ? 'bg-light' : ''
+                              } block px-4 py-2 text-sm text-gray-700 rounded-lg`}
+                            >
+                              How It Works
+                            </Link>
+                          )}
+                        </Menu.Item>
+                      </>
+                    )}
                     <Menu.Item>
                       {({ active }) => (
                         <Link
@@ -318,18 +336,32 @@ const Navbar = () => {
                           )}
                         </Menu.Item>
                         {user?.user_type === 'creator' && (
-                          <Menu.Item>
-                            {({ active }) => (
-                              <Link
-                                to="/wallet"
-                                className={`${
-                                  active ? 'bg-light' : ''
-                                } block px-4 py-2 text-sm text-gray-700 rounded-lg`}
-                              >
-                                Wallet
-                              </Link>
-                            )}
-                          </Menu.Item>
+                          <>
+                            <Menu.Item>
+                              {({ active }) => (
+                                <Link
+                                  to="/wallet"
+                                  className={`${
+                                    active ? 'bg-light' : ''
+                                  } block px-4 py-2 text-sm text-gray-700 rounded-lg`}
+                                >
+                                  Wallet
+                                </Link>
+                              )}
+                            </Menu.Item>
+                            <Menu.Item>
+                              {({ active }) => (
+                                <Link
+                                  to="/subscription/manage"
+                                  className={`${
+                                    active ? 'bg-light' : ''
+                                  } block px-4 py-2 text-sm text-gray-700 rounded-lg`}
+                                >
+                                  Subscription
+                                </Link>
+                              )}
+                            </Menu.Item>
+                          </>
                         )}
                         <Menu.Item>
                           {({ active }) => (
