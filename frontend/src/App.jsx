@@ -78,6 +78,7 @@ import About from './pages/About';
 import HowItWorks from './pages/HowItWorks';
 import SuccessStories from './pages/SuccessStories';
 import Contact from './pages/Contact';
+import Pricing from './pages/Pricing';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfService from './pages/TermsOfService';
 
@@ -648,6 +649,7 @@ function App() {
       <Route path="/how-it-works" element={<HowItWorks />} />
       <Route path="/success-stories" element={<SuccessStories />} />
       <Route path="/contact" element={<Contact />} />
+      <Route path="/pricing" element={<Pricing />} />
       <Route path="/privacy" element={<PrivacyPolicy />} />
       <Route path="/terms" element={<TermsOfService />} />
 

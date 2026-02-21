@@ -64,10 +64,16 @@ const Navbar = () => {
               Search
             </Link>
             <Link
-              to="/packages"
+              to="/how-it-works"
               className="text-gray-700 hover:text-gray-900 transition-colors text-sm font-medium"
             >
               How It Works
+            </Link>
+            <Link
+              to="/pricing"
+              className="text-gray-700 hover:text-gray-900 transition-colors text-sm font-medium"
+            >
+              Pricing
             </Link>
 
             {isAuthenticated ? (
@@ -244,12 +250,24 @@ const Navbar = () => {
                     <Menu.Item>
                       {({ active }) => (
                         <Link
-                          to="/packages"
+                          to="/how-it-works"
                           className={`${
                             active ? 'bg-light' : ''
                           } block px-4 py-2 text-sm text-gray-700 rounded-lg`}
                         >
                           How It Works
+                        </Link>
+                      )}
+                    </Menu.Item>
+                    <Menu.Item>
+                      {({ active }) => (
+                        <Link
+                          to="/pricing"
+                          className={`${
+                            active ? 'bg-light' : ''
+                          } block px-4 py-2 text-sm text-gray-700 rounded-lg`}
+                        >
+                          Pricing
                         </Link>
                       )}
                     </Menu.Item>
