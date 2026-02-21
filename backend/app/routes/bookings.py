@@ -6,7 +6,7 @@ import os
 from app import db
 from app.models import (
     Booking, Package, Campaign, BrandProfile, CreatorProfile, User, Collaboration,
-    Proposal, CollaborationMilestone
+    Proposal, CollaborationMilestone, Subscription, SubscriptionPlan
 )
 from app.services.payment_service import initiate_payment, check_payment_status, process_payment_webhook
 from app.utils.notifications import notify_new_booking, notify_booking_status
@@ -82,6 +82,35 @@ def create_booking():
 
         if not brand or not user:
             return jsonify({'error': 'Brand profile not found'}), 404
+
+        # Check subscription limits
+        subscription = Subscription.query.filter_by(
+            user_id=user_id,
+            status='active'
+        ).first()
+
+        if subscription and subscription.plan:
+            # Get bookings count for current month for this brand
+            from datetime import datetime
+            from dateutil.relativedelta import relativedelta
+            start_of_month = datetime.utcnow().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+            current_month_bookings = Booking.query.filter(
+                Booking.brand_id == brand.id,
+                Booking.created_at >= start_of_month
+            ).count()
+
+            max_bookings = subscription.plan.max_bookings_per_month
+
+            # Check if user has reached their monthly booking limit (-1 means unlimited)
+            if max_bookings != -1 and current_month_bookings >= max_bookings:
+                return jsonify({
+                    'error': f'Monthly booking limit reached. Your {subscription.plan.name} plan allows {max_bookings} bookings per month.',
+                    'limit_reached': True,
+                    'current_count': current_month_bookings,
+                    'max_allowed': max_bookings,
+                    'upgrade_required': True
+                }), 403
 
         data = request.get_json()
         if 'package_id' not in data:
@@ -287,6 +316,339 @@ def get_payment_status(booking_id):
         return jsonify(status), 200
 
     except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@bp.route('/cart/checkout', methods=['POST'])
+@jwt_required()
+def cart_checkout():
+    """
+    Cart checkout: create all bookings then initiate ONE combined Paynow payment.
+    Body: { package_ids: [1, 2, ...] }
+    Returns: { booking_ids, redirect_url, poll_url, payment_reference, total }
+    """
+    try:
+        user_id = int(get_jwt_identity())
+        user = User.query.get(user_id)
+        brand = BrandProfile.query.filter_by(user_id=user_id).first()
+
+        if not brand or not user:
+            return jsonify({'error': 'Brand profile not found'}), 404
+
+        data = request.get_json()
+        package_ids = data.get('package_ids', [])
+        if not package_ids:
+            return jsonify({'error': 'No packages provided'}), 400
+
+        # Check subscription limits
+        subscription = Subscription.query.filter_by(
+            user_id=user_id,
+            status='active'
+        ).first()
+
+        if subscription and subscription.plan:
+            # Get bookings count for current month for this brand
+            start_of_month = datetime.utcnow().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+
+            current_month_bookings = Booking.query.filter(
+                Booking.brand_id == brand.id,
+                Booking.created_at >= start_of_month
+            ).count()
+
+            max_bookings = subscription.plan.max_bookings_per_month
+            new_bookings_count = len(package_ids)
+
+            # Check if adding these bookings would exceed the limit (-1 means unlimited)
+            if max_bookings != -1 and (current_month_bookings + new_bookings_count) > max_bookings:
+                remaining = max_bookings - current_month_bookings
+                return jsonify({
+                    'error': f'Monthly booking limit exceeded. Your {subscription.plan.name} plan allows {max_bookings} bookings per month. You have {remaining} remaining.',
+                    'limit_reached': True,
+                    'current_count': current_month_bookings,
+                    'max_allowed': max_bookings,
+                    'remaining': remaining,
+                    'upgrade_required': True
+                }), 403
+
+        # --- 1. Create all bookings ---
+        bookings = []
+        total = 0.0
+        for pkg_id in package_ids:
+            package = Package.query.get(pkg_id)
+            if not package:
+                return jsonify({'error': f'Package {pkg_id} not found'}), 404
+
+            booking = Booking(
+                package_id=package.id,
+                creator_id=package.creator_id,
+                brand_id=brand.id,
+                amount=package.price,
+                total_price=package.price,
+            )
+            db.session.add(booking)
+            db.session.flush()  # get booking.id before commit
+            bookings.append((booking, package))
+            total += float(package.price)
+
+        db.session.commit()
+
+        # Notify creators
+        for booking, package in bookings:
+            db.session.refresh(booking)
+            creator_user = User.query.get(package.creator.user_id)
+            if creator_user:
+                notify_new_booking(
+                    creator_id=creator_user.id,
+                    brand_name=brand.company_name or user.email,
+                    booking_id=booking.id
+                )
+
+        # --- 2. Initiate ONE combined Paynow payment ---
+        import os
+        from paynow import Paynow
+        from flask import current_app
+
+        try:
+            integration_id = current_app.config.get('PAYNOW_INTEGRATION_ID') or os.getenv('PAYNOW_INTEGRATION_ID')
+            integration_key = current_app.config.get('PAYNOW_INTEGRATION_KEY') or os.getenv('PAYNOW_INTEGRATION_KEY')
+            return_url = current_app.config.get('PAYNOW_RETURN_URL') or os.getenv('PAYNOW_RETURN_URL')
+            result_url = current_app.config.get('PAYNOW_RESULT_URL') or os.getenv('PAYNOW_RESULT_URL')
+        except RuntimeError:
+            integration_id = os.getenv('PAYNOW_INTEGRATION_ID')
+            integration_key = os.getenv('PAYNOW_INTEGRATION_KEY')
+            return_url = os.getenv('PAYNOW_RETURN_URL')
+            result_url = os.getenv('PAYNOW_RESULT_URL')
+
+        booking_ids = [b.id for b, _ in bookings]
+        cart_ref = f"CART-{'_'.join(str(i) for i in booking_ids)}"
+
+        paynow = Paynow(
+            integration_id=integration_id,
+            integration_key=integration_key,
+            return_url=return_url,
+            result_url=result_url
+        )
+
+        payment = paynow.create_payment(cart_ref, user.email)
+        for booking, package in bookings:
+            payment.add(package.title, float(package.price))
+
+        response = paynow.send(payment)
+
+        if not response.success:
+            # Roll back bookings if Paynow fails
+            db.session.rollback()
+            error_msg = str(getattr(response, 'errors', None) or getattr(response, 'status', 'Unknown error'))
+            return jsonify({'success': False, 'error': 'Paynow failed', 'message': error_msg}), 400
+
+        poll_url = response.poll_url
+        redirect_url = response.redirect_url
+        payment_hash = str(response.hash) if response.hash and response.hash is not True else (
+            poll_url.split('guid=')[-1] if '?guid=' in poll_url else None
+        )
+
+        # Store payment reference on all bookings
+        from app.models import Payment as PaymentModel
+        for booking, package in bookings:
+            booking.payment_method = 'paynow'
+            booking.payment_reference = f'PAYNOW-{payment_hash}'
+
+            pay_rec = PaymentModel(
+                booking_id=booking.id,
+                user_id=brand.user_id,
+                amount=float(package.price),
+                payment_method='paynow',
+                payment_type='automated',
+                status='pending',
+                escrow_status='pending',
+                paynow_poll_url=poll_url,
+                paynow_reference=payment_hash,
+                external_reference=cart_ref,
+            )
+            db.session.add(pay_rec)
+
+        db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'booking_ids': booking_ids,
+            'total': total,
+            'redirect_url': redirect_url,
+            'poll_url': poll_url,
+            'payment_reference': payment_hash,
+            'cart_ref': cart_ref,
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        import traceback
+        print(traceback.format_exc())
+        return jsonify({'error': str(e)}), 500
+
+
+@bp.route('/cart/status', methods=['POST'])
+@jwt_required()
+def cart_payment_status():
+    """
+    Poll Paynow status for a cart (multiple booking IDs).
+    Body: { booking_ids: [1,2,...], poll_url: '...' }
+    Marks all bookings paid + creates collaborations when confirmed.
+    """
+    try:
+        import os
+        from paynow import Paynow
+        from flask import current_app
+        from datetime import timedelta
+
+        user_id = int(get_jwt_identity())
+        data = request.get_json()
+        booking_ids = data.get('booking_ids', [])
+        poll_url = data.get('poll_url', '')
+
+        if not booking_ids:
+            return jsonify({'error': 'No booking IDs provided'}), 400
+
+        # Check if already paid
+        all_paid = all(
+            Booking.query.get(bid).payment_status in ('paid', 'verified')
+            for bid in booking_ids
+            if Booking.query.get(bid)
+        )
+        if all_paid:
+            return jsonify({'paid': True, 'status': 'paid'}), 200
+
+        # Poll Paynow
+        try:
+            integration_id = current_app.config.get('PAYNOW_INTEGRATION_ID') or os.getenv('PAYNOW_INTEGRATION_ID')
+            integration_key = current_app.config.get('PAYNOW_INTEGRATION_KEY') or os.getenv('PAYNOW_INTEGRATION_KEY')
+            return_url = current_app.config.get('PAYNOW_RETURN_URL') or os.getenv('PAYNOW_RETURN_URL')
+            result_url = current_app.config.get('PAYNOW_RESULT_URL') or os.getenv('PAYNOW_RESULT_URL')
+        except RuntimeError:
+            integration_id = os.getenv('PAYNOW_INTEGRATION_ID')
+            integration_key = os.getenv('PAYNOW_INTEGRATION_KEY')
+            return_url = os.getenv('PAYNOW_RETURN_URL')
+            result_url = os.getenv('PAYNOW_RESULT_URL')
+
+        paynow = Paynow(
+            integration_id=integration_id,
+            integration_key=integration_key,
+            return_url=return_url,
+            result_url=result_url
+        )
+
+        status_response = paynow.check_transaction_status(poll_url)
+        paynow_paid = getattr(status_response, 'paid', False)
+        paynow_status = getattr(status_response, 'status', 'pending')
+
+        if paynow_paid:
+            # Mark all bookings paid and create collaborations
+            for bid in booking_ids:
+                booking = Booking.query.get(bid)
+                if not booking or booking.payment_status == 'paid':
+                    continue
+
+                booking.payment_status = 'paid'
+                booking.escrow_status = 'escrowed'
+                booking.escrowed_at = datetime.utcnow()
+                booking.status = 'accepted'
+
+                # Create collaboration for each booking
+                existing_collab = Collaboration.query.filter_by(booking_id=booking.id).first()
+                if not existing_collab:
+                    package = Package.query.get(booking.package_id)
+                    start_date = datetime.utcnow()
+                    expected_completion = None
+                    if package and package.duration_days:
+                        expected_completion = start_date + timedelta(days=package.duration_days)
+
+                    collab = Collaboration(
+                        collaboration_type='package',
+                        booking_id=booking.id,
+                        creator_id=booking.creator_id,
+                        brand_id=booking.brand_id,
+                        title=f"Collaboration for {package.title if package else 'Package'}",
+                        description=package.description if package else '',
+                        amount=booking.amount,
+                        status='in_progress',
+                        start_date=start_date,
+                        expected_completion_date=expected_completion,
+                        deliverables=package.deliverables if package and package.deliverables else [],
+                        progress_percentage=0
+                    )
+                    db.session.add(collab)
+
+            db.session.commit()
+            return jsonify({'paid': True, 'status': 'paid'}), 200
+
+        return jsonify({'paid': False, 'status': paynow_status}), 200
+
+    except Exception as e:
+        import traceback
+        print(traceback.format_exc())
+        return jsonify({'error': str(e)}), 500
+
+
+@bp.route('/cart/upload-pop', methods=['POST'])
+@jwt_required()
+def cart_upload_pop():
+    """
+    Bank transfer POP upload for a cart (multiple bookings).
+    Multipart form: file + booking_ids (JSON array as string)
+    """
+    try:
+        import json
+        user_id = int(get_jwt_identity())
+        brand = BrandProfile.query.filter_by(user_id=user_id).first()
+        if not brand:
+            return jsonify({'error': 'Brand profile not found'}), 404
+
+        booking_ids = json.loads(request.form.get('booking_ids', '[]'))
+        if not booking_ids:
+            return jsonify({'error': 'No booking IDs provided'}), 400
+
+        if 'file' not in request.files:
+            return jsonify({'error': 'No file provided'}), 400
+
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({'error': 'No file selected'}), 400
+
+        if not allowed_file(file.filename):
+            return jsonify({'error': 'File type not allowed. Only PDF, JPG, JPEG, PNG, GIF'}), 400
+
+        file.seek(0, os.SEEK_END)
+        file_size = file.tell()
+        file.seek(0)
+        if file_size > 20 * 1024 * 1024:
+            return jsonify({'error': 'File size exceeds 20MB limit'}), 400
+
+        os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+        timestamp = datetime.utcnow().strftime('%Y%m%d_%H%M%S')
+        original_filename = secure_filename(file.filename)
+        filename = f"cart_{'_'.join(str(i) for i in booking_ids)}_{timestamp}_{original_filename}"
+        filepath = os.path.join(UPLOAD_FOLDER, filename)
+        file.save(filepath)
+
+        for bid in booking_ids:
+            booking = Booking.query.get(bid)
+            if not booking or booking.brand_id != brand.id:
+                continue
+            booking.proof_of_payment = filepath
+            booking.payment_method = 'bank_transfer'
+            booking.payment_status = 'pending'
+
+        db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'message': 'Proof of payment uploaded for all bookings. Awaiting admin verification.',
+            'booking_ids': booking_ids,
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        import traceback
+        print(traceback.format_exc())
         return jsonify({'error': str(e)}), 500
 
 

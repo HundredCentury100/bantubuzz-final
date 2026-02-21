@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from app import db
-from app.models import Package, CreatorProfile
+from app.models import Package, CreatorProfile, Subscription, SubscriptionPlan, User
 
 bp = Blueprint('packages', __name__)
 
@@ -85,6 +85,27 @@ def create_package():
 
         if not creator:
             return jsonify({'error': 'Creator profile not found'}), 404
+
+        # Check subscription limits
+        subscription = Subscription.query.filter_by(
+            user_id=user_id,
+            status='active'
+        ).first()
+
+        if subscription and subscription.plan:
+            # Get current package count for this creator
+            current_packages = Package.query.filter_by(creator_id=creator.id).count()
+            max_packages = subscription.plan.max_packages
+
+            # Check if user has reached their package limit (-1 means unlimited)
+            if max_packages != -1 and current_packages >= max_packages:
+                return jsonify({
+                    'error': f'Package limit reached. Your {subscription.plan.name} plan allows {max_packages} packages.',
+                    'limit_reached': True,
+                    'current_count': current_packages,
+                    'max_allowed': max_packages,
+                    'upgrade_required': True
+                }), 403
 
         data = request.get_json()
         required_fields = ['title', 'description', 'price', 'duration_days', 'category']
