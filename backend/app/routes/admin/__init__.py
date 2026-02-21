@@ -26,5 +26,6 @@ from . import categories_management
 from . import activity
 from . import disputes
 from . import reports
+from . import subscriptions
 
 __all__ = ['bp']
