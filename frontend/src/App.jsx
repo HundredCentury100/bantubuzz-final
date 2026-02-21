@@ -49,6 +49,7 @@ import VerificationQueue from './pages/admin/VerificationQueue';
 import AdminActivity from './pages/admin/Activity';
 import AdminDisputes from './pages/admin/Disputes';
 import AdminReports from './pages/admin/Reports';
+import AdminSubscriptions from './pages/admin/Subscriptions';
 import RaiseDispute from './pages/RaiseDispute';
 import DisputeStatus from './pages/DisputeStatus';
 import AdminCashouts from './pages/admin/Cashouts';
@@ -565,6 +566,14 @@ function App() {
         element={
           <AdminRoute>
             <AdminReports />
+          </AdminRoute>
+        }
+      />
+      <Route
+        path="/admin/subscriptions"
+        element={
+          <AdminRoute>
+            <AdminSubscriptions />
           </AdminRoute>
         }
       />
