@@ -11,6 +11,10 @@ import {
   SparklesIcon,
   RocketLaunchIcon,
   BuildingOfficeIcon,
+  StarIcon,
+  BoltIcon,
+  TrophyIcon,
+  UsersIcon,
 } from '@heroicons/react/24/outline';
 
 export default function Pricing() {
@@ -50,13 +54,13 @@ export default function Pricing() {
   const getPlanIcon = (slug) => {
     switch (slug) {
       case 'starter':
-        return SparklesIcon;
+        return StarIcon; // Rising star for starter creators
       case 'pro':
-        return RocketLaunchIcon;
+        return BoltIcon; // Lightning bolt for power/professional users
       case 'agency':
-        return BuildingOfficeIcon;
+        return TrophyIcon; // Trophy for premium/agency level
       default:
-        return CheckIcon;
+        return UsersIcon; // Community icon for free plan
     }
   };
 

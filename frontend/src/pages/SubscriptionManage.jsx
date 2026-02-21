@@ -9,9 +9,10 @@ import {
   XMarkIcon,
   ArrowPathIcon,
   CreditCardIcon,
-  SparklesIcon,
-  RocketLaunchIcon,
-  BuildingOfficeIcon,
+  StarIcon,
+  BoltIcon,
+  TrophyIcon,
+  UsersIcon,
   ExclamationTriangleIcon,
 } from '@heroicons/react/24/outline';
 
@@ -190,13 +191,13 @@ export default function SubscriptionManage() {
   const getPlanIcon = (slug) => {
     switch (slug) {
       case 'starter':
-        return SparklesIcon;
+        return StarIcon; // Rising star for starter creators
       case 'pro':
-        return RocketLaunchIcon;
+        return BoltIcon; // Lightning bolt for power/professional users
       case 'agency':
-        return BuildingOfficeIcon;
+        return TrophyIcon; // Trophy for premium/agency level
       default:
-        return CheckIcon;
+        return UsersIcon; // Community icon for free plan
     }
   };
 
