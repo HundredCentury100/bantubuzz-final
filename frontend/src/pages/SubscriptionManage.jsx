@@ -262,7 +262,7 @@ export default function SubscriptionManage() {
                 <div className={`inline-flex items-center px-4 py-2 rounded-full ${
                   isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
                 }`}>
-                  {currentSubscription.status.toUpperCase()}
+                  {currentSubscription?.status?.toUpperCase() || 'UNKNOWN'}
                 </div>
               </div>
 
@@ -270,19 +270,19 @@ export default function SubscriptionManage() {
                 <div>
                   <p className="text-sm text-gray-600">Billing Cycle</p>
                   <p className="text-lg font-semibold text-gray-900 capitalize">
-                    {currentSubscription.billing_cycle}
+                    {currentSubscription?.billing_cycle || 'N/A'}
                   </p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-600">Current Period Ends</p>
                   <p className="text-lg font-semibold text-gray-900">
-                    {formatDate(currentSubscription.current_period_end)}
+                    {formatDate(currentSubscription?.current_period_end)}
                   </p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-600">Next Payment</p>
                   <p className="text-lg font-semibold text-gray-900">
-                    {currentSubscription.next_payment_date
+                    {currentSubscription?.next_payment_date
                       ? formatDate(currentSubscription.next_payment_date)
                       : 'N/A'}
                   </p>
@@ -298,7 +298,7 @@ export default function SubscriptionManage() {
                         Subscription Cancelled
                       </h3>
                       <p className="text-sm text-yellow-800 mt-1">
-                        Your subscription will remain active until {formatDate(currentSubscription.current_period_end)}.
+                        Your subscription will remain active until {formatDate(currentSubscription?.current_period_end)}.
                         You can reactivate it anytime before then.
                       </p>
                     </div>
