@@ -40,9 +40,10 @@ const Home = () => {
   const fetchCategories = async () => {
     try {
       const response = await categoriesAPI.getCategories();
-      setCategories(response.data || []);
+      setCategories(response.data.categories || []);
     } catch (error) {
       console.error('Error fetching categories:', error);
+      setCategories([]);
     }
   };
 
