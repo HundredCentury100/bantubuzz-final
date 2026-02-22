@@ -9,6 +9,8 @@ class Category(db.Model):
     name = db.Column(db.String(100), unique=True, nullable=False)
     slug = db.Column(db.String(100), unique=True, nullable=False)
     description = db.Column(db.Text, nullable=True)
+    image = db.Column(db.String(255), nullable=True)
+    display_order = db.Column(db.Integer, default=0)
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -19,6 +21,8 @@ class Category(db.Model):
             'name': self.name,
             'slug': self.slug,
             'description': self.description,
+            'image': self.image,
+            'display_order': self.display_order,
             'is_active': self.is_active,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None

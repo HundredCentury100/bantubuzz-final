@@ -54,7 +54,7 @@ import RaiseDispute from './pages/RaiseDispute';
 import DisputeStatus from './pages/DisputeStatus';
 import AdminCashouts from './pages/admin/Cashouts';
 import AdminFeaturedCreators from './pages/admin/FeaturedCreators';
-import AdminCategories from './pages/AdminCategories';
+import AdminCategories from './pages/admin/Categories';
 import AdminCollaborations from './pages/AdminCollaborations';
 import AdminBookings from './pages/AdminBookings';
 import AdminCampaigns from './pages/AdminCampaigns';

@@ -3,10 +3,18 @@ Admin Category Management routes
 Handles create, update, delete operations for categories
 """
 from flask import jsonify, request
+from werkzeug.utils import secure_filename
+import os
 from app import db
 from app.models import Category
 from app.decorators.admin import admin_required
 from . import bp
+
+UPLOAD_FOLDER = 'uploads/categories'
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
 @bp.route('/categories', methods=['GET'])
@@ -33,19 +41,21 @@ def get_all_categories():
 def create_category():
     """
     Create a new category
-    Expects JSON with:
+    Expects FormData with:
     - name: string (required)
     - slug: string (optional, will be auto-generated from name if not provided)
     - description: string
     - is_active: boolean
+    - image: file (optional)
+    - display_order: integer
     """
     try:
-        data = request.get_json()
-
-        name = data.get('name')
-        slug = data.get('slug')
-        description = data.get('description', '')
-        is_active = data.get('is_active', True)
+        # Get form data
+        name = request.form.get('name')
+        slug = request.form.get('slug')
+        description = request.form.get('description', '')
+        is_active = request.form.get('is_active', 'true').lower() == 'true'
+        display_order = int(request.form.get('display_order', 0))
 
         if not name:
             return jsonify({'error': 'Name is required'}), 400
@@ -59,11 +69,31 @@ def create_category():
         if existing:
             return jsonify({'error': 'A category with this slug already exists'}), 400
 
+        # Handle image upload
+        image_path = None
+        if 'image' in request.files:
+            file = request.files['image']
+            if file and file.filename and allowed_file(file.filename):
+                filename = secure_filename(file.filename)
+                # Create unique filename
+                import uuid
+                unique_filename = f"{uuid.uuid4().hex}_{filename}"
+
+                # Ensure upload directory exists
+                upload_dir = os.path.join('uploads', 'categories')
+                os.makedirs(upload_dir, exist_ok=True)
+
+                file_path = os.path.join(upload_dir, unique_filename)
+                file.save(file_path)
+                image_path = f"/{file_path}"
+
         # Create category
         category = Category(
             name=name,
             slug=slug,
             description=description,
+            image=image_path,
+            display_order=display_order,
             is_active=is_active
         )
 
@@ -93,20 +123,19 @@ def create_category():
 def update_category(category_id):
     """
     Update an existing category
-    Expects JSON with same fields as create
+    Expects FormData with same fields as create
     """
     try:
         category = Category.query.get(category_id)
         if not category:
             return jsonify({'error': 'Category not found'}), 404
 
-        data = request.get_json()
-
         # Get form data
-        name = data.get('name')
-        slug = data.get('slug')
-        description = data.get('description')
-        is_active = data.get('is_active')
+        name = request.form.get('name')
+        slug = request.form.get('slug')
+        description = request.form.get('description')
+        is_active = request.form.get('is_active')
+        display_order = request.form.get('display_order')
 
         # Update fields if provided
         if name:
@@ -123,7 +152,35 @@ def update_category(category_id):
         if description is not None:
             category.description = description
         if is_active is not None:
-            category.is_active = is_active
+            category.is_active = is_active.lower() == 'true'
+        if display_order is not None:
+            category.display_order = int(display_order)
+
+        # Handle image upload
+        if 'image' in request.files:
+            file = request.files['image']
+            if file and file.filename and allowed_file(file.filename):
+                # Delete old image if exists
+                if category.image:
+                    old_image_path = category.image.lstrip('/')
+                    if os.path.exists(old_image_path):
+                        try:
+                            os.remove(old_image_path)
+                        except:
+                            pass
+
+                filename = secure_filename(file.filename)
+                # Create unique filename
+                import uuid
+                unique_filename = f"{uuid.uuid4().hex}_{filename}"
+
+                # Ensure upload directory exists
+                upload_dir = os.path.join('uploads', 'categories')
+                os.makedirs(upload_dir, exist_ok=True)
+
+                file_path = os.path.join(upload_dir, unique_filename)
+                file.save(file_path)
+                category.image = f"/{file_path}"
 
         db.session.commit()
 
