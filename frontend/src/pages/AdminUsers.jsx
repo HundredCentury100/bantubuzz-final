@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
 
 export default function AdminUsers() {
+  const navigate = useNavigate();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
@@ -133,10 +135,14 @@ export default function AdminUsers() {
                 </tr>
               ) : (
                 filteredUsers.map((user) => (
-                  <tr key={user.id} className="hover:bg-gray-50">
+                  <tr
+                    key={user.id}
+                    className="hover:bg-gray-50 cursor-pointer"
+                    onClick={() => navigate(`/admin/users/${user.id}`)}
+                  >
                     <td className="px-6 py-4">
                       <div>
-                        <div className="font-medium text-gray-900">{user.email}</div>
+                        <div className="font-medium text-gray-900 hover:text-primary">{user.email}</div>
                         <div className="text-sm text-gray-500">ID: {user.id}</div>
                       </div>
                     </td>

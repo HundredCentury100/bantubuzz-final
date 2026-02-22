@@ -30,6 +30,7 @@ const RegisterCreator = () => {
         email: data.email,
         password: data.password,
         username: data.username,
+        phone_number: data.phone_number,
       });
 
       // Navigate to OTP verification page
@@ -213,6 +214,32 @@ const RegisterCreator = () => {
                 {errors.confirmPassword && (
                   <p className="mt-1 text-sm text-error">{errors.confirmPassword.message}</p>
                 )}
+              </div>
+
+              {/* Phone Number */}
+              <div>
+                <label htmlFor="phone_number" className="block text-sm font-medium text-dark mb-2">
+                  Phone Number
+                </label>
+                <input
+                  id="phone_number"
+                  type="tel"
+                  className="input"
+                  placeholder="+263771234567"
+                  {...register('phone_number', {
+                    required: 'Phone number is required',
+                    pattern: {
+                      value: /^\+?[0-9\s\-()]{7,20}$/,
+                      message: 'Please enter a valid phone number',
+                    },
+                  })}
+                />
+                {errors.phone_number && (
+                  <p className="mt-1 text-sm text-error">{errors.phone_number.message}</p>
+                )}
+                <p className="mt-1 text-xs text-gray-500">
+                  Include country code (e.g. +263 for Zimbabwe)
+                </p>
               </div>
 
               {/* Terms */}

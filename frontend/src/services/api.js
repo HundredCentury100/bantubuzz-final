@@ -185,6 +185,16 @@ export const bookingsAPI = {
     api.get(`/bookings/${bookingId}/download-pop`, { responseType: 'blob' }),
   verifyPayment: (bookingId) =>
     api.post(`/bookings/${bookingId}/verify-payment`),
+
+  // Cart checkout (combined payment for multiple packages)
+  cartCheckout: (packageIds) => api.post('/bookings/cart/checkout', { package_ids: packageIds }),
+  cartPaymentStatus: (bookingIds, pollUrl) => api.post('/bookings/cart/status', { booking_ids: bookingIds, poll_url: pollUrl }),
+  cartUploadPop: (bookingIds, formData) => {
+    formData.append('booking_ids', JSON.stringify(bookingIds));
+    return api.post('/bookings/cart/upload-pop', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+  },
 };
 
 // Messages API

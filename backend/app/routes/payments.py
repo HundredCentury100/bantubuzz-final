@@ -60,12 +60,25 @@ def create_revision_payment():
             # Create a temporary payment reference
             payment_ref = f"REV_{collaboration_id}_{deliverable_id}_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
 
+            # Build a simple object compatible with initiate_payment(booking, user_email, package_title)
+            class RevisionPaymentObj:
+                def __init__(self, _id, _amount, _ref):
+                    self.id = _id
+                    self.amount = _amount
+                    self.payment_reference = _ref
+                    self.brand = brand
+
+            revision_obj = RevisionPaymentObj(
+                f"REV-{collaboration_id}-{deliverable_id}",
+                amount,
+                payment_ref
+            )
+
             # Use payment service to initiate payment
             payment_result = initiate_payment(
-                amount=amount,
-                reference=payment_ref,
-                email=brand.user.email,
-                description=f"Revision fee for collaboration #{collaboration_id}"
+                revision_obj,
+                brand.user.email,
+                f"Revision fee for collaboration #{collaboration_id}"
             )
 
             if payment_result.get('success'):
@@ -305,12 +318,11 @@ def create_campaign_payment():
             # Initiate Paynow payment
             payment_ref = f"CAMP_{booking_id}_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
 
-            # Use payment service to initiate payment
+            # Use payment service to initiate payment (booking object already available)
             payment_result = initiate_payment(
-                amount=booking.amount,
-                reference=payment_ref,
-                email=brand.user.email,
-                description=f"Campaign booking #{booking_id}"
+                booking,
+                brand.user.email,
+                f"Campaign booking #{booking_id}"
             )
 
             if payment_result.get('success'):

@@ -22,7 +22,7 @@ def create_review():
         data = request.get_json()
 
         # Validate required fields
-        required_fields = ['collaboration_id', 'rating', 'comment']
+        required_fields = ['collaboration_id', 'comment']
         if not all(field in data for field in required_fields):
             return jsonify({'error': 'Missing required fields'}), 400
 
@@ -43,8 +43,20 @@ def create_review():
         if existing_review:
             return jsonify({'error': 'Review already exists for this collaboration'}), 400
 
-        # Validate rating
-        rating = int(data['rating'])
+        # Auto-calculate overall rating from sub-ratings if provided
+        sub_ratings = [r for r in [
+            data.get('communication_rating'),
+            data.get('quality_rating'),
+            data.get('professionalism_rating'),
+            data.get('timeliness_rating')
+        ] if r is not None]
+
+        if sub_ratings:
+            rating = round(sum(int(r) for r in sub_ratings) / len(sub_ratings))
+        else:
+            # Fall back to explicit rating if no sub-ratings
+            rating = int(data.get('rating', 3))
+
         if not 1 <= rating <= 5:
             return jsonify({'error': 'Rating must be between 1 and 5'}), 400
 

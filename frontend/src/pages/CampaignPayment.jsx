@@ -189,7 +189,7 @@ const CampaignPayment = () => {
               <div className="ml-3 flex-1">
                 <span className="font-semibold text-gray-900">Paynow</span>
                 <p className="text-sm text-gray-600 mt-1">
-                  Pay instantly with Ecocash or Onemoney. You'll be redirected to complete the payment.
+                  Pay instantly using <strong>EcoCash</strong>, <strong>Innbucks</strong>, <strong>OneMoney</strong>, <strong>Omari</strong>, <strong>Visa</strong>, or <strong>Mastercard</strong> via Paynow
                 </p>
               </div>
             </label>
@@ -228,8 +228,19 @@ const CampaignPayment = () => {
               <p><strong>Bank Name:</strong> Example Bank</p>
               <p><strong>Account Name:</strong> BantuBuzz Platform</p>
               <p><strong>Account Number:</strong> 1234567890</p>
-              <p><strong>Reference:</strong> CAMPAIGN-{paymentData.campaign_id}-{paymentData.application_id || 'APP'}</p>
+              <p>
+                <strong>Reference:</strong>{' '}
+                <span className="font-mono bg-blue-100 px-2 py-0.5 rounded text-blue-800">
+                  CAMPAIGN-{paymentData.campaign_id}-{paymentData.application_id || 'APP'}
+                </span>
+              </p>
+              {paymentData.amount && (
+                <p><strong>Amount:</strong> ${paymentData.amount}</p>
+              )}
             </div>
+            <p className="text-xs text-blue-700 italic mt-3">
+              Use the reference above when making your transfer so we can match your payment.
+            </p>
 
             <div className="mt-4 pt-4 border-t border-blue-200">
               <label className="block text-sm font-medium text-blue-900 mb-2">

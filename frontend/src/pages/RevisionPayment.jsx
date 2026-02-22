@@ -186,7 +186,7 @@ const RevisionPayment = () => {
                 />
                 <div className="ml-3 flex-1">
                   <p className="font-medium text-gray-900">Paynow (Instant)</p>
-                  <p className="text-sm text-gray-500">Pay with Ecocash, Onemoney, or Visa</p>
+                  <p className="text-sm text-gray-500">Pay instantly using <strong>EcoCash</strong>, <strong>Innbucks</strong>, <strong>OneMoney</strong>, <strong>Omari</strong>, <strong>Visa</strong>, or <strong>Mastercard</strong> via Paynow</p>
                 </div>
               </label>
 
@@ -217,7 +217,12 @@ const RevisionPayment = () => {
                 <p><span className="font-medium">Account Name:</span> BantuBuzz Platform</p>
                 <p><span className="font-medium">Account Number:</span> 4107123456789</p>
                 <p><span className="font-medium">Amount:</span> ${revisionData.fee}</p>
-                <p><span className="font-medium">Reference:</span> REV-{revisionData.collaboration_id}-{revisionData.deliverable_id}</p>
+                <p>
+                  <span className="font-medium">Reference:</span>{' '}
+                  <span className="font-mono bg-gray-200 px-2 py-0.5 rounded text-gray-800">
+                    REV-{revisionData.collaboration_id}-{revisionData.deliverable_id}
+                  </span>
+                </p>
               </div>
 
               <div className="mt-4">

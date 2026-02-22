@@ -180,26 +180,31 @@ const Collaborations = () => {
                   key={collab.id}
                   className="block bg-white rounded-lg shadow hover:shadow-lg transition-shadow p-6"
                 >
-                  <div className="flex items-start gap-6">
-                    {/* Avatar */}
-                    <div className="flex-shrink-0">
-                      <Avatar
-                        src={isBrand ? collab.creator?.profile_picture : collab.brand?.logo}
-                        alt={isBrand ? collab.creator?.user?.email?.split('@')[0] : collab.brand?.company_name}
-                        size="lg"
-                        type={isBrand ? 'user' : 'brand'}
-                      />
+                  <div className="flex flex-col sm:flex-row items-start gap-4 sm:gap-6">
+                    {/* Avatar + Status (mobile: side by side) */}
+                    <div className="flex sm:flex-col items-center sm:items-start gap-3 sm:gap-0 w-full sm:w-auto">
+                      <div className="flex-shrink-0">
+                        <Avatar
+                          src={isBrand ? collab.creator?.profile_picture : collab.brand?.logo}
+                          alt={isBrand ? collab.creator?.user?.email?.split('@')[0] : collab.brand?.company_name}
+                          size="lg"
+                          type={isBrand ? 'user' : 'brand'}
+                        />
+                      </div>
+                      <span className={`sm:hidden px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(collab.status)}`}>
+                        {collab.status.replace('_', ' ')}
+                      </span>
                     </div>
 
                     {/* Content */}
-                    <div className="flex-1 min-w-0">
+                    <div className="flex-1 min-w-0 w-full">
                       <div className="flex items-start justify-between mb-3">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <div className="text-gray-500">
+                        <div className="flex-1 min-w-0 pr-2">
+                          <div className="flex items-center gap-2 mb-1 flex-wrap">
+                            <div className="text-gray-500 flex-shrink-0">
                               {getTypeIcon(collab.collaboration_type)}
                             </div>
-                            <h3 className="text-lg font-bold text-gray-900">
+                            <h3 className="text-base sm:text-lg font-bold text-gray-900 truncate">
                               {collab.title}
                             </h3>
                           </div>
@@ -207,16 +212,16 @@ const Collaborations = () => {
                             {isBrand ? 'With' : 'For'}: {isBrand ? collab.creator?.user?.email?.split('@')[0] : collab.brand?.company_name}
                           </p>
                         </div>
-                        <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(collab.status)}`}>
+                        <span className={`hidden sm:inline-block flex-shrink-0 px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(collab.status)}`}>
                           {collab.status.replace('_', ' ')}
                         </span>
                       </div>
 
                       {/* Stats Grid */}
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
                         <div>
                           <p className="text-xs text-gray-600">Amount</p>
-                          <p className="text-lg font-bold text-primary">${collab.amount}</p>
+                          <p className="text-base sm:text-lg font-bold text-primary">${collab.amount}</p>
                         </div>
                         <div>
                           <p className="text-xs text-gray-600">Progress</p>
@@ -227,18 +232,18 @@ const Collaborations = () => {
                                 style={{ width: `${collab.progress_percentage}%` }}
                               ></div>
                             </div>
-                            <span className="text-sm font-semibold text-gray-900">{collab.progress_percentage}%</span>
+                            <span className="text-xs sm:text-sm font-semibold text-gray-900">{collab.progress_percentage}%</span>
                           </div>
                         </div>
                         <div>
                           <p className="text-xs text-gray-600">Start Date</p>
-                          <p className="text-sm font-medium text-gray-900">
+                          <p className="text-xs sm:text-sm font-medium text-gray-900">
                             {new Date(collab.start_date).toLocaleDateString()}
                           </p>
                         </div>
                         <div>
                           <p className="text-xs text-gray-600">Due Date</p>
-                          <p className="text-sm font-medium text-gray-900">
+                          <p className="text-xs sm:text-sm font-medium text-gray-900">
                             {collab.expected_completion_date
                               ? new Date(collab.expected_completion_date).toLocaleDateString()
                               : 'Not set'}
@@ -258,7 +263,7 @@ const Collaborations = () => {
                       )}
 
                       {/* Action Buttons */}
-                      <div className="flex gap-3 mt-4">
+                      <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 mt-4">
                         <Link
                           to="/messages"
                           state={{
@@ -267,7 +272,7 @@ const Collaborations = () => {
                               email: isBrand ? collab.creator?.user?.email : collab.brand?.user?.email
                             }
                           }}
-                          className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors"
+                          className="flex items-center justify-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary/90 transition-colors text-sm"
                         >
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
@@ -276,7 +281,7 @@ const Collaborations = () => {
                         </Link>
                         <Link
                           to={`/${isBrand ? 'brand' : 'creator'}/collaborations/${collab.id}`}
-                          className="flex items-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                          className="flex items-center justify-center gap-2 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm"
                         >
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />

@@ -130,7 +130,7 @@ def get_cashout_details(cashout_id):
 
 
 @bp.route('/cashouts/<int:cashout_id>/approve', methods=['PUT'])
-@role_required('super_admin', 'finance')
+@admin_required
 def approve_cashout(cashout_id):
     """Approve a cashout request and deduct from available balance"""
     try:
@@ -197,7 +197,7 @@ def approve_cashout(cashout_id):
 
 
 @bp.route('/cashouts/<int:cashout_id>/reject', methods=['PUT'])
-@role_required('super_admin', 'finance')
+@admin_required
 def reject_cashout(cashout_id):
     """Reject a cashout request"""
     try:
@@ -241,7 +241,7 @@ def reject_cashout(cashout_id):
 
 
 @bp.route('/cashouts/<int:cashout_id>/complete', methods=['PUT'])
-@role_required('super_admin', 'finance')
+@admin_required
 def complete_cashout(cashout_id):
     """Mark cashout as completed (funds transferred)"""
     try:

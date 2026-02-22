@@ -12,6 +12,10 @@ import {
   ChartBarIcon,
   ExclamationTriangleIcon,
   CheckCircleIcon,
+  UserMinusIcon,
+  XCircleIcon,
+  ArrowTrendingUpIcon,
+  ShieldExclamationIcon,
 } from '@heroicons/react/24/outline';
 
 export default function AdminDashboard() {
@@ -94,7 +98,48 @@ export default function AdminDashboard() {
               subtitle="Requires review"
               icon={ExclamationTriangleIcon}
               color="yellow"
-              onClick={() => navigate('/admin/users?filter=unverified')}
+              onClick={() => navigate('/admin/verification')}
+              loading={loading}
+            />
+          </div>
+        </div>
+
+        {/* Platform Health */}
+        <div>
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Platform Health</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <StatCard
+              title="New Signups Today"
+              value={stats?.users.new_today || 0}
+              subtitle={`${stats?.users.new_this_week || 0} this week`}
+              icon={ArrowTrendingUpIcon}
+              color="green"
+              loading={loading}
+            />
+            <StatCard
+              title="Suspended Accounts"
+              value={stats?.users.suspended || 0}
+              subtitle="Inactive users"
+              icon={UserMinusIcon}
+              color="red"
+              onClick={() => navigate('/admin/users?filter=suspended')}
+              loading={loading}
+            />
+            <StatCard
+              title="Failed Payments"
+              value={stats?.users.failed_payments || 0}
+              subtitle="Requires follow-up"
+              icon={XCircleIcon}
+              color="red"
+              onClick={() => navigate('/admin/bookings?payment_status=failed')}
+              loading={loading}
+            />
+            <StatCard
+              title="Open Disputes"
+              value={0}
+              subtitle="Coming in Phase 3"
+              icon={ShieldExclamationIcon}
+              color="yellow"
               loading={loading}
             />
           </div>

@@ -81,8 +81,20 @@ export const AuthProvider = ({ children }) => {
 
       return response.data;
     } catch (error) {
-      const message = error.response?.data?.error || 'Login failed';
-      toast.error(message);
+      const errorData = error.response?.data;
+      // If user hasn't verified their email, redirect to OTP page
+      if (errorData?.requires_verification && errorData?.email) {
+        toast.error('Please verify your email first.');
+        navigate('/verify-otp', {
+          state: {
+            email: errorData.email,
+            userType: null
+          }
+        });
+      } else {
+        const message = errorData?.error || 'Login failed';
+        toast.error(message);
+      }
       throw error;
     }
   };

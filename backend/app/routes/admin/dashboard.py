@@ -59,6 +59,21 @@ def get_dashboard_stats():
             User.created_at >= week_ago
         ).count()
 
+        # New signups today
+        today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+        new_users_today = User.query.filter(
+            User.created_at >= today_start
+        ).count()
+
+        # Suspended accounts (is_active = False)
+        suspended_accounts = User.query.filter_by(is_active=False).count()
+
+        # Failed payments
+        from app.models import Booking
+        failed_payments = Booking.query.filter(
+            Booking.payment_status == 'failed'
+        ).count()
+
         # ===== COLLABORATION STATISTICS =====
         active_collaborations = Collaboration.query.filter_by(
             status='in_progress'
@@ -247,7 +262,10 @@ def get_dashboard_stats():
                     'brands': brands_count,
                     'unverified_creators': unverified_creators,
                     'unverified_brands': unverified_brands,
-                    'new_this_week': new_users_this_week
+                    'new_this_week': new_users_this_week,
+                    'new_today': new_users_today,
+                    'suspended': suspended_accounts,
+                    'failed_payments': failed_payments
                 },
                 'collaborations': {
                     'active': active_collaborations,
@@ -261,6 +279,9 @@ def get_dashboard_stats():
                     'approved_pending_processing': approved_cashouts_pending_processing
                 },
                 'revenue': {
+                    'total': float(platform_revenue),
+                    'this_month': float(month_platform_revenue),
+                    'this_week': float(week_platform_revenue),
                     'platform_revenue': float(platform_revenue),
                     'platform_revenue_month': float(month_platform_revenue),
                     'platform_revenue_week': float(week_platform_revenue),

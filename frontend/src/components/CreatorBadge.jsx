@@ -20,7 +20,7 @@ const CreatorBadge = ({ badge, size = 'md', variant = 'full' }) => {
         return {
           label: 'Verified',
           icon: (
-            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
               <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
             </svg>
           ),
@@ -44,25 +44,29 @@ const CreatorBadge = ({ badge, size = 'md', variant = 'full' }) => {
   const config = getBadgeConfig(badge);
   if (!config) return null;
 
-  const isTopCreator = badge === 'top_creator';
+  // Badges that use image icons — make icon much larger and more prominent
+  const isImageBadge = badge === 'top_creator' || badge === 'responds_fast';
 
+  // Icon sizes: image badges get large prominent icons, svg badges stay modest
   const iconSizeClasses = {
-    sm: isTopCreator ? 'w-4 h-4' : 'w-3.5 h-3.5',
-    md: isTopCreator ? 'w-5 h-5' : 'w-4 h-4',
-    lg: isTopCreator ? 'w-6 h-6' : 'w-5 h-5'
+    sm: isImageBadge ? 'w-6 h-6' : 'w-3.5 h-3.5',
+    md: isImageBadge ? 'w-8 h-8' : 'w-4 h-4',
+    lg: isImageBadge ? 'w-10 h-10' : 'w-5 h-5'
   };
 
+  // Text size — same for both, no extra size difference
   const textSizeClasses = {
-    sm: isTopCreator ? 'text-xs' : 'text-xs',
-    md: isTopCreator ? 'text-sm' : 'text-xs',
-    lg: isTopCreator ? 'text-base' : 'text-sm'
+    sm: 'text-xs',
+    md: 'text-xs',
+    lg: 'text-sm'
   };
 
-  const overlayPadding = isTopCreator ? 'px-3 py-1.5' : 'px-2 py-1';
-  const overlayFont = isTopCreator ? 'font-bold' : 'font-semibold';
-  const overlayShadow = isTopCreator ? 'shadow-md' : 'shadow-sm';
+  // Padding — same for image badges so pill size stays consistent
+  const overlayPadding = isImageBadge ? 'px-2.5 py-1' : 'px-2 py-1';
+  const overlayFont = 'font-semibold';
+  const overlayShadow = isImageBadge ? 'shadow-md' : 'shadow-sm';
 
-  // Overlay variant - colored pill with white image + white text (matches screenshot)
+  // Overlay variant - colored pill with white image + white text
   if (variant === 'overlay') {
     return (
       <div className={`inline-flex items-center gap-1.5 ${config.pillBg} ${overlayPadding} rounded-full ${overlayShadow}`}>
@@ -70,7 +74,7 @@ const CreatorBadge = ({ badge, size = 'md', variant = 'full' }) => {
           <img
             src={config.image}
             alt={config.label}
-            className={`${iconSizeClasses[size]} object-contain brightness-0 invert`}
+            className={`${iconSizeClasses[size]} object-contain brightness-0 invert flex-shrink-0`}
             title={config.label}
           />
         ) : (
@@ -88,12 +92,12 @@ const CreatorBadge = ({ badge, size = 'md', variant = 'full' }) => {
   // Icon variant (inline next to username)
   if (variant === 'icon') {
     return (
-      <div className={`inline-flex items-center gap-1 ${config.pillBg} px-2 py-0.5 rounded-full`}>
+      <div className={`inline-flex items-center gap-1.5 ${config.pillBg} ${overlayPadding} rounded-full`}>
         {config.image ? (
           <img
             src={config.image}
             alt={config.label}
-            className={`${iconSizeClasses[size]} object-contain brightness-0 invert`}
+            className={`${iconSizeClasses[size]} object-contain brightness-0 invert flex-shrink-0`}
             title={config.label}
           />
         ) : (
@@ -101,7 +105,7 @@ const CreatorBadge = ({ badge, size = 'md', variant = 'full' }) => {
             {config.icon}
           </span>
         )}
-        <span className={`${textSizeClasses[size]} text-white font-semibold`}>
+        <span className={`${textSizeClasses[size]} text-white ${overlayFont}`}>
           {config.label}
         </span>
       </div>
@@ -110,12 +114,12 @@ const CreatorBadge = ({ badge, size = 'md', variant = 'full' }) => {
 
   // Full variant - default
   return (
-    <div className={`inline-flex items-center gap-1 ${config.pillBg} px-2.5 py-1 rounded-full`}>
+    <div className={`inline-flex items-center gap-1.5 ${config.pillBg} ${overlayPadding} rounded-full`}>
       {config.image ? (
         <img
           src={config.image}
           alt={config.label}
-          className={`${iconSizeClasses[size]} object-contain brightness-0 invert`}
+          className={`${iconSizeClasses[size]} object-contain brightness-0 invert flex-shrink-0`}
           title={config.label}
         />
       ) : (
@@ -123,7 +127,7 @@ const CreatorBadge = ({ badge, size = 'md', variant = 'full' }) => {
           {config.icon}
         </span>
       )}
-      <span className={`${textSizeClasses[size]} text-white font-semibold`}>
+      <span className={`${textSizeClasses[size]} text-white ${overlayFont}`}>
         {config.label}
       </span>
     </div>

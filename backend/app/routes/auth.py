@@ -151,6 +151,14 @@ def login():
         if not user.is_active:
             return jsonify({'error': 'Account is deactivated'}), 403
 
+        # Check if user has verified their email (skip for Google OAuth users)
+        if not user.is_verified and not user.google_oauth_id:
+            return jsonify({
+                'error': 'Please verify your email before logging in',
+                'requires_verification': True,
+                'email': user.email
+            }), 403
+
         # Update last login
         user.update_last_login()
         db.session.commit()
