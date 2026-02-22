@@ -3,6 +3,7 @@ import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import api from '../services/api';
 import Navbar from '../components/Navbar';
+import Footer from '../components/Footer';
 import { useAuth } from '../hooks/useAuth';
 import {
   CheckIcon,
@@ -81,10 +82,8 @@ export default function SubscriptionManage() {
       });
 
       if (res.data.success && res.data.data) {
-        // Store subscription ID in localStorage
         localStorage.setItem('lastSubscriptionId', res.data.data.subscription_id);
 
-        // Navigate to payment page with payment data
         navigate('/subscription/payment', {
           state: {
             paymentData: {
@@ -111,14 +110,12 @@ export default function SubscriptionManage() {
       setActionLoading(true);
       const plan = plans.find(p => p.id === planId);
 
-      // Call upgrade endpoint
       const res = await api.put('/subscriptions/upgrade', {
         new_plan_id: planId,
         billing_cycle: billingCycle
       });
 
       if (res.data.success && res.data.data) {
-        // If there's payment data (for paid plans), redirect to payment
         if (res.data.data.redirect_url) {
           localStorage.setItem('lastSubscriptionId', currentSubscription.id);
 
@@ -135,7 +132,6 @@ export default function SubscriptionManage() {
             }
           });
         } else {
-          // Free upgrade without payment
           toast.success('Successfully upgraded subscription!');
           await fetchData();
         }
@@ -191,13 +187,13 @@ export default function SubscriptionManage() {
   const getPlanIcon = (slug) => {
     switch (slug) {
       case 'starter':
-        return StarIcon; // Rising star for starter creators
+        return StarIcon;
       case 'pro':
-        return BoltIcon; // Lightning bolt for power/professional users
+        return BoltIcon;
       case 'agency':
-        return TrophyIcon; // Trophy for premium/agency level
+        return TrophyIcon;
       default:
-        return UsersIcon; // Community icon for free plan
+        return UsersIcon;
     }
   };
 
@@ -225,63 +221,78 @@ export default function SubscriptionManage() {
 
   if (loading) {
     return (
-      <>
+      <div className="min-h-screen flex flex-col bg-light">
         <Navbar />
-        <div className="min-h-screen flex items-center justify-center">
+        <div className="flex-1 flex items-center justify-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
         </div>
-      </>
+      </div>
     );
   }
 
-  const currentPlan = currentSubscription?.plan;
+  const currentPlan = currentSubscription?.plan || (currentSubscription ? plans.find(p => p.slug === 'free') : null);
   const isActive = currentSubscription?.status === 'active';
   const isCancelled = currentSubscription?.cancel_at_period_end;
 
   return (
-    <>
+    <div className="min-h-screen flex flex-col bg-light">
       <Navbar />
-      <div className="min-h-screen bg-gray-50 py-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+
+      <div className="flex-1 py-12 px-6 lg:px-12 xl:px-20">
+        <div className="w-full max-w-7xl mx-auto">
           {/* Header */}
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold text-gray-900">Manage Subscription</h1>
-            <p className="text-gray-600 mt-2">View and manage your BantuBuzz subscription</p>
+          <div className="mb-12 text-center">
+            <h1 className="text-4xl md:text-5xl font-bold text-dark mb-4">
+              Manage Your Subscription
+            </h1>
+            <p className="text-lg text-gray-600">
+              View and manage your BantuBuzz subscription plan
+            </p>
           </div>
 
           {/* Current Subscription Card */}
-          {currentSubscription && (
-            <div className="card mb-8">
-              <div className="flex items-start justify-between mb-6">
-                <div>
-                  <h2 className="text-xl font-semibold text-gray-900 mb-2">
-                    Current Plan: {currentPlan?.name}
-                  </h2>
-                  <p className="text-gray-600">{currentPlan?.description}</p>
+          {currentSubscription && currentPlan && (
+            <div className="bg-white rounded-3xl shadow-lg p-8 md:p-12 mb-12">
+              <div className="flex flex-col md:flex-row md:items-start md:justify-between mb-8">
+                <div className="mb-4 md:mb-0">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className={`inline-flex p-2 rounded-xl bg-gradient-to-r ${getPlanColor(currentPlan.slug)}`}>
+                      {(() => {
+                        const Icon = getPlanIcon(currentPlan.slug);
+                        return <Icon className="h-6 w-6 text-white" />;
+                      })()}
+                    </div>
+                    <h2 className="text-3xl font-bold text-dark">
+                      {currentPlan.name || 'Free Plan'}
+                    </h2>
+                  </div>
+                  <p className="text-gray-600 text-lg">
+                    {currentPlan.description || 'Perfect for getting started on BantuBuzz'}
+                  </p>
                 </div>
-                <div className={`inline-flex items-center px-4 py-2 rounded-full ${
+                <div className={`inline-flex items-center px-6 py-3 rounded-full font-semibold ${
                   isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
                 }`}>
-                  {currentSubscription?.status?.toUpperCase() || 'UNKNOWN'}
+                  {currentSubscription?.status?.toUpperCase() || 'ACTIVE'}
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-                <div>
-                  <p className="text-sm text-gray-600">Billing Cycle</p>
-                  <p className="text-lg font-semibold text-gray-900 capitalize">
-                    {currentSubscription?.billing_cycle || 'N/A'}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <div className="bg-gray-50 rounded-2xl p-6">
+                  <p className="text-sm text-gray-600 mb-2">Billing Cycle</p>
+                  <p className="text-2xl font-bold text-dark capitalize">
+                    {currentSubscription?.billing_cycle || 'Monthly'}
                   </p>
                 </div>
-                <div>
-                  <p className="text-sm text-gray-600">Current Period Ends</p>
-                  <p className="text-lg font-semibold text-gray-900">
+                <div className="bg-gray-50 rounded-2xl p-6">
+                  <p className="text-sm text-gray-600 mb-2">Current Period Ends</p>
+                  <p className="text-2xl font-bold text-dark">
                     {formatDate(currentSubscription?.current_period_end)}
                   </p>
                 </div>
-                <div>
-                  <p className="text-sm text-gray-600">Next Payment</p>
-                  <p className="text-lg font-semibold text-gray-900">
+                <div className="bg-gray-50 rounded-2xl p-6">
+                  <p className="text-sm text-gray-600 mb-2">Next Payment</p>
+                  <p className="text-2xl font-bold text-dark">
                     {currentSubscription?.next_payment_date
                       ? formatDate(currentSubscription.next_payment_date)
                       : 'N/A'}
@@ -290,14 +301,14 @@ export default function SubscriptionManage() {
               </div>
 
               {isCancelled && (
-                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
-                  <div className="flex items-start">
-                    <ExclamationTriangleIcon className="h-5 w-5 text-yellow-600 mr-3 flex-shrink-0 mt-0.5" />
+                <div className="bg-yellow-50 border-2 border-yellow-200 rounded-2xl p-6 mb-8">
+                  <div className="flex items-start gap-4">
+                    <ExclamationTriangleIcon className="h-6 w-6 text-yellow-600 flex-shrink-0 mt-1" />
                     <div>
-                      <h3 className="text-sm font-semibold text-yellow-900">
+                      <h3 className="text-lg font-bold text-yellow-900 mb-2">
                         Subscription Cancelled
                       </h3>
-                      <p className="text-sm text-yellow-800 mt-1">
+                      <p className="text-yellow-800">
                         Your subscription will remain active until {formatDate(currentSubscription?.current_period_end)}.
                         You can reactivate it anytime before then.
                       </p>
@@ -312,193 +323,187 @@ export default function SubscriptionManage() {
                   <button
                     onClick={handleReactivate}
                     disabled={actionLoading}
-                    className="btn-primary"
+                    className="bg-primary hover:bg-primary/90 text-dark px-8 py-4 rounded-full font-semibold transition-colors disabled:opacity-50 flex items-center gap-2"
                   >
-                    {actionLoading ? (
-                      <ArrowPathIcon className="h-5 w-5 animate-spin mr-2" />
-                    ) : (
-                      <ArrowPathIcon className="h-5 w-5 mr-2" />
-                    )}
+                    {actionLoading && <ArrowPathIcon className="h-5 w-5 animate-spin" />}
                     Reactivate Subscription
                   </button>
                 ) : currentPlan?.slug !== 'free' && (
                   <button
                     onClick={handleCancel}
                     disabled={actionLoading}
-                    className="btn-secondary"
+                    className="bg-gray-200 hover:bg-gray-300 text-dark px-8 py-4 rounded-full font-semibold transition-colors"
                   >
                     Cancel Subscription
                   </button>
                 )}
-                <Link to="/pricing" className="btn-secondary">
+                <Link
+                  to="/pricing"
+                  className="bg-dark hover:bg-gray-800 text-white px-8 py-4 rounded-full font-semibold transition-colors"
+                >
                   View All Plans
                 </Link>
               </div>
             </div>
           )}
 
-          {/* Available Plans */}
+          {/* No Subscription State */}
           {!currentSubscription && (
-            <>
-              <div className="mb-8">
-                <h2 className="text-2xl font-bold text-gray-900 mb-4">Choose a Plan</h2>
+            <div className="bg-white rounded-3xl shadow-lg p-12 mb-12 text-center">
+              <div className="max-w-2xl mx-auto">
+                <div className="inline-flex p-4 rounded-full bg-gray-100 mb-6">
+                  <CreditCardIcon className="h-12 w-12 text-gray-400" />
+                </div>
+                <h2 className="text-3xl font-bold text-dark mb-4">
+                  No Active Subscription
+                </h2>
+                <p className="text-lg text-gray-600 mb-8">
+                  Choose a plan below to get started with BantuBuzz and unlock powerful features for your creator journey.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Available/Upgrade Plans */}
+          {(!currentSubscription || (currentSubscription && currentPlan?.slug !== 'agency')) && (
+            <div>
+              <div className="text-center mb-8">
+                <h2 className="text-3xl font-bold text-dark mb-4">
+                  {currentSubscription ? 'Upgrade Your Plan' : 'Choose Your Plan'}
+                </h2>
 
                 {/* Billing Toggle */}
-                <div className="flex items-center justify-center space-x-4 mb-8">
-                  <span className={`text-sm font-medium ${billingCycle === 'monthly' ? 'text-gray-900' : 'text-gray-500'}`}>
+                <div className="flex items-center justify-center gap-4 mt-8">
+                  <span className={`text-sm font-semibold ${billingCycle === 'monthly' ? 'text-dark' : 'text-gray-500'}`}>
                     Monthly
                   </span>
                   <button
                     onClick={() => setBillingCycle(billingCycle === 'monthly' ? 'yearly' : 'monthly')}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                      billingCycle === 'yearly' ? 'bg-primary' : 'bg-gray-200'
+                    className={`relative inline-flex h-7 w-14 items-center rounded-full transition-colors ${
+                      billingCycle === 'yearly' ? 'bg-primary' : 'bg-gray-300'
                     }`}
                   >
                     <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                        billingCycle === 'yearly' ? 'translate-x-6' : 'translate-x-1'
+                      className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform shadow-lg ${
+                        billingCycle === 'yearly' ? 'translate-x-8' : 'translate-x-1'
                       }`}
                     />
                   </button>
-                  <span className={`text-sm font-medium ${billingCycle === 'yearly' ? 'text-gray-900' : 'text-gray-500'}`}>
-                    Yearly <span className="text-green-600">(Save 17%)</span>
+                  <span className={`text-sm font-semibold ${billingCycle === 'yearly' ? 'text-dark' : 'text-gray-500'}`}>
+                    Yearly <span className="text-green-600 font-bold">(Save 17%)</span>
                   </span>
                 </div>
               </div>
 
-              {/* Plan Cards */}
+              {/* Plan Cards Grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                {plans.map((plan) => {
-                  const Icon = getPlanIcon(plan.slug);
-                  const price = billingCycle === 'yearly' ? plan.price_yearly / 12 : plan.price_monthly;
-                  const isCurrentPlan = currentPlan?.id === plan.id;
-                  const isFree = plan.slug === 'free';
-                  const isPreselected = selectedPlanId === plan.id;
-
-                  return (
-                    <div
-                      key={plan.id}
-                      className={`bg-white rounded-xl shadow-md p-6 ${
-                        isPreselected ? 'ring-2 ring-primary' : ''
-                      }`}
-                    >
-                      <div className={`inline-flex p-3 rounded-lg bg-gradient-to-r ${getPlanColor(plan.slug)} mb-4`}>
-                        <Icon className="h-6 w-6 text-white" />
-                      </div>
-
-                      <h3 className="text-xl font-bold text-gray-900 mb-2">{plan.name}</h3>
-
-                      <div className="mb-4">
-                        {isFree ? (
-                          <span className="text-3xl font-bold text-gray-900">Free</span>
-                        ) : (
-                          <>
-                            <span className="text-3xl font-bold text-gray-900">
-                              ${price.toFixed(2)}
-                            </span>
-                            <span className="text-gray-600">/mo</span>
-                          </>
-                        )}
-                      </div>
-
-                      {isCurrentPlan ? (
-                        <div className="w-full py-2 px-4 bg-gray-100 text-gray-700 rounded-lg text-center font-semibold">
-                          Current Plan
-                        </div>
-                      ) : (
-                        <button
-                          onClick={() => handleSubscribe(plan.id)}
-                          disabled={actionLoading}
-                          className="w-full btn-primary"
-                        >
-                          {actionLoading ? 'Processing...' : isFree ? 'Select Free' : 'Subscribe'}
-                        </button>
-                      )}
-
-                      <ul className="mt-6 space-y-3">
-                        <li className="flex items-start text-sm">
-                          <CheckIcon className="h-5 w-5 text-green-500 mr-2 flex-shrink-0" />
-                          <span>{plan.max_packages === -1 ? 'Unlimited' : plan.max_packages} packages</span>
-                        </li>
-                        <li className="flex items-start text-sm">
-                          <CheckIcon className="h-5 w-5 text-green-500 mr-2 flex-shrink-0" />
-                          <span>{plan.max_bookings_per_month === -1 ? 'Unlimited' : plan.max_bookings_per_month} bookings/month</span>
-                        </li>
-                      </ul>
-                    </div>
-                  );
-                })}
-              </div>
-            </>
-          )}
-
-          {/* Upgrade/Change Plan Section */}
-          {currentSubscription && currentPlan?.slug !== 'agency' && (
-            <div className="mt-12">
-              <h2 className="text-2xl font-bold text-gray-900 mb-6">Upgrade Your Plan</h2>
-
-              {/* Billing Toggle */}
-              <div className="flex items-center justify-center space-x-4 mb-8">
-                <span className={`text-sm font-medium ${billingCycle === 'monthly' ? 'text-gray-900' : 'text-gray-500'}`}>
-                  Monthly
-                </span>
-                <button
-                  onClick={() => setBillingCycle(billingCycle === 'monthly' ? 'yearly' : 'monthly')}
-                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                    billingCycle === 'yearly' ? 'bg-primary' : 'bg-gray-200'
-                  }`}
-                >
-                  <span
-                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                      billingCycle === 'yearly' ? 'translate-x-6' : 'translate-x-1'
-                    }`}
-                  />
-                </button>
-                <span className={`text-sm font-medium ${billingCycle === 'yearly' ? 'text-gray-900' : 'text-gray-500'}`}>
-                  Yearly <span className="text-green-600">(Save 17%)</span>
-                </span>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {plans
-                  .filter((plan) => plan.id !== currentPlan?.id && plan.slug !== 'free')
+                  .filter((plan) => !currentSubscription || plan.id !== currentPlan?.id)
                   .map((plan) => {
                     const Icon = getPlanIcon(plan.slug);
                     const price = billingCycle === 'yearly' ? plan.price_yearly / 12 : plan.price_monthly;
+                    const totalPrice = billingCycle === 'yearly' ? plan.price_yearly : plan.price_monthly;
+                    const isCurrentPlan = currentPlan?.id === plan.id;
+                    const isFree = plan.slug === 'free';
+                    const isPopular = plan.slug === 'pro';
 
                     return (
-                      <div key={plan.id} className="bg-white rounded-xl shadow-md p-6">
-                        <div className={`inline-flex p-3 rounded-lg bg-gradient-to-r ${getPlanColor(plan.slug)} mb-4`}>
-                          <Icon className="h-6 w-6 text-white" />
+                      <div
+                        key={plan.id}
+                        className={`bg-white rounded-3xl shadow-lg overflow-hidden transition-transform hover:scale-105 ${
+                          isPopular ? 'ring-2 ring-primary' : ''
+                        }`}
+                      >
+                        {isPopular && (
+                          <div className="bg-gradient-to-r from-primary to-yellow-400 text-dark text-center py-2 font-bold text-sm">
+                            MOST POPULAR
+                          </div>
+                        )}
+
+                        <div className="p-8">
+                          {/* Icon */}
+                          <div className={`inline-flex p-3 rounded-2xl bg-gradient-to-r ${getPlanColor(plan.slug)} mb-6`}>
+                            <Icon className="h-8 w-8 text-white" />
+                          </div>
+
+                          {/* Plan Name */}
+                          <h3 className="text-2xl font-bold text-dark mb-2">{plan.name}</h3>
+                          <p className="text-gray-600 mb-6 min-h-[3rem]">{plan.description}</p>
+
+                          {/* Price */}
+                          <div className="mb-6">
+                            {isFree ? (
+                              <div>
+                                <span className="text-4xl font-bold text-dark">Free</span>
+                              </div>
+                            ) : (
+                              <div>
+                                <div className="flex items-baseline gap-1">
+                                  <span className="text-4xl font-bold text-dark">
+                                    ${price.toFixed(2)}
+                                  </span>
+                                  <span className="text-gray-600">/mo</span>
+                                </div>
+                                {billingCycle === 'yearly' && (
+                                  <p className="text-sm text-gray-500 mt-1">
+                                    Billed ${totalPrice.toFixed(2)} yearly
+                                  </p>
+                                )}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* CTA Button */}
+                          {isCurrentPlan ? (
+                            <div className="w-full py-4 px-6 bg-gray-100 text-gray-700 rounded-full text-center font-bold">
+                              Current Plan
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => currentSubscription ? handleUpgrade(plan.id) : handleSubscribe(plan.id)}
+                              disabled={actionLoading || isCancelled}
+                              className={`w-full py-4 px-6 rounded-full font-bold transition-colors ${
+                                isPopular
+                                  ? 'bg-primary hover:bg-primary/90 text-dark'
+                                  : 'bg-dark hover:bg-gray-800 text-white'
+                              } disabled:opacity-50`}
+                            >
+                              {actionLoading ? 'Processing...' : currentSubscription ? 'Upgrade' : isFree ? 'Get Started' : 'Subscribe'}
+                            </button>
+                          )}
+
+                          {/* Features */}
+                          <ul className="mt-8 space-y-4">
+                            <li className="flex items-start gap-3">
+                              <CheckIcon className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
+                              <span className="text-gray-700">
+                                <span className="font-bold text-dark">
+                                  {plan.features?.max_packages === -1 ? 'Unlimited' : plan.features?.max_packages || 3}
+                                </span> packages
+                              </span>
+                            </li>
+                            <li className="flex items-start gap-3">
+                              <CheckIcon className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
+                              <span className="text-gray-700">
+                                <span className="font-bold text-dark">
+                                  {plan.features?.max_bookings_per_month === -1 ? 'Unlimited' : plan.features?.max_bookings_per_month || 5}
+                                </span> bookings/month
+                              </span>
+                            </li>
+                            {plan.features?.analytics_access && (
+                              <li className="flex items-start gap-3">
+                                <CheckIcon className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
+                                <span className="text-gray-700">Analytics access</span>
+                              </li>
+                            )}
+                            {plan.features?.priority_support && (
+                              <li className="flex items-start gap-3">
+                                <CheckIcon className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
+                                <span className="text-gray-700">Priority support</span>
+                              </li>
+                            )}
+                          </ul>
                         </div>
-
-                        <h3 className="text-xl font-bold text-gray-900 mb-2">{plan.name}</h3>
-
-                        <div className="mb-4">
-                          <span className="text-3xl font-bold text-gray-900">
-                            ${price.toFixed(2)}
-                          </span>
-                          <span className="text-gray-600">/mo</span>
-                        </div>
-
-                        <button
-                          onClick={() => handleUpgrade(plan.id)}
-                          disabled={actionLoading || isCancelled}
-                          className="w-full btn-primary"
-                        >
-                          {actionLoading ? 'Processing...' : 'Upgrade Now'}
-                        </button>
-
-                        <ul className="mt-6 space-y-3">
-                          <li className="flex items-start text-sm">
-                            <CheckIcon className="h-5 w-5 text-green-500 mr-2 flex-shrink-0" />
-                            <span>{plan.max_packages === -1 ? 'Unlimited' : plan.max_packages} packages</span>
-                          </li>
-                          <li className="flex items-start text-sm">
-                            <CheckIcon className="h-5 w-5 text-green-500 mr-2 flex-shrink-0" />
-                            <span>{plan.max_bookings_per_month === -1 ? 'Unlimited' : plan.max_bookings_per_month} bookings/month</span>
-                          </li>
-                        </ul>
                       </div>
                     );
                   })}
@@ -507,6 +512,8 @@ export default function SubscriptionManage() {
           )}
         </div>
       </div>
-    </>
+
+      <Footer />
+    </div>
   );
 }
