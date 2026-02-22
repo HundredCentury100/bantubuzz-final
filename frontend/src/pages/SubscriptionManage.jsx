@@ -197,19 +197,6 @@ export default function SubscriptionManage() {
     }
   };
 
-  const getPlanColor = (slug) => {
-    switch (slug) {
-      case 'starter':
-        return 'from-blue-600 to-blue-400';
-      case 'pro':
-        return 'from-primary to-yellow-400';
-      case 'agency':
-        return 'from-purple-600 to-pink-500';
-      default:
-        return 'from-gray-600 to-gray-400';
-    }
-  };
-
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -256,10 +243,10 @@ export default function SubscriptionManage() {
               <div className="flex flex-col md:flex-row md:items-start md:justify-between mb-8">
                 <div className="mb-4 md:mb-0">
                   <div className="flex items-center gap-3 mb-3">
-                    <div className={`inline-flex p-2 rounded-xl bg-gradient-to-r ${getPlanColor(currentPlan.slug)}`}>
+                    <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center">
                       {(() => {
                         const Icon = getPlanIcon(currentPlan.slug);
-                        return <Icon className="h-6 w-6 text-white" />;
+                        return <Icon className="h-6 w-6 text-primary" />;
                       })()}
                     </div>
                     <h2 className="text-3xl font-bold text-dark">
@@ -422,8 +409,8 @@ export default function SubscriptionManage() {
 
                         <div className="p-6 md:p-8">
                           {/* Icon */}
-                          <div className={`inline-flex p-3 rounded-2xl bg-gradient-to-r ${getPlanColor(plan.slug)} mb-6`}>
-                            <Icon className="h-8 w-8 text-white" />
+                          <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mb-6">
+                            <Icon className="h-6 w-6 text-primary" />
                           </div>
 
                           {/* Plan Name */}

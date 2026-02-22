@@ -67,19 +67,6 @@ export default function Pricing() {
     }
   };
 
-  const getPlanColor = (slug) => {
-    switch (slug) {
-      case 'starter':
-        return 'from-blue-600 to-blue-400';
-      case 'pro':
-        return 'from-primary to-yellow-400';
-      case 'agency':
-        return 'from-purple-600 to-pink-500';
-      default:
-        return 'from-gray-600 to-gray-400';
-    }
-  };
-
   if (loading) {
     return (
       <div className="min-h-screen flex flex-col bg-light">
@@ -154,8 +141,8 @@ export default function Pricing() {
 
                   <div className="p-6 md:p-8">
                     {/* Icon */}
-                    <div className={`inline-flex p-3 rounded-2xl bg-gradient-to-r ${getPlanColor(plan.slug)} mb-6`}>
-                      <Icon className="h-8 w-8 text-white" />
+                    <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mb-6">
+                      <Icon className="h-6 w-6 text-primary" />
                     </div>
 
                     {/* Plan Name */}

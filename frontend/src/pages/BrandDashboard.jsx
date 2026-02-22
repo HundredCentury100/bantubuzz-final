@@ -99,89 +99,55 @@ const BrandDashboard = () => {
       <Navbar />
 
       <div className="container-custom section-padding">
-        {/* Subscription Tier Banner */}
-        {subscription && subscription.plan && (
-          <div className={`mb-8 overflow-hidden rounded-3xl shadow-sm ${
-            subscription.plan.slug === 'premium' || subscription.plan.slug === 'agency'
-              ? 'bg-gradient-to-br from-purple-600 via-purple-700 to-pink-600'
-              : subscription.plan.slug === 'pro'
-              ? 'bg-gradient-to-br from-primary to-primary-dark'
-              : 'bg-gradient-to-br from-gray-700 to-gray-900'
-          }`}>
-            <div className="relative p-8 md:p-10">
-              {/* Decorative elements */}
-              <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -mr-32 -mt-32"></div>
-              <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/10 rounded-full -ml-24 -mb-24"></div>
-
-              <div className="relative flex flex-col md:flex-row md:items-center md:justify-between gap-6">
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="w-14 h-14 bg-white/20 backdrop-blur-sm rounded-2xl flex items-center justify-center flex-shrink-0">
-                      {subscription.plan.slug === 'free' && <SparklesIcon className="h-7 w-7 text-white" />}
-                      {subscription.plan.slug === 'pro' && <RocketLaunchIcon className="h-7 w-7 text-white" />}
-                      {subscription.plan.slug === 'premium' && <BuildingOfficeIcon className="h-7 w-7 text-white" />}
-                    </div>
-                    <div>
-                      <h3 className="text-2xl font-bold text-white flex items-center gap-2">
-                        {subscription.plan.name} Plan
-                        {subscription.status === 'active' && (
-                          <span className="text-xs px-3 py-1 bg-white/30 backdrop-blur-sm text-white rounded-full font-semibold">
-                            Active
-                          </span>
-                        )}
-                      </h3>
-                      <p className="text-white/90 text-sm">
-                        {subscription.plan.description || 'Your current subscription plan'}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-wrap gap-4 mt-4">
-                    <div className="flex items-center gap-2 text-white/95">
-                      <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                      </svg>
-                      <span className="text-sm font-medium">
-                        {subscription.plan.max_packages === -1 ? 'Unlimited' : subscription.plan.max_packages} Packages
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2 text-white/95">
-                      <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                      </svg>
-                      <span className="text-sm font-medium">
-                        {subscription.plan.max_bookings_per_month === -1 ? 'Unlimited' : subscription.plan.max_bookings_per_month} Bookings/month
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2 text-white/95">
-                      <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                      </svg>
-                      <span className="text-sm font-medium">
-                        {subscription.plan.platform_fee_percentage || 10}% Platform Fee
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex-shrink-0">
-                  {subscription.plan.slug !== 'premium' && subscription.plan.slug !== 'agency' ? (
-                    <Link
-                      to="/subscription/manage"
-                      className="flex items-center justify-center gap-2 px-8 py-3 bg-white text-dark rounded-full font-semibold hover:shadow-xl transform hover:scale-105 transition-all duration-200 whitespace-nowrap"
-                    >
-                      <ArrowUpIcon className="h-5 w-5" />
-                      Upgrade Plan
-                    </Link>
-                  ) : (
-                    <Link
-                      to="/subscription/manage"
-                      className="px-8 py-3 bg-white/20 backdrop-blur-sm text-white rounded-full font-semibold hover:bg-white/30 transition-all duration-200 whitespace-nowrap inline-block text-center"
-                    >
-                      Manage Plan
-                    </Link>
+        {/* Upgrade Banner - Show Next Tier Features */}
+        {subscription && subscription.plan && subscription.plan.slug !== 'agency' && (
+          <div className="mb-8 p-6 bg-primary border border-primary rounded-3xl">
+            <div className="flex items-start gap-3">
+              <svg className="w-6 h-6 text-primary-dark mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clipRule="evenodd" />
+              </svg>
+              <div className="flex-1">
+                <h3 className="font-bold text-primary-dark text-lg mb-2">
+                  {subscription.plan.slug === 'free' && 'Upgrade to Starter - Start Growing Your Brand'}
+                  {subscription.plan.slug === 'starter' && 'Upgrade to Pro - Unlock More Power'}
+                  {subscription.plan.slug === 'pro' && 'Upgrade to Agency - Go Unlimited'}
+                </h3>
+                <p className="text-sm text-primary-dark mb-4 leading-relaxed">
+                  {subscription.plan.slug === 'free' && 'Get 5 packages, 10 bookings per month, and keep the 10% platform fee. Perfect for growing brands.'}
+                  {subscription.plan.slug === 'starter' && 'Get 10 packages, 25 bookings per month, advanced analytics, and priority support. Best value!'}
+                  {subscription.plan.slug === 'pro' && 'Get unlimited packages, unlimited bookings, lowest 5% platform fee, and premium support. Scale without limits!'}
+                </p>
+                <div className="flex flex-wrap gap-3 mb-4">
+                  {subscription.plan.slug === 'free' && (
+                    <>
+                      <span className="text-xs px-3 py-1 bg-white/50 text-primary-dark rounded-full font-medium">5 Packages</span>
+                      <span className="text-xs px-3 py-1 bg-white/50 text-primary-dark rounded-full font-medium">10 Bookings/month</span>
+                      <span className="text-xs px-3 py-1 bg-white/50 text-primary-dark rounded-full font-medium">10% Platform Fee</span>
+                    </>
+                  )}
+                  {subscription.plan.slug === 'starter' && (
+                    <>
+                      <span className="text-xs px-3 py-1 bg-white/50 text-primary-dark rounded-full font-medium">10 Packages</span>
+                      <span className="text-xs px-3 py-1 bg-white/50 text-primary-dark rounded-full font-medium">25 Bookings/month</span>
+                      <span className="text-xs px-3 py-1 bg-white/50 text-primary-dark rounded-full font-medium">Advanced Analytics</span>
+                      <span className="text-xs px-3 py-1 bg-white/50 text-primary-dark rounded-full font-medium">Priority Support</span>
+                    </>
+                  )}
+                  {subscription.plan.slug === 'pro' && (
+                    <>
+                      <span className="text-xs px-3 py-1 bg-white/50 text-primary-dark rounded-full font-medium">Unlimited Packages</span>
+                      <span className="text-xs px-3 py-1 bg-white/50 text-primary-dark rounded-full font-medium">Unlimited Bookings</span>
+                      <span className="text-xs px-3 py-1 bg-white/50 text-primary-dark rounded-full font-medium">5% Platform Fee</span>
+                      <span className="text-xs px-3 py-1 bg-white/50 text-primary-dark rounded-full font-medium">API Access</span>
+                    </>
                   )}
                 </div>
+                <Link
+                  to="/subscription/manage"
+                  className="inline-block px-6 py-2 bg-dark text-white rounded-full hover:bg-gray-800 transition-colors text-sm font-semibold"
+                >
+                  Upgrade Now →
+                </Link>
               </div>
             </div>
           </div>

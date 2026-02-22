@@ -14,6 +14,7 @@ const CreatorDashboard = () => {
   const [bookings, setBookings] = useState([]);
   const [applications, setApplications] = useState([]);
   const [subscription, setSubscription] = useState(null);
+  const [verificationStatus, setVerificationStatus] = useState(null);
   const [stats, setStats] = useState({
     totalPackages: 0,
     activePackages: 0,
@@ -47,6 +48,15 @@ const CreatorDashboard = () => {
       } catch (error) {
         console.error('Error fetching subscription:', error);
         // Don't fail dashboard load if subscription fails
+      }
+
+      // Fetch verification status
+      try {
+        const verRes = await api.get('/creator/verification/status');
+        setVerificationStatus(verRes.data);
+      } catch (error) {
+        console.error('Error fetching verification:', error);
+        // Don't fail dashboard load if verification fails
       }
 
       // Fetch packages
@@ -104,49 +114,60 @@ const CreatorDashboard = () => {
       <Navbar />
 
       <div className="container-custom section-padding">
-        {/* Subscription Tier Badge */}
-        {subscription && subscription.plan && (
-          <div className={`mb-6 p-4 rounded-xl border-2 ${
-            subscription.plan.slug === 'agency' ? 'bg-gradient-to-r from-purple-50 to-pink-50 border-purple-200' :
-            subscription.plan.slug === 'pro' ? 'bg-gradient-to-r from-yellow-50 to-primary/10 border-primary' :
-            subscription.plan.slug === 'starter' ? 'bg-gradient-to-r from-blue-50 to-blue-100 border-blue-200' :
-            'bg-gray-50 border-gray-200'
-          }`}>
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-              <div className="flex items-center gap-3">
-                {subscription.plan.slug === 'starter' && <SparklesIcon className="h-6 w-6 text-blue-600 flex-shrink-0" />}
-                {subscription.plan.slug === 'pro' && <RocketLaunchIcon className="h-6 w-6 text-primary-dark flex-shrink-0" />}
-                {subscription.plan.slug === 'agency' && <BuildingOfficeIcon className="h-6 w-6 text-purple-600 flex-shrink-0" />}
-                <div>
-                  <h3 className="font-bold text-gray-900">
-                    {subscription.plan.name} Plan
-                    {subscription.status === 'active' && (
-                      <span className="ml-2 text-xs px-2 py-1 bg-green-100 text-green-800 rounded-full">Active</span>
-                    )}
-                  </h3>
-                  <p className="text-sm text-gray-600">
-                    {subscription.plan.max_packages === -1 ? 'Unlimited' : subscription.plan.max_packages} packages • {' '}
-                    {subscription.plan.max_bookings_per_month === -1 ? 'Unlimited' : subscription.plan.max_bookings_per_month} bookings/month
-                  </p>
+        {/* Verification Banner - Priority 1: Show if not verified */}
+        {(!verificationStatus || !verificationStatus.is_verified) && (
+          <div className="mb-8 p-6 bg-primary border border-primary rounded-3xl">
+            <div className="flex items-start gap-3">
+              <svg className="w-6 h-6 text-primary-dark mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+              </svg>
+              <div className="flex-1">
+                <h3 className="font-bold text-primary-dark text-lg mb-2">Get Verified - Build Trust with Brands</h3>
+                <p className="text-sm text-primary-dark mb-4 leading-relaxed">
+                  Earn the verified badge on your profile. Stand out from the crowd, increase trust, and get more bookings from top brands.
+                </p>
+                <div className="flex flex-wrap gap-3 mb-4">
+                  <span className="text-xs px-3 py-1 bg-white/50 text-primary-dark rounded-full font-medium">✓ Verified Badge</span>
+                  <span className="text-xs px-3 py-1 bg-white/50 text-primary-dark rounded-full font-medium">✓ Increased Trust</span>
+                  <span className="text-xs px-3 py-1 bg-white/50 text-primary-dark rounded-full font-medium">✓ Priority in Search</span>
+                  <span className="text-xs px-3 py-1 bg-white/50 text-primary-dark rounded-full font-medium">$5/month</span>
                 </div>
+                <Link
+                  to="/creator/verification/apply"
+                  className="inline-block px-6 py-2 bg-dark text-white rounded-full hover:bg-gray-800 transition-colors text-sm font-semibold"
+                >
+                  Apply for Verification →
+                </Link>
               </div>
-              {subscription.plan.slug !== 'agency' && (
+            </div>
+          </div>
+        )}
+
+        {/* Featured Banner - Priority 2: Show after verified */}
+        {verificationStatus && verificationStatus.is_verified && (
+          <div className="mb-8 p-6 bg-primary border border-primary rounded-3xl">
+            <div className="flex items-start gap-3">
+              <svg className="w-6 h-6 text-primary-dark mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+              </svg>
+              <div className="flex-1">
+                <h3 className="font-bold text-primary-dark text-lg mb-2">Get Featured - Boost Your Visibility</h3>
+                <p className="text-sm text-primary-dark mb-4 leading-relaxed">
+                  Get priority placement in search results and homepage featured sections. Available for General, Facebook, Instagram, and TikTok categories.
+                </p>
+                <div className="flex flex-wrap gap-3 mb-4">
+                  <span className="text-xs px-3 py-1 bg-white/50 text-primary-dark rounded-full font-medium">✓ Featured Badge</span>
+                  <span className="text-xs px-3 py-1 bg-white/50 text-primary-dark rounded-full font-medium">✓ Priority Placement</span>
+                  <span className="text-xs px-3 py-1 bg-white/50 text-primary-dark rounded-full font-medium">✓ 7 Days Visibility</span>
+                  <span className="text-xs px-3 py-1 bg-white/50 text-primary-dark rounded-full font-medium">$5-$10/week</span>
+                </div>
                 <Link
-                  to="/subscription/manage"
-                  className="flex items-center justify-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium whitespace-nowrap"
+                  to="/creator/subscriptions"
+                  className="inline-block px-6 py-2 bg-dark text-white rounded-full hover:bg-gray-800 transition-colors text-sm font-semibold"
                 >
-                  <ArrowUpIcon className="h-4 w-4" />
-                  Upgrade
+                  Browse Featured Plans →
                 </Link>
-              )}
-              {subscription.plan.slug === 'agency' && (
-                <Link
-                  to="/subscription/manage"
-                  className="px-4 py-2 text-center bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium whitespace-nowrap"
-                >
-                  Manage
-                </Link>
-              )}
+              </div>
             </div>
           </div>
         )}
