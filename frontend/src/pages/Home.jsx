@@ -1,24 +1,27 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import CreatorBadge from '../components/CreatorBadge';
-import { creatorsAPI, BASE_URL } from '../services/api';
+import { creatorsAPI, categoriesAPI, BASE_URL } from '../services/api';
 import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import SEO from '../components/SEO';
 
 const Home = () => {
   const navigate = useNavigate();
   const [featuredCreators, setFeaturedCreators] = useState([]);
+  const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('search');
   const [filters, setFilters] = useState({
     platform: '',
     category: ''
   });
+  const scrollContainerRef = useRef(null);
 
   useEffect(() => {
     fetchFeaturedCreators();
+    fetchCategories();
   }, []);
 
   const fetchFeaturedCreators = async () => {
@@ -33,6 +36,51 @@ const Home = () => {
       setLoading(false);
     }
   };
+
+  const fetchCategories = async () => {
+    try {
+      const response = await categoriesAPI.getCategories();
+      setCategories(response.data || []);
+    } catch (error) {
+      console.error('Error fetching categories:', error);
+    }
+  };
+
+  // Auto-scroll functionality for categories
+  useEffect(() => {
+    const scrollContainer = scrollContainerRef.current;
+    if (!scrollContainer || categories.length === 0) return;
+
+    let scrollAmount = 0;
+    const scrollSpeed = 1; // pixels per frame
+    const maxScroll = scrollContainer.scrollWidth - scrollContainer.clientWidth;
+
+    const autoScroll = () => {
+      scrollAmount += scrollSpeed;
+      if (scrollAmount >= maxScroll) {
+        scrollAmount = 0; // Reset to beginning
+      }
+      scrollContainer.scrollLeft = scrollAmount;
+    };
+
+    const interval = setInterval(autoScroll, 30);
+
+    // Pause auto-scroll on hover
+    const handleMouseEnter = () => clearInterval(interval);
+    const handleMouseLeave = () => {
+      const newInterval = setInterval(autoScroll, 30);
+      return () => clearInterval(newInterval);
+    };
+
+    scrollContainer.addEventListener('mouseenter', handleMouseEnter);
+    scrollContainer.addEventListener('mouseleave', handleMouseLeave);
+
+    return () => {
+      clearInterval(interval);
+      scrollContainer.removeEventListener('mouseenter', handleMouseEnter);
+      scrollContainer.removeEventListener('mouseleave', handleMouseLeave);
+    };
+  }, [categories]);
 
   const handleSearch = (e) => {
     e.preventDefault();
@@ -371,32 +419,109 @@ const Home = () => {
         </>
       )}
 
-      {/* Categories Section */}
-      <section className="py-12 px-6 lg:px-12 xl:px-20">
-        <div className="w-full">
-          <h2 className="text-3xl font-bold mb-8">Categories</h2>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-            {[
-              { name: 'Fashion', color: 'from-gray-300 to-gray-100' },
-              { name: 'Lifestyle', color: 'from-amber-200 to-amber-100' },
-              { name: 'Model', color: 'from-amber-300 to-amber-200' },
-              { name: 'Travel', color: 'from-gray-200 to-gray-100' }
-            ].map((category) => (
-              <Link
-                key={category.name}
-                to={`/browse/creators?category=${category.name}`}
-                className="relative aspect-[4/3] rounded-2xl overflow-hidden group bg-gradient-to-b hover:shadow-lg transition-shadow"
-              >
-                <div className={`absolute inset-0 bg-gradient-to-b ${category.color}`}></div>
-                <div className="absolute bottom-4 left-4">
-                  <span className="text-white font-semibold text-lg drop-shadow-lg">{category.name}</span>
-                </div>
+      {/* Categories Section - Dynamic & Auto-Scrolling */}
+      {categories.length > 0 && (
+        <section className="py-12 px-6 lg:px-12 xl:px-20">
+          <div className="w-full">
+            <div className="flex justify-between items-start mb-8">
+              <div>
+                <h2 className="text-3xl font-bold mb-1">Categories</h2>
+                <p className="text-gray-600">Explore creators by niche</p>
+              </div>
+              <Link to="/browse/creators" className="text-gray-900 font-medium hover:underline">
+                Browse All
               </Link>
-            ))}
+            </div>
+
+            {/* Horizontal Scrolling Container with Auto-Scroll */}
+            <div
+              ref={scrollContainerRef}
+              className="overflow-x-auto scrollbar-hide scroll-smooth"
+              style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+            >
+              <div className="flex gap-6 pb-2">
+                {categories.map((category, index) => {
+                  // Generate gradient colors based on index for variety
+                  const gradients = [
+                    'from-purple-400 to-purple-200',
+                    'from-blue-400 to-blue-200',
+                    'from-pink-400 to-pink-200',
+                    'from-amber-400 to-amber-200',
+                    'from-green-400 to-green-200',
+                    'from-red-400 to-red-200',
+                    'from-indigo-400 to-indigo-200',
+                    'from-teal-400 to-teal-200',
+                  ];
+                  const gradient = gradients[index % gradients.length];
+
+                  return (
+                    <Link
+                      key={category.id}
+                      to={`/browse/creators?category=${category.name}`}
+                      className="relative flex-shrink-0 w-64 aspect-[4/3] rounded-3xl overflow-hidden group hover:shadow-xl transition-all hover:scale-105"
+                    >
+                      <div className={`absolute inset-0 bg-gradient-to-br ${gradient}`}></div>
+                      <div className="absolute inset-0 bg-black/10 group-hover:bg-black/20 transition-colors"></div>
+                      <div className="absolute bottom-6 left-6 right-6">
+                        <h3 className="text-white font-bold text-xl drop-shadow-lg mb-1">
+                          {category.name}
+                        </h3>
+                        {category.description && (
+                          <p className="text-white/90 text-sm drop-shadow-md line-clamp-2">
+                            {category.description}
+                          </p>
+                        )}
+                      </div>
+                    </Link>
+                  );
+                })}
+                {/* Duplicate categories for seamless loop */}
+                {categories.map((category, index) => {
+                  const gradients = [
+                    'from-purple-400 to-purple-200',
+                    'from-blue-400 to-blue-200',
+                    'from-pink-400 to-pink-200',
+                    'from-amber-400 to-amber-200',
+                    'from-green-400 to-green-200',
+                    'from-red-400 to-red-200',
+                    'from-indigo-400 to-indigo-200',
+                    'from-teal-400 to-teal-200',
+                  ];
+                  const gradient = gradients[index % gradients.length];
+
+                  return (
+                    <Link
+                      key={`duplicate-${category.id}`}
+                      to={`/browse/creators?category=${category.name}`}
+                      className="relative flex-shrink-0 w-64 aspect-[4/3] rounded-3xl overflow-hidden group hover:shadow-xl transition-all hover:scale-105"
+                    >
+                      <div className={`absolute inset-0 bg-gradient-to-br ${gradient}`}></div>
+                      <div className="absolute inset-0 bg-black/10 group-hover:bg-black/20 transition-colors"></div>
+                      <div className="absolute bottom-6 left-6 right-6">
+                        <h3 className="text-white font-bold text-xl drop-shadow-lg mb-1">
+                          {category.name}
+                        </h3>
+                        {category.description && (
+                          <p className="text-white/90 text-sm drop-shadow-md line-clamp-2">
+                            {category.description}
+                          </p>
+                        )}
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Hide scrollbar with CSS */}
+            <style>{`
+              .scrollbar-hide::-webkit-scrollbar {
+                display: none;
+              }
+            `}</style>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* How BantuBuzz Works Section */}
       <section className="py-16 px-6 lg:px-12 xl:px-20">
