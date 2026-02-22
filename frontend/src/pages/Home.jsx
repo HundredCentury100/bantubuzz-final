@@ -461,7 +461,16 @@ const Home = () => {
                       to={`/browse/creators?category=${category.name}`}
                       className="relative flex-shrink-0 w-64 aspect-[4/3] rounded-3xl overflow-hidden group hover:shadow-xl transition-all hover:scale-105"
                     >
-                      <div className={`absolute inset-0 bg-gradient-to-br ${gradient}`}></div>
+                      {/* Show image if available, otherwise show gradient */}
+                      {category.image ? (
+                        <img
+                          src={`https://bantubuzz.com${category.image}`}
+                          alt={category.name}
+                          className="absolute inset-0 w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className={`absolute inset-0 bg-gradient-to-br ${gradient}`}></div>
+                      )}
                       <div className="absolute inset-0 bg-black/10 group-hover:bg-black/20 transition-colors"></div>
                       <div className="absolute bottom-6 left-6 right-6">
                         <h3 className="text-white font-bold text-xl drop-shadow-lg mb-1">
@@ -496,7 +505,16 @@ const Home = () => {
                       to={`/browse/creators?category=${category.name}`}
                       className="relative flex-shrink-0 w-64 aspect-[4/3] rounded-3xl overflow-hidden group hover:shadow-xl transition-all hover:scale-105"
                     >
-                      <div className={`absolute inset-0 bg-gradient-to-br ${gradient}`}></div>
+                      {/* Show image if available, otherwise show gradient */}
+                      {category.image ? (
+                        <img
+                          src={`https://bantubuzz.com${category.image}`}
+                          alt={category.name}
+                          className="absolute inset-0 w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className={`absolute inset-0 bg-gradient-to-br ${gradient}`}></div>
+                      )}
                       <div className="absolute inset-0 bg-black/10 group-hover:bg-black/20 transition-colors"></div>
                       <div className="absolute bottom-6 left-6 right-6">
                         <h3 className="text-white font-bold text-xl drop-shadow-lg mb-1">
