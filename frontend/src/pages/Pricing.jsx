@@ -21,6 +21,13 @@ export default function Pricing() {
   const { isAuthenticated, user } = useAuth();
   const navigate = useNavigate();
 
+  // Redirect creators to their subscription page
+  useEffect(() => {
+    if (user && user.account_type === 'creator') {
+      navigate('/creator/subscriptions');
+    }
+  }, [user, navigate]);
+
   useEffect(() => {
     fetchPlans();
   }, []);
@@ -92,10 +99,10 @@ export default function Pricing() {
         <div className="w-full max-w-7xl mx-auto">
           {/* Header */}
           <div className="text-center mb-12">
-            <h1 className="text-4xl md:text-5xl font-bold text-dark mb-4">
-              Choose Your Plan
+            <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold text-dark mb-6 leading-tight">
+              Brand Subscription Plans
             </h1>
-            <p className="text-lg md:text-xl text-gray-600 max-w-3xl mx-auto">
+            <p className="text-lg md:text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
               Unlock more features and grow your business with our flexible subscription plans
             </p>
 
@@ -123,7 +130,7 @@ export default function Pricing() {
           </div>
 
           {/* Pricing Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {plans.map((plan) => {
               const Icon = getPlanIcon(plan.slug);
               const price = billingCycle === 'yearly' ? plan.price_yearly / 12 : plan.price_monthly;
@@ -134,18 +141,18 @@ export default function Pricing() {
               return (
                 <div
                   key={plan.id}
-                  className={`bg-white rounded-3xl shadow-lg overflow-hidden transition-all hover:shadow-xl hover:scale-105 ${
-                    isPopular ? 'ring-2 ring-primary lg:scale-105' : ''
+                  className={`bg-white rounded-3xl shadow-sm overflow-hidden transition-shadow hover:shadow-md ${
+                    isPopular ? 'ring-2 ring-primary' : ''
                   }`}
                 >
                   {/* Popular Badge */}
                   {isPopular && (
-                    <div className="bg-gradient-to-r from-primary to-yellow-400 text-dark text-center py-2 font-bold text-sm">
+                    <div className="bg-primary text-dark text-center py-2 font-bold text-sm">
                       MOST POPULAR
                     </div>
                   )}
 
-                  <div className="p-8">
+                  <div className="p-6 md:p-8">
                     {/* Icon */}
                     <div className={`inline-flex p-3 rounded-2xl bg-gradient-to-r ${getPlanColor(plan.slug)} mb-6`}>
                       <Icon className="h-8 w-8 text-white" />
@@ -181,7 +188,7 @@ export default function Pricing() {
                     {/* CTA Button */}
                     <button
                       onClick={() => handleSubscribe(plan.id)}
-                      className={`w-full py-4 px-6 rounded-full font-bold transition-colors ${
+                      className={`w-full py-3 px-6 rounded-full font-medium transition-colors ${
                         isPopular
                           ? 'bg-primary hover:bg-primary/90 text-dark'
                           : 'bg-dark hover:bg-gray-800 text-white'

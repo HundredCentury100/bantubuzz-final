@@ -101,17 +101,17 @@ const BrandDashboard = () => {
       <div className="container-custom section-padding">
         {/* Subscription Tier Banner */}
         {subscription && subscription.plan && (
-          <div className={`mb-8 overflow-hidden rounded-3xl shadow-lg ${
-            subscription.plan.slug === 'premium'
+          <div className={`mb-8 overflow-hidden rounded-3xl shadow-sm ${
+            subscription.plan.slug === 'premium' || subscription.plan.slug === 'agency'
               ? 'bg-gradient-to-br from-purple-600 via-purple-700 to-pink-600'
               : subscription.plan.slug === 'pro'
-              ? 'bg-gradient-to-br from-primary via-primary-dark to-blue-700'
-              : 'bg-gradient-to-br from-gray-700 via-gray-800 to-gray-900'
+              ? 'bg-gradient-to-br from-primary to-primary-dark'
+              : 'bg-gradient-to-br from-gray-700 to-gray-900'
           }`}>
-            <div className="relative p-6 md:p-8">
+            <div className="relative p-8 md:p-10">
               {/* Decorative elements */}
               <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -mr-32 -mt-32"></div>
-              <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/5 rounded-full -ml-24 -mb-24"></div>
+              <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/10 rounded-full -ml-24 -mb-24"></div>
 
               <div className="relative flex flex-col md:flex-row md:items-center md:justify-between gap-6">
                 <div className="flex-1">
@@ -165,10 +165,10 @@ const BrandDashboard = () => {
                 </div>
 
                 <div className="flex-shrink-0">
-                  {subscription.plan.slug !== 'premium' ? (
+                  {subscription.plan.slug !== 'premium' && subscription.plan.slug !== 'agency' ? (
                     <Link
                       to="/subscription/manage"
-                      className="flex items-center justify-center gap-2 px-6 py-3 bg-white text-gray-900 rounded-2xl font-bold hover:shadow-2xl transform hover:scale-105 transition-all duration-200 whitespace-nowrap"
+                      className="flex items-center justify-center gap-2 px-8 py-3 bg-white text-dark rounded-full font-semibold hover:shadow-xl transform hover:scale-105 transition-all duration-200 whitespace-nowrap"
                     >
                       <ArrowUpIcon className="h-5 w-5" />
                       Upgrade Plan
@@ -176,7 +176,7 @@ const BrandDashboard = () => {
                   ) : (
                     <Link
                       to="/subscription/manage"
-                      className="px-6 py-3 bg-white/20 backdrop-blur-sm text-white rounded-2xl font-bold hover:bg-white/30 transition-all duration-200 whitespace-nowrap inline-block text-center"
+                      className="px-8 py-3 bg-white/20 backdrop-blur-sm text-white rounded-full font-semibold hover:bg-white/30 transition-all duration-200 whitespace-nowrap inline-block text-center"
                     >
                       Manage Plan
                     </Link>

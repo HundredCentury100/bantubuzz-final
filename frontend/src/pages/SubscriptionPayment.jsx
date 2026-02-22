@@ -168,13 +168,13 @@ const SubscriptionPayment = () => {
           </div>
 
           {/* Header */}
-          <div className="mb-8 text-center">
-            <h1 className="text-4xl font-bold text-dark mb-2">Complete Subscription Payment</h1>
-            <p className="text-gray-600">Secure payment via Paynow</p>
+          <div className="mb-12 text-center">
+            <h1 className="text-5xl md:text-6xl font-bold text-dark mb-4 leading-tight">Complete Payment</h1>
+            <p className="text-lg md:text-xl text-gray-600 leading-relaxed">Secure payment via Paynow</p>
           </div>
 
           {/* Subscription Summary Card */}
-          <div className="bg-white rounded-3xl shadow-sm p-6 mb-6">
+          <div className="bg-white rounded-3xl shadow-sm p-8 mb-6">
             <h2 className="text-xl font-bold text-dark mb-4">Subscription Summary</h2>
 
             <div className="space-y-4">
@@ -200,7 +200,7 @@ const SubscriptionPayment = () => {
                 </div>
               </div>
 
-              <div className="flex justify-between items-center py-4 bg-light rounded-lg px-4">
+              <div className="flex justify-between items-center py-4 bg-light rounded-3xl px-6">
                 <span className="text-lg font-bold text-dark">Total Amount</span>
                 <span className="text-2xl font-bold text-primary">${amount?.toFixed(2) || '0.00'}</span>
               </div>
@@ -208,8 +208,8 @@ const SubscriptionPayment = () => {
           </div>
 
           {/* Payment Actions */}
-          <div className="bg-white rounded-3xl shadow-sm p-6">
-            <h2 className="text-xl font-bold text-dark mb-4">Select Payment Method</h2>
+          <div className="bg-white rounded-3xl shadow-sm p-8">
+            <h2 className="text-2xl font-bold text-dark mb-6">Select Payment Method</h2>
 
             <div className="space-y-4 mb-6">
               {/* Paynow Option */}
@@ -253,7 +253,7 @@ const SubscriptionPayment = () => {
 
             {/* Bank Transfer Instructions */}
             {paymentMethod === 'bank_transfer' && (
-              <div className="bg-blue-50 border-2 border-blue-200 rounded-3xl p-6 mb-6">
+              <div className="bg-blue-50 border border-blue-200 rounded-3xl p-6 mb-6">
                 <h3 className="font-bold text-blue-900 mb-3 flex items-center gap-2">
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -305,7 +305,7 @@ const SubscriptionPayment = () => {
             <button
               onClick={paymentMethod === 'paynow' ? handleProceedToPayment : handleManualPayment}
               disabled={(paymentMethod === 'paynow' && !paymentData?.redirect_url) || (paymentMethod === 'bank_transfer' && !proofFile) || uploading}
-              className="bg-primary hover:bg-primary-dark text-white font-medium px-6 py-3 rounded-full w-full disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-colors"
+              className="bg-dark hover:bg-gray-800 text-white font-medium px-6 py-3 rounded-full w-full disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-colors"
             >
               {uploading ? (
                 <>
@@ -357,14 +357,14 @@ const SubscriptionPayment = () => {
           </div>
 
           {/* Security Notice */}
-          <div className="mt-6 p-4 bg-primary/10 border border-primary rounded-3xl">
+          <div className="mt-6 p-6 bg-light border border-gray-200 rounded-3xl">
             <div className="flex items-start">
-              <svg className="w-5 h-5 text-primary-dark mr-3 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+              <svg className="w-5 h-5 text-primary mr-3 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
               </svg>
               <div>
-                <h3 className="font-medium text-primary-dark mb-1">Secure Payment</h3>
-                <p className="text-sm text-primary-dark">
+                <h3 className="font-semibold text-dark mb-1">Secure Payment</h3>
+                <p className="text-sm text-gray-600">
                   All payments are processed securely through Paynow. Your financial information is encrypted and protected.
                 </p>
               </div>

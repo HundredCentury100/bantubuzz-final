@@ -138,13 +138,13 @@ const VerificationApplication = () => {
       <div className="container-custom section-padding">
         <div className="max-w-4xl mx-auto">
           {/* Header */}
-          <div className="text-center mb-8">
+          <div className="text-center mb-12">
             <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary/10 rounded-full mb-4">
               <CheckBadgeIcon className="h-5 w-5 text-primary" />
               <span className="text-sm font-medium text-primary">Creator Verification</span>
             </div>
-            <h1 className="text-4xl font-bold text-dark mb-4">Apply for Verification</h1>
-            <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+            <h1 className="text-5xl md:text-6xl font-bold text-dark mb-4 leading-tight">Apply for Verification</h1>
+            <p className="text-lg md:text-xl text-gray-600 max-w-2xl mx-auto leading-relaxed">
               Get the verified badge and build trust with brands. Complete the application below.
             </p>
           </div>
@@ -155,10 +155,10 @@ const VerificationApplication = () => {
               {steps.map((step, index) => (
                 <div key={step.id} className="flex items-center flex-1">
                   <div className="flex flex-col items-center flex-1">
-                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center mb-2 transition-all ${
+                    <div className={`w-12 h-12 rounded-full flex items-center justify-center mb-2 transition-all ${
                       currentStep >= step.id
-                        ? 'bg-primary text-white shadow-lg'
-                        : 'bg-gray-200 text-gray-500'
+                        ? 'bg-primary text-dark shadow-sm'
+                        : 'bg-light text-gray-500'
                     }`}>
                       <step.icon className="h-6 w-6" />
                     </div>
@@ -278,10 +278,10 @@ const VerificationApplication = () => {
                         />
                         <label
                           htmlFor="id_front"
-                          className={`flex flex-col items-center justify-center w-full h-48 border-2 border-dashed rounded-2xl cursor-pointer transition-all ${
+                          className={`flex flex-col items-center justify-center w-full h-48 border-2 border-dashed rounded-3xl cursor-pointer transition-all ${
                             formData.id_document_front
                               ? 'border-primary bg-primary/5'
-                              : 'border-gray-300 hover:border-primary hover:bg-gray-50'
+                              : 'border-gray-300 hover:border-primary hover:bg-light'
                           }`}
                         >
                           {uploading.id_front ? (
@@ -316,10 +316,10 @@ const VerificationApplication = () => {
                         />
                         <label
                           htmlFor="id_back"
-                          className={`flex flex-col items-center justify-center w-full h-48 border-2 border-dashed rounded-2xl cursor-pointer transition-all ${
+                          className={`flex flex-col items-center justify-center w-full h-48 border-2 border-dashed rounded-3xl cursor-pointer transition-all ${
                             formData.id_document_back
                               ? 'border-primary bg-primary/5'
-                              : 'border-gray-300 hover:border-primary hover:bg-gray-50'
+                              : 'border-gray-300 hover:border-primary hover:bg-light'
                           }`}
                         >
                           {uploading.id_back ? (
@@ -354,10 +354,10 @@ const VerificationApplication = () => {
                         />
                         <label
                           htmlFor="selfie"
-                          className={`flex flex-col items-center justify-center w-full h-48 border-2 border-dashed rounded-2xl cursor-pointer transition-all ${
+                          className={`flex flex-col items-center justify-center w-full h-48 border-2 border-dashed rounded-3xl cursor-pointer transition-all ${
                             formData.selfie_with_id
                               ? 'border-primary bg-primary/5'
-                              : 'border-gray-300 hover:border-primary hover:bg-gray-50'
+                              : 'border-gray-300 hover:border-primary hover:bg-light'
                           }`}
                         >
                           {uploading.selfie ? (
@@ -378,7 +378,7 @@ const VerificationApplication = () => {
                     </div>
                   </div>
 
-                  <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                  <div className="bg-blue-50 border border-blue-200 rounded-3xl p-4">
                     <p className="text-sm text-blue-800">
                       <strong>Tips for good photos:</strong> Ensure documents are clear, well-lit, and all text is readable.
                       For the selfie, hold your ID next to your face and make sure both are clearly visible.
@@ -396,9 +396,9 @@ const VerificationApplication = () => {
                   </div>
 
                   {/* Instagram */}
-                  <div className="p-6 border border-gray-200 rounded-2xl">
+                  <div className="p-6 border border-gray-200 rounded-3xl">
                     <div className="flex items-center gap-3 mb-4">
-                      <div className="w-10 h-10 bg-gradient-to-tr from-purple-600 via-pink-600 to-orange-600 rounded-xl flex items-center justify-center text-white font-bold">
+                      <div className="w-10 h-10 bg-gradient-to-tr from-purple-600 via-pink-600 to-orange-600 rounded-full flex items-center justify-center text-white font-bold text-sm">
                         IG
                       </div>
                       <h3 className="text-lg font-bold text-dark">Instagram</h3>
@@ -444,9 +444,9 @@ const VerificationApplication = () => {
                   </div>
 
                   {/* TikTok */}
-                  <div className="p-6 border border-gray-200 rounded-2xl">
+                  <div className="p-6 border border-gray-200 rounded-3xl">
                     <div className="flex items-center gap-3 mb-4">
-                      <div className="w-10 h-10 bg-black rounded-xl flex items-center justify-center text-white font-bold">
+                      <div className="w-10 h-10 bg-dark rounded-full flex items-center justify-center text-white font-bold text-sm">
                         TT
                       </div>
                       <h3 className="text-lg font-bold text-dark">TikTok</h3>
@@ -492,9 +492,9 @@ const VerificationApplication = () => {
                   </div>
 
                   {/* Facebook */}
-                  <div className="p-6 border border-gray-200 rounded-2xl">
+                  <div className="p-6 border border-gray-200 rounded-3xl">
                     <div className="flex items-center gap-3 mb-4">
-                      <div className="w-10 h-10 bg-blue-600 rounded-xl flex items-center justify-center text-white font-bold">
+                      <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white font-bold text-sm">
                         FB
                       </div>
                       <h3 className="text-lg font-bold text-dark">Facebook</h3>
@@ -547,7 +547,7 @@ const VerificationApplication = () => {
                   type="button"
                   onClick={handlePrevious}
                   disabled={currentStep === 1}
-                  className="px-6 py-3 border border-gray-300 text-gray-700 rounded-xl font-semibold hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                  className="px-8 py-3 border border-gray-300 text-gray-700 rounded-full font-medium hover:bg-light transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                 >
                   <ArrowLeftIcon className="h-5 w-5" />
                   Previous
@@ -557,7 +557,7 @@ const VerificationApplication = () => {
                   <button
                     type="button"
                     onClick={handleNext}
-                    className="px-6 py-3 bg-primary text-white rounded-xl font-semibold hover:bg-primary-dark transition-colors flex items-center gap-2"
+                    className="px-8 py-3 bg-dark text-white rounded-full font-medium hover:bg-gray-800 transition-colors flex items-center gap-2"
                   >
                     Next
                     <ArrowRightIcon className="h-5 w-5" />
@@ -566,11 +566,11 @@ const VerificationApplication = () => {
                   <button
                     type="submit"
                     disabled={loading}
-                    className="px-8 py-3 bg-primary text-white rounded-xl font-semibold hover:bg-primary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                    className="px-8 py-3 bg-primary text-dark rounded-full font-semibold hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
                   >
                     {loading ? (
                       <>
-                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-dark"></div>
                         Submitting...
                       </>
                     ) : (

@@ -242,17 +242,17 @@ export default function SubscriptionManage() {
         <div className="w-full max-w-7xl mx-auto">
           {/* Header */}
           <div className="mb-12 text-center">
-            <h1 className="text-4xl md:text-5xl font-bold text-dark mb-4">
+            <h1 className="text-5xl md:text-6xl font-bold text-dark mb-4 leading-tight">
               Manage Your Subscription
             </h1>
-            <p className="text-lg text-gray-600">
+            <p className="text-lg md:text-xl text-gray-600 max-w-2xl mx-auto leading-relaxed">
               View and manage your BantuBuzz subscription plan
             </p>
           </div>
 
           {/* Current Subscription Card */}
           {currentSubscription && currentPlan && (
-            <div className="bg-white rounded-3xl shadow-lg p-8 md:p-12 mb-12">
+            <div className="bg-white rounded-3xl shadow-sm p-8 md:p-12 mb-12">
               <div className="flex flex-col md:flex-row md:items-start md:justify-between mb-8">
                 <div className="mb-4 md:mb-0">
                   <div className="flex items-center gap-3 mb-3">
@@ -278,19 +278,19 @@ export default function SubscriptionManage() {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                <div className="bg-gray-50 rounded-2xl p-6">
+                <div className="bg-light rounded-3xl p-6">
                   <p className="text-sm text-gray-600 mb-2">Billing Cycle</p>
                   <p className="text-2xl font-bold text-dark capitalize">
                     {currentSubscription?.billing_cycle || 'Monthly'}
                   </p>
                 </div>
-                <div className="bg-gray-50 rounded-2xl p-6">
+                <div className="bg-light rounded-3xl p-6">
                   <p className="text-sm text-gray-600 mb-2">Current Period Ends</p>
                   <p className="text-2xl font-bold text-dark">
                     {formatDate(currentSubscription?.current_period_end)}
                   </p>
                 </div>
-                <div className="bg-gray-50 rounded-2xl p-6">
+                <div className="bg-light rounded-3xl p-6">
                   <p className="text-sm text-gray-600 mb-2">Next Payment</p>
                   <p className="text-2xl font-bold text-dark">
                     {currentSubscription?.next_payment_date
@@ -301,7 +301,7 @@ export default function SubscriptionManage() {
               </div>
 
               {isCancelled && (
-                <div className="bg-yellow-50 border-2 border-yellow-200 rounded-2xl p-6 mb-8">
+                <div className="bg-yellow-50 border-2 border-yellow-200 rounded-3xl p-6 mb-8">
                   <div className="flex items-start gap-4">
                     <ExclamationTriangleIcon className="h-6 w-6 text-yellow-600 flex-shrink-0 mt-1" />
                     <div>
@@ -323,7 +323,7 @@ export default function SubscriptionManage() {
                   <button
                     onClick={handleReactivate}
                     disabled={actionLoading}
-                    className="bg-primary hover:bg-primary/90 text-dark px-8 py-4 rounded-full font-semibold transition-colors disabled:opacity-50 flex items-center gap-2"
+                    className="bg-primary hover:bg-primary/90 text-dark px-8 py-3 rounded-full font-medium transition-colors disabled:opacity-50 flex items-center gap-2"
                   >
                     {actionLoading && <ArrowPathIcon className="h-5 w-5 animate-spin" />}
                     Reactivate Subscription
@@ -332,14 +332,14 @@ export default function SubscriptionManage() {
                   <button
                     onClick={handleCancel}
                     disabled={actionLoading}
-                    className="bg-gray-200 hover:bg-gray-300 text-dark px-8 py-4 rounded-full font-semibold transition-colors"
+                    className="bg-gray-200 hover:bg-gray-300 text-dark px-8 py-3 rounded-full font-medium transition-colors"
                   >
                     Cancel Subscription
                   </button>
                 )}
                 <Link
                   to="/pricing"
-                  className="bg-dark hover:bg-gray-800 text-white px-8 py-4 rounded-full font-semibold transition-colors"
+                  className="bg-dark hover:bg-gray-800 text-white px-8 py-3 rounded-full font-medium transition-colors"
                 >
                   View All Plans
                 </Link>
@@ -349,7 +349,7 @@ export default function SubscriptionManage() {
 
           {/* No Subscription State */}
           {!currentSubscription && (
-            <div className="bg-white rounded-3xl shadow-lg p-12 mb-12 text-center">
+            <div className="bg-white rounded-3xl shadow-sm p-12 mb-12 text-center">
               <div className="max-w-2xl mx-auto">
                 <div className="inline-flex p-4 rounded-full bg-gray-100 mb-6">
                   <CreditCardIcon className="h-12 w-12 text-gray-400" />
@@ -368,7 +368,7 @@ export default function SubscriptionManage() {
           {(!currentSubscription || (currentSubscription && currentPlan?.slug !== 'agency')) && (
             <div>
               <div className="text-center mb-8">
-                <h2 className="text-3xl font-bold text-dark mb-4">
+                <h2 className="text-3xl md:text-4xl font-bold text-dark mb-4">
                   {currentSubscription ? 'Upgrade Your Plan' : 'Choose Your Plan'}
                 </h2>
 
@@ -410,17 +410,17 @@ export default function SubscriptionManage() {
                     return (
                       <div
                         key={plan.id}
-                        className={`bg-white rounded-3xl shadow-lg overflow-hidden transition-transform hover:scale-105 ${
+                        className={`bg-white rounded-3xl shadow-sm overflow-hidden transition-shadow hover:shadow-md ${
                           isPopular ? 'ring-2 ring-primary' : ''
                         }`}
                       >
                         {isPopular && (
-                          <div className="bg-gradient-to-r from-primary to-yellow-400 text-dark text-center py-2 font-bold text-sm">
+                          <div className="bg-primary text-dark text-center py-2 font-bold text-sm">
                             MOST POPULAR
                           </div>
                         )}
 
-                        <div className="p-8">
+                        <div className="p-6 md:p-8">
                           {/* Icon */}
                           <div className={`inline-flex p-3 rounded-2xl bg-gradient-to-r ${getPlanColor(plan.slug)} mb-6`}>
                             <Icon className="h-8 w-8 text-white" />
@@ -455,14 +455,14 @@ export default function SubscriptionManage() {
 
                           {/* CTA Button */}
                           {isCurrentPlan ? (
-                            <div className="w-full py-4 px-6 bg-gray-100 text-gray-700 rounded-full text-center font-bold">
+                            <div className="w-full py-3 px-6 bg-light text-gray-700 rounded-full text-center font-medium">
                               Current Plan
                             </div>
                           ) : (
                             <button
                               onClick={() => currentSubscription ? handleUpgrade(plan.id) : handleSubscribe(plan.id)}
                               disabled={actionLoading || isCancelled}
-                              className={`w-full py-4 px-6 rounded-full font-bold transition-colors ${
+                              className={`w-full py-3 px-6 rounded-full font-medium transition-colors ${
                                 isPopular
                                   ? 'bg-primary hover:bg-primary/90 text-dark'
                                   : 'bg-dark hover:bg-gray-800 text-white'
