@@ -128,18 +128,17 @@ export default function Pricing() {
               return (
                 <div
                   key={plan.id}
-                  className={`bg-white rounded-3xl shadow-sm overflow-hidden transition-shadow hover:shadow-md ${
-                    isPopular ? 'ring-2 ring-primary' : ''
-                  }`}
+                  className={`${isPopular ? 'bg-primary' : 'bg-white'} rounded-3xl shadow-sm hover:shadow-md transition-shadow p-4`}
                 >
-                  {/* Popular Badge */}
+                  {/* Popular Badge - Only for popular plans */}
                   {isPopular && (
-                    <div className="bg-primary text-dark text-center py-2 font-bold text-sm">
+                    <div className="bg-dark text-white text-center py-2 px-4 rounded-full font-bold text-xs mb-4">
                       MOST POPULAR
                     </div>
                   )}
 
-                  <div className="p-6 md:p-8">
+                  {/* White Inner Container */}
+                  <div className="bg-white rounded-2xl p-6">
                     {/* Icon */}
                     <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mb-6">
                       <Icon className="h-6 w-6 text-primary" />
@@ -147,7 +146,7 @@ export default function Pricing() {
 
                     {/* Plan Name */}
                     <h3 className="text-2xl font-bold text-dark mb-2">{plan.name}</h3>
-                    <p className="text-gray-600 mb-6 min-h-[3rem]">{plan.description}</p>
+                    <p className="text-gray-600 text-sm mb-6 min-h-[3rem]">{plan.description}</p>
 
                     {/* Price */}
                     <div className="mb-6">
@@ -172,35 +171,23 @@ export default function Pricing() {
                       )}
                     </div>
 
-                    {/* CTA Button */}
-                    <button
-                      onClick={() => handleSubscribe(plan.id)}
-                      className={`w-full py-3 px-6 rounded-full font-medium transition-colors ${
-                        isPopular
-                          ? 'bg-primary hover:bg-primary/90 text-dark'
-                          : 'bg-dark hover:bg-gray-800 text-white'
-                      }`}
-                    >
-                      {isFree ? 'Get Started' : 'Subscribe Now'}
-                    </button>
-
                     {/* Features */}
-                    <ul className="mt-8 space-y-4">
+                    <ul className="space-y-3 mb-6">
                       {/* Packages */}
-                      <li className="flex items-start gap-3">
-                        <CheckIcon className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
-                        <span className="text-gray-700">
-                          <span className="font-bold text-dark">
+                      <li className="flex items-start gap-2">
+                        <CheckIcon className="h-4 w-4 text-green-600 flex-shrink-0 mt-0.5" />
+                        <span className="text-sm text-gray-700">
+                          <span className="font-semibold text-dark">
                             {plan.features?.max_packages === -1 ? 'Unlimited' : plan.features?.max_packages || 3}
                           </span> packages
                         </span>
                       </li>
 
                       {/* Bookings */}
-                      <li className="flex items-start gap-3">
-                        <CheckIcon className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
-                        <span className="text-gray-700">
-                          <span className="font-bold text-dark">
+                      <li className="flex items-start gap-2">
+                        <CheckIcon className="h-4 w-4 text-green-600 flex-shrink-0 mt-0.5" />
+                        <span className="text-sm text-gray-700">
+                          <span className="font-semibold text-dark">
                             {plan.features?.max_bookings_per_month === -1 ? 'Unlimited' : plan.features?.max_bookings_per_month || 5}
                           </span> bookings/month
                         </span>
@@ -208,65 +195,77 @@ export default function Pricing() {
 
                       {/* Custom Packages */}
                       {plan.features?.can_create_custom_packages ? (
-                        <li className="flex items-start gap-3">
-                          <CheckIcon className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
-                          <span className="text-gray-700">Custom packages</span>
+                        <li className="flex items-start gap-2">
+                          <CheckIcon className="h-4 w-4 text-green-600 flex-shrink-0 mt-0.5" />
+                          <span className="text-sm text-gray-700">Custom packages</span>
                         </li>
                       ) : (
-                        <li className="flex items-start gap-3">
-                          <XMarkIcon className="h-5 w-5 text-gray-400 flex-shrink-0 mt-0.5" />
-                          <span className="text-gray-400">Custom packages</span>
+                        <li className="flex items-start gap-2">
+                          <XMarkIcon className="h-4 w-4 text-gray-400 flex-shrink-0 mt-0.5" />
+                          <span className="text-sm text-gray-400">Custom packages</span>
                         </li>
                       )}
 
                       {/* Briefs & Campaigns */}
                       {plan.features?.can_access_briefs || plan.features?.can_access_campaigns ? (
-                        <li className="flex items-start gap-3">
-                          <CheckIcon className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
-                          <span className="text-gray-700">Briefs & campaigns</span>
+                        <li className="flex items-start gap-2">
+                          <CheckIcon className="h-4 w-4 text-green-600 flex-shrink-0 mt-0.5" />
+                          <span className="text-sm text-gray-700">Briefs & campaigns</span>
                         </li>
                       ) : (
-                        <li className="flex items-start gap-3">
-                          <XMarkIcon className="h-5 w-5 text-gray-400 flex-shrink-0 mt-0.5" />
-                          <span className="text-gray-400">Briefs & campaigns</span>
+                        <li className="flex items-start gap-2">
+                          <XMarkIcon className="h-4 w-4 text-gray-400 flex-shrink-0 mt-0.5" />
+                          <span className="text-sm text-gray-400">Briefs & campaigns</span>
                         </li>
                       )}
 
                       {/* Analytics */}
                       {plan.features?.analytics_access ? (
-                        <li className="flex items-start gap-3">
-                          <CheckIcon className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
-                          <span className="text-gray-700">Advanced analytics</span>
+                        <li className="flex items-start gap-2">
+                          <CheckIcon className="h-4 w-4 text-green-600 flex-shrink-0 mt-0.5" />
+                          <span className="text-sm text-gray-700">Advanced analytics</span>
                         </li>
                       ) : (
-                        <li className="flex items-start gap-3">
-                          <XMarkIcon className="h-5 w-5 text-gray-400 flex-shrink-0 mt-0.5" />
-                          <span className="text-gray-400">Advanced analytics</span>
+                        <li className="flex items-start gap-2">
+                          <XMarkIcon className="h-4 w-4 text-gray-400 flex-shrink-0 mt-0.5" />
+                          <span className="text-sm text-gray-400">Advanced analytics</span>
                         </li>
                       )}
 
                       {/* Priority Support */}
                       {plan.features?.priority_support ? (
-                        <li className="flex items-start gap-3">
-                          <CheckIcon className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
-                          <span className="text-gray-700">Priority support</span>
+                        <li className="flex items-start gap-2">
+                          <CheckIcon className="h-4 w-4 text-green-600 flex-shrink-0 mt-0.5" />
+                          <span className="text-sm text-gray-700">Priority support</span>
                         </li>
                       ) : (
-                        <li className="flex items-start gap-3">
-                          <XMarkIcon className="h-5 w-5 text-gray-400 flex-shrink-0 mt-0.5" />
-                          <span className="text-gray-400">Priority support</span>
+                        <li className="flex items-start gap-2">
+                          <XMarkIcon className="h-4 w-4 text-gray-400 flex-shrink-0 mt-0.5" />
+                          <span className="text-sm text-gray-400">Priority support</span>
                         </li>
                       )}
 
                       {/* API Access */}
                       {plan.features?.api_access && (
-                        <li className="flex items-start gap-3">
-                          <CheckIcon className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
-                          <span className="text-gray-700">API access</span>
+                        <li className="flex items-start gap-2">
+                          <CheckIcon className="h-4 w-4 text-green-600 flex-shrink-0 mt-0.5" />
+                          <span className="text-sm text-gray-700">API access</span>
                         </li>
                       )}
                     </ul>
                   </div>
+
+                  {/* CTA Button - Outside white container, on colored background */}
+                  <button
+                    onClick={() => handleSubscribe(plan.id)}
+                    className={`w-full mt-4 py-3 px-6 rounded-full font-medium transition-colors ${
+                      isPopular
+                        ? 'bg-white text-dark hover:bg-gray-100'
+                        : 'bg-dark text-white hover:bg-gray-800'
+                    }`}
+                  >
+                    {isFree ? 'Get Started' : 'Subscribe Now'}
+                  </button>
                 </div>
               );
             })}

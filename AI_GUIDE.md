@@ -55,66 +55,176 @@ light: '#ebf4e5'         // Light backgrounds (same as primary-light)
 
 ### Design System Rules (CRITICAL - ALWAYS FOLLOW)
 
-#### 1. **Card Design**
+#### 1. **Card Design Patterns**
+
+**Standard Card (White Background):**
 ```jsx
 // CORRECT - Homepage style
 <div className="bg-white rounded-3xl shadow-sm hover:shadow-md p-6 md:p-8">
+  {/* Content */}
+</div>
 
 // WRONG - Don't use
-<div className="bg-white rounded-2xl shadow-lg">
+<div className="bg-white rounded-2xl shadow-lg p-8">
+```
+
+**Popular/Featured Card (Primary Background with White Inner Container):**
+```jsx
+// CORRECT - BrowseCreators & Pricing style
+<div className="bg-primary rounded-3xl shadow-sm hover:shadow-md p-4">
+  {/* Optional badge */}
+  <div className="bg-dark text-white text-center py-2 px-4 rounded-full font-bold text-xs mb-4">
+    MOST POPULAR
+  </div>
+
+  {/* White inner container with rounded-2xl */}
+  <div className="bg-white rounded-2xl p-6">
+    {/* Card content */}
+  </div>
+
+  {/* Button on primary background */}
+  <button className="w-full mt-4 py-3 px-6 bg-white text-dark rounded-full font-medium hover:bg-gray-100">
+    Button Text
+  </button>
+</div>
 ```
 
 **Rules:**
-- ✅ Use `rounded-3xl` for ALL cards
-- ✅ Use `shadow-sm` default, `hover:shadow-md` on hover
-- ✅ Padding: `p-6 md:p-8` for cards
-- ❌ Never use `rounded-2xl`, `rounded-lg`, or `shadow-lg`
+- ✅ Outer cards: ALWAYS `rounded-3xl` + `shadow-sm` + `hover:shadow-md`
+- ✅ Inner containers (when on colored background): Use `rounded-2xl`
+- ✅ Standard padding: `p-4` for outer, `p-6` for inner
+- ✅ Image containers within cards: `rounded-2xl` with `m-4` margin
+- ❌ NEVER use `shadow-lg` or `shadow-xl`
+- ❌ NEVER use gradients for icons or containers (use solid colors only)
 
-#### 2. **Buttons**
+#### 2. **Icon Design**
 ```jsx
-// CORRECT - All buttons must be rounded-full
-<button className="px-8 py-3 bg-dark text-white rounded-full font-medium hover:bg-gray-800">
-<button className="px-8 py-3 bg-primary text-dark rounded-full font-semibold hover:bg-primary/90">
+// CORRECT - Simple bg-primary/10 circle
+<div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center mb-6">
+  <Icon className="h-6 w-6 text-primary" />
+</div>
+
+// WRONG - No gradients allowed
+<div className="bg-gradient-to-r from-blue-600 to-blue-400 p-3 rounded-2xl">
+  <Icon className="h-8 w-8 text-white" />
+</div>
+```
+
+**Rules:**
+- ✅ Use `bg-primary/10 rounded-full` for icon backgrounds
+- ✅ Icon size: `w-12 h-12` container, `h-6 w-6` icon
+- ✅ Icon color: `text-primary` for primary icons
+- ❌ NO gradients (`bg-gradient-to-r`, etc.)
+- ❌ NO colored shadows or glows
+
+#### 3. **Buttons**
+```jsx
+// CORRECT - Primary button
+<button className="px-8 py-3 bg-primary text-dark rounded-full font-medium hover:bg-primary/90 transition-colors">
+
+// CORRECT - Dark button
+<button className="px-8 py-3 bg-dark text-white rounded-full font-medium hover:bg-gray-800 transition-colors">
+
+// CORRECT - White button (on colored background)
+<button className="px-8 py-3 bg-white text-dark rounded-full font-medium hover:bg-gray-100 transition-colors">
 
 // WRONG
 <button className="px-6 py-4 bg-dark text-white rounded-xl">
 ```
 
 **Rules:**
-- ✅ Always `rounded-full`
-- ✅ Padding: `px-8 py-3` (standard), `px-6 py-3` (compact)
+- ✅ ALWAYS `rounded-full` - no exceptions
+- ✅ Padding: `px-8 py-3` (standard), `px-6 py-3` (compact), `px-6 py-2` (small)
 - ✅ Font: `font-medium` (normal) or `font-semibold` (emphasis)
-- ❌ Never use `rounded-xl`, `rounded-2xl`, or `rounded-lg`
+- ✅ Always include `transition-colors` for smooth hover
+- ❌ NEVER use `rounded-xl`, `rounded-2xl`, `rounded-lg`, or square buttons
 
-#### 3. **Typography**
+#### 4. **Typography**
 ```jsx
 // Page headers
 <h1 className="text-5xl md:text-6xl lg:text-7xl font-bold text-dark mb-6 leading-tight">
 
 // Section headers
-<h2 className="text-3xl md:text-4xl font-bold text-dark mb-4">
+<h2 className="text-3xl font-bold text-dark mb-4">
+<h3 className="text-2xl font-bold text-dark mb-2">
 
 // Body text
 <p className="text-lg md:text-xl text-gray-600 leading-relaxed">
+<p className="text-sm text-gray-600">  // Small text
 ```
 
-#### 4. **Color Usage**
-- **Primary Text**: Use `text-dark` (NOT `text-gray-900`)
-- **Secondary Text**: Use `text-gray-600`
-- **Backgrounds**: `bg-white`, `bg-light`, `bg-primary`
-- **Buttons**:
-  - Dark: `bg-dark text-white hover:bg-gray-800`
-  - Primary: `bg-primary text-dark hover:bg-primary/90`
-  - Secondary: `bg-light text-dark hover:bg-gray-200`
+#### 5. **Color Usage**
 
-#### 5. **Reference File**
-**ALWAYS check** [frontend/src/pages/Home.jsx](frontend/src/pages/Home.jsx) when designing new pages. It's the design system source of truth.
+**Text Colors:**
+- **Primary Text**: `text-dark` (NOT `text-gray-900`)
+- **Secondary Text**: `text-gray-600`, `text-gray-700`
+- **Disabled/Inactive**: `text-gray-400`, `text-gray-500`
+- **On Primary Background**: `text-dark`, `text-gray-700` for secondary
+
+**Background Colors:**
+- **Main Backgrounds**: `bg-light` (page backgrounds)
+- **Cards**: `bg-white` (default), `bg-primary` (featured/popular)
+- **Accent Areas**: `bg-dark`, `bg-primary`
+- **Icon Backgrounds**: `bg-primary/10` (10% opacity primary)
+
+**Button Colors:**
+- **Dark**: `bg-dark text-white hover:bg-gray-800`
+- **Primary**: `bg-primary text-dark hover:bg-primary/90`
+- **White (on colored BG)**: `bg-white text-dark hover:bg-gray-100`
+
+**Border Colors:**
+- **Standard**: `border-gray-300`
+- **On Primary BG**: `border-gray-700`
+- **Active/Focus**: `border-primary`
+
+#### 6. **Spacing & Layout**
+```jsx
+// Page container
+<div className="py-12 px-6 lg:px-12 xl:px-20">
+  <div className="w-full max-w-7xl mx-auto">
+    {/* Content */}
+  </div>
+</div>
+
+// Section spacing
+<section className="py-12 px-6 lg:px-12 xl:px-20">
+
+// Grid layouts
+<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+```
+
+#### 7. **NO GRADIENTS Policy**
+
+**IMPORTANT**: BantuBuzz design system does NOT use gradients for UI elements (only categories use subtle gradients for visual variety).
+
+❌ **NEVER use:**
+- `bg-gradient-to-r from-blue-600 to-blue-400`
+- Gradient icon backgrounds
+- Gradient text
+- Gradient borders
+
+✅ **INSTEAD use:**
+- Solid colors: `bg-primary`, `bg-dark`, `bg-white`
+- Opacity variations: `bg-primary/10`, `bg-dark/5`
+- Simple color combinations
+
+#### 8. **Reference Files (ALWAYS CHECK)**
+
+**Design Reference:** [frontend/src/pages/Home.jsx](frontend/src/pages/Home.jsx)
+**Card Patterns:** [frontend/src/pages/BrowseCreators.jsx](frontend/src/pages/BrowseCreators.jsx)
+**Subscription Design:** [frontend/src/pages/Pricing.jsx](frontend/src/pages/Pricing.jsx)
 
 Key patterns from Home.jsx:
 - Creator cards: `rounded-3xl`, `shadow-sm`, proper spacing
 - Platform sections: Clean section padding `py-12 px-6 lg:px-12 xl:px-20`
 - Buttons: `rounded-full` with proper hover states
-- Gradients: Used sparingly in category cards
+- Categories: Only place where gradients are used (sparingly)
+
+Key patterns from BrowseCreators.jsx:
+- Cards with `bg-primary` outer + `bg-white rounded-2xl` inner
+- Image containers: `aspect-square rounded-2xl overflow-hidden bg-gray-100`
+- Badges overlaid on images: `absolute top-2 left-2`
+- Platform icons with proper brand colors
 
 ---
 
@@ -350,13 +460,19 @@ Understanding what's been implemented helps maintain consistency and avoid rewor
 - Admin verification queue
 - Platform fees based on brand subscription tier
 
-### Recent: Design System Alignment (Complete)
-- Homepage design as reference (Home.jsx)
-- All pages redesigned to match Homepage style
-- Subscription pages updated (Feb 2026)
-- Consistent card borders (rounded-3xl)
-- Unified button styles (rounded-full)
-- Proper color usage (primary, dark, light)
+### Recent: Design System Alignment (Complete - Feb 23, 2026)
+- **Homepage design as reference** (Home.jsx is the source of truth)
+- **All subscription pages redesigned** to match Homepage/BrowseCreators patterns:
+  - Pricing.jsx: Cards with `bg-primary` outer + `bg-white rounded-2xl` inner for popular plans
+  - SubscriptionManage.jsx: Icon redesign (removed gradients, added `bg-primary/10` circles)
+  - BrandDashboard.jsx: Upgrade banner shows NEXT tier features
+  - CreatorDashboard.jsx: Priority banner system (verification → featured)
+- **Eliminated gradient backgrounds** from all UI elements (icons, buttons, cards)
+- **Icon standardization**: `bg-primary/10 rounded-full` with `text-primary` icons
+- **Consistent card borders**: `rounded-3xl` outer, `rounded-2xl` for inner containers
+- **Unified button styles**: `rounded-full` with proper hover transitions
+- **Color usage**: `text-dark` (not `text-gray-900`), `bg-primary`, `bg-white`, `bg-light`
+- **Shadow consistency**: `shadow-sm` + `hover:shadow-md` (never `shadow-lg`)
 
 ### Current State (Feb 2026)
 ✅ Fully functional platform
