@@ -19,6 +19,9 @@ from .custom_package_offer import CustomPackageOffer
 from .dispute import Dispute
 from .subscription_plan import SubscriptionPlan
 from .subscription import Subscription
+from .creator_subscription_plan import CreatorSubscriptionPlan
+from .creator_subscription import CreatorSubscription
+from .verification_application import VerificationApplication
 
 # Import milestone models BEFORE their parent models
 from .collaboration_milestone import CollaborationMilestone

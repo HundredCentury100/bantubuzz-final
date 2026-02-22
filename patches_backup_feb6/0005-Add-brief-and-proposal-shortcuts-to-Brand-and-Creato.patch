@@ -1,0 +1,101 @@
+From 3a455e22eee390e04df20729de805f70f89efa4a Mon Sep 17 00:00:00 2001
+From: HundredCentury100 <hundredtechnologies2023@gmail.com>
+Date: Fri, 6 Feb 2026 15:44:39 +0200
+Subject: [PATCH 5/8] Add brief and proposal shortcuts to Brand and Creator
+ dashboards
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Brand Dashboard Quick Actions:
+- Add 'My Briefs' shortcut to /brand/briefs
+- Add 'Create Brief' shortcut to /brand/briefs/create
+
+Creator Dashboard Quick Actions:
+- Add 'Browse Briefs' shortcut to /creator/briefs
+- Add 'My Proposals' shortcut to /creator/proposals
+
+These shortcuts provide quick access to the brief marketplace features
+that were previously only accessible through the Navbar.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+---
+ frontend/src/pages/BrandDashboard.jsx   | 24 ++++++++++++++++++++++++
+ frontend/src/pages/CreatorDashboard.jsx | 24 ++++++++++++++++++++++++
+ 2 files changed, 48 insertions(+)
+
+diff --git a/frontend/src/pages/BrandDashboard.jsx b/frontend/src/pages/BrandDashboard.jsx
+index c1904a7..e60c8f5 100644
+--- a/frontend/src/pages/BrandDashboard.jsx
++++ b/frontend/src/pages/BrandDashboard.jsx
+@@ -333,6 +333,30 @@ const BrandDashboard = () => {
+                   </div>
+                 </Link>
+ 
++                <Link
++                  to="/brand/briefs"
++                  className="block p-3 border border-gray-200 rounded-lg hover:border-primary hover:bg-primary/5 transition-colors"
++                >
++                  <div className="flex items-center">
++                    <svg className="w-5 h-5 text-primary mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
++                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
++                    </svg>
++                    <span className="font-medium text-dark">My Briefs</span>
++                  </div>
++                </Link>
++
++                <Link
++                  to="/brand/briefs/create"
++                  className="block p-3 border border-gray-200 rounded-lg hover:border-primary hover:bg-primary/5 transition-colors"
++                >
++                  <div className="flex items-center">
++                    <svg className="w-5 h-5 text-primary mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
++                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
++                    </svg>
++                    <span className="font-medium text-dark">Create Brief</span>
++                  </div>
++                </Link>
++
+                 <Link
+                   to="/brand/campaigns"
+                   className="block p-3 border border-gray-200 rounded-lg hover:border-primary hover:bg-primary/5 transition-colors"
+diff --git a/frontend/src/pages/CreatorDashboard.jsx b/frontend/src/pages/CreatorDashboard.jsx
+index c48f978..922d361 100644
+--- a/frontend/src/pages/CreatorDashboard.jsx
++++ b/frontend/src/pages/CreatorDashboard.jsx
+@@ -410,6 +410,30 @@ const CreatorDashboard = () => {
+                   </div>
+                 </Link>
+ 
++                <Link
++                  to="/creator/briefs"
++                  className="block p-3 border border-gray-200 rounded-lg hover:border-primary hover:bg-primary/5 transition-colors"
++                >
++                  <div className="flex items-center">
++                    <svg className="w-5 h-5 text-primary mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
++                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
++                    </svg>
++                    <span className="font-medium text-dark">Browse Briefs</span>
++                  </div>
++                </Link>
++
++                <Link
++                  to="/creator/proposals"
++                  className="block p-3 border border-gray-200 rounded-lg hover:border-primary hover:bg-primary/5 transition-colors"
++                >
++                  <div className="flex items-center">
++                    <svg className="w-5 h-5 text-primary mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
++                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
++                    </svg>
++                    <span className="font-medium text-dark">My Proposals</span>
++                  </div>
++                </Link>
++
+                 <Link
+                   to="/creator/campaigns"
+                   className="block p-3 border border-gray-200 rounded-lg hover:border-primary hover:bg-primary/5 transition-colors"
+-- 
+2.51.0.windows.1
+

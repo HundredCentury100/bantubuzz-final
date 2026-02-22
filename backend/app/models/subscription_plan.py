@@ -34,6 +34,9 @@ class SubscriptionPlan(db.Model):
     analytics_access = db.Column(db.Boolean, default=False)
     api_access = db.Column(db.Boolean, default=False)
 
+    # Platform Fees
+    platform_fee_percentage = db.Column(db.Float, default=10.00)  # 10% for Free/Pro, 5% for Premium
+
     # Status
     is_active = db.Column(db.Boolean, default=True)
     is_default = db.Column(db.Boolean, default=False)  # Default plan for new users
@@ -54,6 +57,7 @@ class SubscriptionPlan(db.Model):
             'description': self.description,
             'price_monthly': float(self.price_monthly),
             'price_yearly': float(self.price_yearly),
+            'platform_fee_percentage': float(self.platform_fee_percentage) if self.platform_fee_percentage else 10.00,
             'features': {
                 'max_packages': self.max_packages,
                 'max_bookings_per_month': self.max_bookings_per_month,

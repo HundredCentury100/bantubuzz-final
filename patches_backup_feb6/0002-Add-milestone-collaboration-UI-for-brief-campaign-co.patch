@@ -1,0 +1,479 @@
+From ce90c9b207e58ae53326044498817c9b7d67a72d Mon Sep 17 00:00:00 2001
+From: HundredCentury100 <hundredtechnologies2023@gmail.com>
+Date: Fri, 6 Feb 2026 15:11:10 +0200
+Subject: [PATCH 2/8] Add milestone collaboration UI for brief/campaign
+ collaborations
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Create MilestonesList component:
+- Displays milestones with deliverable submission and approval workflow
+- Per-milestone deliverable management with status tracking (pending_review, approved, revision_requested)
+- Brand can approve or request revisions on milestone deliverables
+- Creator can submit deliverables to specific milestones
+- Shows milestone completion status and escrow release information
+- Inline deliverable submission form for creators
+
+Update CollaborationDetails to support both workflows:
+- Detect milestone-based collaborations via has_milestones flag
+- Conditionally render MilestonesList for brief/campaign collaborations
+- Keep existing package-based deliverable UI for package collaborations
+- Hide revision policy and revision history for milestone-based collaborations
+
+This enables proper deliverable workflow for brief and campaign collaborations
+with milestone-based escrow releases (30-day clearance per milestone).
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+---
+ frontend/src/components/MilestonesList.jsx  | 366 ++++++++++++++++++++
+ frontend/src/pages/CollaborationDetails.jsx |  23 +-
+ 2 files changed, 385 insertions(+), 4 deletions(-)
+ create mode 100644 frontend/src/components/MilestonesList.jsx
+
+diff --git a/frontend/src/components/MilestonesList.jsx b/frontend/src/components/MilestonesList.jsx
+new file mode 100644
+index 0000000..c0553ea
+--- /dev/null
++++ b/frontend/src/components/MilestonesList.jsx
+@@ -0,0 +1,366 @@
++import { useState } from 'react';
++import { collaborationsAPI } from '../services/api';
++import toast from 'react-hot-toast';
++
++const MilestonesList = ({ collaboration, isBrand, onUpdate }) => {
++  const [submittingTo, setSubmittingTo] = useState(null);
++  const [deliverableData, setDeliverableData] = useState({
++    title: '',
++    url: '',
++    description: ''
++  });
++  const [revisionNotes, setRevisionNotes] = useState('');
++  const [selectedDeliverable, setSelectedDeliverable] = useState(null);
++  const [showRevisionModal, setShowRevisionModal] = useState(false);
++
++  const handleSubmitDeliverable = async (milestoneId) => {
++    if (!deliverableData.title || !deliverableData.url) {
++      toast.error('Please provide both title and URL');
++      return;
++    }
++
++    try {
++      await collaborationsAPI.submitMilestoneDeliverable(
++        collaboration.id,
++        milestoneId,
++        deliverableData
++      );
++      toast.success('Deliverable submitted for review!');
++      setDeliverableData({ title: '', url: '', description: '' });
++      setSubmittingTo(null);
++      onUpdate();
++    } catch (error) {
++      console.error('Error submitting deliverable:', error);
++      toast.error(error.response?.data?.error || 'Failed to submit deliverable');
++    }
++  };
++
++  const handleApproveDeliverable = async (milestoneId, deliverableId) => {
++    try {
++      await collaborationsAPI.approveMilestoneDeliverable(
++        collaboration.id,
++        milestoneId,
++        deliverableId
++      );
++      toast.success('Deliverable approved! Milestone progress updated.');
++      onUpdate();
++    } catch (error) {
++      console.error('Error approving deliverable:', error);
++      toast.error(error.response?.data?.error || 'Failed to approve deliverable');
++    }
++  };
++
++  const handleRequestRevision = async () => {
++    if (!revisionNotes.trim()) {
++      toast.error('Please provide revision notes');
++      return;
++    }
++
++    try {
++      await collaborationsAPI.requestMilestoneRevision(
++        collaboration.id,
++        selectedDeliverable.milestoneId,
++        selectedDeliverable.id,
++        revisionNotes
++      );
++      toast.success('Revision requested successfully');
++      setShowRevisionModal(false);
++      setRevisionNotes('');
++      setSelectedDeliverable(null);
++      onUpdate();
++    } catch (error) {
++      console.error('Error requesting revision:', error);
++      toast.error(error.response?.data?.error || 'Failed to request revision');
++    }
++  };
++
++  const getMilestoneStatusColor = (status) => {
++    const colors = {
++      pending: 'bg-gray-100 text-gray-800',
++      in_progress: 'bg-blue-100 text-blue-800',
++      completed: 'bg-green-100 text-green-800'
++    };
++    return colors[status] || 'bg-gray-100 text-gray-800';
++  };
++
++  const getDeliverableStatusBadge = (status) => {
++    const badges = {
++      pending_review: 'bg-yellow-100 text-yellow-800',
++      revision_requested: 'bg-orange-100 text-orange-800',
++      approved: 'bg-green-100 text-green-800'
++    };
++    return badges[status] || 'bg-gray-100 text-gray-800';
++  };
++
++  return (
++    <div className="space-y-6">
++      <div className="bg-white rounded-lg shadow p-6">
++        <h2 className="text-xl font-bold text-gray-900 mb-4">Milestones</h2>
++        <div className="space-y-6">
++          {collaboration.milestones?.map((milestone, index) => (
++            <div key={milestone.id} className="border-2 border-gray-200 rounded-lg p-5">
++              {/* Milestone Header */}
++              <div className="flex items-start justify-between mb-4">
++                <div className="flex-1">
++                  <div className="flex items-center gap-3 mb-2">
++                    <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary text-white font-bold text-sm">
++                      {index + 1}
++                    </div>
++                    <h3 className="text-lg font-bold text-gray-900">{milestone.title}</h3>
++                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${getMilestoneStatusColor(milestone.status)}`}>
++                      {milestone.status.replace('_', ' ')}
++                    </span>
++                  </div>
++                  {milestone.description && (
++                    <p className="text-sm text-gray-600 ml-11">{milestone.description}</p>
++                  )}
++                </div>
++                <div className="text-right ml-4">
++                  <p className="text-sm text-gray-600">Payment</p>
++                  <p className="text-xl font-bold text-primary">${milestone.price}</p>
++                </div>
++              </div>
++
++              {/* Due Date */}
++              {milestone.due_date && (
++                <div className="ml-11 mb-4">
++                  <p className="text-xs text-gray-500">
++                    Due: {new Date(milestone.due_date).toLocaleDateString()}
++                  </p>
++                </div>
++              )}
++
++              {/* Expected Deliverables */}
++              {milestone.expected_deliverables && milestone.expected_deliverables.length > 0 && (
++                <div className="ml-11 mb-4">
++                  <p className="text-sm font-medium text-gray-700 mb-2">Expected:</p>
++                  <ul className="space-y-1">
++                    {milestone.expected_deliverables.map((item, idx) => (
++                      <li key={idx} className="flex items-start gap-2 text-sm text-gray-600">
++                        <svg className="w-4 h-4 text-gray-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
++                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
++                        </svg>
++                        <span>{item}</span>
++                      </li>
++                    ))}
++                  </ul>
++                </div>
++              )}
++
++              {/* Submitted Deliverables */}
++              {milestone.deliverables && milestone.deliverables.length > 0 && (
++                <div className="ml-11 mb-4">
++                  <p className="text-sm font-medium text-gray-700 mb-3">Submitted Deliverables:</p>
++                  <div className="space-y-3">
++                    {milestone.deliverables.map((deliverable) => (
++                      <div
++                        key={deliverable.id}
++                        className={`border-2 rounded-lg p-4 ${
++                          deliverable.status === 'approved'
++                            ? 'border-green-200 bg-green-50'
++                            : deliverable.status === 'revision_requested'
++                            ? 'border-orange-200 bg-orange-50'
++                            : 'border-yellow-200 bg-yellow-50'
++                        }`}
++                      >
++                        <div className="flex items-start justify-between mb-2">
++                          <div className="flex-1">
++                            <div className="flex items-center gap-2 mb-1">
++                              <h4 className="font-medium text-gray-900">{deliverable.title}</h4>
++                              <span className={`px-2 py-1 rounded text-xs font-medium ${getDeliverableStatusBadge(deliverable.status)}`}>
++                                {deliverable.status.replace('_', ' ')}
++                              </span>
++                            </div>
++                            <p className="text-xs text-gray-500">
++                              Submitted {new Date(deliverable.submitted_at).toLocaleDateString()}
++                            </p>
++                          </div>
++                        </div>
++
++                        {deliverable.description && (
++                          <p className="text-sm text-gray-600 mb-2">{deliverable.description}</p>
++                        )}
++
++                        {deliverable.revision_notes && (
++                          <div className="bg-orange-100 border border-orange-200 rounded p-3 mb-3">
++                            <p className="text-xs font-medium text-orange-900 mb-1">Revision Requested:</p>
++                            <p className="text-sm text-orange-800">{deliverable.revision_notes}</p>
++                          </div>
++                        )}
++
++                        <div className="flex items-center gap-3">
++                          <a
++                            href={deliverable.url}
++                            target="_blank"
++                            rel="noopener noreferrer"
++                            className="text-sm text-primary hover:text-primary-dark flex items-center gap-1"
++                          >
++                            View Deliverable
++                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
++                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
++                            </svg>
++                          </a>
++
++                          {isBrand && deliverable.status === 'pending_review' && collaboration.status === 'in_progress' && (
++                            <div className="ml-auto flex gap-2">
++                              <button
++                                onClick={() => handleApproveDeliverable(milestone.id, deliverable.id)}
++                                className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition-colors"
++                              >
++                                Approve
++                              </button>
++                              <button
++                                onClick={() => {
++                                  setSelectedDeliverable({ ...deliverable, milestoneId: milestone.id });
++                                  setShowRevisionModal(true);
++                                }}
++                                className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white text-sm font-medium rounded-lg transition-colors"
++                              >
++                                Request Revision
++                              </button>
++                            </div>
++                          )}
++                        </div>
++                      </div>
++                    ))}
++                  </div>
++                </div>
++              )}
++
++              {/* Submit Deliverable Form (Creator Only) */}
++              {!isBrand && milestone.status !== 'completed' && collaboration.status === 'in_progress' && (
++                <div className="ml-11 mt-4">
++                  {submittingTo === milestone.id ? (
++                    <div className="bg-light rounded-lg p-4 border-2 border-primary">
++                      <h4 className="font-medium text-gray-900 mb-3">Submit Deliverable</h4>
++                      <div className="space-y-3">
++                        <div>
++                          <label className="block text-sm font-medium text-gray-700 mb-1">
++                            Title <span className="text-red-500">*</span>
++                          </label>
++                          <input
++                            type="text"
++                            value={deliverableData.title}
++                            onChange={(e) => setDeliverableData({ ...deliverableData, title: e.target.value })}
++                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm"
++                            placeholder="e.g., Instagram Reel"
++                          />
++                        </div>
++                        <div>
++                          <label className="block text-sm font-medium text-gray-700 mb-1">
++                            URL <span className="text-red-500">*</span>
++                          </label>
++                          <input
++                            type="url"
++                            value={deliverableData.url}
++                            onChange={(e) => setDeliverableData({ ...deliverableData, url: e.target.value })}
++                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm"
++                            placeholder="https://..."
++                          />
++                        </div>
++                        <div>
++                          <label className="block text-sm font-medium text-gray-700 mb-1">
++                            Description (Optional)
++                          </label>
++                          <textarea
++                            value={deliverableData.description}
++                            onChange={(e) => setDeliverableData({ ...deliverableData, description: e.target.value })}
++                            rows={2}
++                            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent text-sm"
++                            placeholder="Add notes..."
++                          />
++                        </div>
++                        <div className="flex gap-2">
++                          <button
++                            onClick={() => handleSubmitDeliverable(milestone.id)}
++                            className="flex-1 px-4 py-2 bg-primary hover:bg-primary-dark text-white font-medium rounded-lg transition-colors text-sm"
++                          >
++                            Submit for Review
++                          </button>
++                          <button
++                            onClick={() => {
++                              setSubmittingTo(null);
++                              setDeliverableData({ title: '', url: '', description: '' });
++                            }}
++                            className="px-4 py-2 border-2 border-gray-300 hover:border-gray-400 text-gray-700 font-medium rounded-lg transition-colors text-sm"
++                          >
++                            Cancel
++                          </button>
++                        </div>
++                      </div>
++                    </div>
++                  ) : (
++                    <button
++                      onClick={() => setSubmittingTo(milestone.id)}
++                      className="px-4 py-2 bg-primary hover:bg-primary-dark text-white font-medium rounded-lg transition-colors text-sm"
++                    >
++                      Submit Deliverable
++                    </button>
++                  )}
++                </div>
++              )}
++
++              {/* Milestone Completion Info */}
++              {milestone.status === 'completed' && milestone.completed_at && (
++                <div className="ml-11 mt-4 bg-green-50 border border-green-200 rounded-lg p-3">
++                  <p className="text-sm font-medium text-green-900">
++                    Milestone completed on {new Date(milestone.completed_at).toLocaleDateString()}
++                  </p>
++                  <p className="text-xs text-green-700 mt-1">
++                    Payment released to creator wallet (30-day clearance period)
++                  </p>
++                </div>
++              )}
++            </div>
++          ))}
++        </div>
++      </div>
++
++      {/* Revision Request Modal */}
++      {showRevisionModal && selectedDeliverable && (
++        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
++          <div className="bg-white rounded-lg max-w-md w-full p-6">
++            <h2 className="text-2xl font-bold text-gray-900 mb-2">Request Revision</h2>
++            <p className="text-sm text-gray-600 mb-4">
++              Deliverable: <span className="font-medium">{selectedDeliverable.title}</span>
++            </p>
++
++            <div className="mb-6">
++              <label className="block text-sm font-medium text-gray-700 mb-2">
++                Revision Notes <span className="text-red-500">*</span>
++              </label>
++              <textarea
++                value={revisionNotes}
++                onChange={(e) => setRevisionNotes(e.target.value)}
++                rows={5}
++                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
++                placeholder="Please provide detailed feedback on what needs to be revised..."
++              />
++            </div>
++
++            <div className="flex gap-3">
++              <button
++                onClick={handleRequestRevision}
++                className="flex-1 px-6 py-3 bg-orange-600 hover:bg-orange-700 text-white font-medium rounded-lg transition-colors"
++              >
++                Request Revision
++              </button>
++              <button
++                onClick={() => {
++                  setShowRevisionModal(false);
++                  setRevisionNotes('');
++                  setSelectedDeliverable(null);
++                }}
++                className="px-6 py-3 border-2 border-gray-300 hover:border-gray-400 text-gray-700 font-medium rounded-lg transition-colors"
++              >
++                Cancel
++              </button>
++            </div>
++          </div>
++        </div>
++      )}
++    </div>
++  );
++};
++
++export default MilestonesList;
+diff --git a/frontend/src/pages/CollaborationDetails.jsx b/frontend/src/pages/CollaborationDetails.jsx
+index 5f00644..d2fdd11 100644
+--- a/frontend/src/pages/CollaborationDetails.jsx
++++ b/frontend/src/pages/CollaborationDetails.jsx
+@@ -5,6 +5,7 @@ import { useAuth } from '../hooks/useAuth';
+ import { useMessaging } from '../contexts/MessagingContext';
+ import Navbar from '../components/Navbar';
+ import Avatar from '../components/Avatar';
++import MilestonesList from '../components/MilestonesList';
+ import toast from 'react-hot-toast';
+ 
+ const CollaborationDetails = () => {
+@@ -281,6 +282,9 @@ const CollaborationDetails = () => {
+     );
+   }
+ 
++  // Check if collaboration has milestones (brief/campaign) or uses flat deliverables (package)
++  const hasMilestones = collaboration.has_milestones || (collaboration.milestones && collaboration.milestones.length > 0);
++
+   const totalExpected = collaboration.deliverables?.length || 0;
+   const totalApproved = collaboration.submitted_deliverables?.length || 0;
+   const totalDrafts = collaboration.draft_deliverables?.length || 0;
+@@ -382,8 +386,8 @@ const CollaborationDetails = () => {
+               )}
+             </div>
+ 
+-            {/* Revision Policy (Brand View) */}
+-            {isBrand && (
++            {/* Revision Policy (Brand View) - Only show for package-based collaborations */}
++            {isBrand && !hasMilestones && (
+               <div className="bg-primary/5 border border-primary/20 rounded-lg p-4">
+                 <h3 className="font-semibold text-primary-dark leading-snug mb-2">Creator's Revision Policy</h3>
+                 <div className="text-sm text-dark leading-relaxed space-y-1">
+@@ -394,7 +398,16 @@ const CollaborationDetails = () => {
+               </div>
+             )}
+ 
+-            {/* Draft Deliverables (Pending Review) */}
++            {/* Milestone-based Deliverables (Brief/Campaign Collaborations) */}
++            {hasMilestones ? (
++              <MilestonesList
++                collaboration={collaboration}
++                isBrand={isBrand}
++                onUpdate={fetchCollaboration}
++              />
++            ) : (
++              <>
++            {/* Draft Deliverables (Pending Review) - Package Collaborations */}
+             {totalDrafts > 0 && (
+               <div className="bg-white rounded-lg shadow p-6">
+                 <h2 className="text-xl font-bold text-gray-900 mb-4">
+@@ -566,7 +579,7 @@ const CollaborationDetails = () => {
+             </div>
+ 
+             {/* Revision History */}
+-            {collaboration.revision_requests && collaboration.revision_requests.length > 0 && (
++            {!hasMilestones && collaboration.revision_requests && collaboration.revision_requests.length > 0 && (
+               <div className="bg-white rounded-lg shadow p-6">
+                 <h2 className="text-xl font-bold text-gray-900 mb-4">Revision History</h2>
+                 <div className="space-y-3">
+@@ -591,6 +604,8 @@ const CollaborationDetails = () => {
+                 </div>
+               </div>
+             )}
++            </>
++            )}
+ 
+             {/* Description */}
+             {collaboration.description && (
+-- 
+2.51.0.windows.1
+

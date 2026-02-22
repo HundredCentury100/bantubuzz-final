@@ -1,0 +1,390 @@
+From 6089272814c3a4510e77ca035f02be75ffa6ea89 Mon Sep 17 00:00:00 2001
+From: HundredCentury100 <hundredtechnologies2023@gmail.com>
+Date: Fri, 6 Feb 2026 15:01:26 +0200
+Subject: [PATCH 1/8] Implement milestone-based collaboration deliverable
+ system
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Add milestone deliverable submission, approval, and revision endpoints:
+- POST /collaborations/<id>/milestones/<mid>/deliverables - Submit deliverable to milestone
+- POST /collaborations/<id>/milestones/<mid>/deliverables/<did>/approve - Approve deliverable
+- POST /collaborations/<id>/milestones/<mid>/deliverables/<did>/request-revision - Request revision
+
+Add milestone escrow release function:
+- release_milestone_escrow() in payment_service.py
+- Per-milestone escrow with 30-day clearance period
+- Updates wallet pending_clearance and total_earned
+- Prevents duplicate releases per milestone
+
+When all deliverables in a milestone are approved:
+- Milestone marked as completed
+- Escrow automatically triggered and released
+- Creator wallet credited (pending 30-day clearance)
+- When all milestones complete, collaboration marked as completed
+
+This enables proper workflow for brief/campaign collaborations with milestones.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+---
+ backend/app/routes/collaborations.py    | 246 ++++++++++++++++++++++++
+ backend/app/services/payment_service.py |  86 +++++++++
+ 2 files changed, 332 insertions(+)
+
+diff --git a/backend/app/routes/collaborations.py b/backend/app/routes/collaborations.py
+index 3578691..331218b 100644
+--- a/backend/app/routes/collaborations.py
++++ b/backend/app/routes/collaborations.py
+@@ -1099,3 +1099,249 @@ def cancel_collaboration(collab_id):
+     except Exception as e:
+         db.session.rollback()
+         return jsonify({'error': str(e)}), 500
++
++
++# ============================================================================
++# MILESTONE DELIVERABLE ENDPOINTS (for Brief/Campaign Collaborations)
++# ============================================================================
++
++@bp.route('/<int:collab_id>/milestones/<int:milestone_id>/deliverables', methods=['POST'])
++@jwt_required()
++def submit_milestone_deliverable(collab_id, milestone_id):
++    """Submit deliverable to a specific milestone (creator only)"""
++    try:
++        user_id = int(get_jwt_identity())
++        creator = CreatorProfile.query.filter_by(user_id=user_id).first()
++
++        if not creator:
++            return jsonify({'error': 'Creator profile not found'}), 404
++
++        collaboration = Collaboration.query.get(collab_id)
++        if not collaboration:
++            return jsonify({'error': 'Collaboration not found'}), 404
++
++        if collaboration.creator_id != creator.id:
++            return jsonify({'error': 'Unauthorized'}), 403
++
++        milestone = CollaborationMilestone.query.get(milestone_id)
++        if not milestone or milestone.collaboration_id != collab_id:
++            return jsonify({'error': 'Milestone not found'}), 404
++
++        data = request.get_json()
++
++        # Validate required fields
++        if 'title' not in data or 'url' not in data:
++            return jsonify({'error': 'Title and URL are required'}), 400
++
++        # Create deliverable
++        deliverable = MilestoneDeliverable(
++            collaboration_milestone_id=milestone.id,
++            title=data['title'],
++            url=data['url'],
++            description=data.get('description', ''),
++            status='pending_review'
++        )
++        db.session.add(deliverable)
++
++        # Update milestone status if it's pending
++        if milestone.status == 'pending':
++            milestone.status = 'in_progress'
++
++        db.session.commit()
++
++        # Update collaboration
++        collaboration.last_update = f"Deliverable submitted for {milestone.title}"
++        collaboration.last_update_date = datetime.utcnow()
++        db.session.commit()
++
++        # Notify brand
++        brand_user = User.query.get(collaboration.brand.user_id)
++        if brand_user:
++            notify_collaboration_update(
++                user_id=brand_user.id,
++                collaboration_title=collaboration.title,
++                collaboration_id=collaboration.id,
++                update_message=f"New deliverable submitted for milestone: {milestone.title}"
++            )
++
++        return jsonify({
++            'message': 'Deliverable submitted successfully',
++            'deliverable': deliverable.to_dict(),
++            'milestone': milestone.to_dict(include_deliverables=True)
++        }), 201
++
++    except Exception as e:
++        db.session.rollback()
++        print(f"Error submitting milestone deliverable: {str(e)}")
++        import traceback
++        traceback.print_exc()
++        return jsonify({'error': str(e)}), 500
++
++
++@bp.route('/<int:collab_id>/milestones/<int:milestone_id>/deliverables/<int:deliverable_id>/approve', methods=['POST'])
++@jwt_required()
++def approve_milestone_deliverable(collab_id, milestone_id, deliverable_id):
++    """Approve milestone deliverable (brand only)"""
++    try:
++        user_id = int(get_jwt_identity())
++        brand = BrandProfile.query.filter_by(user_id=user_id).first()
++
++        if not brand:
++            return jsonify({'error': 'Brand profile not found'}), 404
++
++        collaboration = Collaboration.query.get(collab_id)
++        if not collaboration:
++            return jsonify({'error': 'Collaboration not found'}), 404
++
++        if collaboration.brand_id != brand.id:
++            return jsonify({'error': 'Unauthorized'}), 403
++
++        milestone = CollaborationMilestone.query.get(milestone_id)
++        if not milestone or milestone.collaboration_id != collab_id:
++            return jsonify({'error': 'Milestone not found'}), 404
++
++        deliverable = MilestoneDeliverable.query.get(deliverable_id)
++        if not deliverable or deliverable.collaboration_milestone_id != milestone.id:
++            return jsonify({'error': 'Deliverable not found'}), 404
++
++        # Approve deliverable
++        deliverable.status = 'approved'
++        deliverable.approved_at = datetime.utcnow()
++        db.session.commit()
++
++        # Check if milestone is now complete (all deliverables approved)
++        if milestone.is_complete():
++            milestone.status = 'completed'
++            milestone.completed_at = datetime.utcnow()
++            milestone.approved_at = datetime.utcnow()
++
++            # Trigger escrow for this milestone
++            milestone.escrow_triggered_at = datetime.utcnow()
++            milestone.escrow_release_date = (datetime.utcnow() + timedelta(days=30)).date()
++
++            # Release escrow for this specific milestone
++            from app.services.payment_service import release_milestone_escrow
++            try:
++                transaction = release_milestone_escrow(milestone.id, platform_fee_percentage=15)
++                print(f"Milestone {milestone.id} escrow released. Transaction: {transaction.id}")
++            except Exception as e:
++                print(f"Warning: Failed to release milestone escrow: {str(e)}")
++
++            # Check if all milestones are complete
++            all_milestones = collaboration.milestones.all()
++            all_complete = all(m.status == 'completed' for m in all_milestones)
++
++            if all_complete:
++                collaboration.status = 'completed'
++                collaboration.actual_completion_date = datetime.utcnow()
++                collaboration.progress_percentage = 100
++
++                # Notify both parties
++                creator_user = User.query.get(collaboration.creator.user_id)
++                if creator_user:
++                    notify_collaboration_status(
++                        user_id=creator_user.id,
++                        status='completed',
++                        collaboration_title=collaboration.title,
++                        collaboration_id=collaboration.id,
++                        user_type='creator'
++                    )
++
++                brand_user = User.query.get(collaboration.brand.user_id)
++                if brand_user:
++                    notify_collaboration_status(
++                        user_id=brand_user.id,
++                        status='completed',
++                        collaboration_title=collaboration.title,
++                        collaboration_id=collaboration.id,
++                        user_type='brand'
++                    )
++
++        db.session.commit()
++
++        # Notify creator about approval
++        creator_user = User.query.get(collaboration.creator.user_id)
++        if creator_user:
++            notify_collaboration_update(
++                user_id=creator_user.id,
++                collaboration_title=collaboration.title,
++                collaboration_id=collaboration.id,
++                update_message=f"Deliverable approved for {milestone.title}"
++            )
++
++        return jsonify({
++            'message': 'Deliverable approved successfully',
++            'deliverable': deliverable.to_dict(),
++            'milestone': milestone.to_dict(include_deliverables=True),
++            'collaboration': collaboration.to_dict(include_relations=True)
++        }), 200
++
++    except Exception as e:
++        db.session.rollback()
++        print(f"Error approving milestone deliverable: {str(e)}")
++        import traceback
++        traceback.print_exc()
++        return jsonify({'error': str(e)}), 500
++
++
++@bp.route('/<int:collab_id>/milestones/<int:milestone_id>/deliverables/<int:deliverable_id>/request-revision', methods=['POST'])
++@jwt_required()
++def request_milestone_deliverable_revision(collab_id, milestone_id, deliverable_id):
++    """Request revision on milestone deliverable (brand only)"""
++    try:
++        user_id = int(get_jwt_identity())
++        brand = BrandProfile.query.filter_by(user_id=user_id).first()
++
++        if not brand:
++            return jsonify({'error': 'Brand profile not found'}), 404
++
++        collaboration = Collaboration.query.get(collab_id)
++        if not collaboration:
++            return jsonify({'error': 'Collaboration not found'}), 404
++
++        if collaboration.brand_id != brand.id:
++            return jsonify({'error': 'Unauthorized'}), 403
++
++        milestone = CollaborationMilestone.query.get(milestone_id)
++        if not milestone or milestone.collaboration_id != collab_id:
++            return jsonify({'error': 'Milestone not found'}), 404
++
++        deliverable = MilestoneDeliverable.query.get(deliverable_id)
++        if not deliverable or deliverable.collaboration_milestone_id != milestone.id:
++            return jsonify({'error': 'Deliverable not found'}), 404
++
++        data = request.get_json()
++        revision_notes = data.get('notes', '')
++
++        if not revision_notes:
++            return jsonify({'error': 'Revision notes are required'}), 400
++
++        # Update deliverable
++        deliverable.status = 'revision_requested'
++        deliverable.revision_notes = revision_notes
++        deliverable.revision_requested_at = datetime.utcnow()
++
++        db.session.commit()
++
++        # Notify creator
++        creator_user = User.query.get(collaboration.creator.user_id)
++        if creator_user:
++            notify_collaboration_update(
++                user_id=creator_user.id,
++                collaboration_title=collaboration.title,
++                collaboration_id=collaboration.id,
++                update_message=f"Revision requested for deliverable in {milestone.title}"
++            )
++
++        return jsonify({
++            'message': 'Revision requested successfully',
++            'deliverable': deliverable.to_dict(),
++            'milestone': milestone.to_dict(include_deliverables=True)
++        }), 200
++
++    except Exception as e:
++        db.session.rollback()
++        print(f"Error requesting milestone deliverable revision: {str(e)}")
++        import traceback
++        traceback.print_exc()
++        return jsonify({'error': str(e)}), 500
+diff --git a/backend/app/services/payment_service.py b/backend/app/services/payment_service.py
+index 8b7bd9d..5d6feef 100644
+--- a/backend/app/services/payment_service.py
++++ b/backend/app/services/payment_service.py
+@@ -276,6 +276,92 @@ def release_escrow_to_wallet(collaboration_id, platform_fee_percentage=15):
+     return transaction
+ 
+ 
++def release_milestone_escrow(milestone_id, platform_fee_percentage=15):
++    """
++    Release escrow for a specific completed milestone to creator wallet
++    Only releases the portion allocated to this milestone
++    Creates a pending transaction with 30-day clearance period
++    """
++    from app.models import CollaborationMilestone, Collaboration
++
++    milestone = CollaborationMilestone.query.get(milestone_id)
++    if not milestone:
++        raise ValueError(f"Milestone {milestone_id} not found")
++
++    collaboration = Collaboration.query.get(milestone.collaboration_id)
++    if not collaboration:
++        raise ValueError(f"Collaboration not found for milestone {milestone_id}")
++
++    if milestone.status != 'completed':
++        raise ValueError("Milestone must be completed before releasing funds")
++
++    # Check if wallet transaction already exists for this milestone
++    existing_transaction = WalletTransaction.query.filter_by(
++        milestone_id=milestone.id,
++        transaction_type='milestone_earning'
++    ).first()
++
++    if existing_transaction:
++        raise ValueError("Funds already released for this milestone")
++
++    # Calculate amounts
++    milestone_amount = float(milestone.price)
++    platform_fee = milestone_amount * (platform_fee_percentage / 100)
++    net_amount = milestone_amount - platform_fee
++
++    # Get or create wallet
++    wallet = get_or_create_wallet(collaboration.creator.user_id)
++
++    # Set timestamps for 30-day clearance
++    completed_at = datetime.utcnow()
++    available_at = completed_at + timedelta(days=30)
++
++    # Build description
++    description = f"Milestone earnings: {milestone.title}"
++    if collaboration.brand:
++        description += f" (with {collaboration.brand.company_name})"
++
++    metadata = {
++        'milestone_id': milestone.id,
++        'milestone_title': milestone.title,
++        'collaboration_id': collaboration.id,
++        'collaboration_title': collaboration.title if hasattr(collaboration, 'title') else 'Collaboration',
++        'brand_name': collaboration.brand.company_name if collaboration.brand else 'Unknown'
++    }
++
++    # Create wallet transaction
++    transaction = WalletTransaction(
++        wallet_id=wallet.id,
++        user_id=collaboration.creator.user_id,
++        transaction_type='milestone_earning',
++        amount=net_amount,
++        status='pending_clearance',
++        clearance_required=True,
++        clearance_days=30,  # 30 days for milestones
++        completed_at=completed_at,
++        available_at=available_at,
++        collaboration_id=collaboration.id,
++        milestone_id=milestone.id,
++        gross_amount=milestone_amount,
++        platform_fee=platform_fee,
++        platform_fee_percentage=platform_fee_percentage,
++        net_amount=net_amount,
++        description=description,
++        transaction_metadata=metadata
++    )
++    db.session.add(transaction)
++
++    # Update wallet balances
++    wallet.pending_clearance = float(wallet.pending_clearance or 0) + net_amount
++    wallet.total_earned = float(wallet.total_earned or 0) + net_amount
++    wallet.updated_at = datetime.utcnow()
++
++    # Commit all changes
++    db.session.commit()
++
++    return transaction
++
++
+ def get_pending_payments_for_admin():
+     """Get all payments pending verification"""
+     payments = Payment.query.filter(
+-- 
+2.51.0.windows.1
+

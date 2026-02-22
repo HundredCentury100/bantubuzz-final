@@ -1,0 +1,259 @@
+From 2c1942078218aa4387b499b89cb6a3e939a4192b Mon Sep 17 00:00:00 2001
+From: HundredCentury100 <hundredtechnologies2023@gmail.com>
+Date: Fri, 6 Feb 2026 15:55:24 +0200
+Subject: [PATCH 6/8] Implement creator badge system and platform improvements
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Creator Badge System:
+- Add is_verified and verified_at fields to creator_profiles
+- Implement get_badges() method with 3-tier badge system:
+  * Top Creator: 5+ completed collaborations in last 30 days
+  * Verified Creator: Platform verified with documents
+  * Creator: Default badge for all creators
+- Return up to 2 badges per creator in API responses
+
+Package Improvements:
+- Add collaboration_type field to packages (Brand Endorsement, UGC, etc.)
+- Make category field nullable for backward compatibility
+- Creators now choose niche on profile, collaboration type on packages
+
+Creator Browse Filtering:
+- Require creators to have at least one active package to appear in browse
+- Price filtering already uses cheapest_package_price from packages
+- Add total_packages count to creator data
+
+Database Migrations:
+- add_creator_verification_badges.py: Add verification fields
+- add_collaboration_type_to_packages.py: Add collaboration type field
+
+This improves creator credibility display and package categorization.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+---
+ backend/app/models/creator_profile.py         | 43 +++++++++++++++++++
+ backend/app/models/package.py                 |  4 +-
+ backend/app/routes/creators.py                | 19 +++++---
+ .../add_collaboration_type_to_packages.py     | 35 +++++++++++++++
+ .../add_creator_verification_badges.py        | 35 +++++++++++++++
+ 5 files changed, 128 insertions(+), 8 deletions(-)
+ create mode 100644 backend/migrations/add_collaboration_type_to_packages.py
+ create mode 100644 backend/migrations/add_creator_verification_badges.py
+
+diff --git a/backend/app/models/creator_profile.py b/backend/app/models/creator_profile.py
+index 1a3ee05..b67475b 100644
+--- a/backend/app/models/creator_profile.py
++++ b/backend/app/models/creator_profile.py
+@@ -33,6 +33,10 @@ class CreatorProfile(db.Model):
+     featured_order = db.Column(db.Integer, default=0)
+     featured_since = db.Column(db.DateTime, nullable=True)
+ 
++    # Verification and badges
++    is_verified = db.Column(db.Boolean, default=False)  # Verified by platform with documents
++    verified_at = db.Column(db.DateTime, nullable=True)
++
+     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+ 
+@@ -41,6 +45,43 @@ class CreatorProfile(db.Model):
+     bookings_as_creator = db.relationship('Booking', foreign_keys='Booking.creator_id', backref='creator', lazy='dynamic')
+     saved_by_brands = db.relationship('SavedCreator', backref='creator', lazy='dynamic', cascade='all, delete-orphan')
+ 
++    def get_badges(self):
++        """
++        Calculate creator badges based on verification and performance
++        Returns list of up to 2 badges in priority order
++
++        Badge hierarchy:
++        1. Top Creator (5+ completed collaborations in last 30 days)
++        2. Verified Creator (platform verified with documents)
++        3. Creator (default badge for all creators)
++        """
++        from datetime import datetime, timedelta
++        from app.models import Collaboration
++
++        badges = []
++
++        # Check for Top Creator badge (highest priority)
++        thirty_days_ago = datetime.utcnow() - timedelta(days=30)
++        completed_count = Collaboration.query.filter(
++            Collaboration.creator_id == self.id,
++            Collaboration.status == 'completed',
++            Collaboration.updated_at >= thirty_days_ago
++        ).count()
++
++        if completed_count >= 5:
++            badges.append('top_creator')
++
++        # Check for Verified Creator badge
++        if self.is_verified:
++            badges.append('verified_creator')
++
++        # Always include Creator badge if no other badges (everyone gets at least one)
++        if not badges:
++            badges.append('creator')
++
++        # Return maximum of 2 badges
++        return badges[:2]
++
+     def to_dict(self, include_user=False, public_view=False):
+         """
+         Convert creator profile to dictionary
+@@ -70,6 +111,8 @@ class CreatorProfile(db.Model):
+             'gallery_images': self.gallery_images or [],
+             'free_revisions': self.free_revisions or 2,
+             'revision_fee': self.revision_fee or 0.0,
++            'is_verified': self.is_verified or False,
++            'badges': self.get_badges(),
+             'created_at': self.created_at.isoformat(),
+             'updated_at': self.updated_at.isoformat()
+         }
+diff --git a/backend/app/models/package.py b/backend/app/models/package.py
+index fcca8ad..58ea75b 100644
+--- a/backend/app/models/package.py
++++ b/backend/app/models/package.py
+@@ -12,7 +12,8 @@ class Package(db.Model):
+     price = db.Column(db.Float, nullable=False)  # Price in USD
+     duration_days = db.Column(db.Integer, nullable=False)
+     deliverables = db.Column(db.JSON, default=list)  # List of deliverable items
+-    category = db.Column(db.String(100), nullable=False)
++    category = db.Column(db.String(100), nullable=True)  # Kept for backward compatibility
++    collaboration_type = db.Column(db.String(100), nullable=True)  # Brand Endorsement, UGC, etc.
+     is_active = db.Column(db.Boolean, default=True)
+     created_at = db.Column(db.DateTime, default=datetime.utcnow)
+     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+@@ -31,6 +32,7 @@ class Package(db.Model):
+             'duration_days': self.duration_days,
+             'deliverables': self.deliverables or [],
+             'category': self.category,
++            'collaboration_type': self.collaboration_type,
+             'is_active': self.is_active,
+             'created_at': self.created_at.isoformat(),
+             'updated_at': self.updated_at.isoformat()
+diff --git a/backend/app/routes/creators.py b/backend/app/routes/creators.py
+index 4a29760..80cfbc7 100644
+--- a/backend/app/routes/creators.py
++++ b/backend/app/routes/creators.py
+@@ -223,8 +223,16 @@ def get_creators():
+             ]
+ 
+         # Add review stats and cheapest package price
++        # IMPORTANT: Only include creators who have at least one active package
+         creators_with_stats = []
+         for creator in all_creators:
++            # Get active packages for this creator
++            packages = Package.query.filter_by(creator_id=creator.id, is_active=True).all()
++
++            # Skip creators without any active packages
++            if not packages:
++                continue
++
+             creator_dict = creator.to_dict(include_user=True, public_view=True)
+ 
+             # Get review stats
+@@ -241,13 +249,10 @@ def get_creators():
+                     'total_reviews': 0
+                 }
+ 
+-            # Get cheapest package price
+-            packages = Package.query.filter_by(creator_id=creator.id, is_active=True).all()
+-            if packages:
+-                prices = [p.price for p in packages]
+-                creator_dict['cheapest_package_price'] = min(prices)
+-            else:
+-                creator_dict['cheapest_package_price'] = None
++            # Get cheapest package price (we know packages exist here)
++            prices = [p.price for p in packages]
++            creator_dict['cheapest_package_price'] = min(prices)
++            creator_dict['total_packages'] = len(packages)
+ 
+             creators_with_stats.append(creator_dict)
+ 
+diff --git a/backend/migrations/add_collaboration_type_to_packages.py b/backend/migrations/add_collaboration_type_to_packages.py
+new file mode 100644
+index 0000000..055a9b1
+--- /dev/null
++++ b/backend/migrations/add_collaboration_type_to_packages.py
+@@ -0,0 +1,35 @@
++"""
++Migration: Add collaboration_type field to packages table
++"""
++from app import create_app, db
++from sqlalchemy import text
++
++app = create_app()
++
++with app.app_context():
++    print("Starting migration: Add collaboration_type to packages")
++
++    try:
++        # Add collaboration_type column
++        print("Adding collaboration_type column...")
++        db.session.execute(text("""
++            ALTER TABLE packages
++            ADD COLUMN IF NOT EXISTS collaboration_type VARCHAR(100)
++        """))
++        db.session.commit()
++        print("✓ Added collaboration_type column")
++
++        # Make category nullable
++        print("Making category column nullable...")
++        db.session.execute(text("""
++            ALTER TABLE packages
++            ALTER COLUMN category DROP NOT NULL
++        """))
++        db.session.commit()
++        print("✓ Made category column nullable")
++
++        print("\n✅ Migration completed successfully!")
++    except Exception as e:
++        print(f"\n❌ Migration failed: {str(e)}")
++        db.session.rollback()
++        raise
+diff --git a/backend/migrations/add_creator_verification_badges.py b/backend/migrations/add_creator_verification_badges.py
+new file mode 100644
+index 0000000..4859e02
+--- /dev/null
++++ b/backend/migrations/add_creator_verification_badges.py
+@@ -0,0 +1,35 @@
++"""
++Migration: Add creator verification and badge fields
++"""
++from app import create_app, db
++from sqlalchemy import text
++
++app = create_app()
++
++with app.app_context():
++    print("Starting migration: Add creator verification fields")
++
++    try:
++        # Add is_verified column
++        print("Adding is_verified column...")
++        db.session.execute(text("""
++            ALTER TABLE creator_profiles
++            ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT FALSE
++        """))
++        db.session.commit()
++        print("✓ Added is_verified column")
++
++        # Add verified_at column
++        print("Adding verified_at column...")
++        db.session.execute(text("""
++            ALTER TABLE creator_profiles
++            ADD COLUMN IF NOT EXISTS verified_at TIMESTAMP
++        """))
++        db.session.commit()
++        print("✓ Added verified_at column")
++
++        print("\n✅ Migration completed successfully!")
++    except Exception as e:
++        print(f"\n❌ Migration failed: {str(e)}")
++        db.session.rollback()
++        raise
+-- 
+2.51.0.windows.1
+

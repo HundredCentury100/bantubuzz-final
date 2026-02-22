@@ -1,0 +1,41 @@
+From ae36b5783192b011e03cb304a66bc9c3ba4b864f Mon Sep 17 00:00:00 2001
+From: HundredCentury100 <hundredtechnologies2023@gmail.com>
+Date: Fri, 6 Feb 2026 15:23:23 +0200
+Subject: [PATCH 3/8] Fix missing imports in collaborations.py for milestone
+ endpoints
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Add missing imports:
+- timedelta from datetime (for escrow date calculations)
+- CollaborationMilestone and MilestoneDeliverable models
+
+This fixes the 'Failed to submit deliverable' error when creators try to
+submit deliverables to milestone-based collaborations.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+---
+ backend/app/routes/collaborations.py | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/backend/app/routes/collaborations.py b/backend/app/routes/collaborations.py
+index 331218b..c9d7015 100644
+--- a/backend/app/routes/collaborations.py
++++ b/backend/app/routes/collaborations.py
+@@ -1,8 +1,8 @@
+ from flask import Blueprint, request, jsonify
+ from flask_jwt_extended import jwt_required, get_jwt_identity
+-from datetime import datetime
++from datetime import datetime, timedelta
+ from app import db, socketio
+-from app.models import Collaboration, BrandProfile, CreatorProfile, User
++from app.models import Collaboration, BrandProfile, CreatorProfile, User, CollaborationMilestone, MilestoneDeliverable
+ from app.utils.notifications import notify_collaboration_status, notify_collaboration_update
+ 
+ bp = Blueprint('collaborations', __name__)
+-- 
+2.51.0.windows.1
+

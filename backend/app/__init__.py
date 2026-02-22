@@ -55,7 +55,7 @@ def create_app(config_name='development'):
         return {'error': 'Token has been revoked'}, 401
 
     # Register blueprints
-    from .routes import auth, users, creators, brands, packages, campaigns, bookings, messages, notifications, analytics, collaborations, reviews, wallet, categories, brand_wallet, custom_packages, disputes, subscriptions, briefs
+    from .routes import auth, users, creators, brands, packages, campaigns, bookings, messages, notifications, analytics, collaborations, reviews, wallet, categories, brand_wallet, custom_packages, disputes, subscriptions, briefs, creator_subscriptions, verification
     from .routes import admin  # New admin module structure
 
     app.register_blueprint(auth.bp, url_prefix='/api/auth')
@@ -78,6 +78,8 @@ def create_app(config_name='development'):
     app.register_blueprint(disputes.bp)  # Dispute routes at /api/disputes
     app.register_blueprint(subscriptions.bp, url_prefix='/api/subscriptions')  # Subscription routes
     app.register_blueprint(briefs.bp, url_prefix='/api/briefs')  # Briefs routes
+    app.register_blueprint(creator_subscriptions.creator_subscriptions_bp)  # Creator subscription routes
+    app.register_blueprint(verification.verification_bp)  # Verification routes
 
     # Serve uploaded files
     from flask import send_from_directory

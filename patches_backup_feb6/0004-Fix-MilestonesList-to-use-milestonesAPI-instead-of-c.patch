@@ -1,0 +1,74 @@
+From 98994e6f03d873219c5526179671cfb7060a8a47 Mon Sep 17 00:00:00 2001
+From: HundredCentury100 <hundredtechnologies2023@gmail.com>
+Date: Fri, 6 Feb 2026 15:29:10 +0200
+Subject: [PATCH 4/8] Fix MilestonesList to use milestonesAPI instead of
+ collaborationsAPI
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+Change API calls from collaborationsAPI to milestonesAPI:
+- submitMilestoneDeliverable -> milestonesAPI.submitDeliverable
+- approveMilestoneDeliverable -> milestonesAPI.approveDeliverable
+- requestMilestoneRevision -> milestonesAPI.requestRevision
+
+This fixes the 'yt.submitMilestoneDeliverable is not a function' error.
+The milestone API functions were defined in milestonesAPI object in api.js,
+not in collaborationsAPI.
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>
+---
+ frontend/src/components/MilestonesList.jsx | 14 ++++++++------
+ 1 file changed, 8 insertions(+), 6 deletions(-)
+
+diff --git a/frontend/src/components/MilestonesList.jsx b/frontend/src/components/MilestonesList.jsx
+index c0553ea..97de8ff 100644
+--- a/frontend/src/components/MilestonesList.jsx
++++ b/frontend/src/components/MilestonesList.jsx
+@@ -1,5 +1,5 @@
+ import { useState } from 'react';
+-import { collaborationsAPI } from '../services/api';
++import { milestonesAPI } from '../services/api';
+ import toast from 'react-hot-toast';
+ 
+ const MilestonesList = ({ collaboration, isBrand, onUpdate }) => {
+@@ -20,7 +20,7 @@ const MilestonesList = ({ collaboration, isBrand, onUpdate }) => {
+     }
+ 
+     try {
+-      await collaborationsAPI.submitMilestoneDeliverable(
++      await milestonesAPI.submitDeliverable(
+         collaboration.id,
+         milestoneId,
+         deliverableData
+@@ -37,7 +37,7 @@ const MilestonesList = ({ collaboration, isBrand, onUpdate }) => {
+ 
+   const handleApproveDeliverable = async (milestoneId, deliverableId) => {
+     try {
+-      await collaborationsAPI.approveMilestoneDeliverable(
++      await milestonesAPI.approveDeliverable(
+         collaboration.id,
+         milestoneId,
+         deliverableId
+@@ -57,11 +57,13 @@ const MilestonesList = ({ collaboration, isBrand, onUpdate }) => {
+     }
+ 
+     try {
+-      await collaborationsAPI.requestMilestoneRevision(
++      await milestonesAPI.requestRevision(
+         collaboration.id,
+         selectedDeliverable.milestoneId,
+-        selectedDeliverable.id,
+-        revisionNotes
++        {
++          deliverable_id: selectedDeliverable.id,
++          notes: revisionNotes
++        }
+       );
+       toast.success('Revision requested successfully');
+       setShowRevisionModal(false);
+-- 
+2.51.0.windows.1
+

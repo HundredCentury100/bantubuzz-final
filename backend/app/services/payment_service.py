@@ -3,9 +3,144 @@ Payment Service - Handles payment verification and management
 """
 from datetime import datetime, timedelta
 from app import db
-from app.models import Payment, PaymentVerification, Booking, WalletTransaction, Collaboration, User
+from app.models import Payment, PaymentVerification, Booking, WalletTransaction, Collaboration, User, BrandProfile, Subscription
 from app.services.wallet_service import get_or_create_wallet
 from app.utils.email_service import send_payment_verified_notification
+
+
+class PaymentService:
+    """Service for handling payment operations including Paynow integration"""
+
+    @staticmethod
+    def get_brand_platform_fee(brand_id):
+        """Get platform fee percentage for a brand based on their subscription tier"""
+        try:
+            brand = BrandProfile.query.get(brand_id)
+            if not brand:
+                return 10.00  # Default to 10% if brand not found
+
+            # Get brand's active subscription
+            active_subscription = Subscription.query.filter_by(
+                user_id=brand.user_id,
+                status='active'
+            ).first()
+
+            if not active_subscription or not active_subscription.plan:
+                return 10.00  # Default to 10% for Free tier
+
+            # Return the platform fee from the subscription plan
+            return float(active_subscription.plan.platform_fee_percentage or 10.00)
+
+        except Exception as e:
+            print(f"Error getting brand platform fee: {str(e)}")
+            return 10.00  # Default to 10% on error
+
+    @staticmethod
+    def initiate_paynow_payment(amount, email, reference, description):
+        """Initiate a Paynow payment"""
+        import os
+        from paynow import Paynow
+        from flask import current_app
+
+        # Get Paynow credentials
+        try:
+            integration_id = current_app.config.get('PAYNOW_INTEGRATION_ID') or os.getenv('PAYNOW_INTEGRATION_ID')
+            integration_key = current_app.config.get('PAYNOW_INTEGRATION_KEY') or os.getenv('PAYNOW_INTEGRATION_KEY')
+            return_url = current_app.config.get('PAYNOW_RETURN_URL') or os.getenv('PAYNOW_RETURN_URL')
+            result_url = current_app.config.get('PAYNOW_RESULT_URL') or os.getenv('PAYNOW_RESULT_URL')
+        except RuntimeError:
+            integration_id = os.getenv('PAYNOW_INTEGRATION_ID')
+            integration_key = os.getenv('PAYNOW_INTEGRATION_KEY')
+            return_url = os.getenv('PAYNOW_RETURN_URL')
+            result_url = os.getenv('PAYNOW_RESULT_URL')
+
+        # Initialize Paynow
+        paynow = Paynow(
+            integration_id=integration_id,
+            integration_key=integration_key,
+            return_url=return_url,
+            result_url=result_url
+        )
+
+        try:
+            # Create payment
+            payment = paynow.create_payment(reference, email)
+            payment.add(description, amount)
+
+            # Send payment to Paynow
+            response = paynow.send(payment)
+
+            if response.success:
+                poll_url = response.poll_url
+                redirect_url = response.redirect_url
+                payment_hash = str(response.hash) if response.hash and response.hash is not True else poll_url.split('guid=')[-1] if '?guid=' in poll_url else None
+
+                return {
+                    'success': True,
+                    'message': 'Payment initiated successfully',
+                    'redirect_url': redirect_url,
+                    'poll_url': poll_url,
+                    'reference': payment_hash
+                }
+            else:
+                error_msg = 'Unknown error'
+                if hasattr(response, 'errors') and response.errors:
+                    error_msg = str(response.errors)
+                elif hasattr(response, 'status') and response.status:
+                    error_msg = f"Paynow Status: {response.status}"
+
+                return {
+                    'success': False,
+                    'message': error_msg
+                }
+
+        except Exception as e:
+            return {
+                'success': False,
+                'message': str(e)
+            }
+
+    @staticmethod
+    def check_paynow_status(poll_url):
+        """Check payment status using Paynow poll URL"""
+        import os
+        from paynow import Paynow
+        from flask import current_app
+
+        try:
+            # Get Paynow credentials
+            try:
+                integration_id = current_app.config.get('PAYNOW_INTEGRATION_ID') or os.getenv('PAYNOW_INTEGRATION_ID')
+                integration_key = current_app.config.get('PAYNOW_INTEGRATION_KEY') or os.getenv('PAYNOW_INTEGRATION_KEY')
+                return_url = current_app.config.get('PAYNOW_RETURN_URL') or os.getenv('PAYNOW_RETURN_URL')
+                result_url = current_app.config.get('PAYNOW_RESULT_URL') or os.getenv('PAYNOW_RESULT_URL')
+            except RuntimeError:
+                integration_id = os.getenv('PAYNOW_INTEGRATION_ID')
+                integration_key = os.getenv('PAYNOW_INTEGRATION_KEY')
+                return_url = os.getenv('PAYNOW_RETURN_URL')
+                result_url = os.getenv('PAYNOW_RESULT_URL')
+
+            # Initialize Paynow
+            paynow = Paynow(
+                integration_id=integration_id,
+                integration_key=integration_key,
+                return_url=return_url,
+                result_url=result_url
+            )
+
+            # Check status
+            status = paynow.check_transaction_status(poll_url)
+
+            if status.paid:
+                return {'status': 'paid', 'paid': True}
+            elif hasattr(status, 'status') and status.status.lower() in ['cancelled', 'failed']:
+                return {'status': 'cancelled', 'paid': False}
+            else:
+                return {'status': 'pending', 'paid': False}
+
+        except Exception as e:
+            print(f"Error checking Paynow status: {str(e)}")
+            return {'status': 'error', 'paid': False, 'message': str(e)}
 
 
 def create_payment_record(booking_id, user_id, amount, payment_method='paynow', payment_type='automated'):
@@ -167,6 +302,18 @@ def release_escrow_to_wallet(collaboration_id, platform_fee_percentage=15):
     """
     Release money to creator wallet with 24-hour clearance
     Works with both booking-based and collaboration-based payments
+
+    Payment Flow:
+    1. Brand pays: collaboration_price + upfront_platform_fee (based on their subscription tier)
+    2. On release: Take 15% commission from collaboration_price
+    3. Creator receives: collaboration_price - 15%
+
+    Example: $50 collaboration, Brand on Free tier (10% upfront fee)
+    - Brand pays: $50 + ($50 × 10%) = $55 total
+    - Platform gets upfront from brand: $5
+    - On release, platform commission from creator: $50 × 15% = $7.50
+    - Creator receives: $50 - $7.50 = $42.50
+    - Total platform revenue: $5 + $7.50 = $12.50
     """
     collaboration = Collaboration.query.get(collaboration_id)
     if not collaboration:
@@ -203,11 +350,28 @@ def release_escrow_to_wallet(collaboration_id, platform_fee_percentage=15):
     if payment.escrow_status not in ['escrowed', 'pending']:
         raise ValueError(f"Payment escrow status invalid - '{payment.escrow_status}'")
 
+    # Get the brand to determine their platform fee (for upfront calculation)
+    brand_platform_fee_pct = PaymentService.get_brand_platform_fee(collaboration.brand_id)
+
     # Calculate amounts
+    # payment.amount = total paid by brand (collaboration_price + upfront_platform_fee)
+    # We need to extract the original collaboration_price
+    total_paid = float(payment.amount)
+
+    # Original collaboration price = total_paid / (1 + brand_platform_fee_pct/100)
+    original_collab_price = total_paid / (1 + brand_platform_fee_pct / 100)
+    upfront_platform_fee = total_paid - original_collab_price
+
+    # Platform takes 10% commission from the ORIGINAL collaboration price
+    platform_commission = original_collab_price * (platform_fee_percentage / 100)
+
+    # Creator receives: original price - 10% commission
+    creator_amount = original_collab_price - platform_commission
+
+    # Total platform revenue = upfront fee + commission
+    total_platform_revenue = upfront_platform_fee + platform_commission
+
     creator = collaboration.creator
-    gross_amount = float(payment.amount)
-    platform_fee = gross_amount * (platform_fee_percentage / 100)
-    net_amount = gross_amount - platform_fee
 
     # Get or create wallet
     wallet = get_or_create_wallet(creator.user_id)
@@ -241,7 +405,7 @@ def release_escrow_to_wallet(collaboration_id, platform_fee_percentage=15):
         wallet_id=wallet.id,
         user_id=creator.user_id,
         transaction_type='earning',
-        amount=net_amount,
+        amount=creator_amount,
         status='pending_clearance',
         clearance_required=True,
         clearance_days=1,  # 24 hours
@@ -249,12 +413,18 @@ def release_escrow_to_wallet(collaboration_id, platform_fee_percentage=15):
         available_at=available_at,
         collaboration_id=collaboration.id,
         booking_id=booking.id if booking else None,
-        gross_amount=gross_amount,
-        platform_fee=platform_fee,
+        gross_amount=original_collab_price,
+        platform_fee=platform_commission,
         platform_fee_percentage=platform_fee_percentage,
-        net_amount=net_amount,
+        net_amount=creator_amount,
         description=description,
-        transaction_metadata=metadata
+        transaction_metadata={
+            **metadata,
+            'upfront_platform_fee': upfront_platform_fee,
+            'brand_platform_fee_pct': brand_platform_fee_pct,
+            'total_platform_revenue': total_platform_revenue,
+            'breakdown': f'Brand paid ${total_paid:.2f} (${original_collab_price:.2f} + ${upfront_platform_fee:.2f} upfront fee). Platform takes ${platform_commission:.2f} commission. Creator receives ${creator_amount:.2f}.'
+        }
     )
     db.session.add(transaction)
 
@@ -266,8 +436,8 @@ def release_escrow_to_wallet(collaboration_id, platform_fee_percentage=15):
         booking.escrow_status = 'released'
 
     # Update wallet balances
-    wallet.pending_clearance = float(wallet.pending_clearance or 0) + net_amount
-    wallet.total_earned = float(wallet.total_earned or 0) + net_amount  # Fixed: Use net_amount instead of gross
+    wallet.pending_clearance = float(wallet.pending_clearance or 0) + creator_amount
+    wallet.total_earned = float(wallet.total_earned or 0) + creator_amount
     wallet.updated_at = datetime.utcnow()
 
     # Commit all changes

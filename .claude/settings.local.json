@@ -56,7 +56,8 @@
       "Bash(head -1 head -20 \"$f\")",
       "Bash(awk:*)",
       "Bash(ls \"D:\\Bantubuzz Platform\\backend\\app\\models\"\" && ls \"D:Bantubuzz Platformbackendapproutesadmin\"\")",
-      "Bash(if exist backendnul del backendnul)"
+      "Bash(if exist backendnul del backendnul)",
+      "Bash(if exist \"backend\\nul\" del \"backend\\nul\")"
     ],
     "deny": [],
     "ask": []

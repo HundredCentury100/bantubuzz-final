@@ -299,8 +299,39 @@ def get_creators():
                     )
                 ]
 
-        # Apply sorting based on sort_by parameter
-        if sort_by == 'followers_desc':
+        # Check for featured creators (only when sort is 'relevance' or default)
+        # Featured creators get priority ONLY when user hasn't explicitly selected another sort
+        if sort_by in ['relevance', ''] or not sort_by:
+            # Get active featured subscriptions
+            from app.models import CreatorSubscription, CreatorSubscriptionPlan
+            from datetime import datetime
+
+            featured_creator_ids = set()
+            active_featured_subs = CreatorSubscription.query.join(
+                CreatorSubscriptionPlan
+            ).filter(
+                CreatorSubscription.status == 'active',
+                CreatorSubscription.payment_verified == True,
+                CreatorSubscription.end_date > datetime.utcnow(),
+                CreatorSubscriptionPlan.subscription_type == 'featured'
+            ).all()
+
+            for sub in active_featured_subs:
+                featured_creator_ids.add(sub.creator_id)
+
+            # Add is_featured flag to creators
+            for creator in creators_with_stats:
+                creator['is_featured'] = creator['id'] in featured_creator_ids
+
+            # Sort: Featured creators first, then by reviews & rating
+            creators_with_stats.sort(
+                key=lambda x: (
+                    not x.get('is_featured', False),  # Featured first (False < True, so not featured = False sorts first)
+                    -x['review_stats']['total_reviews'],  # Then by reviews descending
+                    -x['review_stats']['average_rating']  # Then by rating descending
+                )
+            )
+        elif sort_by == 'followers_desc':
             creators_with_stats.sort(key=lambda x: x.get('follower_count', 0), reverse=True)
         elif sort_by == 'followers_asc':
             creators_with_stats.sort(key=lambda x: x.get('follower_count', 0), reverse=False)
@@ -315,12 +346,6 @@ def get_creators():
         elif sort_by == 'newest':
             # Sort by created_at if available, otherwise use id as proxy
             creators_with_stats.sort(key=lambda x: x.get('created_at', ''), reverse=True)
-        else:
-            # Default: Sort by total reviews (descending), then by average rating (descending)
-            creators_with_stats.sort(
-                key=lambda x: (x['review_stats']['total_reviews'], x['review_stats']['average_rating']),
-                reverse=True
-            )
 
         # Apply pagination manually after sorting
         total = len(creators_with_stats)
