@@ -39,6 +39,9 @@ import NotFound from './pages/NotFound';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import GoogleProfileComplete from './pages/GoogleProfileComplete';
+import CreatorSubscriptions from './pages/CreatorSubscriptions';
+import VerificationApplication from './pages/VerificationApplication';
+import VerificationStatus from './pages/VerificationStatus';
 
 // Admin Pages
 import AdminLogin from './pages/AdminLogin';
@@ -46,6 +49,7 @@ import AdminDashboard from './pages/admin/Dashboard';
 import AdminUsers from './pages/admin/Users';
 import AdminUserProfile from './pages/admin/UserProfile';
 import VerificationQueue from './pages/admin/VerificationQueue';
+import CreatorVerifications from './pages/admin/CreatorVerifications';
 import AdminActivity from './pages/admin/Activity';
 import AdminDisputes from './pages/admin/Disputes';
 import AdminReports from './pages/admin/Reports';
@@ -310,6 +314,30 @@ function App() {
           </ProtectedRoute>
         }
       />
+      <Route
+        path="/creator/subscriptions"
+        element={
+          <ProtectedRoute requiredType="creator">
+            <CreatorSubscriptions />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/creator/verification/apply"
+        element={
+          <ProtectedRoute requiredType="creator">
+            <VerificationApplication />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/creator/verification/status"
+        element={
+          <ProtectedRoute requiredType="creator">
+            <VerificationStatus />
+          </ProtectedRoute>
+        }
+      />
 
       {/* Brand Protected Routes */}
       <Route
@@ -546,6 +574,14 @@ function App() {
         element={
           <AdminRoute>
             <VerificationQueue />
+          </AdminRoute>
+        }
+      />
+      <Route
+        path="/admin/creator-verifications"
+        element={
+          <AdminRoute>
+            <CreatorVerifications />
           </AdminRoute>
         }
       />
