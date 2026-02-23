@@ -27,9 +27,14 @@ const CreatorCardHome = ({ creator, bgColor = 'white', textColor = 'dark' }) => 
         {/* Badge Overlays on Image */}
         {creator.badges && creator.badges.length > 0 && (
           <div className="absolute top-2 left-2 flex flex-wrap gap-1.5">
-            {creator.badges.map((badge, idx) => (
-              <CreatorBadge key={idx} badge={badge} size="md" variant="overlay" />
-            ))}
+            {creator.badges
+              .sort((a, b) => {
+                const priority = { 'top_creator': 1, 'verified_creator': 2, 'responds_fast': 3, 'creator': 4 };
+                return (priority[a] || 99) - (priority[b] || 99);
+              })
+              .map((badge, idx) => (
+                <CreatorBadge key={idx} badge={badge} size="md" variant="overlay" />
+              ))}
           </div>
         )}
       </div>

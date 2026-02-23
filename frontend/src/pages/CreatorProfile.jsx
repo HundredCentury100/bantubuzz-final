@@ -219,9 +219,14 @@ const CreatorProfile = () => {
                   {creator.badges && creator.badges.length > 0 && (
                     <div className="mb-3">
                       <div className="flex flex-wrap gap-2 mb-2">
-                        {creator.badges.map((badge, idx) => (
-                          <CreatorBadge key={idx} badge={badge} size="md" />
-                        ))}
+                        {creator.badges
+                          .sort((a, b) => {
+                            const priority = { 'top_creator': 1, 'verified_creator': 2, 'responds_fast': 3, 'creator': 4 };
+                            return (priority[a] || 99) - (priority[b] || 99);
+                          })
+                          .map((badge, idx) => (
+                            <CreatorBadge key={idx} badge={badge} size="md" />
+                          ))}
                       </div>
 
                       {/* Badge Explanations - Mobile Responsive */}

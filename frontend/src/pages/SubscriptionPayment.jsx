@@ -3,11 +3,13 @@ import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import api from '../services/api';
 import Navbar from '../components/Navbar';
 import toast from 'react-hot-toast';
+import { useAuth } from '../hooks/useAuth';
 
 const SubscriptionPayment = () => {
   const { subscriptionId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
+  const { user } = useAuth();
   const [subscription, setSubscription] = useState(null);
   const [loading, setLoading] = useState(true);
   const [paymentLoading, setPaymentLoading] = useState(false);
@@ -88,7 +90,12 @@ const SubscriptionPayment = () => {
       formData.append('file', proofFile);
       formData.append('subscription_id', subscriptionId || paymentData?.subscription_id);
 
-      const response = await api.post(`/subscriptions/upload-proof`, formData, {
+      // Use different endpoint based on user type
+      const endpoint = user?.user_type === 'creator'
+        ? '/creator/subscriptions/upload-proof'
+        : '/subscriptions/upload-proof';
+
+      const response = await api.post(endpoint, formData, {
         headers: {
           'Content-Type': 'multipart/form-data'
         }

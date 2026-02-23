@@ -11,8 +11,16 @@ from app.models import (
 )
 from app.services.payment_service import PaymentService
 from datetime import datetime, timedelta
+import os
+from werkzeug.utils import secure_filename
 
 creator_subscriptions_bp = Blueprint('creator_subscriptions', __name__)
+
+UPLOAD_FOLDER = '/var/www/bantubuzz/backend/uploads/payment_proofs'
+ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'pdf'}
+
+def allowed_file(filename):
+    return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
 @creator_subscriptions_bp.route('/api/creator/subscriptions/plans', methods=['GET'])
@@ -280,3 +288,72 @@ def cancel_subscription(subscription_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
+
+
+@creator_subscriptions_bp.route('/api/creator/subscriptions/upload-proof', methods=['POST'])
+@jwt_required()
+def upload_payment_proof():
+    """
+    Upload manual payment proof for creator subscription
+    Requires admin verification before subscription activates
+    """
+    try:
+        current_user_id = get_jwt_identity()
+        user = User.query.get(current_user_id)
+
+        if not user or user.user_type != 'creator':
+            return jsonify({'success': False, 'error': 'Creator account required'}), 403
+
+        creator = CreatorProfile.query.filter_by(user_id=current_user_id).first()
+        if not creator:
+            return jsonify({'success': False, 'error': 'Creator profile not found'}), 404
+
+        if 'file' not in request.files:
+            return jsonify({'success': False, 'error': 'No file provided'}), 400
+
+        file = request.files['file']
+        subscription_id = request.form.get('subscription_id')
+
+        if not subscription_id:
+            return jsonify({'success': False, 'error': 'subscription_id is required'}), 400
+
+        subscription = CreatorSubscription.query.get(subscription_id)
+        if not subscription:
+            return jsonify({'success': False, 'error': 'Subscription not found'}), 404
+
+        # Verify ownership
+        if subscription.creator_id != creator.id:
+            return jsonify({'success': False, 'error': 'Unauthorized'}), 403
+
+        if file.filename == '':
+            return jsonify({'success': False, 'error': 'No file selected'}), 400
+
+        if file and allowed_file(file.filename):
+            # Create upload directory if it doesn't exist
+            os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+            # Generate unique filename
+            filename = secure_filename(f"creator_sub_{subscription_id}_{creator.id}_{datetime.utcnow().timestamp()}.{file.filename.rsplit('.', 1)[1].lower()}")
+            filepath = os.path.join(UPLOAD_FOLDER, filename)
+
+            file.save(filepath)
+
+            # Update subscription with payment proof path
+            subscription.payment_proof_path = f"/uploads/payment_proofs/{filename}"
+            subscription.payment_method = 'manual'
+            subscription.payment_status = 'pending_verification'  # Awaiting admin verification
+            subscription.updated_at = datetime.utcnow()
+
+            db.session.commit()
+
+            return jsonify({
+                'success': True,
+                'message': 'Payment proof uploaded successfully',
+                'subscription': subscription.to_dict()
+            }), 200
+
+        return jsonify({'success': False, 'error': 'Invalid file type. Allowed: png, jpg, jpeg, gif, pdf'}), 400
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
