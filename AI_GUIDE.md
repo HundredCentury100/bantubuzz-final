@@ -522,6 +522,34 @@ Understanding what's been implemented helps maintain consistency and avoid rewor
   - Better mobile experience
 - **Files**: `frontend/src/pages/VerificationApplication.jsx`, `backend/app/routes/verification.py`
 
+### Recent: Badge Priority & Verification Flow Fixes (Feb 23, 2026)
+- **Badge display priority standardized**:
+  - Top Creator badge now displays first (highest priority)
+  - Priority order: top_creator (1) > verified_creator (2) > responds_fast (3) > creator (4)
+  - Sort function applied to all badge rendering locations
+  - Pattern: `.sort((a, b) => { const priority = {...}; return (priority[a] || 99) - (priority[b] || 99); })`
+  - Files: `CreatorCardHome.jsx`, `BrowseCreators.jsx`, `Creators.jsx`, `CreatorProfile.jsx`, `Home.jsx`
+- **Verification subscription requirement enforced**:
+  - Frontend now checks for active verification subscription BEFORE showing application form
+  - `checkVerificationSubscription()` runs on component mount
+  - Redirects to `/creator/subscriptions` if no active subscription found
+  - Prevents form completion without valid subscription (better UX)
+  - Matches backend requirement where verification application requires active subscription
+  - File: `frontend/src/pages/VerificationApplication.jsx`
+- **Creator payment upload endpoint created**:
+  - Issue: "Unauthorized" error when creators uploaded manual payment proof
+  - Root cause: Brand subscriptions use `Subscription` model with `user_id`, Creator subscriptions use `CreatorSubscription` model with `creator_id`
+  - Solution: Created separate endpoint `/api/creator/subscriptions/upload-proof`
+  - Endpoint checks `subscription.creator_id` instead of `subscription.user_id` for authorization
+  - Frontend dynamically selects endpoint based on `user.user_type`
+  - Files: `backend/app/routes/creator_subscriptions.py`, `frontend/src/pages/SubscriptionPayment.jsx`
+- **Social media icons updated**:
+  - Replaced emoji icons (🌟, 📘, 📸, 🎵) with proper SVG icons in Creator Subscriptions page
+  - Created `getPlatformIcon()` function returning platform-specific SVGs (Facebook, Instagram, TikTok)
+  - Updated verification form social media section with branded SVG icons (pink Instagram, black TikTok, blue Facebook)
+  - Icons match design patterns from `BrowseCreators.jsx`
+  - Files: `frontend/src/pages/CreatorSubscriptions.jsx`, `frontend/src/pages/VerificationApplication.jsx`
+
 ### Current State (Feb 2026)
 ✅ Fully functional platform
 ✅ Complete subscription systems (brand + creator)
@@ -736,6 +764,52 @@ ssh root@173.212.245.22 "systemctl status apache2"
 
 # Restart Apache
 ssh root@173.212.245.22 "systemctl restart apache2"
+```
+
+### Subscription & Payment Issues
+
+**"Unauthorized" error on payment proof upload:**
+```
+Problem: Creator gets 401/403 error when uploading manual payment proof
+Root cause: Brand and Creator subscriptions use different models
+- Brand subscriptions: Subscription model with user_id
+- Creator subscriptions: CreatorSubscription model with creator_id
+
+Solution: Check user_type and use correct endpoint
+- Brands: POST /subscriptions/upload-proof
+- Creators: POST /creator/subscriptions/upload-proof
+
+File: frontend/src/pages/SubscriptionPayment.jsx
+```
+
+**Badge display order incorrect:**
+```
+Problem: Verified badge showing before Top Creator badge
+Root cause: Badges rendered in array order without sorting
+
+Solution: Sort badges before rendering
+const priority = {
+  'top_creator': 1,
+  'verified_creator': 2,
+  'responds_fast': 3,
+  'creator': 4
+};
+badges.sort((a, b) => (priority[a] || 99) - (priority[b] || 99));
+
+Files: All creator card components (5 files)
+```
+
+**Verification application accessible without subscription:**
+```
+Problem: Users can access verification form without paying for subscription
+Root cause: Backend enforces requirement but frontend shows form first
+
+Solution: Add subscription check on component mount
+useEffect(() => {
+  checkVerificationSubscription(); // Redirects if no active subscription
+}, []);
+
+File: frontend/src/pages/VerificationApplication.jsx
 ```
 
 ---
