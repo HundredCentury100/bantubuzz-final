@@ -117,12 +117,12 @@ export default function SubscriptionManage() {
 
       if (res.data.success && res.data.data) {
         if (res.data.data.redirect_url) {
-          localStorage.setItem('lastSubscriptionId', currentSubscription.id);
+          localStorage.setItem('lastSubscriptionId', actualSubscription?.id || currentSubscription?.subscription?.id);
 
           navigate('/subscription/payment', {
             state: {
               paymentData: {
-                subscription_id: currentSubscription.id,
+                subscription_id: actualSubscription?.id || currentSubscription?.subscription?.id,
                 redirect_url: res.data.data.redirect_url,
                 poll_url: res.data.data.poll_url,
                 payment_reference: res.data.data.payment_reference
@@ -217,9 +217,12 @@ export default function SubscriptionManage() {
     );
   }
 
-  const currentPlan = currentSubscription?.plan || (currentSubscription ? plans.find(p => p.slug === 'free') : null);
-  const isActive = currentSubscription?.status === 'active';
-  const isCancelled = currentSubscription?.cancel_at_period_end;
+  // Check if user has an actual active subscription (not just free plan)
+  const hasActiveSubscription = currentSubscription?.has_subscription === true;
+  const actualSubscription = hasActiveSubscription ? currentSubscription?.subscription : null;
+  const currentPlan = actualSubscription?.plan || currentSubscription?.plan || plans.find(p => p.slug === 'free');
+  const isActive = actualSubscription?.status === 'active';
+  const isCancelled = actualSubscription?.cancel_at_period_end;
 
   return (
     <div className="min-h-screen flex flex-col bg-light">
@@ -238,7 +241,7 @@ export default function SubscriptionManage() {
           </div>
 
           {/* Current Subscription Card */}
-          {currentSubscription && currentPlan && (
+          {hasActiveSubscription && currentPlan && actualSubscription && (
             <div className="bg-white rounded-3xl shadow-sm p-8 md:p-12 mb-12">
               <div className="flex flex-col md:flex-row md:items-start md:justify-between mb-8">
                 <div className="mb-4 md:mb-0">
@@ -260,7 +263,7 @@ export default function SubscriptionManage() {
                 <div className={`inline-flex items-center px-6 py-3 rounded-full font-semibold ${
                   isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
                 }`}>
-                  {currentSubscription?.status?.toUpperCase() || 'ACTIVE'}
+                  {actualSubscription?.status?.toUpperCase() || 'ACTIVE'}
                 </div>
               </div>
 
@@ -268,20 +271,20 @@ export default function SubscriptionManage() {
                 <div className="bg-light rounded-3xl p-6">
                   <p className="text-sm text-gray-600 mb-2">Billing Cycle</p>
                   <p className="text-2xl font-bold text-dark capitalize">
-                    {currentSubscription?.billing_cycle || 'Monthly'}
+                    {actualSubscription?.billing_cycle || 'Monthly'}
                   </p>
                 </div>
                 <div className="bg-light rounded-3xl p-6">
                   <p className="text-sm text-gray-600 mb-2">Current Period Ends</p>
                   <p className="text-2xl font-bold text-dark">
-                    {formatDate(currentSubscription?.current_period_end)}
+                    {formatDate(actualSubscription?.current_period_end)}
                   </p>
                 </div>
                 <div className="bg-light rounded-3xl p-6">
                   <p className="text-sm text-gray-600 mb-2">Next Payment</p>
                   <p className="text-2xl font-bold text-dark">
-                    {currentSubscription?.next_payment_date
-                      ? formatDate(currentSubscription.next_payment_date)
+                    {actualSubscription?.next_payment_date
+                      ? formatDate(actualSubscription.next_payment_date)
                       : 'N/A'}
                   </p>
                 </div>
@@ -296,7 +299,7 @@ export default function SubscriptionManage() {
                         Subscription Cancelled
                       </h3>
                       <p className="text-yellow-800">
-                        Your subscription will remain active until {formatDate(currentSubscription?.current_period_end)}.
+                        Your subscription will remain active until {formatDate(actualSubscription?.current_period_end)}.
                         You can reactivate it anytime before then.
                       </p>
                     </div>
@@ -352,11 +355,11 @@ export default function SubscriptionManage() {
           )}
 
           {/* Available/Upgrade Plans */}
-          {(!currentSubscription || (currentSubscription && currentPlan?.slug !== 'agency')) && (
+          {(!hasActiveSubscription || (hasActiveSubscription && currentPlan?.slug !== 'agency')) && (
             <div>
               <div className="text-center mb-8">
                 <h2 className="text-3xl md:text-4xl font-bold text-dark mb-4">
-                  {currentSubscription ? 'Upgrade Your Plan' : 'Choose Your Plan'}
+                  {hasActiveSubscription ? 'Upgrade Your Plan' : 'Choose Your Plan'}
                 </h2>
 
                 {/* Billing Toggle */}
@@ -385,7 +388,7 @@ export default function SubscriptionManage() {
               {/* Plan Cards Grid */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
                 {plans
-                  .filter((plan) => !currentSubscription || plan.id !== currentPlan?.id)
+                  .filter((plan) => !hasActiveSubscription || plan.id !== currentPlan?.id)
                   .map((plan) => {
                     const Icon = getPlanIcon(plan.slug);
                     const price = billingCycle === 'yearly' ? plan.price_yearly / 12 : plan.price_monthly;
@@ -531,7 +534,7 @@ export default function SubscriptionManage() {
                           </div>
                         ) : (
                           <button
-                            onClick={() => currentSubscription ? handleUpgrade(plan.id) : handleSubscribe(plan.id)}
+                            onClick={() => hasActiveSubscription ? handleUpgrade(plan.id) : handleSubscribe(plan.id)}
                             disabled={actionLoading || isCancelled}
                             className={`w-full mt-4 py-3 px-6 rounded-full font-medium transition-colors ${
                               isPopular
@@ -539,7 +542,7 @@ export default function SubscriptionManage() {
                                 : 'bg-dark text-white hover:bg-gray-800'
                             } disabled:opacity-50`}
                           >
-                            {actionLoading ? 'Processing...' : currentSubscription ? 'Upgrade' : isFree ? 'Get Started' : 'Subscribe'}
+                            {actionLoading ? 'Processing...' : hasActiveSubscription ? 'Upgrade' : isFree ? 'Get Started' : 'Subscribe'}
                           </button>
                         )}
                       </div>
