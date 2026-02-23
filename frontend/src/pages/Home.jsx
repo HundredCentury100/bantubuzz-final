@@ -47,10 +47,14 @@ const Home = () => {
     }
   };
 
-  // Auto-scroll functionality for categories
+  // Auto-scroll functionality for categories (desktop only)
   useEffect(() => {
     const scrollContainer = scrollContainerRef.current;
     if (!scrollContainer || categories.length === 0) return;
+
+    // Only enable auto-scroll on desktop (width >= 1024px)
+    const isDesktop = window.innerWidth >= 1024;
+    if (!isDesktop) return;
 
     let scrollAmount = 0;
     const scrollSpeed = 1; // pixels per frame

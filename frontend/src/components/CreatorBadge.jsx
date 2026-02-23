@@ -49,9 +49,9 @@ const CreatorBadge = ({ badge, size = 'md', variant = 'full' }) => {
 
   // Icon sizes: image badges get large prominent icons, svg badges stay modest
   const iconSizeClasses = {
-    sm: isImageBadge ? 'w-6 h-6' : 'w-3.5 h-3.5',
-    md: isImageBadge ? 'w-8 h-8' : 'w-4 h-4',
-    lg: isImageBadge ? 'w-10 h-10' : 'w-5 h-5'
+    sm: isImageBadge ? 'w-4 h-4' : 'w-3 h-3',
+    md: isImageBadge ? 'w-5 h-5' : 'w-3.5 h-3.5',
+    lg: isImageBadge ? 'w-6 h-6' : 'w-4 h-4'
   };
 
   // Text size — same for both, no extra size difference
@@ -62,7 +62,7 @@ const CreatorBadge = ({ badge, size = 'md', variant = 'full' }) => {
   };
 
   // Padding — same for image badges so pill size stays consistent
-  const overlayPadding = isImageBadge ? 'px-2.5 py-1' : 'px-2 py-1';
+  const overlayPadding = isImageBadge ? 'px-2 py-0.5' : 'px-1.5 py-0.5';
   const overlayFont = 'font-semibold';
   const overlayShadow = isImageBadge ? 'shadow-md' : 'shadow-sm';
 

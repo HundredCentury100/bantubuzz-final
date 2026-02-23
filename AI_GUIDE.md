@@ -464,7 +464,7 @@ Understanding what's been implemented helps maintain consistency and avoid rewor
 - **Homepage design as reference** (Home.jsx is the source of truth)
 - **All subscription pages redesigned** to match Homepage/BrowseCreators patterns:
   - Pricing.jsx: Cards with `bg-primary` outer + `bg-white rounded-2xl` inner for popular plans
-  - SubscriptionManage.jsx: Icon redesign (removed gradients, added `bg-primary/10` circles)
+  - SubscriptionManage.jsx: Complete redesign with full feature list + centered 3-column layout
   - BrandDashboard.jsx: Upgrade banner shows NEXT tier features
   - CreatorDashboard.jsx: Priority banner system (verification → featured)
 - **Eliminated gradient backgrounds** from all UI elements (icons, buttons, cards)
@@ -473,6 +473,18 @@ Understanding what's been implemented helps maintain consistency and avoid rewor
 - **Unified button styles**: `rounded-full` with proper hover transitions
 - **Color usage**: `text-dark` (not `text-gray-900`), `bg-primary`, `bg-white`, `bg-light`
 - **Shadow consistency**: `shadow-sm` + `hover:shadow-md` (never `shadow-lg`)
+
+### Recent: Critical Bug Fixes (Feb 23, 2026)
+- **Subscription upgrade logic fixed**:
+  - Issue: Free plan users got "No active subscription found" error when upgrading
+  - Root cause: Frontend incorrectly checking `currentSubscription` (always truthy) instead of `has_subscription` flag
+  - Backend `/upgrade` requires active subscription record; free plan users don't have this
+  - Solution: Check `currentSubscription.has_subscription === true` before calling `/upgrade`
+  - Free plan users now correctly use `/subscribe`, paid users use `/upgrade`
+  - File: `frontend/src/pages/SubscriptionManage.jsx`
+- **API parameter naming**:
+  - Fixed `new_plan_id` → `plan_id` to match backend expectation
+  - Backend `/upgrade` endpoint expects `{ plan_id: int, billing_cycle: string }`
 
 ### Current State (Feb 2026)
 ✅ Fully functional platform
