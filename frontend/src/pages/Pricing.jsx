@@ -117,7 +117,7 @@ export default function Pricing() {
           </div>
 
           {/* Pricing Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 max-w-6xl mx-auto">
             {plans.map((plan) => {
               const Icon = getPlanIcon(plan.slug);
               const price = billingCycle === 'yearly' ? plan.price_yearly / 12 : plan.price_monthly;
