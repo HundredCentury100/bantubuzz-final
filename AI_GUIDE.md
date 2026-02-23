@@ -485,6 +485,42 @@ Understanding what's been implemented helps maintain consistency and avoid rewor
 - **API parameter naming**:
   - Fixed `new_plan_id` → `plan_id` to match backend expectation
   - Backend `/upgrade` endpoint expects `{ plan_id: int, billing_cycle: string }`
+- **Manual payment upload endpoint missing**:
+  - Issue: "Resource not found" when submitting manual bank transfer payment
+  - Root cause: `/subscriptions/upload-proof` endpoint didn't exist in backend
+  - Solution: Created endpoint in `backend/app/routes/subscriptions.py`
+  - Accepts file upload (PNG, JPG, JPEG, GIF, PDF - max 5MB)
+  - Saves to `/var/www/bantubuzz/backend/uploads/payment_proofs/`
+  - Sets `payment_status='pending_verification'` for admin approval
+  - Files: `frontend/src/pages/SubscriptionPayment.jsx`, `backend/app/routes/subscriptions.py`
+
+### Recent: UI/UX Improvements (Feb 23, 2026)
+- **Homepage mobile experience**:
+  - Disabled auto-scroll on mobile for categories section (< 1024px width)
+  - Desktop (≥1024px) still has smooth auto-scrolling
+  - File: `frontend/src/pages/Home.jsx`
+- **Creator badge sizes reduced**:
+  - Icon sizes reduced by ~35% (md: w-8 h-8 → w-5 h-5 for images)
+  - Padding reduced: px-2.5 py-1 → px-2 py-0.5
+  - Cleaner visual hierarchy on creator cards
+  - File: `frontend/src/components/CreatorBadge.jsx`
+
+### Recent: Verification Form Redesign (Feb 23, 2026)
+- **Dynamic document labels**:
+  - Labels change based on selected ID type (National ID, Passport, Driver's License)
+  - `getDocumentLabel()` function returns appropriate label
+  - All form text updates dynamically (headers, fields, instructions)
+- **Simplified document requirements**:
+  - Removed `id_document_back` field (3 documents → 2 documents)
+  - Now requires: Document Front + Selfie with Document
+  - Matches industry standard verification flow
+  - Backend sets `id_document_back=None` explicitly
+- **Improved upload UX**:
+  - Layout changed from 3 columns to 2 columns
+  - Upload area height increased: h-48 → h-56
+  - Contextual micro-copy under each upload area
+  - Better mobile experience
+- **Files**: `frontend/src/pages/VerificationApplication.jsx`, `backend/app/routes/verification.py`
 
 ### Current State (Feb 2026)
 ✅ Fully functional platform
