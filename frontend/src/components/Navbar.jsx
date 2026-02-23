@@ -74,12 +74,15 @@ const Navbar = () => {
                 </Link>
               </>
             )}
-            <Link
-              to="/pricing"
-              className="text-gray-700 hover:text-gray-900 transition-colors text-sm font-medium"
-            >
-              Pricing
-            </Link>
+            {/* Hide Pricing from creators */}
+            {(!isAuthenticated || user?.user_type !== 'creator') && (
+              <Link
+                to="/pricing"
+                className="text-gray-700 hover:text-gray-900 transition-colors text-sm font-medium"
+              >
+                Pricing
+              </Link>
+            )}
 
             {isAuthenticated ? (
               <div className="flex items-center space-x-6">
@@ -277,18 +280,21 @@ const Navbar = () => {
                         </Menu.Item>
                       </>
                     )}
-                    <Menu.Item>
-                      {({ active }) => (
-                        <Link
-                          to="/pricing"
-                          className={`${
-                            active ? 'bg-light' : ''
-                          } block px-4 py-2 text-sm text-gray-700 rounded-lg`}
-                        >
-                          Pricing
-                        </Link>
-                      )}
-                    </Menu.Item>
+                    {/* Hide Pricing from creators */}
+                    {(!isAuthenticated || user?.user_type !== 'creator') && (
+                      <Menu.Item>
+                        {({ active }) => (
+                          <Link
+                            to="/pricing"
+                            className={`${
+                              active ? 'bg-light' : ''
+                            } block px-4 py-2 text-sm text-gray-700 rounded-lg`}
+                          >
+                            Pricing
+                          </Link>
+                        )}
+                      </Menu.Item>
+                    )}
 
                     {isAuthenticated ? (
                       <>
