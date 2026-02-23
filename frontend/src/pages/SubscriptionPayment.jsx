@@ -88,8 +88,7 @@ const SubscriptionPayment = () => {
       formData.append('file', proofFile);
       formData.append('subscription_id', subscriptionId || paymentData?.subscription_id);
 
-      // Note: You'll need to create this endpoint in the backend
-      const response = await api.post(`/api/subscriptions/upload-proof`, formData, {
+      const response = await api.post(`/subscriptions/upload-proof`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data'
         }
