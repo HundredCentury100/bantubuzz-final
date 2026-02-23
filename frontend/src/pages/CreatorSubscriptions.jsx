@@ -3,10 +3,12 @@ import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import api from '../services/api';
 import toast from 'react-hot-toast';
+import { useAuth } from '../hooks/useAuth';
 import { SparklesIcon, StarIcon, CheckBadgeIcon, ArrowRightIcon } from '@heroicons/react/24/outline';
 
 const CreatorSubscriptions = () => {
   const navigate = useNavigate();
+  const { profile } = useAuth();
   const [plans, setPlans] = useState([]);
   const [mySubscriptions, setMySubscriptions] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -67,6 +69,9 @@ const CreatorSubscriptions = () => {
   const featuredPlans = plans.filter(p => p.subscription_type === 'featured');
   const verificationPlan = plans.find(p => p.subscription_type === 'verification');
 
+  // Check if user is already verified
+  const isVerified = profile?.badges?.includes('verified_creator') || false;
+
   if (loading) {
     return (
       <div className="min-h-screen bg-light">
@@ -97,8 +102,8 @@ const CreatorSubscriptions = () => {
           </p>
         </div>
 
-        {/* Verification Plan */}
-        {verificationPlan && (
+        {/* Verification Plan - Only show if not already verified */}
+        {verificationPlan && !isVerified && (
           <div className="max-w-4xl mx-auto mb-12">
             <div className="card bg-gradient-to-br from-primary to-primary-dark text-white overflow-hidden relative">
               <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -mr-32 -mt-32"></div>
