@@ -16,7 +16,6 @@ const VerificationApplication = () => {
     id_number: '',
     reason: '',
     id_document_front: '',
-    id_document_back: '',
     selfie_with_id: '',
     instagram_verified: false,
     instagram_username: '',
@@ -28,6 +27,20 @@ const VerificationApplication = () => {
     facebook_username: '',
     facebook_followers: 0
   });
+
+  // Get document type label
+  const getDocumentLabel = () => {
+    switch (formData.id_type) {
+      case 'national_id':
+        return 'ID';
+      case 'passport':
+        return 'Passport';
+      case 'drivers_license':
+        return "Driver's License";
+      default:
+        return 'ID';
+    }
+  };
 
   const steps = [
     { id: 1, name: 'Personal Info', icon: DocumentTextIcon },
@@ -73,9 +86,7 @@ const VerificationApplication = () => {
 
       setFormData(prev => ({
         ...prev,
-        [documentType === 'id_front' ? 'id_document_front' :
-         documentType === 'id_back' ? 'id_document_back' :
-         'selfie_with_id']: response.data.file_path
+        [documentType === 'id_front' ? 'id_document_front' : 'selfie_with_id']: response.data.file_path
       }));
 
       toast.success('Document uploaded successfully');
@@ -94,8 +105,8 @@ const VerificationApplication = () => {
         return false;
       }
     } else if (step === 2) {
-      if (!formData.id_document_front || !formData.id_document_back || !formData.selfie_with_id) {
-        toast.error('Please upload all required documents');
+      if (!formData.id_document_front || !formData.selfie_with_id) {
+        toast.error('Please upload both required documents (Front and Selfie)');
         return false;
       }
     }
@@ -258,15 +269,15 @@ const VerificationApplication = () => {
               {currentStep === 2 && (
                 <div className="space-y-6">
                   <div>
-                    <h2 className="text-2xl font-bold text-dark mb-2">Upload ID Documents</h2>
-                    <p className="text-gray-600">Upload clear photos of your identification and a selfie</p>
+                    <h2 className="text-2xl font-bold text-dark mb-2">Upload {getDocumentLabel()} Documents</h2>
+                    <p className="text-gray-600">Upload a clear photo of your {getDocumentLabel().toLowerCase()} and a selfie holding it</p>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                    {/* ID Front */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Document Front */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-3">
-                        ID Front *
+                        {getDocumentLabel()} (Front) *
                       </label>
                       <div className="relative">
                         <input
@@ -278,7 +289,7 @@ const VerificationApplication = () => {
                         />
                         <label
                           htmlFor="id_front"
-                          className={`flex flex-col items-center justify-center w-full h-48 border-2 border-dashed rounded-3xl cursor-pointer transition-all ${
+                          className={`flex flex-col items-center justify-center w-full h-56 border-2 border-dashed rounded-3xl cursor-pointer transition-all ${
                             formData.id_document_front
                               ? 'border-primary bg-primary/5'
                               : 'border-gray-300 hover:border-primary hover:bg-light'
@@ -294,55 +305,20 @@ const VerificationApplication = () => {
                           ) : (
                             <>
                               <PhotoIcon className="h-12 w-12 text-gray-400 mb-2" />
-                              <p className="text-sm text-gray-500">Upload Front</p>
+                              <p className="text-sm text-gray-500">Upload {getDocumentLabel()} Front</p>
+                              <p className="text-xs text-gray-400 mt-2 px-4 text-center">
+                                Clear photo showing all details
+                              </p>
                             </>
                           )}
                         </label>
                       </div>
                     </div>
 
-                    {/* ID Back */}
+                    {/* Selfie with Document */}
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-3">
-                        ID Back *
-                      </label>
-                      <div className="relative">
-                        <input
-                          type="file"
-                          id="id_back"
-                          accept="image/*,application/pdf"
-                          onChange={(e) => handleFileUpload(e, 'id_back')}
-                          className="hidden"
-                        />
-                        <label
-                          htmlFor="id_back"
-                          className={`flex flex-col items-center justify-center w-full h-48 border-2 border-dashed rounded-3xl cursor-pointer transition-all ${
-                            formData.id_document_back
-                              ? 'border-primary bg-primary/5'
-                              : 'border-gray-300 hover:border-primary hover:bg-light'
-                          }`}
-                        >
-                          {uploading.id_back ? (
-                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                          ) : formData.id_document_back ? (
-                            <div className="text-center">
-                              <CheckBadgeIcon className="h-12 w-12 text-primary mx-auto mb-2" />
-                              <p className="text-sm text-primary font-medium">Uploaded</p>
-                            </div>
-                          ) : (
-                            <>
-                              <PhotoIcon className="h-12 w-12 text-gray-400 mb-2" />
-                              <p className="text-sm text-gray-500">Upload Back</p>
-                            </>
-                          )}
-                        </label>
-                      </div>
-                    </div>
-
-                    {/* Selfie with ID */}
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-3">
-                        Selfie with ID *
+                        Selfie with {getDocumentLabel()} *
                       </label>
                       <div className="relative">
                         <input
@@ -354,7 +330,7 @@ const VerificationApplication = () => {
                         />
                         <label
                           htmlFor="selfie"
-                          className={`flex flex-col items-center justify-center w-full h-48 border-2 border-dashed rounded-3xl cursor-pointer transition-all ${
+                          className={`flex flex-col items-center justify-center w-full h-56 border-2 border-dashed rounded-3xl cursor-pointer transition-all ${
                             formData.selfie_with_id
                               ? 'border-primary bg-primary/5'
                               : 'border-gray-300 hover:border-primary hover:bg-light'
@@ -371,6 +347,9 @@ const VerificationApplication = () => {
                             <>
                               <PhotoIcon className="h-12 w-12 text-gray-400 mb-2" />
                               <p className="text-sm text-gray-500">Upload Selfie</p>
+                              <p className="text-xs text-gray-400 mt-2 px-4 text-center">
+                                Hold {getDocumentLabel().toLowerCase()} next to your face
+                              </p>
                             </>
                           )}
                         </label>
@@ -380,8 +359,8 @@ const VerificationApplication = () => {
 
                   <div className="bg-blue-50 border border-blue-200 rounded-3xl p-4">
                     <p className="text-sm text-blue-800">
-                      <strong>Tips for good photos:</strong> Ensure documents are clear, well-lit, and all text is readable.
-                      For the selfie, hold your ID next to your face and make sure both are clearly visible.
+                      <strong>Tips for good photos:</strong> Ensure your {getDocumentLabel().toLowerCase()} is clear, well-lit, and all text is readable.
+                      For the selfie, hold your {getDocumentLabel().toLowerCase()} next to your face and make sure both your face and the document are clearly visible.
                     </p>
                   </div>
                 </div>

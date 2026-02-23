@@ -81,6 +81,12 @@ def apply_for_verification():
             if not data.get(field):
                 return jsonify({'error': f'{field} is required'}), 400
 
+        # Validate document uploads
+        if not data.get('id_document_front'):
+            return jsonify({'error': 'ID/Passport/License front photo is required'}), 400
+        if not data.get('selfie_with_id'):
+            return jsonify({'error': 'Selfie with ID/Passport/License is required'}), 400
+
         # Create application
         application = VerificationApplication(
             creator_id=creator.id,
@@ -91,9 +97,9 @@ def apply_for_verification():
             id_number=data['id_number'],
             reason=data.get('reason', ''),
 
-            # Document paths (will be uploaded separately)
+            # Document paths (uploaded separately via /upload-document endpoint)
             id_document_front=data.get('id_document_front'),
-            id_document_back=data.get('id_document_back'),
+            id_document_back=None,  # No longer required
             selfie_with_id=data.get('selfie_with_id'),
 
             # Social media verification
