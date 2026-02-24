@@ -20,6 +20,7 @@ const BrowseCreators = () => {
   const [savedCreatorIds, setSavedCreatorIds] = useState(new Set());
   const [showMoreFilters, setShowMoreFilters] = useState(false);
   const [searchInput, setSearchInput] = useState(''); // Separate state for search input
+  const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
   const [filters, setFilters] = useState({
     category: '',
     location: '',
@@ -173,6 +174,29 @@ const BrowseCreators = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const toggleLanguage = (language) => {
+    setFilters(prev => {
+      const currentLanguages = prev.languages || [];
+      const newLanguages = currentLanguages.includes(language)
+        ? currentLanguages.filter(l => l !== language)
+        : [...currentLanguages, language];
+      return { ...prev, languages: newLanguages };
+    });
+    setPagination(prev => ({ ...prev, current_page: 1 }));
+  };
+
+  // Close language dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showLanguageDropdown && !event.target.closest('.language-dropdown-container')) {
+        setShowLanguageDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showLanguageDropdown]);
+
   return (
     <div className="min-h-screen bg-light">
       <SEO
@@ -299,19 +323,45 @@ const BrowseCreators = () => {
                 />
               </div>
 
-              {/* Language Filter */}
-              <div className="flex-1 min-w-[150px]">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Language</label>
-                <select
-                  value={filters.languages[0] || ''}
-                  onChange={(e) => handleFilterChange('languages', e.target.value ? [e.target.value] : [])}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                >
-                  <option value="">All Languages</option>
-                  {ZIMBABWE_LANGUAGES.map((language) => (
-                    <option key={language} value={language}>{language}</option>
-                  ))}
-                </select>
+              {/* Language Filter - Multi-select */}
+              <div className="flex-1 min-w-[150px] relative language-dropdown-container">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Languages</label>
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setShowLanguageDropdown(!showLanguageDropdown)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-white text-left flex items-center justify-between"
+                  >
+                    <span className="truncate">
+                      {filters.languages.length === 0
+                        ? 'All Languages'
+                        : filters.languages.length === 1
+                        ? filters.languages[0]
+                        : `${filters.languages.length} selected`}
+                    </span>
+                    <svg className={`w-4 h-4 transition-transform ${showLanguageDropdown ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </button>
+                  {showLanguageDropdown && (
+                    <div className="absolute z-50 mt-1 w-full bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                      {ZIMBABWE_LANGUAGES.map((language) => (
+                        <label
+                          key={language}
+                          className="flex items-center px-3 py-2 hover:bg-gray-50 cursor-pointer"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={filters.languages.includes(language)}
+                            onChange={() => toggleLanguage(language)}
+                            className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary"
+                          />
+                          <span className="ml-2 text-sm text-gray-700">{language}</span>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Price Range Filter - Min/Max */}
@@ -459,19 +509,45 @@ const BrowseCreators = () => {
                     />
                   </div>
 
-                  {/* Language Filter */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Language</label>
-                    <select
-                      value={filters.languages[0] || ''}
-                      onChange={(e) => handleFilterChange('languages', e.target.value ? [e.target.value] : [])}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                    >
-                      <option value="">All Languages</option>
-                      {ZIMBABWE_LANGUAGES.map((language) => (
-                        <option key={language} value={language}>{language}</option>
-                      ))}
-                    </select>
+                  {/* Language Filter - Multi-select */}
+                  <div className="language-dropdown-container">
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Languages</label>
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setShowLanguageDropdown(!showLanguageDropdown)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent bg-white text-left flex items-center justify-between"
+                      >
+                        <span className="truncate">
+                          {filters.languages.length === 0
+                            ? 'All Languages'
+                            : filters.languages.length === 1
+                            ? filters.languages[0]
+                            : `${filters.languages.length} selected`}
+                        </span>
+                        <svg className={`w-4 h-4 transition-transform ${showLanguageDropdown ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </button>
+                      {showLanguageDropdown && (
+                        <div className="absolute z-50 mt-1 w-full bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                          {ZIMBABWE_LANGUAGES.map((language) => (
+                            <label
+                              key={language}
+                              className="flex items-center px-3 py-2 hover:bg-gray-50 cursor-pointer"
+                            >
+                              <input
+                                type="checkbox"
+                                checked={filters.languages.includes(language)}
+                                onChange={() => toggleLanguage(language)}
+                                className="w-4 h-4 text-primary border-gray-300 rounded focus:ring-primary"
+                              />
+                              <span className="ml-2 text-sm text-gray-700">{language}</span>
+                            </label>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
 
                   {/* Price Range Filter - Min/Max */}
