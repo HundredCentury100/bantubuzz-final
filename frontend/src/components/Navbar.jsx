@@ -144,20 +144,12 @@ const Navbar = () => {
                   )}
                 </Link>
                 {user?.user_type === 'creator' && (
-                  <>
-                    <Link
-                      to="/wallet"
-                      className="text-gray-700 hover:text-gray-900 transition-colors text-sm font-medium"
-                    >
-                      Wallet
-                    </Link>
-                    <Link
-                      to="/subscription/manage"
-                      className="text-gray-700 hover:text-gray-900 transition-colors text-sm font-medium"
-                    >
-                      Subscription
-                    </Link>
-                  </>
+                  <Link
+                    to="/wallet"
+                    className="text-gray-700 hover:text-gray-900 transition-colors text-sm font-medium"
+                  >
+                    Wallet
+                  </Link>
                 )}
 
                 {/* Notification Bell */}
@@ -342,32 +334,18 @@ const Navbar = () => {
                           )}
                         </Menu.Item>
                         {user?.user_type === 'creator' && (
-                          <>
-                            <Menu.Item>
-                              {({ active }) => (
-                                <Link
-                                  to="/wallet"
-                                  className={`${
-                                    active ? 'bg-light' : ''
-                                  } block px-4 py-2 text-sm text-gray-700 rounded-lg`}
-                                >
-                                  Wallet
-                                </Link>
-                              )}
-                            </Menu.Item>
-                            <Menu.Item>
-                              {({ active }) => (
-                                <Link
-                                  to="/subscription/manage"
-                                  className={`${
-                                    active ? 'bg-light' : ''
-                                  } block px-4 py-2 text-sm text-gray-700 rounded-lg`}
-                                >
-                                  Subscription
-                                </Link>
-                              )}
-                            </Menu.Item>
-                          </>
+                          <Menu.Item>
+                            {({ active }) => (
+                              <Link
+                                to="/wallet"
+                                className={`${
+                                  active ? 'bg-light' : ''
+                                } block px-4 py-2 text-sm text-gray-700 rounded-lg`}
+                              >
+                                Wallet
+                              </Link>
+                            )}
+                          </Menu.Item>
                         )}
                         <Menu.Item>
                           {({ active }) => (
