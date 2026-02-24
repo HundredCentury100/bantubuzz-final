@@ -1,6 +1,6 @@
 # 🤖 AI Assistant Guide for BantuBuzz Platform
 
-**Last Updated**: February 23, 2026
+**Last Updated**: February 24, 2026
 **Purpose**: Complete context and guidelines for AI assistants working on this project
 
 ---
@@ -522,7 +522,7 @@ Understanding what's been implemented helps maintain consistency and avoid rewor
   - Better mobile experience
 - **Files**: `frontend/src/pages/VerificationApplication.jsx`, `backend/app/routes/verification.py`
 
-### Recent: Badge Priority & Verification Flow Fixes (Feb 23, 2026)
+### Recent: Badge Priority & Verification Flow Fixes (Feb 23-24, 2026)
 - **Badge display priority standardized**:
   - Top Creator badge now displays first (highest priority)
   - Priority order: top_creator (1) > verified_creator (2) > responds_fast (3) > creator (4)
@@ -549,6 +549,36 @@ Understanding what's been implemented helps maintain consistency and avoid rewor
   - Updated verification form social media section with branded SVG icons (pink Instagram, black TikTok, blue Facebook)
   - Icons match design patterns from `BrowseCreators.jsx`
   - Files: `frontend/src/pages/CreatorSubscriptions.jsx`, `frontend/src/pages/VerificationApplication.jsx`
+
+### Recent: Verification Badge & UI Improvements (Feb 24, 2026)
+- **Fancy blue verification checkmark**:
+  - Replaced generic checkmark with Twitter/WhatsApp/Facebook-style blue circular badge
+  - Blue circle (#1D9BF0 - Twitter blue) with white checkmark inside
+  - Modern, instantly recognizable verified badge design
+  - File: `frontend/src/components/CreatorBadge.jsx`
+  - Pattern:
+    ```jsx
+    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none">
+      <circle cx="12" cy="12" r="10" fill="#1D9BF0" />
+      <path d="M9.5 12.5L11 14L14.5 10.5" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+    ```
+- **Hide verification banner for verified creators**:
+  - CreatorSubscriptions page now checks `profile.badges` for `verified_creator`
+  - Verification banner only shows if creator is NOT already verified
+  - Prevents redundant subscription prompts for verified creators
+  - File: `frontend/src/pages/CreatorSubscriptions.jsx`
+- **Remove subscription link from creator navbar**:
+  - Removed `/subscription/manage` link from desktop and mobile navigation for creators
+  - Creators now only see Wallet link (brands remain unchanged)
+  - Cleaner navigation experience aligned with creator-specific features
+  - File: `frontend/src/components/Navbar.jsx`
+- **Fix proposals endpoint - missing blueprint registration**:
+  - Issue: "Resource not found" error on `/creator/proposals` page
+  - Root cause: Proposals blueprint existed but was never imported/registered in app
+  - Solution: Added `proposals` to imports and registered with `url_prefix='/api/proposals'`
+  - File: `backend/app/__init__.py`
+  - IMPORTANT: Always check that new blueprints are registered in `__init__.py`
 
 ### Current State (Feb 2026)
 ✅ Fully functional platform
@@ -812,6 +842,27 @@ useEffect(() => {
 File: frontend/src/pages/VerificationApplication.jsx
 ```
 
+**"Resource not found" error on API endpoints:**
+```
+Problem: 404 error when accessing an API endpoint that exists in routes folder
+Root cause: Blueprint created but never registered in app/__init__.py
+
+Solution: Check blueprint registration
+1. Verify blueprint is imported in backend/app/__init__.py
+2. Verify blueprint is registered with app.register_blueprint()
+3. Check url_prefix matches expected route
+
+Example:
+# Import
+from .routes import proposals
+
+# Register
+app.register_blueprint(proposals.bp, url_prefix='/api/proposals')
+
+Common mistake: Creating routes/proposals.py but forgetting to import/register
+File: backend/app/__init__.py
+```
+
 ---
 
 ## 📚 Key Documentation Files
@@ -887,4 +938,4 @@ If you lose context, follow this checklist:
 
 **Remember**: This platform serves real users. Every change should maintain consistency, functionality, and the professional design we've established. When in doubt, refer to Home.jsx and this guide.
 
-🤖 **Generated for AI Assistants** | **Maintained by**: Development Team | **Last Review**: Feb 23, 2026
+🤖 **Generated for AI Assistants** | **Maintained by**: Development Team | **Last Review**: Feb 24, 2026
