@@ -222,14 +222,6 @@ function App() {
         }
       />
       <Route
-        path="/creator/packages/edit/:id"
-        element={
-          <ProtectedRoute requiredType="creator">
-            <PackageForm />
-          </ProtectedRoute>
-        }
-      />
-      <Route
         path="/creator/packages/:id/edit"
         element={
           <ProtectedRoute requiredType="creator">

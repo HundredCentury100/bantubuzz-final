@@ -232,7 +232,7 @@ const PackageManagement = () => {
               {/* Actions */}
               <div className="flex gap-2">
                 <button
-                  onClick={() => navigate(`/creator/packages/edit/${pkg.id}`)}
+                  onClick={() => navigate(`/creator/packages/${pkg.id}/edit`)}
                   className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-900 px-4 py-2 rounded-lg font-medium transition"
                 >
                   Edit
