@@ -98,8 +98,20 @@ const PackageForm = () => {
     } catch (error) {
       console.error('Error saving package:', error);
       alert(error.response?.data?.error || 'Failed to save package');
+      // Scroll to top to show error
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const onError = (errors) => {
+    // Scroll to first error field
+    const firstErrorField = Object.keys(errors)[0];
+    const element = document.querySelector(`[name="${firstErrorField}"]`);
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      element.focus();
     }
   };
 
@@ -158,8 +170,27 @@ const PackageForm = () => {
         </p>
       </div>
 
+      {/* Form Validation Summary */}
+      {Object.keys(errors).length > 0 && (
+        <div className="bg-red-50 border-l-4 border-red-500 p-4 mb-6 rounded-lg">
+          <div className="flex items-start">
+            <svg className="w-6 h-6 text-red-500 mr-3 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+            </svg>
+            <div className="flex-1">
+              <h3 className="text-red-800 font-semibold mb-1">Please fix the following errors:</h3>
+              <ul className="list-disc list-inside text-sm text-red-700 space-y-1">
+                {Object.entries(errors).map(([field, error]) => (
+                  <li key={field}>{error.message}</li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Form */}
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+      <form onSubmit={handleSubmit(onSubmit, onError)} className="space-y-6">
         {/* Package Title */}
         <div className="bg-white rounded-lg shadow-sm p-6">
           <label className="block text-sm font-semibold text-gray-700 mb-2">
@@ -171,11 +202,20 @@ const PackageForm = () => {
               required: 'Package title is required',
               minLength: { value: 3, message: 'Title must be at least 3 characters' }
             })}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+            className={`w-full px-4 py-2 border rounded-lg focus:ring-2 transition ${
+              errors.title
+                ? 'border-red-500 bg-red-50 focus:ring-red-500 focus:border-red-500'
+                : 'border-gray-300 focus:ring-primary focus:border-transparent'
+            }`}
             placeholder="e.g., Instagram Story Package - 3 Posts"
           />
           {errors.title && (
-            <p className="mt-1 text-sm text-red-600">{errors.title.message}</p>
+            <p className="mt-2 text-sm text-red-600 font-medium flex items-start gap-2">
+              <svg className="w-5 h-5 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+              </svg>
+              <span>{errors.title.message}</span>
+            </p>
           )}
         </div>
 
@@ -190,11 +230,20 @@ const PackageForm = () => {
               minLength: { value: 20, message: 'Description must be at least 20 characters' }
             })}
             rows={5}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+            className={`w-full px-4 py-2 border rounded-lg focus:ring-2 transition ${
+              errors.description
+                ? 'border-red-500 bg-red-50 focus:ring-red-500 focus:border-red-500'
+                : 'border-gray-300 focus:ring-primary focus:border-transparent'
+            }`}
             placeholder="Describe what this package includes, what brands can expect, and any specific requirements..."
           />
           {errors.description && (
-            <p className="mt-1 text-sm text-red-600">{errors.description.message}</p>
+            <p className="mt-2 text-sm text-red-600 font-medium flex items-start gap-2">
+              <svg className="w-5 h-5 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+              </svg>
+              <span>{errors.description.message}</span>
+            </p>
           )}
         </div>
 
@@ -215,12 +264,21 @@ const PackageForm = () => {
                     required: 'Price is required',
                     min: { value: 1, message: 'Price must be at least $1' }
                   })}
-                  className="w-full pl-8 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                  className={`w-full pl-8 pr-4 py-2 border rounded-lg focus:ring-2 transition ${
+                    errors.price
+                      ? 'border-red-500 bg-red-50 focus:ring-red-500 focus:border-red-500'
+                      : 'border-gray-300 focus:ring-primary focus:border-transparent'
+                  }`}
                   placeholder="99.99"
                 />
               </div>
               {errors.price && (
-                <p className="mt-1 text-sm text-red-600">{errors.price.message}</p>
+                <p className="mt-2 text-sm text-red-600 font-medium flex items-start gap-2">
+                  <svg className="w-5 h-5 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
+                  <span>{errors.price.message}</span>
+                </p>
               )}
             </div>
 
@@ -235,11 +293,20 @@ const PackageForm = () => {
                   required: 'Duration is required',
                   min: { value: 1, message: 'Duration must be at least 1 day' }
                 })}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                className={`w-full px-4 py-2 border rounded-lg focus:ring-2 transition ${
+                  errors.duration_days
+                    ? 'border-red-500 bg-red-50 focus:ring-red-500 focus:border-red-500'
+                    : 'border-gray-300 focus:ring-primary focus:border-transparent'
+                }`}
                 placeholder="7"
               />
               {errors.duration_days && (
-                <p className="mt-1 text-sm text-red-600">{errors.duration_days.message}</p>
+                <p className="mt-2 text-sm text-red-600 font-medium flex items-start gap-2">
+                  <svg className="w-5 h-5 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
+                  <span>{errors.duration_days.message}</span>
+                </p>
               )}
             </div>
           </div>
@@ -252,7 +319,11 @@ const PackageForm = () => {
           </label>
           <select
             {...register('collaboration_type', { required: 'Collaboration type is required' })}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+            className={`w-full px-4 py-2 border rounded-lg focus:ring-2 transition ${
+              errors.collaboration_type
+                ? 'border-red-500 bg-red-50 focus:ring-red-500 focus:border-red-500'
+                : 'border-gray-300 focus:ring-primary focus:border-transparent'
+            }`}
           >
             <option value="">Select collaboration type</option>
             {COLLABORATION_TYPES.map((type) => (
@@ -262,7 +333,12 @@ const PackageForm = () => {
             ))}
           </select>
           {errors.collaboration_type && (
-            <p className="mt-1 text-sm text-red-600">{errors.collaboration_type.message}</p>
+            <p className="mt-2 text-sm text-red-600 font-medium flex items-start gap-2">
+              <svg className="w-5 h-5 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+              </svg>
+              <span>{errors.collaboration_type.message}</span>
+            </p>
           )}
           <p className="mt-2 text-sm text-gray-500">
             Your niche/category can be set in your profile settings
