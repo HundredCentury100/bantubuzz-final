@@ -287,6 +287,18 @@ const BrowseCreators = () => {
                 </div>
               </div>
 
+              {/* Location Filter */}
+              <div className="flex-1 min-w-[150px]">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Location</label>
+                <input
+                  type="text"
+                  value={filters.location}
+                  onChange={(e) => handleFilterChange('location', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                  placeholder="City or country..."
+                />
+              </div>
+
               {/* Language Filter */}
               <div className="flex-1 min-w-[150px]">
                 <label className="block text-sm font-medium text-gray-700 mb-2">Language</label>
@@ -435,6 +447,18 @@ const BrowseCreators = () => {
                     </div>
                   </div>
 
+                  {/* Location Filter */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Location</label>
+                    <input
+                      type="text"
+                      value={filters.location}
+                      onChange={(e) => handleFilterChange('location', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                      placeholder="City or country..."
+                    />
+                  </div>
+
                   {/* Language Filter */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Language</label>
@@ -509,7 +533,7 @@ const BrowseCreators = () => {
           </div>
 
           {/* Clear Filters Button */}
-          {(filters.search || filters.category || filters.platform || filters.min_followers || filters.max_followers || filters.languages.length > 0 || filters.min_price || filters.max_price || filters.min_rating || filters.sort_by || searchInput) && (
+          {(filters.search || filters.category || filters.platform || filters.location || filters.min_followers || filters.max_followers || filters.languages.length > 0 || filters.min_price || filters.max_price || filters.min_rating || filters.sort_by || searchInput) && (
             <div className="mt-4 flex justify-end">
               <button
                 onClick={() => {
