@@ -19,6 +19,7 @@ const BrowseCreators = () => {
   const [loading, setLoading] = useState(true);
   const [savedCreatorIds, setSavedCreatorIds] = useState(new Set());
   const [showMoreFilters, setShowMoreFilters] = useState(false);
+  const [searchInput, setSearchInput] = useState(''); // Separate state for search input
   const [filters, setFilters] = useState({
     category: '',
     location: '',
@@ -51,6 +52,10 @@ const BrowseCreators = () => {
         platform: platformParam || '',
         search: searchParam || ''
       }));
+      // Also set searchInput if search param exists
+      if (searchParam) {
+        setSearchInput(searchParam);
+      }
     }
   }, [searchParams]);
 
@@ -158,7 +163,9 @@ const BrowseCreators = () => {
 
   const handleSearch = (e) => {
     if (e) e.preventDefault();
-    // Search is already triggered by useEffect, but this can be used for manual submit
+    // Update filters with the search input value
+    setFilters(prev => ({ ...prev, search: searchInput }));
+    setPagination(prev => ({ ...prev, current_page: 1 }));
   };
 
   const handlePageChange = (newPage) => {
@@ -199,16 +206,25 @@ const BrowseCreators = () => {
         <div className="bg-white rounded-3xl shadow-sm p-6 mb-8">
           {/* Search Bar */}
           <div className="mb-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
-              <input
-                type="text"
-                placeholder="Search creators by name, bio, or category..."
-                value={filters.search}
-                onChange={(e) => handleFilterChange('search', e.target.value)}
-                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-full focus:ring-2 focus:ring-primary focus:border-transparent"
-              />
-            </div>
+            <form onSubmit={handleSearch} className="flex gap-3">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+                <input
+                  type="text"
+                  placeholder="Search creators by name, bio, or category..."
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-full focus:ring-2 focus:ring-primary focus:border-transparent"
+                />
+              </div>
+              <button
+                type="submit"
+                className="px-6 py-3 bg-primary hover:bg-primary-dark text-white font-medium rounded-full transition-colors flex items-center gap-2 whitespace-nowrap"
+              >
+                <Search size={18} />
+                <span className="hidden sm:inline">Search</span>
+              </button>
+            </form>
           </div>
 
           {/* Filters - Responsive Layout */}
@@ -489,10 +505,11 @@ const BrowseCreators = () => {
           </div>
 
           {/* Clear Filters Button */}
-          {(filters.search || filters.category || filters.platform || filters.min_followers || filters.max_followers || filters.languages.length > 0 || filters.min_price || filters.max_price || filters.min_rating || filters.sort_by) && (
+          {(filters.search || filters.category || filters.platform || filters.min_followers || filters.max_followers || filters.languages.length > 0 || filters.min_price || filters.max_price || filters.min_rating || filters.sort_by || searchInput) && (
             <div className="mt-4 flex justify-end">
               <button
                 onClick={() => {
+                  setSearchInput('');
                   setFilters({
                     category: '',
                     location: '',
