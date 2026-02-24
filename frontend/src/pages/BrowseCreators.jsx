@@ -52,7 +52,7 @@ const BrowseCreators = () => {
         search: searchParam || ''
       }));
     }
-  }, []);
+  }, [searchParams]);
 
   useEffect(() => {
     fetchCategories();
