@@ -259,8 +259,10 @@ const BrowseCreators = () => {
                   <option value="TikTok">TikTok</option>
                   <option value="YouTube">YouTube</option>
                   <option value="Facebook">Facebook</option>
-                  <option value="Twitter">Twitter</option>
+                  <option value="Twitter">X (Twitter)</option>
                   <option value="LinkedIn">LinkedIn</option>
+                  <option value="Twitch">Twitch</option>
+                  <option value="Threads">Threads</option>
                 </select>
               </div>
 
@@ -405,8 +407,10 @@ const BrowseCreators = () => {
                       <option value="TikTok">TikTok</option>
                       <option value="YouTube">YouTube</option>
                       <option value="Facebook">Facebook</option>
-                      <option value="Twitter">Twitter</option>
+                      <option value="Twitter">X (Twitter)</option>
                       <option value="LinkedIn">LinkedIn</option>
+                      <option value="Twitch">Twitch</option>
+                      <option value="Threads">Threads</option>
                     </select>
                   </div>
 
