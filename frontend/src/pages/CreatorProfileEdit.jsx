@@ -34,6 +34,7 @@ const CreatorProfileEdit = () => {
   const selectedCategories = watch('categories') || [];
   const selectedLanguages = watch('languages') || [];
   const selectedPlatforms = watch('platforms') || [];
+  const bioText = watch('bio') || '';
 
   useEffect(() => {
     fetchProfile();
@@ -491,9 +492,14 @@ const CreatorProfileEdit = () => {
                     }
                   })}
                 />
-                {errors.bio && (
-                  <p className="mt-1 text-sm text-error">{errors.bio.message}</p>
-                )}
+                <div className="flex items-center justify-between mt-2">
+                  {errors.bio && (
+                    <p className="text-sm text-error">{errors.bio.message}</p>
+                  )}
+                  <p className={`text-sm ml-auto ${bioText.length > 500 ? 'text-error font-medium' : bioText.length > 450 ? 'text-yellow-600' : 'text-gray-500'}`}>
+                    {bioText.length} / 500 characters
+                  </p>
+                </div>
               </div>
 
               {/* City and Country */}
