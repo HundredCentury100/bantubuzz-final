@@ -1,15 +1,18 @@
 import { useState, useEffect, useRef } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate, Link } from 'react-router-dom';
 import { useMessaging } from '../contexts/MessagingContext';
 import messagingService from '../services/messagingAPI';
 import Navbar from '../components/Navbar';
 import Avatar from '../components/Avatar';
 import CustomPackageMessage from '../components/CustomPackageMessage';
 import { BASE_URL } from '../services/api';
+import { useAuth } from '../hooks/useAuth';
 import toast from 'react-hot-toast';
 
 const Messages = () => {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { user } = useAuth();
   const {
     isConnected,
     messages,
@@ -213,8 +216,19 @@ const Messages = () => {
     <div className="min-h-screen bg-light">
       <Navbar />
       <div className="container-custom section-padding">
-        {/* Hide title on mobile when chat is open */}
-        <h1 className={`text-4xl font-bold mb-8 ${showMobileChat ? 'hidden lg:block' : 'block'}`}>Messages</h1>
+        {/* Header with title and New Message button */}
+        <div className={`flex items-center justify-between mb-8 ${showMobileChat ? 'hidden lg:flex' : 'flex'}`}>
+          <h1 className="text-4xl font-bold">Messages</h1>
+          <Link
+            to={user?.user_type === 'brand' ? '/browse/creators' : '/browse/campaigns'}
+            className="px-6 py-3 bg-primary hover:bg-primary-dark text-white font-medium rounded-lg transition-colors flex items-center gap-2"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            New Conversation
+          </Link>
+        </div>
 
         {!isConnected && conversations.length > 0 && (
           <div className="bg-primary/20 border border-primary text-primary-dark px-4 py-3 rounded-lg mb-6 flex items-center gap-2">
@@ -249,8 +263,17 @@ const Messages = () => {
                   Loading conversations...
                 </div>
               ) : conversations.length === 0 ? (
-                <div className="p-4 text-center text-gray-500">
-                  No conversations yet
+                <div className="p-6 text-center">
+                  <svg className="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                  </svg>
+                  <p className="text-gray-500 mb-4">No conversations yet</p>
+                  <Link
+                    to={user?.user_type === 'brand' ? '/browse/creators' : '/browse/campaigns'}
+                    className="inline-block text-primary hover:text-primary-dark font-medium text-sm"
+                  >
+                    Start a conversation →
+                  </Link>
                 </div>
               ) : (
                 conversations.map((conversation) => (
