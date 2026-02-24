@@ -580,6 +580,23 @@ Understanding what's been implemented helps maintain consistency and avoid rewor
   - File: `backend/app/__init__.py`
   - IMPORTANT: Always check that new blueprints are registered in `__init__.py`
 
+### Upcoming: ThunziAI Analytics Integration (Planned - Feb 2026)
+- **Strategic Analytics Partnership**: Integration with ThunziAI for creator marketplace analytics
+- **Platform Connections**: OAuth flow for Instagram, TikTok, YouTube, Facebook, X
+- **Real-time Metrics**: Live tracking of social media post performance
+- **Sentiment Analysis**: AI-powered comment sentiment and brand safety monitoring
+- **Campaign Analytics**: Comprehensive ROI tracking for brand campaigns
+- **Implementation Plan**: See `THUNZIAI_ANALYTICS_IMPLEMENTATION_PLAN.md` for detailed phases
+- **Key Components**:
+  - Platform connection management with OAuth token storage
+  - Post tracking engine with multi-tier polling
+  - Creator KPI dashboard with performance trends
+  - Brand campaign analytics with ROI calculations
+  - Sentiment analysis and comment tracking
+  - Automated alerts for viral content and performance drops
+- **Status**: Planning phase - 7 phases over 14 weeks
+- **Documentation**: Complete technical architecture and database schema designed
+
 ### Current State (Feb 2026)
 ✅ Fully functional platform
 ✅ Complete subscription systems (brand + creator)
@@ -587,6 +604,7 @@ Understanding what's been implemented helps maintain consistency and avoid rewor
 ✅ Admin dashboard
 ✅ Messaging with real-time updates
 ✅ Design system consistency achieved
+🔄 Analytics integration planning complete (awaiting implementation)
 
 ---
 
@@ -869,6 +887,7 @@ File: backend/app/__init__.py
 
 Reference these for specific contexts:
 
+- `THUNZIAI_ANALYTICS_IMPLEMENTATION_PLAN.md` - **Analytics integration plan (Feb 2026)**
 - `PHASE_6_IMPLEMENTATION_PLAN.md` - Latest subscription system details
 - `ADMIN_IMPLEMENTATION_PLAN.md` - Admin dashboard structure
 - `deployment/QUICK-START.md` - Deployment scripts guide
