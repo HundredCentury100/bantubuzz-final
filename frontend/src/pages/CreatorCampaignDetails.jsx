@@ -76,11 +76,12 @@ const CreatorCampaignDetails = () => {
       });
       toast.success('Application submitted successfully!');
       setShowApplyModal(false);
-      setHasApplied(true);
       // Reset form
       setApplicationMessage('');
       setProposedPrice('');
       setDeliverables(['']);
+      // Refetch campaign data to get updated has_applied status
+      await fetchCampaignData();
     } catch (error) {
       console.error('Error applying to campaign:', error);
       toast.error(error.response?.data?.error || 'Failed to submit application');
