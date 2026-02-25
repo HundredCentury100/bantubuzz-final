@@ -320,8 +320,13 @@ def approve_deliverable(collab_id, deliverable_id):
             # Release funds to wallet
             try:
                 from app.services.payment_service import release_escrow_to_wallet
-                transaction = release_escrow_to_wallet(collaboration.id, platform_fee_percentage=15)
-                print(f"Auto-completion: Escrow released for collaboration {collaboration.id}. Transaction: {transaction.id}")
+                from app.utils.subscription_helper import get_brand_platform_fee_percentage
+
+                # Get brand's platform fee based on subscription tier
+                platform_fee = get_brand_platform_fee_percentage(collaboration.brand.user_id)
+
+                transaction = release_escrow_to_wallet(collaboration.id, platform_fee_percentage=platform_fee)
+                print(f"Auto-completion: Escrow released for collaboration {collaboration.id}. Fee: {platform_fee}%. Transaction: {transaction.id}")
             except Exception as e:
                 print(f"Warning: Failed to auto-release escrow: {str(e)}")
 
@@ -922,10 +927,15 @@ def complete_collaboration(collab_id):
         # Release escrow to creator wallet with 24-hour countdown
         try:
             from app.services.payment_service import release_escrow_to_wallet
-            transaction = release_escrow_to_wallet(collaboration.id, platform_fee_percentage=15)
+            from app.utils.subscription_helper import get_brand_platform_fee_percentage
+
+            # Get brand's platform fee based on subscription tier
+            platform_fee = get_brand_platform_fee_percentage(collaboration.brand.user_id)
+
+            transaction = release_escrow_to_wallet(collaboration.id, platform_fee_percentage=platform_fee)
 
             # Transaction created successfully with 24-hour countdown
-            print(f"Escrow released to wallet for collaboration {collaboration.id}. Transaction ID: {transaction.id}")
+            print(f"Escrow released to wallet for collaboration {collaboration.id}. Fee: {platform_fee}%. Transaction ID: {transaction.id}")
         except Exception as e:
             # Log error but don't fail the completion
             print(f"Warning: Failed to release escrow to wallet: {str(e)}")
@@ -1221,9 +1231,14 @@ def approve_milestone_deliverable(collab_id, milestone_id, deliverable_id):
 
             # Release escrow for this specific milestone
             from app.services.payment_service import release_milestone_escrow
+            from app.utils.subscription_helper import get_brand_platform_fee_percentage
+
+            # Get brand's platform fee based on subscription tier
+            platform_fee = get_brand_platform_fee_percentage(collaboration.brand.user_id)
+
             try:
-                transaction = release_milestone_escrow(milestone.id, platform_fee_percentage=15)
-                print(f"Milestone {milestone.id} escrow released. Transaction: {transaction.id}")
+                transaction = release_milestone_escrow(milestone.id, platform_fee_percentage=platform_fee)
+                print(f"Milestone {milestone.id} escrow released. Fee: {platform_fee}%. Transaction: {transaction.id}")
             except Exception as e:
                 print(f"Warning: Failed to release milestone escrow: {str(e)}")
 

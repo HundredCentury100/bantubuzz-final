@@ -277,9 +277,11 @@ def approve_milestone(collaboration_id, milestone_number):
             db.session.add(wallet)
             db.session.flush()
 
-        # Calculate platform fee (10%)
+        # Calculate platform fee based on brand's subscription tier
+        from app.utils.subscription_helper import get_brand_platform_fee_percentage
+
         gross_amount = float(milestone.price)
-        platform_fee_percentage = 10.0
+        platform_fee_percentage = get_brand_platform_fee_percentage(collaboration.brand.user_id)
         platform_fee = gross_amount * (platform_fee_percentage / 100)
         net_amount = gross_amount - platform_fee
 

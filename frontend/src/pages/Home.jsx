@@ -315,7 +315,7 @@ const Home = () => {
                       <option value="LinkedIn">LinkedIn</option>
                       <option value="Threads">Threads</option>
                       <option value="Twitch">Twitch</option>
-                      <option value="UGC">UGC</option>
+                      <option value="UGC">User generated content</option>
                     </select>
                   </div>
                 </div>
@@ -358,7 +358,7 @@ const Home = () => {
                   <option value="LinkedIn">LinkedIn</option>
                   <option value="Threads">Threads</option>
                   <option value="Twitch">Twitch</option>
-                  <option value="UGC">UGC</option>
+                  <option value="UGC">User generated content</option>
                 </select>
               </div>
 

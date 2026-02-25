@@ -20,6 +20,7 @@ import Packages from './pages/Packages';
 import PackageDetails from './pages/PackageDetails';
 import BrowsePackages from './pages/BrowsePackages';
 import BrowseCreators from './pages/BrowseCreators';
+import SavedCreators from './pages/SavedCreators';
 import Bookings from './pages/Bookings';
 import BookingDetails from './pages/BookingDetails';
 import Payment from './pages/Payment';
@@ -401,6 +402,14 @@ function App() {
       />
       <Route path="/browse/packages" element={<BrowsePackages />} />
       <Route path="/browse/creators" element={<BrowseCreators />} />
+      <Route
+        path="/saved-creators"
+        element={
+          <ProtectedRoute requiredType="brand">
+            <SavedCreators />
+          </ProtectedRoute>
+        }
+      />
       <Route
         path="/brand/bookings"
         element={

@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { packagesAPI } from '../services/api';
+import { packagesAPI, BASE_URL } from '../services/api';
 import { toast } from 'react-hot-toast';
 import Avatar from '../components/Avatar';
 import Navbar from '../components/Navbar';
 import SEO from '../components/SEO';
-import { Search, X } from 'lucide-react';
+import { Search, Filter, X } from 'lucide-react';
 
 const CATEGORIES = [
   'Fashion & Beauty',
@@ -18,10 +18,51 @@ const CATEGORIES = [
   'Other'
 ];
 
+const PACKAGE_TYPES = [
+  'Sponsored Post',
+  'Story Feature',
+  'Video Content',
+  'Product Review',
+  'Brand Ambassador',
+  'Giveaway/Contest',
+  'Custom Package',
+  'Other'
+];
+
+const PLATFORMS = [
+  'Instagram',
+  'TikTok',
+  'YouTube',
+  'Facebook',
+  'Twitter',
+  'LinkedIn',
+  'Threads',
+  'Twitch'
+];
+
+const DELIVERY_TIME_RANGES = [
+  { label: '1-3 days', value: '1-3' },
+  { label: '3-7 days', value: '3-7' },
+  { label: '1-2 weeks', value: '7-14' },
+  { label: '2-4 weeks', value: '14-30' },
+  { label: '1+ month', value: '30+' }
+];
+
+const FOLLOWER_RANGES = [
+  { label: '0-1K', value: '0-1000' },
+  { label: '1K-10K', value: '1000-10000' },
+  { label: '10K-50K', value: '10000-50000' },
+  { label: '50K-100K', value: '50000-100000' },
+  { label: '100K-500K', value: '100000-500000' },
+  { label: '500K+', value: '500000+' }
+];
+
 const BrowsePackages = () => {
   const navigate = useNavigate();
   const [packages, setPackages] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [showMoreFilters, setShowMoreFilters] = useState(false);
+  const [searchInput, setSearchInput] = useState('');
   const [filters, setFilters] = useState({
     category: '',
     min_price: '',
@@ -31,7 +72,10 @@ const BrowsePackages = () => {
     languages: [],
     follower_range: '',
     min_rating: '',
-    price_range: ''
+    price_range: '',
+    package_type: '',
+    delivery_time: '',
+    sort_by: 'relevance'
   });
   const [pagination, setPagination] = useState({
     current_page: 1,
@@ -81,10 +125,17 @@ const BrowsePackages = () => {
 
   const handleFilterChange = (field, value) => {
     setFilters(prev => ({ ...prev, [field]: value }));
-    setPagination(prev => ({ ...prev, current_page: 1 })); // Reset to page 1 when filtering
+    setPagination(prev => ({ ...prev, current_page: 1 }));
+  };
+
+  const handleSearch = (e) => {
+    if (e) e.preventDefault();
+    setFilters(prev => ({ ...prev, search: searchInput }));
+    setPagination(prev => ({ ...prev, current_page: 1 }));
   };
 
   const clearFilters = () => {
+    setSearchInput('');
     setFilters({
       category: '',
       min_price: '',
@@ -94,18 +145,17 @@ const BrowsePackages = () => {
       languages: [],
       follower_range: '',
       min_rating: '',
-      price_range: ''
+      price_range: '',
+      package_type: '',
+      delivery_time: '',
+      sort_by: 'relevance'
     });
-  };
-
-  const handleSearch = () => {
-    // Trigger search by setting page to 1, which will trigger fetchPackages
     setPagination(prev => ({ ...prev, current_page: 1 }));
   };
 
   const handlePageChange = (newPage) => {
     setPagination(prev => ({ ...prev, current_page: newPage }));
-    window.scrollTo(0, 0);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   return (
@@ -133,82 +183,286 @@ const BrowsePackages = () => {
 
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-4xl font-bold text-dark mb-2">Browse Packages</h1>
-          <p className="text-gray-600">
-            Discover and book collaboration packages from talented creators
-          </p>
+          <h1 className="text-4xl font-bold text-dark mb-2">Discover Packages</h1>
+          <p className="text-gray-600">Find the perfect collaboration package for your brand</p>
         </div>
 
         {/* Search and Filters */}
-        <div className="bg-white rounded-xl shadow-sm p-6 mb-8">
+        <div className="bg-white rounded-3xl shadow-sm p-6 mb-8">
           {/* Search Bar */}
           <div className="mb-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
-              <input
-                type="text"
-                placeholder="Search packages by title or description..."
-                value={filters.search}
-                onChange={(e) => handleFilterChange('search', e.target.value)}
-                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-              />
-            </div>
+            <form onSubmit={handleSearch} className="flex gap-3">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+                <input
+                  type="text"
+                  placeholder="Search packages by title or description..."
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-full focus:ring-2 focus:ring-primary focus:border-transparent"
+                />
+              </div>
+              <button
+                type="submit"
+                className="px-6 py-3 bg-primary hover:bg-primary-dark text-white font-medium rounded-full transition-colors flex items-center gap-2 whitespace-nowrap"
+              >
+                <Search size={18} />
+                <span className="hidden sm:inline">Search</span>
+              </button>
+            </form>
           </div>
 
-          {/* Filter Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {/* Category Filter */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
-              <select
-                value={filters.category}
-                onChange={(e) => handleFilterChange('category', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-              >
-                <option value="">All Categories</option>
-                {CATEGORIES.map(cat => (
-                  <option key={cat} value={cat}>{cat}</option>
-                ))}
-              </select>
+          {/* Filters - Responsive Layout */}
+          <div className="space-y-4">
+            {/* Desktop: All filters visible */}
+            <div className="hidden lg:flex lg:flex-wrap lg:gap-4">
+              {/* Sort By */}
+              <div className="flex-1 min-w-[150px]">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Sort By</label>
+                <select
+                  value={filters.sort_by}
+                  onChange={(e) => handleFilterChange('sort_by', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-full focus:ring-2 focus:ring-primary focus:border-transparent"
+                >
+                  <option value="relevance">Relevance</option>
+                  <option value="price_low">Price: Low to High</option>
+                  <option value="price_high">Price: High to Low</option>
+                  <option value="newest">Newest First</option>
+                  <option value="popular">Most Popular</option>
+                </select>
+              </div>
+
+              {/* Category Filter */}
+              <div className="flex-1 min-w-[150px]">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
+                <select
+                  value={filters.category}
+                  onChange={(e) => handleFilterChange('category', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-full focus:ring-2 focus:ring-primary focus:border-transparent"
+                >
+                  <option value="">All Categories</option>
+                  {CATEGORIES.map(cat => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Package Type Filter */}
+              <div className="flex-1 min-w-[150px]">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Package Type</label>
+                <select
+                  value={filters.package_type}
+                  onChange={(e) => handleFilterChange('package_type', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                >
+                  <option value="">All Types</option>
+                  {PACKAGE_TYPES.map(type => (
+                    <option key={type} value={type}>{type}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Platform Filter */}
+              <div className="flex-1 min-w-[150px]">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Platform</label>
+                <select
+                  value={filters.platform}
+                  onChange={(e) => handleFilterChange('platform', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                >
+                  <option value="">All Platforms</option>
+                  {PLATFORMS.map(platform => (
+                    <option key={platform} value={platform}>{platform}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Price Range Filter */}
+              <div className="flex-1 min-w-[150px]">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Price Range</label>
+                <select
+                  value={filters.price_range}
+                  onChange={(e) => handleFilterChange('price_range', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                >
+                  <option value="">All Prices</option>
+                  <option value="$0-$50">$0-$50</option>
+                  <option value="$50-$100">$50-$100</option>
+                  <option value="$100-$250">$100-$250</option>
+                  <option value="$250-$500">$250-$500</option>
+                  <option value="$500-$1000">$500-$1000</option>
+                  <option value="$1000+">$1000+</option>
+                </select>
+              </div>
+
+              {/* Delivery Time Filter */}
+              <div className="flex-1 min-w-[150px]">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Delivery Time</label>
+                <select
+                  value={filters.delivery_time}
+                  onChange={(e) => handleFilterChange('delivery_time', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                >
+                  <option value="">Any Delivery Time</option>
+                  {DELIVERY_TIME_RANGES.map(range => (
+                    <option key={range.value} value={range.value}>{range.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Followers Filter */}
+              <div className="flex-1 min-w-[150px]">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Creator Followers</label>
+                <select
+                  value={filters.follower_range}
+                  onChange={(e) => handleFilterChange('follower_range', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                >
+                  <option value="">Any Followers</option>
+                  {FOLLOWER_RANGES.map(range => (
+                    <option key={range.value} value={range.value}>{range.label}</option>
+                  ))}
+                </select>
+              </div>
             </div>
 
-            {/* Platform Filter */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Platform</label>
-              <select
-                value={filters.platform}
-                onChange={(e) => handleFilterChange('platform', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-              >
-                <option value="">All Platforms</option>
-                <option value="Instagram">Instagram</option>
-                <option value="TikTok">TikTok</option>
-                <option value="YouTube">YouTube</option>
-                <option value="Facebook">Facebook</option>
-              </select>
-            </div>
+            {/* Mobile: Category visible, rest behind "More" button */}
+            <div className="lg:hidden">
+              {/* Always visible - Category Filter */}
+              <div className="mb-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Category</label>
+                <select
+                  value={filters.category}
+                  onChange={(e) => handleFilterChange('category', e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                >
+                  <option value="">All Categories</option>
+                  {CATEGORIES.map(cat => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
+                </select>
+              </div>
 
-            {/* Price Range Filter */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Price Range</label>
-              <select
-                value={filters.price_range}
-                onChange={(e) => handleFilterChange('price_range', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+              {/* More Filters Toggle Button */}
+              <button
+                onClick={() => setShowMoreFilters(!showMoreFilters)}
+                className="flex items-center justify-center gap-2 w-full px-4 py-2 mb-4 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
               >
-                <option value="">All Prices</option>
-                <option value="$0-$50">$0-$50</option>
-                <option value="$50-$100">$50-$100</option>
-                <option value="$100-$250">$100-$250</option>
-                <option value="$250-$500">$250-$500</option>
-                <option value="$500-$1000">$500-$1000</option>
-                <option value="$1000+">$1000+</option>
-              </select>
+                <Filter size={18} />
+                {showMoreFilters ? 'Hide' : 'More'} Filters
+                <svg
+                  className={`w-4 h-4 transition-transform ${showMoreFilters ? 'rotate-180' : ''}`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+
+              {/* Additional Filters - Collapsed on mobile */}
+              {showMoreFilters && (
+                <div className="space-y-4">
+                  {/* Sort By */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Sort By</label>
+                    <select
+                      value={filters.sort_by}
+                      onChange={(e) => handleFilterChange('sort_by', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                    >
+                      <option value="relevance">Relevance</option>
+                      <option value="price_low">Price: Low to High</option>
+                      <option value="price_high">Price: High to Low</option>
+                      <option value="newest">Newest First</option>
+                      <option value="popular">Most Popular</option>
+                    </select>
+                  </div>
+
+                  {/* Package Type Filter */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Package Type</label>
+                    <select
+                      value={filters.package_type}
+                      onChange={(e) => handleFilterChange('package_type', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                    >
+                      <option value="">All Types</option>
+                      {PACKAGE_TYPES.map(type => (
+                        <option key={type} value={type}>{type}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Platform Filter */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Platform</label>
+                    <select
+                      value={filters.platform}
+                      onChange={(e) => handleFilterChange('platform', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                    >
+                      <option value="">All Platforms</option>
+                      {PLATFORMS.map(platform => (
+                        <option key={platform} value={platform}>{platform}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Price Range Filter */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Price Range</label>
+                    <select
+                      value={filters.price_range}
+                      onChange={(e) => handleFilterChange('price_range', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                    >
+                      <option value="">All Prices</option>
+                      <option value="$0-$50">$0-$50</option>
+                      <option value="$50-$100">$50-$100</option>
+                      <option value="$100-$250">$100-$250</option>
+                      <option value="$250-$500">$250-$500</option>
+                      <option value="$500-$1000">$500-$1000</option>
+                      <option value="$1000+">$1000+</option>
+                    </select>
+                  </div>
+
+                  {/* Delivery Time Filter */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Delivery Time</label>
+                    <select
+                      value={filters.delivery_time}
+                      onChange={(e) => handleFilterChange('delivery_time', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                    >
+                      <option value="">Any Delivery Time</option>
+                      {DELIVERY_TIME_RANGES.map(range => (
+                        <option key={range.value} value={range.value}>{range.label}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Followers Filter */}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Creator Followers</label>
+                    <select
+                      value={filters.follower_range}
+                      onChange={(e) => handleFilterChange('follower_range', e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                    >
+                      <option value="">Any Followers</option>
+                      {FOLLOWER_RANGES.map(range => (
+                        <option key={range.value} value={range.value}>{range.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
           {/* Clear Filters Button */}
-          {(filters.search || filters.category || filters.platform || filters.price_range) && (
+          {(searchInput || filters.search || filters.category || filters.platform || filters.price_range || filters.package_type || filters.delivery_time || filters.follower_range || filters.sort_by !== 'relevance') && (
             <div className="mt-4 flex justify-end">
               <button
                 onClick={clearFilters}
@@ -222,17 +476,20 @@ const BrowsePackages = () => {
         </div>
 
         {/* Results Count */}
-        <div className="mb-4 text-sm text-gray-600">
-          Showing {packages.length} of {pagination.total} packages
+        <div className="mb-6">
+          <p className="text-gray-600">
+            Showing {packages.length} of {pagination.total} packages
+          </p>
         </div>
 
-        {/* Packages Grid */}
+        {/* Loading State */}
         {loading ? (
-          <div className="flex justify-center items-center py-12">
+          <div className="flex justify-center items-center py-20">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
           </div>
         ) : packages.length === 0 ? (
-          <div className="text-center py-12">
+          /* Empty State */
+          <div className="card text-center py-20">
             <svg
               className="mx-auto h-12 w-12 text-gray-400"
               fill="none"
@@ -250,121 +507,136 @@ const BrowsePackages = () => {
             <p className="mt-1 text-sm text-gray-500">Try adjusting your filters</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {packages.map((pkg) => (
-              <div
-                key={pkg.id}
-                className="bg-white rounded-lg shadow hover:shadow-lg transition-shadow cursor-pointer"
-                onClick={() => navigate(`/packages/${pkg.id}`)}
-              >
-                <div className="p-6">
-                  {/* Category Badge */}
-                  <span className="inline-block px-3 py-1 bg-primary/10 text-primary text-xs font-semibold rounded-full mb-3">
-                    {pkg.category}
-                  </span>
+          <>
+            {/* Packages Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+              {packages.map((pkg) => (
+                <div
+                  key={pkg.id}
+                  className="bg-primary p-4 rounded-3xl shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+                  onClick={() => navigate(`/packages/${pkg.id}`)}
+                >
+                  {/* White Inner Container */}
+                  <div className="bg-white rounded-2xl overflow-hidden mb-4">
+                    {/* Image Placeholder or Creator Avatar */}
+                    <div className="aspect-square overflow-hidden bg-gray-100 relative flex items-center justify-center">
+                      {pkg.creator?.profile_picture ? (
+                        <img
+                          src={`${BASE_URL}${pkg.creator.profile_picture}`}
+                          alt={pkg.creator.display_name || pkg.creator.username || 'Creator'}
+                          className="w-full h-full object-cover"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <svg className="w-16 h-16 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+                          </svg>
+                        </div>
+                      )}
+                      {/* Category Badge on Image */}
+                      <div className="absolute top-2 left-2">
+                        <span className="inline-block px-3 py-1 bg-primary/90 text-white text-xs font-semibold rounded-full backdrop-blur-sm">
+                          {pkg.category}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
 
-                  {/* Title */}
-                  <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                  {/* Package Title */}
+                  <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2">
                     {pkg.title}
                   </h3>
 
-                  {/* Creator Info */}
+                  {/* Creator Name */}
                   {pkg.creator && (
-                    <div className="flex items-center gap-2 mb-3">
-                      <Avatar
-                        src={pkg.creator.profile_picture}
-                        alt={pkg.creator.user?.email?.split('@')[0] || 'Creator'}
-                        size="sm"
-                        type="user"
-                      />
-                      <p className="text-sm text-gray-600">
-                        by {pkg.creator.user?.email?.split('@')[0] || 'Creator'}
-                      </p>
+                    <div className="flex items-center gap-1.5 mb-3 text-sm text-gray-600">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+                      </svg>
+                      <span className="truncate">
+                        {pkg.creator.display_name || pkg.creator.username || pkg.creator.user?.email?.split('@')[0] || 'Creator'}
+                      </span>
                     </div>
                   )}
 
-                  {/* Description */}
-                  <p className="text-gray-600 text-sm mb-4 line-clamp-3">
-                    {pkg.description}
-                  </p>
-
-                  {/* Duration */}
-                  <div className="flex items-center text-sm text-gray-500 mb-4">
-                    <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  {/* Delivery Time */}
+                  <div className="flex items-center gap-1.5 mb-4 text-xs text-gray-600">
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
-                    {pkg.duration_days} days delivery
+                    <span>{pkg.duration_days} days delivery</span>
                   </div>
 
-                  {/* Deliverables */}
-                  {pkg.deliverables && pkg.deliverables.length > 0 && (
-                    <div className="mb-4">
-                      <p className="text-xs text-gray-500 mb-1">Includes:</p>
-                      <div className="flex flex-wrap gap-1">
-                        {pkg.deliverables.slice(0, 3).map((item, idx) => (
-                          <span key={idx} className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded">
-                            {item}
-                          </span>
-                        ))}
-                        {pkg.deliverables.length > 3 && (
-                          <span className="text-xs text-gray-500">
-                            +{pkg.deliverables.length - 3} more
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
                   {/* Price & CTA */}
-                  <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+                  <div className="flex items-center justify-between">
                     <div>
                       <span className="text-2xl font-bold text-gray-900">
                         ${pkg.price}
                       </span>
                     </div>
-                    <button className="bg-primary text-white px-4 py-2 rounded-lg hover:bg-primary-dark transition-colors">
-                      View Details
-                    </button>
                   </div>
+
+                  {/* View Button */}
+                  <button className="mt-4 block w-full bg-white text-dark text-center py-3 rounded-full font-medium hover:bg-gray-100 transition-colors">
+                    View Details
+                  </button>
                 </div>
+              ))}
+            </div>
+
+            {/* Pagination */}
+            {pagination.pages > 1 && (
+              <div className="flex justify-center items-center gap-2">
+                <button
+                  onClick={() => handlePageChange(pagination.current_page - 1)}
+                  disabled={pagination.current_page === 1}
+                  className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                >
+                  Previous
+                </button>
+
+                <div className="flex gap-2">
+                  {[...Array(pagination.pages)].map((_, idx) => {
+                    const pageNum = idx + 1;
+                    // Show first page, last page, current page, and pages around current
+                    if (
+                      pageNum === 1 ||
+                      pageNum === pagination.pages ||
+                      (pageNum >= pagination.current_page - 1 && pageNum <= pagination.current_page + 1)
+                    ) {
+                      return (
+                        <button
+                          key={pageNum}
+                          onClick={() => handlePageChange(pageNum)}
+                          className={`px-4 py-2 border rounded-lg ${
+                            pageNum === pagination.current_page
+                              ? 'bg-primary text-white border-primary'
+                              : 'border-gray-300 hover:bg-gray-50'
+                          }`}
+                        >
+                          {pageNum}
+                        </button>
+                      );
+                    } else if (
+                      pageNum === pagination.current_page - 2 ||
+                      pageNum === pagination.current_page + 2
+                    ) {
+                      return <span key={pageNum} className="px-2">...</span>;
+                    }
+                    return null;
+                  })}
+                </div>
+
+                <button
+                  onClick={() => handlePageChange(pagination.current_page + 1)}
+                  disabled={pagination.current_page === pagination.pages}
+                  className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+                >
+                  Next
+                </button>
               </div>
-            ))}
-          </div>
-        )}
-
-        {/* Pagination */}
-        {!loading && pagination.pages > 1 && (
-          <div className="mt-8 flex justify-center gap-2">
-            <button
-              onClick={() => handlePageChange(pagination.current_page - 1)}
-              disabled={pagination.current_page === 1}
-              className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-            >
-              Previous
-            </button>
-
-            {Array.from({ length: pagination.pages }, (_, i) => i + 1).map(page => (
-              <button
-                key={page}
-                onClick={() => handlePageChange(page)}
-                className={`px-4 py-2 rounded-lg ${
-                  page === pagination.current_page
-                    ? 'bg-primary text-white'
-                    : 'border border-gray-300 hover:bg-gray-50'
-                }`}
-              >
-                {page}
-              </button>
-            ))}
-
-            <button
-              onClick={() => handlePageChange(pagination.current_page + 1)}
-              disabled={pagination.current_page === pagination.pages}
-              className="px-4 py-2 border border-gray-300 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-            >
-              Next
-            </button>
-          </div>
+            )}
+          </>
         )}
       </div>
     </div>

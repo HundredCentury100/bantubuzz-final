@@ -32,20 +32,109 @@ def get_packages():
         category = request.args.get('category')
         min_price = request.args.get('min_price', type=float)
         max_price = request.args.get('max_price', type=float)
+        price_range = request.args.get('price_range')
         creator_id = request.args.get('creator_id', type=int)
         page = request.args.get('page', 1, type=int)
         per_page = request.args.get('per_page', 12, type=int)
+        package_type = request.args.get('package_type')
+        delivery_time = request.args.get('delivery_time')
+        follower_range = request.args.get('follower_range')
+        sort_by = request.args.get('sort_by', 'relevance')
+        search = request.args.get('search', '')
+        platform = request.args.get('platform')
 
         query = Package.query.filter_by(is_active=True)
 
+        # Join with CreatorProfile for follower filtering or platform filtering
+        if follower_range or platform:
+            query = query.join(CreatorProfile, Package.creator_id == CreatorProfile.id)
+
         if category:
             query = query.filter_by(category=category)
+
+        # Handle individual min/max price filters
         if min_price:
             query = query.filter(Package.price >= min_price)
         if max_price:
             query = query.filter(Package.price <= max_price)
+
+        # Handle price_range filter (format: "$0-$50", "$1000+")
+        if price_range:
+            price_range = price_range.replace('$', '').strip()
+            if '+' in price_range:
+                # Format: "1000+"
+                min_price_val = float(price_range.replace('+', ''))
+                query = query.filter(Package.price >= min_price_val)
+            elif '-' in price_range:
+                # Format: "0-50"
+                parts = price_range.split('-')
+                if len(parts) == 2:
+                    min_price_val = float(parts[0])
+                    max_price_val = float(parts[1])
+                    query = query.filter(Package.price >= min_price_val, Package.price <= max_price_val)
+
         if creator_id:
             query = query.filter_by(creator_id=creator_id)
+        if package_type:
+            query = query.filter(Package.title.ilike(f'%{package_type}%'))
+
+        # Delivery time filter
+        if delivery_time:
+            if delivery_time == '1-3':
+                query = query.filter(Package.duration_days >= 1, Package.duration_days <= 3)
+            elif delivery_time == '3-7':
+                query = query.filter(Package.duration_days >= 3, Package.duration_days <= 7)
+            elif delivery_time == '7-14':
+                query = query.filter(Package.duration_days >= 7, Package.duration_days <= 14)
+            elif delivery_time == '14-30':
+                query = query.filter(Package.duration_days >= 14, Package.duration_days <= 30)
+            elif delivery_time == '30+':
+                query = query.filter(Package.duration_days >= 30)
+
+        # Follower range filter (format: "0-1000", "500000+")
+        if follower_range:
+            if '+' in follower_range:
+                # Format: "500000+"
+                min_followers = int(follower_range.replace('+', ''))
+                query = query.filter(CreatorProfile.follower_count >= min_followers)
+            elif '-' in follower_range:
+                # Format: "0-1000"
+                parts = follower_range.split('-')
+                if len(parts) == 2:
+                    min_followers = int(parts[0])
+                    max_followers = int(parts[1])
+                    query = query.filter(
+                        CreatorProfile.follower_count >= min_followers,
+                        CreatorProfile.follower_count <= max_followers
+                    )
+
+        # Platform filter (platforms is a JSON array field)
+        if platform:
+            # Check if platform exists in the platforms JSON array
+            from sqlalchemy import cast, String
+            query = query.filter(cast(CreatorProfile.platforms, String).like(f'%"{platform}"%'))
+
+        # Search filter
+        if search:
+            query = query.filter(
+                db.or_(
+                    Package.title.ilike(f'%{search}%'),
+                    Package.description.ilike(f'%{search}%')
+                )
+            )
+
+        # Sorting
+        if sort_by == 'price_low':
+            query = query.order_by(Package.price.asc())
+        elif sort_by == 'price_high':
+            query = query.order_by(Package.price.desc())
+        elif sort_by == 'newest':
+            query = query.order_by(Package.created_at.desc())
+        elif sort_by == 'popular':
+            # Order by number of collaborations (we'll need to add this later)
+            query = query.order_by(Package.created_at.desc())  # For now, same as newest
+        else:  # relevance (default)
+            query = query.order_by(Package.created_at.desc())
 
         pagination = query.paginate(page=page, per_page=per_page, error_out=False)
         packages = [pkg.to_dict(include_creator=True) for pkg in pagination.items]

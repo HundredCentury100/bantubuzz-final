@@ -90,7 +90,7 @@ export default function Pricing() {
               Brand Subscription Plans
             </h1>
             <p className="text-lg md:text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
-              Unlock more features and grow your business with our flexible subscription plans
+              Intelligence-forward influencer marketing with powerful insights for African brands
             </p>
 
             {/* Billing Toggle */}
@@ -111,7 +111,7 @@ export default function Pricing() {
                 />
               </button>
               <span className={`text-sm font-semibold ${billingCycle === 'yearly' ? 'text-dark' : 'text-gray-500'}`}>
-                Yearly <span className="text-green-600 font-bold">(Save 17%)</span>
+                Yearly <span className="text-green-600 font-bold">(2 Months Free!)</span>
               </span>
             </div>
           </div>
@@ -171,85 +171,98 @@ export default function Pricing() {
                       )}
                     </div>
 
+                    {/* Service Fee Badge */}
+                    {plan.platform_fee_percentage && (
+                      <div className="mb-4 px-3 py-2 bg-primary/10 rounded-lg">
+                        <p className="text-xs text-gray-600 text-center">
+                          <span className="font-bold text-dark">{plan.platform_fee_percentage}%</span> service fee
+                        </p>
+                      </div>
+                    )}
+
                     {/* Features */}
                     <ul className="space-y-3 mb-6">
-                      {/* Packages */}
+                      {/* Browse & Search Creators */}
                       <li className="flex items-start gap-2">
                         <CheckIcon className="h-4 w-4 text-green-600 flex-shrink-0 mt-0.5" />
-                        <span className="text-sm text-gray-700">
-                          <span className="font-semibold text-dark">
-                            {plan.features?.max_packages === -1 ? 'Unlimited' : plan.features?.max_packages || 3}
-                          </span> packages
-                        </span>
+                        <span className="text-sm text-gray-700">Browse & hire creators</span>
                       </li>
-
-                      {/* Bookings */}
-                      <li className="flex items-start gap-2">
-                        <CheckIcon className="h-4 w-4 text-green-600 flex-shrink-0 mt-0.5" />
-                        <span className="text-sm text-gray-700">
-                          <span className="font-semibold text-dark">
-                            {plan.features?.max_bookings_per_month === -1 ? 'Unlimited' : plan.features?.max_bookings_per_month || 5}
-                          </span> bookings/month
-                        </span>
-                      </li>
-
-                      {/* Custom Packages */}
-                      {plan.features?.can_create_custom_packages ? (
-                        <li className="flex items-start gap-2">
-                          <CheckIcon className="h-4 w-4 text-green-600 flex-shrink-0 mt-0.5" />
-                          <span className="text-sm text-gray-700">Custom packages</span>
-                        </li>
-                      ) : (
-                        <li className="flex items-start gap-2">
-                          <XMarkIcon className="h-4 w-4 text-gray-400 flex-shrink-0 mt-0.5" />
-                          <span className="text-sm text-gray-400">Custom packages</span>
-                        </li>
-                      )}
 
                       {/* Briefs & Campaigns */}
-                      {plan.features?.can_access_briefs || plan.features?.can_access_campaigns ? (
-                        <li className="flex items-start gap-2">
-                          <CheckIcon className="h-4 w-4 text-green-600 flex-shrink-0 mt-0.5" />
-                          <span className="text-sm text-gray-700">Briefs & campaigns</span>
-                        </li>
+                      <li className="flex items-start gap-2">
+                        <CheckIcon className="h-4 w-4 text-green-600 flex-shrink-0 mt-0.5" />
+                        <span className="text-sm text-gray-700">Create campaigns & briefs</span>
+                      </li>
+
+                      {/* Basic Campaign Workflow */}
+                      <li className="flex items-start gap-2">
+                        <CheckIcon className="h-4 w-4 text-green-600 flex-shrink-0 mt-0.5" />
+                        <span className="text-sm text-gray-700">Basic campaign workflow</span>
+                      </li>
+
+                      {/* Analytics Dashboard */}
+                      {plan.features?.analytics_access ? (
+                        <>
+                          <li className="flex items-start gap-2">
+                            <CheckIcon className="h-4 w-4 text-green-600 flex-shrink-0 mt-0.5" />
+                            <span className="text-sm text-gray-700">Live analytics dashboards</span>
+                          </li>
+                          <li className="flex items-start gap-2">
+                            <CheckIcon className="h-4 w-4 text-green-600 flex-shrink-0 mt-0.5" />
+                            <span className="text-sm text-gray-700">Engagement trends (7d & 30d)</span>
+                          </li>
+                          <li className="flex items-start gap-2">
+                            <CheckIcon className="h-4 w-4 text-green-600 flex-shrink-0 mt-0.5" />
+                            <span className="text-sm text-gray-700">Exportable reports (PDF/CSV)</span>
+                          </li>
+                          <li className="flex items-start gap-2">
+                            <CheckIcon className="h-4 w-4 text-green-600 flex-shrink-0 mt-0.5" />
+                            <span className="text-sm text-gray-700">
+                              {plan.slug === 'premium' ? 'Full sentiment analysis' : 'Basic sentiment analysis'}
+                            </span>
+                          </li>
+                        </>
                       ) : (
-                        <li className="flex items-start gap-2">
-                          <XMarkIcon className="h-4 w-4 text-gray-400 flex-shrink-0 mt-0.5" />
-                          <span className="text-sm text-gray-400">Briefs & campaigns</span>
-                        </li>
+                        <>
+                          <li className="flex items-start gap-2">
+                            <XMarkIcon className="h-4 w-4 text-gray-400 flex-shrink-0 mt-0.5" />
+                            <span className="text-sm text-gray-400">Live analytics dashboards</span>
+                          </li>
+                          <li className="flex items-start gap-2">
+                            <XMarkIcon className="h-4 w-4 text-gray-400 flex-shrink-0 mt-0.5" />
+                            <span className="text-sm text-gray-400">Sentiment analysis</span>
+                          </li>
+                        </>
                       )}
 
-                      {/* Analytics */}
-                      {plan.features?.analytics_access ? (
-                        <li className="flex items-start gap-2">
-                          <CheckIcon className="h-4 w-4 text-green-600 flex-shrink-0 mt-0.5" />
-                          <span className="text-sm text-gray-700">Advanced analytics</span>
-                        </li>
-                      ) : (
-                        <li className="flex items-start gap-2">
-                          <XMarkIcon className="h-4 w-4 text-gray-400 flex-shrink-0 mt-0.5" />
-                          <span className="text-sm text-gray-400">Advanced analytics</span>
-                        </li>
+                      {/* Premium Features */}
+                      {plan.slug === 'premium' && (
+                        <>
+                          <li className="flex items-start gap-2">
+                            <CheckIcon className="h-4 w-4 text-green-600 flex-shrink-0 mt-0.5" />
+                            <span className="text-sm text-gray-700">Brand mentions tracking</span>
+                          </li>
+                          <li className="flex items-start gap-2">
+                            <CheckIcon className="h-4 w-4 text-green-600 flex-shrink-0 mt-0.5" />
+                            <span className="text-sm text-gray-700">Top comments insights</span>
+                          </li>
+                          <li className="flex items-start gap-2">
+                            <CheckIcon className="h-4 w-4 text-green-600 flex-shrink-0 mt-0.5" />
+                            <span className="text-sm text-gray-700">Reduced service fee (5%)</span>
+                          </li>
+                        </>
                       )}
 
                       {/* Priority Support */}
                       {plan.features?.priority_support ? (
                         <li className="flex items-start gap-2">
                           <CheckIcon className="h-4 w-4 text-green-600 flex-shrink-0 mt-0.5" />
-                          <span className="text-sm text-gray-700">Priority support</span>
+                          <span className="text-sm text-gray-700">Priority support & onboarding</span>
                         </li>
                       ) : (
                         <li className="flex items-start gap-2">
                           <XMarkIcon className="h-4 w-4 text-gray-400 flex-shrink-0 mt-0.5" />
                           <span className="text-sm text-gray-400">Priority support</span>
-                        </li>
-                      )}
-
-                      {/* API Access */}
-                      {plan.features?.api_access && (
-                        <li className="flex items-start gap-2">
-                          <CheckIcon className="h-4 w-4 text-green-600 flex-shrink-0 mt-0.5" />
-                          <span className="text-sm text-gray-700">API access</span>
                         </li>
                       )}
                     </ul>
@@ -271,6 +284,22 @@ export default function Pricing() {
             })}
           </div>
 
+          {/* Plan Taglines */}
+          <div className="mt-16 grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
+            <div className="text-center">
+              <h3 className="font-bold text-dark mb-2">Free</h3>
+              <p className="text-sm text-gray-600">Try BantuBuzz. Pay only when you collaborate.</p>
+            </div>
+            <div className="text-center">
+              <h3 className="font-bold text-dark mb-2">Pro</h3>
+              <p className="text-sm text-gray-600">Powerful insights for growing brands.</p>
+            </div>
+            <div className="text-center">
+              <h3 className="font-bold text-dark mb-2">Premium</h3>
+              <p className="text-sm text-gray-600">Enterprise-grade intelligence & brand monitoring.</p>
+            </div>
+          </div>
+
           {/* FAQ or Additional Info */}
           <div className="mt-16 text-center">
             <p className="text-gray-600 mb-6">
@@ -280,7 +309,7 @@ export default function Pricing() {
               </Link>
             </p>
             <p className="text-sm text-gray-500">
-              All plans include secure payments, 24/7 support, and access to the BantuBuzz community.
+              All plans include secure payments, brand protection, and access to Africa's top creators.
             </p>
           </div>
         </div>

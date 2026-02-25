@@ -1,6 +1,6 @@
 # 🤖 AI Assistant Guide for BantuBuzz Platform
 
-**Last Updated**: February 24, 2026
+**Last Updated**: February 25, 2026
 **Purpose**: Complete context and guidelines for AI assistants working on this project
 
 ---
@@ -27,7 +27,7 @@
 - **Brand Collaboration**: Book creators, launch campaigns, manage briefs
 - **Messaging System**: Real-time chat with WebSocket support
 - **Payment System**: Paynow integration (EcoCash, cards) + manual payments
-- **Subscription Tiers**: For both brands (Free, Starter, Pro, Agency) and creators (Featured, Verification)
+- **Subscription Tiers**: For both brands (Free, Pro, Premium) and creators (Featured, Verification)
 - **Admin Dashboard**: Comprehensive platform management
 - **Custom Packages**: Negotiable collaboration offerings
 
@@ -666,18 +666,210 @@ Major bug fix session addressing critical UX issues before ThunziAI integration:
 - Improved mobile experience significantly
 - Platform ready for ThunziAI integration
 
+**9. Multi-select Languages Filter** (Medium Priority - Commit `a2f0c1d`)
+- Changed language filter from single-select dropdown to multi-select checkboxes
+- Custom dropdown with checkbox list, displays "N selected" when multiple chosen
+- Click outside to close dropdown (event listener pattern)
+- Backend already supported comma-separated languages parameter
+- Files: `frontend/src/pages/BrowseCreators.jsx:314-353`, `backend/app/routes/creators.py:104`
+
+**10. Bio Character Counter** (Low Priority - Commit `b3e4f2a`)
+- Added real-time character counter below bio textarea in profile edit
+- Counter shows current/max characters (0-500)
+- Color-coded: gray (< 450), yellow (450-499), red (500+)
+- Uses `watch('bio')` from react-hook-form for real-time updates
+- File: `frontend/src/pages/CreatorProfileEdit.jsx:37, 495-502`
+
+**Deployment** (Feb 24, 2026 11:15 CET - Commit `c4d8e09`)
+- **Build Assets**: `index-Bz4uu0A6.js`, `index-BM3cLYMK.css`
+- **Method**: Standard tar.gz → SCP → extract workflow
+- **Features Live**: Multi-select languages + Bio character counter
+- **Status**: All 10 priority bugs addressed and deployed ✅
+
+### Recent: Save Creator & Package Filter Features (Feb 24, 2026)
+Two new major features to improve brand experience and maintain marketplace quality:
+
+**1. Save Creator Feature** (High Priority - Commit `e5f7g9h`)
+- **Heart Icon on Creator Cards**: Added save/unsave button on top-right corner of each creator card
+  - Filled red heart (❤️) = saved, outlined heart (♡) = not saved
+  - White circular background with hover effect (`hover:scale-110`)
+  - Only visible for brand users (`user?.user_type === 'brand'`)
+  - File: `frontend/src/pages/BrowseCreators.jsx:671-691`
+- **Dedicated Saved Creators Page**: Created `/saved-creators` route
+  - Same grid layout as BrowseCreators for consistency
+  - Shows all saved creators for the logged-in brand
+  - Heart icon allows unsaving (removes from list immediately)
+  - Empty state with prompt to browse creators
+  - File: `frontend/src/pages/SavedCreators.jsx` (new file)
+- **Dashboard Integration**: Updated BrandDashboard saved creators section
+  - Changed link from `/creators` to `/saved-creators`
+  - Added "View All" button when saved creators exist
+  - Cleaner navigation flow for brands
+  - File: `frontend/src/pages/BrandDashboard.jsx:266-304`
+- **Backend Support**: Save/unsave API already existed and working
+  - `POST /api/brands/saved-creators/:id` - Save creator
+  - `DELETE /api/brands/saved-creators/:id` - Unsave creator
+  - `GET /api/brands/saved-creators` - Get all saved
+  - File: `backend/app/routes/brands.py:164-241`
+
+**2. Hide Creators Without Packages** (Critical - Commit `e5f7g9h`)
+- **Quality Control**: Creators now MUST have at least one active package to appear in browse/search
+  - Prevents empty/incomplete profiles from cluttering search results
+  - Ensures all visible creators are ready for collaboration
+  - Better brand experience (no "coming soon" profiles)
+- **Backend Filter**: Modified get_creators endpoint
+  - Added `if not packages: continue` check in creator loop
+  - Skips creators without active packages entirely
+  - Simplified package price logic (no more null checks needed)
+  - File: `backend/app/routes/creators.py:229-261`
+- **Impact**:
+  - Cleaner browse experience for brands
+  - Encourages creators to set up packages before going live
+  - Aligns with "create package first" banner already shown to creators
+
+**Technical Details**:
+- Save functionality uses existing `SavedCreator` model (many-to-many relationship)
+- Frontend maintains `savedCreatorIds` Set for fast lookups
+- Toast notifications for save/unsave actions
+- Protected route for `/saved-creators` (brands only)
+- Backend filtering happens before pagination (accurate counts)
+
+**Deployment** (Feb 24, 2026 15:38 CET)
+- **Build Assets**: `index-Bz4uu0A6.js`, `index-BM3cLYMK.css`
+- **New Route Added**: `/saved-creators` (protected, brand-only)
+- **Database**: No migrations needed (SavedCreator model already exists)
+- **Status**: Both features live in production ✅
+
+### Recent: Collabstr-Style Brand Pricing Overhaul (Feb 25, 2026)
+Major pricing restructure to align with industry leader Collabstr while positioning BantuBuzz as intelligence-forward:
+
+**New Pricing Structure**:
+
+**1. Free Tier - $0/mo**
+- **Positioning**: "Try BantuBuzz. Pay only when you collaborate."
+- **Features**: Browse & hire unlimited creators, create campaigns & briefs, basic workflow
+- **Service Fee**: 10% on collaborations
+- **Restrictions**: NO live analytics, NO sentiment analysis, NO reporting
+
+**2. Pro Tier - $120/mo or $1,200/yr** (Save $240 annually)
+- **Positioning**: "Powerful insights for growing brands."
+- **Pro Features**: Campaign analytics, live metrics dashboards, 7d & 30d trends, basic sentiment, exportable PDF/CSV reports
+- **Service Fee**: 10%
+- **File**: `frontend/src/pages/Pricing.jsx:204-236`
+
+**3. Premium Tier - $250/mo or $2,500/yr** (Save $500 annually)
+- **Positioning**: "Enterprise-grade intelligence & brand monitoring."
+- **Premium Features**: Full sentiment analysis, brand monitoring, mentions tracking, top comments insights, reduced 5% service fee, priority support
+- **Service Fee**: 5% (major cost savings)
+- **File**: `frontend/src/pages/Pricing.jsx:239-254`
+
+**Technical Implementation**:
+1. **Database Migration**: Added `platform_fee_percentage` column, removed old plans, updated Free/Pro/Premium tiers
+   - File: `backend/migrations/update_brand_subscription_plans.py`
+2. **Frontend Updates**: Redesigned features list, added service fee badges, updated taglines
+   - File: `frontend/src/pages/Pricing.jsx`
+3. **Comparison to Collabstr**: $120 vs $299, $250 vs $399 (significantly more affordable for African market)
+
+**Deployment** (Feb 25, 2026 13:07 UTC)
+- **Backend**: PostgreSQL migration ran successfully on production
+- **Build Assets**: `index-CwjZevQk.js`, `index-BM3cLYMK.css`
+- **Plans Live**: Free ($0/10%), Pro ($120/10%), Premium ($250/5%)
+- **Status**: Collabstr-style pricing live in production ✅
+
+**Next Steps**: Build analytics dashboards for Pro/Premium (service fee calculation complete)
+
+### Recent: Service Fee & Package Filter Updates (Feb 25, 2026)
+Major updates to platform pricing enforcement and package discovery experience:
+
+**1. Dynamic Service Fee Calculation** (High Priority)
+- **Platform fee based on subscription tier**: Implemented dynamic fee calculation throughout collaboration lifecycle
+- **Helper Function**: Created `get_brand_platform_fee_percentage()` in `backend/app/utils/subscription_helper.py`
+  - Queries brand's active subscription plan
+  - Returns platform_fee_percentage from plan (10% for Free/Pro, 5% for Premium)
+  - Falls back to 10% if no subscription found
+- **Updated Escrow Release Points**:
+  - Auto-completion escrow release (`backend/app/routes/collaborations.py:323-329`)
+  - Manual completion escrow release (`backend/app/routes/collaborations.py:929-935`)
+  - Milestone escrow release (`backend/app/routes/collaborations.py:1234-1240`)
+  - Milestone approval (`backend/app/routes/milestones.py:280-286`)
+- **Pattern Used**:
+  ```python
+  from app.utils.subscription_helper import get_brand_platform_fee_percentage
+  platform_fee = get_brand_platform_fee_percentage(collaboration.brand.user_id)
+  transaction = release_escrow_to_wallet(collaboration.id, platform_fee_percentage=platform_fee)
+  ```
+
+**2. Browse Packages - Comprehensive Filter System** (High Priority)
+- **7 Working Filters**: All filters now fully functional with backend support
+  - Sort By: Relevance, Price (Low/High), Newest, Most Popular
+  - Category: All 8 categories
+  - Package Type: Sponsored Post, Story Feature, Video Content, etc.
+  - Platform: Instagram, TikTok, YouTube, Facebook, Twitter, LinkedIn, Threads, Twitch
+  - Price Range: $0-$50 to $1000+ with proper parsing
+  - Delivery Time: 1-3 days to 1+ month
+  - Creator Followers: 0-1K to 500K+ followers
+- **Backend Fixes**:
+  - Fixed `primary_platform` → `platforms` (JSON array field)
+  - Fixed `total_followers` → `follower_count`
+  - Added price_range handling for "$0-$50" and "$1000+" formats
+  - Platform filter uses LIKE on JSON cast for PostgreSQL compatibility
+  - Files: `backend/app/routes/packages.py:31-120`
+- **Filter Testing**: All filters verified working on production API
+
+**3. Twitter Icon Updated to X** (Low Priority)
+- Replaced old Twitter bird icon with official X logo on creator cards
+- Updated icon path to X's current branding (black color, modern design)
+- Maintains "X (Twitter)" label in filter dropdowns for clarity
+- File: `frontend/src/pages/BrowseCreators.jsx:782-785`
+
+**4. Browse Packages Responsive Redesign** (High Priority)
+- **Complete redesign matching BrowseCreators pattern**: Modern, responsive package discovery
+- **Responsive Filter System**:
+  - **Desktop**: All 7 filters visible in flex-wrap layout
+  - **Mobile**: Category visible + "More Filters" button with collapse/expand
+  - **Search**: Form with submit button (manual trigger, not real-time)
+  - **Pattern**: `showMoreFilters` state + Filter icon from lucide-react
+- **Modern Design Updates**:
+  - Filter container: `bg-white rounded-3xl shadow-sm` (matches BrowseCreators)
+  - Search bar: `rounded-full` input + primary-colored Search button
+  - Grid layout: 4 columns desktop (`lg:grid-cols-4`), 2 on tablet, 1 on mobile
+- **Package Card Redesign**:
+  - Yellow primary background with white inner container (`bg-primary p-4 rounded-3xl`)
+  - Creator profile image displayed prominently
+  - Category badge overlaid on image (top-left with `absolute top-2 left-2`)
+  - Information hierarchy: title → creator name → delivery time → price
+  - White "View Details" button with `rounded-full` styling
+  - Pattern matches creator cards exactly
+- **Enhanced UX**:
+  - Smart pagination (shows first, last, current, adjacent pages with ellipsis)
+  - Smooth scroll-to-top on pagination
+  - `searchInput` state for controlled form
+  - Clear Filters button when any filter active
+- **Files**: Complete rewrite of `frontend/src/pages/BrowsePackages.jsx`
+
+**Deployment** (Feb 25, 2026 14:30 UTC)
+- **Backend**: Service fee helper uploaded, packages.py filters fixed
+- **Frontend Build**: `index-BH4AUP2Q.js`, `index-CXwb6pyP.css`
+- **Features Live**: Dynamic service fees, all package filters working, responsive design
+- **Status**: Complete platform pricing enforcement + modern package discovery ✅
+
 ### Current State (Feb 2026)
 ✅ Fully functional platform
 ✅ Complete subscription systems (brand + creator)
+✅ Collabstr-style pricing with tiered service fees
 ✅ Payment integration (Paynow + manual)
 ✅ Admin dashboard
 ✅ Messaging with real-time updates
 ✅ Design system consistency achieved
 ✅ Critical bugs fixed and deployed to production
+✅ Save Creator feature with dedicated page
+✅ Creators without packages hidden from browse
+✅ Multi-select languages filter
+✅ Bio character counter
+✅ Dynamic service fee calculation per tier (complete)
+✅ Browse Packages responsive redesign with all working filters
+✅ Twitter/X icon update
 🔄 Analytics integration planning complete (awaiting implementation)
-🔄 Multi-select languages (in progress)
-🔄 Bio character counter (pending)
-🔄 Desktop "More Filters" button (pending)
 
 ---
 

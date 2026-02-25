@@ -227,10 +227,15 @@ def get_creators():
             ]
 
         # Add review stats and cheapest package price
+        # ONLY include creators with at least one active package
         creators_with_stats = []
         for creator in all_creators:
             # Get active packages for this creator
             packages = Package.query.filter_by(creator_id=creator.id, is_active=True).all()
+
+            # Skip creators without any active packages
+            if not packages:
+                continue
 
             creator_dict = creator.to_dict(include_user=True, public_view=True)
 
@@ -248,14 +253,10 @@ def get_creators():
                     'total_reviews': 0
                 }
 
-            # Get cheapest package price if packages exist
-            if packages:
-                prices = [p.price for p in packages]
-                creator_dict['cheapest_package_price'] = min(prices)
-                creator_dict['total_packages'] = len(packages)
-            else:
-                creator_dict['cheapest_package_price'] = None
-                creator_dict['total_packages'] = 0
+            # Get cheapest package price (we already know packages exist)
+            prices = [p.price for p in packages]
+            creator_dict['cheapest_package_price'] = min(prices)
+            creator_dict['total_packages'] = len(packages)
 
             creators_with_stats.append(creator_dict)
 
@@ -266,17 +267,17 @@ def get_creators():
                 if c['review_stats']['average_rating'] >= min_rating
             ]
 
-        # Apply min/max price filters
+        # Apply min/max price filters (all creators have packages now)
         if min_price is not None:
             creators_with_stats = [
                 c for c in creators_with_stats
-                if c['cheapest_package_price'] is not None and c['cheapest_package_price'] >= min_price
+                if c['cheapest_package_price'] >= min_price
             ]
 
         if max_price is not None:
             creators_with_stats = [
                 c for c in creators_with_stats
-                if c['cheapest_package_price'] is not None and c['cheapest_package_price'] <= max_price
+                if c['cheapest_package_price'] <= max_price
             ]
 
         # Legacy price_range filter (kept for backward compatibility)
@@ -293,10 +294,8 @@ def get_creators():
                 min_p, max_p = price_ranges[price_range]
                 creators_with_stats = [
                     c for c in creators_with_stats
-                    if c['cheapest_package_price'] is not None and (
-                        (max_p is None and c['cheapest_package_price'] >= min_p) or
-                        (max_p is not None and min_p <= c['cheapest_package_price'] < max_p)
-                    )
+                    if (max_p is None and c['cheapest_package_price'] >= min_p) or
+                       (max_p is not None and min_p <= c['cheapest_package_price'] < max_p)
                 ]
 
         # Check for featured creators (only when sort is 'relevance' or default)

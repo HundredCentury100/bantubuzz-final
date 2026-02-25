@@ -263,8 +263,8 @@ const BrandDashboard = () => {
                 </svg>
               </div>
             </div>
-            <Link to="/creators" className="text-xs text-primary hover:underline mt-2 inline-block">
-              Browse creators
+            <Link to="/saved-creators" className="text-xs text-primary hover:underline mt-2 inline-block">
+              View all saved
             </Link>
           </div>
 
@@ -292,9 +292,16 @@ const BrandDashboard = () => {
             <div className="card">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-xl font-bold text-dark">Saved Creators</h2>
-                <Link to="/browse/creators" className="btn btn-primary">
-                  Browse Creators
-                </Link>
+                <div className="flex gap-2">
+                  {savedCreators.length > 0 && (
+                    <Link to="/saved-creators" className="btn btn-outline">
+                      View All
+                    </Link>
+                  )}
+                  <Link to="/browse/creators" className="btn btn-primary">
+                    Browse Creators
+                  </Link>
+                </div>
               </div>
 
               {savedCreators.length === 0 ? (
