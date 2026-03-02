@@ -197,9 +197,14 @@ def create_package():
                 }), 403
 
         data = request.get_json()
-        required_fields = ['title', 'description', 'price', 'duration_days', 'category']
+        required_fields = ['title', 'description', 'price', 'duration_days']
         if not all(field in data for field in required_fields):
             return jsonify({'error': 'Missing required fields'}), 400
+
+        # Support both 'category' and 'collaboration_type' for backwards compatibility
+        category = data.get('category') or data.get('collaboration_type')
+        if not category:
+            return jsonify({'error': 'Category or collaboration type is required'}), 400
 
         package = Package(
             creator_id=creator.id,
@@ -207,7 +212,7 @@ def create_package():
             description=data['description'],
             price=data['price'],
             duration_days=data['duration_days'],
-            category=data['category'],
+            category=category,
             deliverables=data.get('deliverables', [])
         )
 
