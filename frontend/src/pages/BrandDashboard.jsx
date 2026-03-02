@@ -239,7 +239,7 @@ const BrandDashboard = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600 mb-1">Total Spent</p>
-                <p className="text-3xl font-bold text-dark">${stats.totalSpent.toFixed(2)}</p>
+                <p className="text-3xl font-bold text-dark">${(Number(stats.totalSpent) || 0).toFixed(2)}</p>
               </div>
               <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
                 <svg className="w-6 h-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
