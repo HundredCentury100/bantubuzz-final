@@ -59,6 +59,7 @@ class Campaign(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     brand_id = db.Column(db.Integer, db.ForeignKey('brand_profiles.id'), nullable=False)
+    brief_id = db.Column(db.Integer, db.ForeignKey('briefs.id'), nullable=True)  # Link to source brief if converted
     title = db.Column(db.String(200), nullable=False)
     description = db.Column(db.Text, nullable=False)
     objectives = db.Column(db.Text)
@@ -83,6 +84,7 @@ class Campaign(db.Model):
         data = {
             'id': self.id,
             'brand_id': self.brand_id,
+            'brief_id': self.brief_id,
             'title': self.title,
             'description': self.description,
             'objectives': self.objectives,

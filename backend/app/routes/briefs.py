@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from datetime import datetime
+from datetime import datetime, timedelta
 from app import db
 from app.models import Brief, BriefMilestone, User, BrandProfile, CreatorProfile, Proposal
 from app.utils.notifications import create_notification
@@ -399,4 +399,82 @@ def get_brief_proposals(brief_id):
         }), 200
 
     except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@bp.route('/<int:brief_id>/convert-to-campaign', methods=['POST'])
+@jwt_required()
+def convert_brief_to_campaign(brief_id):
+    """Convert a brief to a campaign (Brand only)"""
+    try:
+        user_id = int(get_jwt_identity())
+        user = User.query.get(user_id)
+
+        if user.user_type != 'brand':
+            return jsonify({'error': 'Only brands can convert briefs'}), 403
+
+        brand = BrandProfile.query.filter_by(user_id=user_id).first()
+        brief = Brief.query.get(brief_id)
+
+        if not brief:
+            return jsonify({'error': 'Brief not found'}), 404
+
+        if brief.brand_id != brand.id:
+            return jsonify({'error': 'Unauthorized'}), 403
+
+        # Check if already converted
+        if brief.campaign:
+            return jsonify({
+                'message': 'Brief already converted to campaign',
+                'campaign_id': brief.campaign.id
+            }), 200
+
+        # Import Campaign model
+        from app.models.campaign import Campaign
+
+        # Create campaign from brief
+        campaign = Campaign(
+            brand_id=brand.id,
+            brief_id=brief.id,
+            title=brief.title,
+            description=brief.description,
+            objectives=brief.goal,
+            budget=float((brief.budget_min + brief.budget_max) / 2),  # Use average budget
+            start_date=datetime.utcnow(),
+            end_date=datetime.utcnow() + timedelta(days=brief.timeline_days),
+            status='active',  # Set as active so it accepts more proposals
+            requirements={
+                'platforms': brief.platforms,
+                'target_categories': brief.target_categories,
+                'target_min_followers': brief.target_min_followers,
+                'target_max_followers': brief.target_max_followers,
+                'target_locations': brief.target_locations
+            },
+            category=brief.target_categories[0] if brief.target_categories else 'General'
+        )
+
+        db.session.add(campaign)
+
+        # Update brief status to 'converted' or keep as 'open'
+        brief.status = 'open'  # Keep open for reference
+        brief.updated_at = datetime.utcnow()
+
+        db.session.commit()
+
+        # Notify user
+        create_notification(
+            user_id=user_id,
+            message=f'Brief "{brief.title}" has been converted to a campaign',
+            notification_type='campaign_created',
+            related_id=campaign.id
+        )
+
+        return jsonify({
+            'message': 'Brief converted to campaign successfully',
+            'campaign': campaign.to_dict(include_brand=True),
+            'campaign_id': campaign.id
+        }), 201
+
+    except Exception as e:
+        db.session.rollback()
         return jsonify({'error': str(e)}), 500

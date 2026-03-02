@@ -72,12 +72,15 @@ const ManageBriefs = () => {
     try {
       const response = await proposalsAPI.acceptProposal(acceptModalData.proposalId);
 
-      // If user chose to keep brief open (as campaign), reopen it
+      // If user chose to keep brief open (as campaign), convert to campaign
       if (!closeBrief && response.data.booking_id) {
         try {
-          await briefsAPI.publishBrief(acceptModalData.briefId); // Reopen the brief
+          const campaignResponse = await briefsAPI.convertToCampaign(acceptModalData.briefId);
+          console.log('Brief converted to campaign:', campaignResponse.data);
+          alert(`Brief converted to campaign! You can now accept more proposals. View it in the Campaigns section.`);
         } catch (err) {
-          console.error('Error reopening brief:', err);
+          console.error('Error converting brief to campaign:', err);
+          alert('Proposal accepted, but failed to convert to campaign. Please try converting manually.');
         }
       }
 

@@ -291,6 +291,7 @@ export const briefsAPI = {
   // Brief Actions
   publishBrief: (id) => api.post(`/briefs/${id}/publish`),
   closeBrief: (id) => api.post(`/briefs/${id}/close`),
+  convertToCampaign: (id) => api.post(`/briefs/${id}/convert-to-campaign`),
 
   // Proposals for Brief
   getBriefProposals: (id) => api.get(`/briefs/${id}/proposals`),
