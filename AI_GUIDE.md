@@ -1,6 +1,6 @@
 # 🤖 AI Assistant Guide for BantuBuzz Platform
 
-**Last Updated**: February 25, 2026
+**Last Updated**: March 2, 2026
 **Purpose**: Complete context and guidelines for AI assistants working on this project
 
 ---
@@ -293,41 +293,255 @@ deployment/03-deploy-platform.bat
 
 ## 🖥️ Server Architecture
 
-### Directory Structure
+### VPS Details
+```
+Server IP: 173.212.245.22
+Username: root
+Password: P9MYrbtC61MA54t
+OS: Ubuntu
+Location: /var/www/bantubuzz/
+```
+
+### Complete Directory Structure
 ```
 /var/www/bantubuzz/
 ├── frontend/
-│   ├── dist/              # Built React app (served by Express)
-│   ├── src/              # Source files
-│   ├── serve.js          # Express server
-│   └── package.json
+│   ├── dist/                    # Built React app (served by Express on port 8080)
+│   │   ├── index.html          # Entry point
+│   │   ├── assets/             # JS, CSS, images
+│   │   └── ...
+│   ├── src/                    # Source files (not deployed)
+│   ├── serve.js                # Express server script
+│   ├── package.json            # Node dependencies
+│   └── node_modules/           # Installed packages
 ├── backend/
-│   ├── app/              # Flask application
-│   ├── migrations/       # Database migrations
-│   ├── uploads/          # User uploads (served by nginx)
-│   └── venv/             # Python virtual environment
-└── messaging-service/
-    └── server.js         # Socket.io messaging server
+│   ├── app/                    # Flask application
+│   │   ├── __init__.py        # App factory + blueprint registration
+│   │   ├── models/            # Database models
+│   │   │   ├── user.py
+│   │   │   ├── creator_profile.py
+│   │   │   ├── package.py
+│   │   │   ├── collaboration.py
+│   │   │   ├── collaboration_milestone.py
+│   │   │   └── ...
+│   │   ├── routes/            # API endpoints (blueprints)
+│   │   │   ├── auth.py
+│   │   │   ├── creators.py
+│   │   │   ├── packages.py
+│   │   │   ├── collaborations.py
+│   │   │   ├── milestones.py
+│   │   │   ├── milestone_endpoints.py
+│   │   │   ├── subscriptions.py
+│   │   │   └── ...
+│   │   ├── services/          # Business logic
+│   │   │   ├── payment_service.py
+│   │   │   └── ...
+│   │   └── utils/             # Helper functions
+│   │       ├── subscription_helper.py
+│   │       └── ...
+│   ├── migrations/            # Database migration scripts
+│   ├── uploads/               # User-uploaded files
+│   │   ├── profile_pictures/
+│   │   ├── payment_proofs/
+│   │   ├── verification_documents/
+│   │   └── ...
+│   ├── venv/                  # Python virtual environment
+│   ├── gunicorn.log          # Gunicorn process logs
+│   ├── app.py                # Application entry point
+│   └── requirements.txt       # Python dependencies
+├── messaging-service/
+│   ├── server.js             # Socket.io messaging server (port 3002)
+│   ├── messaging.log         # Service logs
+│   ├── package.json
+│   └── node_modules/
+└── ecosystem.config.js       # PM2 configuration (if exists)
 ```
 
-### Running Services (PM2)
+### Local Project Structure
+```
+D:\Bantubuzz Platform\
+├── frontend/
+│   ├── src/
+│   │   ├── pages/            # React page components
+│   │   ├── components/       # Reusable React components
+│   │   ├── services/         # API service (api.js)
+│   │   ├── hooks/            # Custom React hooks
+│   │   ├── constants/        # Constants & options
+│   │   └── assets/           # Images, icons
+│   ├── dist/                 # Build output (created by `npm run build`)
+│   ├── public/               # Static files
+│   ├── index.html            # HTML template
+│   ├── vite.config.js        # Vite configuration
+│   ├── tailwind.config.js    # Tailwind CSS config
+│   └── package.json
+├── backend/
+│   ├── app/                  # Same structure as VPS
+│   ├── migrations/           # Migration scripts
+│   ├── venv/                 # Local Python virtual environment
+│   ├── app.py
+│   └── requirements.txt
+├── docs/                     # Documentation
+├── deployment/               # Deployment scripts (if exists)
+├── AI_GUIDE.md              # This file
+├── PHASE_6_IMPLEMENTATION_PLAN.md
+├── THUNZIAI_ANALYTICS_IMPLEMENTATION_PLAN.md
+└── .git/                    # Git repository
+```
 
+### Running Services & Ports
+
+**Backend (Gunicorn):**
+- Port: 8002
+- Process Manager: Manual (not PM2)
+- Workers: 4
+- Log: `/var/www/bantubuzz/backend/gunicorn.log`
+
+**Frontend (Express):**
+- Port: 8080
+- Process Manager: PM2 (if configured)
+- Serves: `/var/www/bantubuzz/frontend/dist/`
+
+**Messaging Service (Node.js + Socket.io):**
+- Port: 3002
+- Process Manager: PM2
+- Log: `/var/www/bantubuzz/messaging-service/messaging.log`
+
+**Web Server (Apache2):**
+- Ports: 80 (HTTP), 443 (HTTPS)
+- Proxies to Express.js (8080) and Gunicorn (8002)
+
+### Essential SSH Commands
+
+**1. File Upload/Download:**
 ```bash
-# Check services
+# Upload single file to server
+scp "local/path/file.py" root@173.212.245.22:/var/www/bantubuzz/backend/app/routes/
+
+# Upload multiple files
+scp "file1.py" "file2.py" root@173.212.245.22:/var/www/bantubuzz/backend/app/routes/
+
+# Upload entire directory
+scp -r "local/folder" root@173.212.245.22:/var/www/bantubuzz/backend/
+
+# Download file from server
+scp root@173.212.245.22:/var/www/bantubuzz/backend/gunicorn.log "D:\Downloads\"
+```
+
+**2. Backend Management (Gunicorn):**
+```bash
+# Check if gunicorn is running
+ssh root@173.212.245.22 "ps aux | grep '[g]unicorn'"
+
+# Check gunicorn port
+ssh root@173.212.245.22 "netstat -tlnp | grep 8002"
+
+# Kill gunicorn processes
+ssh root@173.212.245.22 "pkill -f gunicorn"
+
+# Start gunicorn (daemon mode)
+ssh root@173.212.245.22 "cd /var/www/bantubuzz/backend && venv/bin/gunicorn -w 4 -b 0.0.0.0:8002 --timeout 120 'app:create_app()' --daemon"
+
+# Check recent logs
+ssh root@173.212.245.22 "tail -50 /var/www/bantubuzz/backend/gunicorn.log"
+
+# Full restart (kill + start)
+ssh root@173.212.245.22 "pkill gunicorn && sleep 2 && cd /var/www/bantubuzz/backend && venv/bin/gunicorn -w 4 -b 0.0.0.0:8002 --timeout 120 'app:create_app()' --daemon && sleep 3 && ps aux | grep '[g]unicorn'"
+```
+
+**3. PM2 Management (Frontend & Messaging):**
+```bash
+# Check all PM2 services
 ssh root@173.212.245.22 "pm2 list"
 
-# Services:
-# - bantubuzz-backend      (Gunicorn on port 8002)
-# - bantubuzz-frontend     (Express on port 8080)
-# - bantubuzz-messaging    (Socket.io on port 8001)
-
-# Restart services
+# Restart specific service
 ssh root@173.212.245.22 "pm2 restart bantubuzz-frontend"
-ssh root@173.212.245.22 "pm2 restart bantubuzz-backend"
-ssh root@173.212.245.22 "pm2 restart bantubuzz-messaging"
+ssh root@173.212.245.22 "pm2 restart messaging-service"
 
 # View logs
 ssh root@173.212.245.22 "pm2 logs bantubuzz-frontend --lines 50"
+ssh root@173.212.245.22 "pm2 logs messaging-service --lines 50"
+
+# Stop/Start service
+ssh root@173.212.245.22 "pm2 stop messaging-service"
+ssh root@173.212.245.22 "pm2 start messaging-service"
+
+# Show detailed service info
+ssh root@173.212.245.22 "pm2 show messaging-service"
+```
+
+**4. File Management & Inspection:**
+```bash
+# List directory contents
+ssh root@173.212.245.22 "ls -la /var/www/bantubuzz/backend/app/routes/"
+
+# Check file content (specific lines)
+ssh root@173.212.245.22 "sed -n '229,245p' /var/www/bantubuzz/backend/app/routes/creators.py"
+
+# Search for text in file
+ssh root@173.212.245.22 "grep -n 'function_name' /var/www/bantubuzz/backend/app/routes/file.py"
+
+# Check file modification time
+ssh root@173.212.245.22 "stat /var/www/bantubuzz/backend/app/routes/creators.py"
+
+# Compare local and server file
+diff "D:\Bantubuzz Platform\backend\app\routes\creators.py" <(ssh root@173.212.245.22 "cat /var/www/bantubuzz/backend/app/routes/creators.py")
+```
+
+**5. Database Management:**
+```bash
+# Check PostgreSQL status
+ssh root@173.212.245.22 "systemctl status postgresql"
+
+# Restart PostgreSQL
+ssh root@173.212.245.22 "systemctl restart postgresql"
+
+# Run database migration
+ssh root@173.212.245.22 "cd /var/www/bantubuzz/backend && source venv/bin/activate && python migrations/migration_script.py"
+
+# Access PostgreSQL console
+ssh root@173.212.245.22 "sudo -u postgres psql bantubuzz_db"
+```
+
+**6. Apache2 Management:**
+```bash
+# Check Apache status
+ssh root@173.212.245.22 "systemctl status apache2"
+
+# Restart Apache
+ssh root@173.212.245.22 "systemctl restart apache2"
+
+# Check Apache config
+ssh root@173.212.245.22 "apache2ctl -t"
+
+# View Apache error log
+ssh root@173.212.245.22 "tail -50 /var/log/apache2/error.log"
+```
+
+**7. System Monitoring:**
+```bash
+# Check disk space
+ssh root@173.212.245.22 "df -h"
+
+# Check memory usage
+ssh root@173.212.245.22 "free -h"
+
+# Check running processes
+ssh root@173.212.245.22 "top -bn1 | head -20"
+
+# Check open ports
+ssh root@173.212.245.22 "netstat -tlnp"
+
+# Check system logs
+ssh root@173.212.245.22 "journalctl -xe | tail -50"
+```
+
+**8. Quick Diagnostics:**
+```bash
+# Full health check (all services)
+ssh root@173.212.245.22 "echo '=== Gunicorn (8002) ===' && ps aux | grep '[g]unicorn' && echo '=== PM2 Services ===' && pm2 list && echo '=== Apache2 ===' && systemctl status apache2 --no-pager"
+
+# Check all listening ports
+ssh root@173.212.245.22 "netstat -tlnp | grep -E '8002|8080|3002|80|443'"
 ```
 
 ### Web Server Flow
@@ -853,7 +1067,60 @@ Major updates to platform pricing enforcement and package discovery experience:
 - **Features Live**: Dynamic service fees, all package filters working, responsive design
 - **Status**: Complete platform pricing enforcement + modern package discovery ✅
 
-### Current State (Feb 2026)
+### Recent: Creator Requirements & Escrow Period Changes (Mar 2, 2026)
+Three major updates to improve creator profile quality, reduce payment hold times, and display pricing:
+
+**1. Required Creator Profile Fields** (High Priority - Commit `e49d2f7`)
+- **Mandatory fields enforced**: City, Country, Total Followers, Categories (≥1), Platforms (≥1)
+- **Form validation enhancements**:
+  - Added `required` validation with error messages for city, country, followers
+  - Custom `onSubmit` validation for categories and platforms arrays
+  - Red asterisks (*) added to section headers for visual clarity
+  - Updated placeholder descriptions to indicate requirements
+- **Impact**: Ensures complete creator profiles before activation
+- **File**: `frontend/src/pages/CreatorProfileEdit.jsx:510-735`
+
+**2. Escrow Period Reduction: 30 Days → 14 Days** (Critical - Commit `e49d2f7`)
+- **Why**: Faster payment release improves creator cash flow and platform competitiveness
+- **Changed across 5 backend files**:
+  - `backend/app/models/collaboration_milestone.py:68` - `trigger_escrow()` method
+  - `backend/app/routes/milestone_endpoints.py:123` - Manual escrow trigger endpoint
+  - `backend/app/routes/collaborations.py:1230` - Collaboration milestone completion
+  - `backend/app/routes/milestones.py:297` - Milestone approval `available_at` date
+  - `backend/app/services/payment_service.py:799` - Payment service escrow release
+- **Pattern**: All instances of `timedelta(days=30)` → `timedelta(days=14)`
+- **Impact**: Money released to creator wallets 16 days faster (14 days after approval vs 30)
+
+**3. Lowest Package Price Display** (High Priority - Commit `e49d2f7`)
+- **Frontend updates**: Added "Starting from $X" price display on creator cards
+  - `frontend/src/pages/BrowseCreators.jsx:817-825` - Browse page cards
+  - `frontend/src/components/CreatorCardHome.jsx:70-80` - Reusable card component
+  - `frontend/src/pages/Home.jsx:227-237` - Homepage creator sections
+- **Backend already provided**: `cheapest_package_price` field calculated in `creators.py:256-259`
+- **Design**: Centered text with "Starting from" label + bold price ($XX format)
+- **Conditional display**: Only shows if `creator.cheapest_package_price` exists
+
+**4. Package Filtering Logic Fixed** (Critical - Commit `e49d2f7`)
+- **Issue**: Browse creators showing ALL creators regardless of packages
+- **Root cause**: Server had old `creators.py` without filtering logic
+- **Solution**:
+  ```python
+  # Skip creators without any active packages
+  if not packages:
+      continue
+  ```
+- **Impact**: Only creators with ≥1 active package appear in browse/search
+- **Quality control**: Prevents empty profiles from cluttering results
+- **Files**: `backend/app/routes/creators.py:236-238`
+
+**Deployment** (Mar 2, 2026 09:58 CET)
+- **Frontend Build**: `index-oaDaUYxq.js`, `index-CXwb6pyP.css`
+- **Backend Files Uploaded**: 6 files (5 escrow + 1 creators.py filter)
+- **Gunicorn Restart**: 5 processes running (PID 128611 master + 4 workers)
+- **Port 8002**: Backend API listening and responding
+- **Features Live**: Required fields, 14-day escrow, price display, package filtering ✅
+
+### Current State (Mar 2026)
 ✅ Fully functional platform
 ✅ Complete subscription systems (brand + creator)
 ✅ Collabstr-style pricing with tiered service fees
@@ -863,12 +1130,15 @@ Major updates to platform pricing enforcement and package discovery experience:
 ✅ Design system consistency achieved
 ✅ Critical bugs fixed and deployed to production
 ✅ Save Creator feature with dedicated page
-✅ Creators without packages hidden from browse
+✅ Creators without packages hidden from browse (enforced)
 ✅ Multi-select languages filter
 ✅ Bio character counter
 ✅ Dynamic service fee calculation per tier (complete)
 ✅ Browse Packages responsive redesign with all working filters
 ✅ Twitter/X icon update
+✅ Required creator profile fields (city, country, followers, categories, platforms)
+✅ 14-day escrow period (reduced from 30 days)
+✅ Lowest package price displayed on creator cards
 🔄 Analytics integration planning complete (awaiting implementation)
 
 ---
