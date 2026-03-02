@@ -213,7 +213,7 @@ const CreateBrief = () => {
     }
   };
 
-  const platforms = ['Instagram', 'TikTok', 'YouTube', 'Twitter', 'Facebook', 'LinkedIn', 'Other'];
+  const platforms = ['Instagram', 'TikTok', 'YouTube', 'X (Twitter)', 'Facebook', 'LinkedIn', 'Twitch', 'Threads', 'Other'];
 
   return (
     <div className="min-h-screen bg-light">

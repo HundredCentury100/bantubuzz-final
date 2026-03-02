@@ -33,7 +33,8 @@ const ManageBriefs = () => {
     try {
       setLoading(true);
       setError('');
-      const response = await briefsAPI.getBriefs();
+      // Fetch ALL briefs (draft, open, closed) by passing status='all'
+      const response = await briefsAPI.getBriefs({ status: 'all' });
       setBriefs(response.data.briefs || []);
     } catch (err) {
       console.error('Error fetching briefs:', err);
