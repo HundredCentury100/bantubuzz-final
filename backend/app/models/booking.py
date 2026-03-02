@@ -8,6 +8,8 @@ class Booking(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     package_id = db.Column(db.Integer, db.ForeignKey('packages.id'), nullable=True)  # Nullable for campaign applications
     campaign_id = db.Column(db.Integer, db.ForeignKey('campaigns.id'), nullable=True)
+    brief_id = db.Column(db.Integer, db.ForeignKey('briefs.id'), nullable=True)  # For brief-based bookings
+    proposal_id = db.Column(db.Integer, db.ForeignKey('proposals.id'), nullable=True)  # For proposal-based bookings
     creator_id = db.Column(db.Integer, db.ForeignKey('creator_profiles.id'), nullable=False)
     brand_id = db.Column(db.Integer, db.ForeignKey('brand_profiles.id'), nullable=False)
     status = db.Column(db.String(20), default='pending')  # pending, accepted, in_progress, completed, cancelled, rejected
@@ -15,6 +17,7 @@ class Booking(db.Model):
     completion_date = db.Column(db.DateTime)
     amount = db.Column(db.Float, nullable=False)
     total_price = db.Column(db.Float, nullable=False)  # Alias for amount (for compatibility)
+    duration_days = db.Column(db.Integer, nullable=True)  # Duration from package or proposal
     payment_status = db.Column(db.String(20), default='pending')  # pending, paid, failed, refunded, verified
     payment_method = db.Column(db.String(20), nullable=True)  # paynow, bank_transfer (set when user chooses payment method)
     payment_reference = db.Column(db.String(100))
@@ -35,6 +38,8 @@ class Booking(db.Model):
             'id': self.id,
             'package_id': self.package_id,
             'campaign_id': self.campaign_id,
+            'brief_id': self.brief_id if hasattr(self, 'brief_id') else None,
+            'proposal_id': self.proposal_id if hasattr(self, 'proposal_id') else None,
             'creator_id': self.creator_id,
             'brand_id': self.brand_id,
             'status': self.status,
@@ -42,11 +47,13 @@ class Booking(db.Model):
             'completion_date': self.completion_date.isoformat() if self.completion_date else None,
             'amount': self.amount,
             'total_price': self.total_price if hasattr(self, 'total_price') and self.total_price else self.amount,
+            'duration_days': self.duration_days if hasattr(self, 'duration_days') else None,
             'payment_status': self.payment_status,
             'payment_method': self.payment_method if hasattr(self, 'payment_method') and self.payment_method else None,
             'payment_reference': self.payment_reference,
             'proof_of_payment': self.proof_of_payment if hasattr(self, 'proof_of_payment') else None,
             'payment_category': self.payment_category if hasattr(self, 'payment_category') else 'package',
+            'booking_type': self.booking_type if hasattr(self, 'booking_type') else 'direct',
             'notes': self.notes,
             'created_at': self.created_at.isoformat(),
             'updated_at': self.updated_at.isoformat()
@@ -57,6 +64,10 @@ class Booking(db.Model):
                 data['package'] = self.package.to_dict()
             if self.campaign:
                 data['campaign'] = self.campaign.to_dict()
+            if hasattr(self, 'brief') and self.brief:
+                data['brief'] = self.brief.to_dict(include_relations=True)
+            if hasattr(self, 'proposal') and self.proposal:
+                data['proposal'] = self.proposal.to_dict(include_relations=True)
             if self.creator:
                 data['creator'] = self.creator.to_dict(include_user=True)
             if self.brand:

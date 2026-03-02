@@ -214,9 +214,17 @@ const Payment = () => {
             <h2 className="text-xl font-bold text-dark mb-4">Booking Summary</h2>
 
             <div className="space-y-4">
+              {/* Show Package or Brief title */}
               <div className="flex justify-between items-center pb-4 border-b border-gray-200">
-                <span className="text-gray-600">Package</span>
-                <span className="font-medium text-dark">{booking.package?.title || 'N/A'}</span>
+                <span className="text-gray-600">
+                  {booking.booking_type === 'brief' ? 'Brief' : 'Package'}
+                </span>
+                <span className="font-medium text-dark">
+                  {booking.booking_type === 'brief'
+                    ? (booking.brief?.title || booking.notes || 'N/A')
+                    : (booking.package?.title || 'N/A')
+                  }
+                </span>
               </div>
 
               <div className="flex justify-between items-center pb-4 border-b border-gray-200">
@@ -228,8 +236,20 @@ const Payment = () => {
 
               <div className="flex justify-between items-center pb-4 border-b border-gray-200">
                 <span className="text-gray-600">Duration</span>
-                <span className="font-medium text-dark">{booking.package?.duration_days || 0} days</span>
+                <span className="font-medium text-dark">
+                  {booking.duration_days || booking.package?.duration_days || 0} days
+                </span>
               </div>
+
+              {/* Show category for brief bookings */}
+              {booking.booking_type === 'brief' && (
+                <div className="flex justify-between items-center pb-4 border-b border-gray-200">
+                  <span className="text-gray-600">Type</span>
+                  <span className="font-medium text-dark capitalize">
+                    {booking.payment_category || 'Brief'}
+                  </span>
+                </div>
+              )}
 
               <div className="flex justify-between items-center pb-4 border-b border-gray-200">
                 <span className="text-gray-600">Booking Status</span>

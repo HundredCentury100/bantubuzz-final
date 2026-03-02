@@ -311,13 +311,17 @@ def accept_proposal(proposal_id):
         brief.status = 'closed'
         brief.closed_at = datetime.utcnow()
 
-        # Create booking
+        # Create booking with full brief/proposal details
         booking = Booking(
             brand_id=brand.id,
             creator_id=proposal.creator_id,
+            brief_id=brief.id,
+            proposal_id=proposal.id,
             booking_type='brief',
+            payment_category='brief',
             amount=float(proposal.total_price),
             total_price=float(proposal.total_price),
+            duration_days=proposal.timeline_days,
             status='pending',
             payment_status='pending',
             booking_date=datetime.utcnow(),
