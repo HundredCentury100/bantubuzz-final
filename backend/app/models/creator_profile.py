@@ -14,7 +14,7 @@ class CreatorProfile(db.Model):
     portfolio_url = db.Column(db.String(255))
     categories = db.Column(db.JSON, default=list)  # List of categories
     follower_count = db.Column(db.Integer, default=0)
-    engagement_rate = db.Column(db.Float, default=0.0)
+    engagement_rate = db.Column(db.Numeric(5, 4), default=0.0)
     location = db.Column(db.String(100))
     city = db.Column(db.String(100))  # City/Town
     country = db.Column(db.String(2))  # 2-letter country code (e.g., ZW, ZA)
@@ -28,7 +28,7 @@ class CreatorProfile(db.Model):
 
     # Revision policy
     free_revisions = db.Column(db.Integer, default=2)  # Number of free revisions allowed per collaboration
-    revision_fee = db.Column(db.Float, default=0.0)  # Fee charged per revision after free limit
+    revision_fee = db.Column(db.Numeric(10, 2), default=0.0)  # Fee charged per revision after free limit
 
     # Featured creator fields
     is_featured = db.Column(db.Boolean, default=False)

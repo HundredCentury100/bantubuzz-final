@@ -23,7 +23,7 @@ class Collaboration(db.Model):
     # Basic information
     title = db.Column(db.String(200), nullable=False)  # Campaign title or Package title
     description = db.Column(db.Text)
-    amount = db.Column(db.Float, nullable=False)
+    amount = db.Column(db.Numeric(10, 2), nullable=False)
 
     # Status tracking
     status = db.Column(db.String(20), default='in_progress')  # in_progress, completed, cancelled

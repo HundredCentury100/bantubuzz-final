@@ -32,7 +32,7 @@ class Subscription(db.Model):
     paynow_poll_url = db.Column(db.Text, nullable=True)  # Paynow polling URL
     last_payment_date = db.Column(db.DateTime, nullable=True)
     next_payment_date = db.Column(db.DateTime, nullable=True)
-    last_payment_amount = db.Column(db.Float, nullable=True)
+    last_payment_amount = db.Column(db.Numeric(10, 2), nullable=True)
 
     # Admin Actions
     admin_note = db.Column(db.Text, nullable=True)  # Internal admin notes

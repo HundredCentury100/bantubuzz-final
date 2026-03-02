@@ -14,8 +14,8 @@ class SubscriptionPlan(db.Model):
     description = db.Column(db.Text)
 
     # Pricing
-    price_monthly = db.Column(db.Float, default=0.0)  # Monthly price in USD
-    price_yearly = db.Column(db.Float, default=0.0)   # Yearly price in USD (discounted)
+    price_monthly = db.Column(db.Numeric(10, 2), default=0.0)  # Monthly price in USD
+    price_yearly = db.Column(db.Numeric(10, 2), default=0.0)   # Yearly price in USD (discounted)
 
     # Feature Limits
     max_packages = db.Column(db.Integer, default=3)  # Maximum active packages creator can have
@@ -35,7 +35,7 @@ class SubscriptionPlan(db.Model):
     api_access = db.Column(db.Boolean, default=False)
 
     # Platform Fees
-    platform_fee_percentage = db.Column(db.Float, default=10.00)  # 10% for Free/Pro, 5% for Premium
+    platform_fee_percentage = db.Column(db.Numeric(5, 2), default=10.00)  # 10% for Free/Pro, 5% for Premium
 
     # Status
     is_active = db.Column(db.Boolean, default=True)

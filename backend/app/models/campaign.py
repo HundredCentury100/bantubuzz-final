@@ -11,7 +11,7 @@ class CampaignApplication(db.Model):
     creator_id = db.Column(db.Integer, db.ForeignKey('creator_profiles.id'), nullable=False)
     status = db.Column(db.String(20), default='pending')  # pending, accepted, rejected
     application_message = db.Column(db.Text)
-    proposed_price = db.Column(db.Float, nullable=False)  # How much creator is charging
+    proposed_price = db.Column(db.Numeric(10, 2), nullable=False)  # How much creator is charging
     deliverables = db.Column(db.JSON, default=list)  # List of deliverables creator proposes
     applied_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -63,7 +63,7 @@ class Campaign(db.Model):
     title = db.Column(db.String(200), nullable=False)
     description = db.Column(db.Text, nullable=False)
     objectives = db.Column(db.Text)
-    budget = db.Column(db.Float, nullable=False)
+    budget = db.Column(db.Numeric(10, 2), nullable=False)
     start_date = db.Column(db.DateTime, nullable=False)
     end_date = db.Column(db.DateTime, nullable=False)
     status = db.Column(db.String(20), default='draft')  # draft, active, paused, completed, cancelled

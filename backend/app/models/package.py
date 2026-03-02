@@ -9,7 +9,7 @@ class Package(db.Model):
     creator_id = db.Column(db.Integer, db.ForeignKey('creator_profiles.id'), nullable=False)
     title = db.Column(db.String(200), nullable=False)
     description = db.Column(db.Text, nullable=False)
-    price = db.Column(db.Float, nullable=False)  # Price in USD
+    price = db.Column(db.Numeric(10, 2), nullable=False)  # Price in USD - exact decimal (no rounding)
     duration_days = db.Column(db.Integer, nullable=False)
     deliverables = db.Column(db.JSON, default=list)  # List of deliverable items
     category = db.Column(db.String(100), nullable=True)  # Kept for backward compatibility

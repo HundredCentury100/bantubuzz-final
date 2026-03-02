@@ -15,8 +15,8 @@ class Booking(db.Model):
     status = db.Column(db.String(20), default='pending')  # pending, accepted, in_progress, completed, cancelled, rejected
     booking_date = db.Column(db.DateTime, default=datetime.utcnow)
     completion_date = db.Column(db.DateTime)
-    amount = db.Column(db.Float, nullable=False)
-    total_price = db.Column(db.Float, nullable=False)  # Alias for amount (for compatibility)
+    amount = db.Column(db.Numeric(10, 2), nullable=False)
+    total_price = db.Column(db.Numeric(10, 2), nullable=False)  # Alias for amount (for compatibility)
     duration_days = db.Column(db.Integer, nullable=True)  # Duration from package or proposal
     payment_status = db.Column(db.String(20), default='pending')  # pending, paid, failed, refunded, verified
     payment_method = db.Column(db.String(20), nullable=True)  # paynow, bank_transfer (set when user chooses payment method)

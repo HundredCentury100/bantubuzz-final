@@ -31,7 +31,7 @@ class Dispute(db.Model):
     resolution = db.Column(db.String(30), nullable=True)
     # release_funds | partial_release | refund | warning | suspension | no_action
     resolution_notes = db.Column(db.Text, nullable=True)
-    payout_percentage = db.Column(db.Float, nullable=True)  # for partial_release
+    payout_percentage = db.Column(db.Numeric(5, 2), nullable=True)  # for partial_release
 
     # Admin handling
     assigned_admin_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)

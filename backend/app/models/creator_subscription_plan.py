@@ -14,7 +14,7 @@ class CreatorSubscriptionPlan(db.Model):
     slug = db.Column(db.String(100), unique=True, nullable=False)
     subscription_type = db.Column(db.String(20), nullable=False)  # 'featured' or 'verification'
     featured_category = db.Column(db.String(20))  # 'general', 'facebook', 'instagram', 'tiktok', NULL
-    price = db.Column(db.Float, nullable=False)
+    price = db.Column(db.Numeric(10, 2), nullable=False)
     duration_days = db.Column(db.Integer, nullable=False)  # 7 for featured, 30 for verification
     description = db.Column(db.Text)
     is_active = db.Column(db.Boolean, default=True)
