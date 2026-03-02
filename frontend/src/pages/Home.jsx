@@ -150,30 +150,20 @@ const Home = () => {
           </div>
         </div>
 
-        {/* Location and Price - Inline */}
-        <div className="flex items-center justify-between mb-3 text-xs">
-          {/* Location */}
-          {(creator.city || creator.country || creator.location) && (
-            <div className={`flex items-center gap-1 ${bgColor === 'primary' ? 'text-gray-600' : 'text-gray-600'}`}>
-              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-              </svg>
-              <span>
-                {creator.city && creator.country
-                  ? `${creator.city}, ${creator.country}`
-                  : creator.location || creator.city || creator.country}
-              </span>
-            </div>
-          )}
-
-          {/* Price - Right aligned */}
-          {creator.cheapest_package_price && (
-            <span className={`font-semibold ${bgColor === 'primary' ? 'text-gray-900' : 'text-dark'}`}>
-              ${creator.cheapest_package_price}
+        {/* Location */}
+        {(creator.city || creator.country || creator.location) && (
+          <div className={`flex items-center gap-1 mb-3 text-xs ${bgColor === 'primary' ? 'text-gray-600' : 'text-gray-600'}`}>
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+            <span>
+              {creator.city && creator.country
+                ? `${creator.city}, ${creator.country}`
+                : creator.location || creator.city || creator.country}
             </span>
-          )}
-        </div>
+          </div>
+        )}
 
         {/* Platform Icons and Category */}
         <div className="flex justify-between items-center mb-3">
@@ -234,13 +224,13 @@ const Home = () => {
           </span>
         </div>
 
-        {/* Price Display */}
+        {/* Price Display - Smaller */}
         {creator.cheapest_package_price && (
-          <div className="mb-4 text-center">
-            <p className={`text-xs mb-1 ${bgColor === 'primary' ? 'text-gray-700' : 'text-gray-600'}`}>
+          <div className="mb-3 text-center">
+            <p className={`text-xs mb-0.5 ${bgColor === 'primary' ? 'text-gray-600' : 'text-gray-600'}`}>
               Starting from
             </p>
-            <p className={`text-2xl font-bold ${bgColor === 'primary' ? 'text-gray-900' : 'text-dark'}`}>
+            <p className={`text-lg font-semibold ${bgColor === 'primary' ? 'text-gray-900' : 'text-dark'}`}>
               ${creator.cheapest_package_price}
             </p>
           </div>

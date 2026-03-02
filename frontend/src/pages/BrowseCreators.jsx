@@ -740,30 +740,30 @@ const BrowseCreators = () => {
                     </div>
                   </div>
 
-                  {/* Location and Price - Inline */}
-                  <div className="flex items-center justify-between mb-3 text-xs">
-                    {/* Location */}
-                    {(creator.city || creator.country || creator.location) && (
-                      <div className="flex items-center gap-1 text-gray-600">
-                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                        </svg>
-                        <span>
-                          {creator.city && creator.country
-                            ? `${creator.city}, ${creator.country}`
-                            : creator.location || creator.city || creator.country}
-                        </span>
-                      </div>
-                    )}
-
-                    {/* Price - Right aligned */}
-                    {creator.cheapest_package_price && (
-                      <span className="font-semibold text-gray-900">
-                        ${creator.cheapest_package_price}
+                  {/* Location */}
+                  {(creator.city || creator.country || creator.location) && (
+                    <div className="flex items-center gap-1 text-gray-600 mb-3 text-xs">
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                      </svg>
+                      <span>
+                        {creator.city && creator.country
+                          ? `${creator.city}, ${creator.country}`
+                          : creator.location || creator.city || creator.country}
                       </span>
-                    )}
-                  </div>
+                    </div>
+                  )}
+
+                  {/* Price Display - Smaller */}
+                  {creator.cheapest_package_price && (
+                    <div className="mb-3 text-center">
+                      <p className="text-xs text-gray-600 mb-0.5">Starting from</p>
+                      <p className="text-lg font-semibold text-gray-900">
+                        ${creator.cheapest_package_price}
+                      </p>
+                    </div>
+                  )}
 
                   {/* Platform Icons and Category - On Primary Background */}
                   <div className="flex justify-between items-center mb-3">
