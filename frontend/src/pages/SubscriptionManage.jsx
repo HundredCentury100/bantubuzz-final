@@ -41,13 +41,32 @@ export default function SubscriptionManage() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [subsRes, plansRes] = await Promise.all([
-        api.get('/subscriptions/my-subscription'),
-        api.get('/subscriptions/plans'),
-      ]);
 
-      setCurrentSubscription(subsRes.data.data);
-      setPlans(plansRes.data.data);
+      // For creators, fetch creator subscriptions
+      if (user?.user_type === 'creator') {
+        const [subsRes, plansRes] = await Promise.all([
+          api.get('/creator/subscriptions'),
+          api.get('/creator/subscriptions/plans'),
+        ]);
+
+        // Transform creator subscriptions to match expected format
+        const activeSubscriptions = subsRes.data.subscriptions?.filter(s => s.is_active) || [];
+        setCurrentSubscription({
+          has_subscription: activeSubscriptions.length > 0,
+          subscriptions: activeSubscriptions,
+          subscription: activeSubscriptions[0] // Most recent active subscription
+        });
+        setPlans(plansRes.data.plans || []);
+      } else {
+        // For brands, fetch brand subscriptions
+        const [subsRes, plansRes] = await Promise.all([
+          api.get('/subscriptions/my-subscription'),
+          api.get('/subscriptions/plans'),
+        ]);
+
+        setCurrentSubscription(subsRes.data.data);
+        setPlans(plansRes.data.data);
+      }
     } catch (error) {
       console.error('Error fetching subscription data:', error);
       toast.error('Failed to load subscription information');
@@ -60,6 +79,12 @@ export default function SubscriptionManage() {
     try {
       setActionLoading(true);
       const plan = plans.find(p => p.id === planId);
+
+      // For creators, redirect to creator subscriptions page
+      if (user?.user_type === 'creator') {
+        navigate('/creator/subscriptions');
+        return;
+      }
 
       // For free plan, subscribe immediately
       if (plan.slug === 'free' || (plan.price_monthly === 0 && plan.price_yearly === 0)) {
@@ -233,10 +258,12 @@ export default function SubscriptionManage() {
           {/* Header */}
           <div className="mb-12 text-center">
             <h1 className="text-5xl md:text-6xl font-bold text-dark mb-4 leading-tight">
-              Manage Your Subscription
+              {user?.user_type === 'creator' ? 'My Creator Subscriptions' : 'Manage Your Subscription'}
             </h1>
             <p className="text-lg md:text-xl text-gray-600 max-w-2xl mx-auto leading-relaxed">
-              View and manage your BantuBuzz subscription plan
+              {user?.user_type === 'creator'
+                ? 'View and manage your verification and featured subscriptions'
+                : 'View and manage your BantuBuzz subscription plan'}
             </p>
           </div>
 
@@ -328,7 +355,7 @@ export default function SubscriptionManage() {
                   </button>
                 )}
                 <Link
-                  to="/pricing"
+                  to={user?.user_type === 'creator' ? '/creator/subscriptions' : '/pricing'}
                   className="bg-dark hover:bg-gray-800 text-white px-8 py-3 rounded-full font-medium transition-colors"
                 >
                   View All Plans
