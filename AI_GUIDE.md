@@ -544,6 +544,54 @@ ssh root@173.212.245.22 "echo '=== Gunicorn (8002) ===' && ps aux | grep '[g]uni
 ssh root@173.212.245.22 "netstat -tlnp | grep -E '8002|8080|3002|80|443'"
 ```
 
+**9. Other Platforms on Same Server (Systemd Services):**
+
+The VPS also hosts other platforms managed by **systemd** (not PM2):
+
+```bash
+# Makumbiri Game Park Booking System
+# Service: makumbiri-booking.service
+# Directory: /var/www/makumbiri_booking/
+# Domain: booking.makumbirigamepark.com
+
+# Check status
+ssh root@173.212.245.22 "systemctl status makumbiri-booking.service"
+
+# Restart service
+ssh root@173.212.245.22 "systemctl restart makumbiri-booking.service"
+
+# View logs
+ssh root@173.212.245.22 "journalctl -u makumbiri-booking.service -n 50 --no-pager"
+
+# Huey worker (background tasks)
+ssh root@173.212.245.22 "systemctl restart makumbiri-huey.service"
+ssh root@173.212.245.22 "tail -50 /var/www/makumbiri_booking/logs/huey.log"
+
+
+# Savanna & Sage LMS Portal
+# Service: savanna_sage_lms.service
+# Directory: /var/www/savanna_sage_lms/
+# Domain: portal.savannaandsage.africa
+
+# Check status
+ssh root@173.212.245.22 "systemctl status savanna_sage_lms.service"
+
+# Restart service
+ssh root@173.212.245.22 "systemctl restart savanna_sage_lms.service"
+
+# View logs
+ssh root@173.212.245.22 "journalctl -u savanna_sage_lms.service -n 50 --no-pager"
+
+
+# Restart all platforms at once (after server reboot or updates)
+ssh root@173.212.245.22 "systemctl restart makumbiri-booking.service savanna_sage_lms.service makumbiri-huey.service && echo 'All platform services restarted'"
+
+# Check all platform services
+ssh root@173.212.245.22 "systemctl is-active makumbiri-booking.service savanna_sage_lms.service makumbiri-huey.service"
+```
+
+**IMPORTANT**: When you see "Service Unavailable" errors on booking.makumbirigamepark.com or portal.savannaandsage.africa, it means their systemd services have stopped and need to be restarted using the commands above.
+
 ### Web Server Flow
 
 ```
