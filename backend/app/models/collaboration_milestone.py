@@ -65,7 +65,7 @@ class CollaborationMilestone(db.Model):
     def trigger_escrow(self):
         """Trigger escrow release countdown"""
         self.escrow_triggered_at = datetime.utcnow()
-        self.escrow_release_date = (datetime.utcnow() + timedelta(days=30)).date()
+        self.escrow_release_date = (datetime.utcnow() + timedelta(days=14)).date()
         db.session.commit()
 
     def is_complete(self):

@@ -61,11 +61,23 @@ const CreatorCardHome = ({ creator, bgColor = 'white', textColor = 'dark' }) => 
         </div>
 
         {/* Category */}
-        <div className="flex justify-end items-center mb-4">
+        <div className="flex justify-end items-center mb-3">
           <span className={`text-xs px-3 py-1 border ${textColor === 'white' ? 'border-gray-700 text-gray-900' : 'border-gray-300 text-gray-700'} rounded-full`}>
             {creator.categories?.[0] || 'Lifestyle'}
           </span>
         </div>
+
+        {/* Price Display */}
+        {creator.cheapest_package_price && (
+          <div className="mb-4 text-center">
+            <p className={`text-xs mb-1 ${textColor === 'white' ? 'text-gray-700' : 'text-gray-600'}`}>
+              Starting from
+            </p>
+            <p className={`text-2xl font-bold ${textColor === 'white' ? 'text-gray-900' : 'text-dark'}`}>
+              ${creator.cheapest_package_price}
+            </p>
+          </div>
+        )}
 
         {/* View Profile Button */}
         <Link

@@ -57,7 +57,10 @@
       "Bash(awk:*)",
       "Bash(ls \"D:\\Bantubuzz Platform\\backend\\app\\models\"\" && ls \"D:Bantubuzz Platformbackendapproutesadmin\"\")",
       "Bash(if exist backendnul del backendnul)",
-      "Bash(if exist \"backend\\nul\" del \"backend\\nul\")"
+      "Bash(if exist \"backend\\nul\" del \"backend\\nul\")",
+      "Bash(git log:*)",
+      "Bash(if exist dist.tar.gz del dist.tar.gz)",
+      "Bash(del \"d:\\Bantubuzz Platform\\dist.tar.gz\")"
     ],
     "deny": [],
     "ask": []

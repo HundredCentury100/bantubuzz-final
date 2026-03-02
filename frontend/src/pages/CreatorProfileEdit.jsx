@@ -218,6 +218,20 @@ const CreatorProfileEdit = () => {
     setSuccess(false);
 
     try {
+      // Validate categories
+      if (!data.categories || data.categories.length === 0) {
+        setError('Please select at least one category');
+        setLoading(false);
+        return;
+      }
+
+      // Validate platforms
+      if (!data.platforms || data.platforms.length === 0) {
+        setError('Please select at least one platform');
+        setLoading(false);
+        return;
+      }
+
       // Build social links object
       const socialLinks = {
         instagram: data.instagram || '',
@@ -507,24 +521,27 @@ const CreatorProfileEdit = () => {
                 {/* City */}
                 <div>
                   <label className="block text-sm font-medium text-dark mb-2">
-                    City/Town
+                    City/Town <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
                     className="input"
                     placeholder="Harare"
-                    {...register('city')}
+                    {...register('city', { required: 'City is required' })}
                   />
+                  {errors.city && (
+                    <p className="mt-1 text-sm text-error">{errors.city.message}</p>
+                  )}
                 </div>
 
                 {/* Country */}
                 <div>
                   <label className="block text-sm font-medium text-dark mb-2">
-                    Country
+                    Country <span className="text-red-500">*</span>
                   </label>
                   <select
                     className="input"
-                    {...register('country')}
+                    {...register('country', { required: 'Country is required' })}
                   >
                     {COUNTRIES.map((country) => (
                       <option key={country.code} value={country.code}>
@@ -532,6 +549,9 @@ const CreatorProfileEdit = () => {
                       </option>
                     ))}
                   </select>
+                  {errors.country && (
+                    <p className="mt-1 text-sm text-error">{errors.country.message}</p>
+                  )}
                 </div>
               </div>
 
@@ -571,13 +591,14 @@ const CreatorProfileEdit = () => {
               {/* Follower Count */}
               <div>
                 <label className="block text-sm font-medium text-dark mb-2">
-                  Total Followers
+                  Total Followers <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="number"
                   className="input"
                   placeholder="10000"
                   {...register('follower_count', {
+                    required: 'Total followers is required',
                     min: { value: 0, message: 'Cannot be negative' }
                   })}
                 />
@@ -711,8 +732,8 @@ const CreatorProfileEdit = () => {
 
             {/* Categories */}
             <div className="card">
-              <h2 className="text-xl font-bold text-dark mb-4">Categories</h2>
-              <p className="text-sm text-gray-600 mb-4">Select the categories that best describe your content</p>
+              <h2 className="text-xl font-bold text-dark mb-4">Categories <span className="text-red-500">*</span></h2>
+              <p className="text-sm text-gray-600 mb-4">Select at least one category that best describes your content</p>
 
               {categories.length === 0 ? (
                 <div className="text-center py-4 text-gray-500">Loading categories...</div>
@@ -740,8 +761,8 @@ const CreatorProfileEdit = () => {
 
             {/* Platforms */}
             <div className="card">
-              <h2 className="text-xl font-bold text-dark mb-4">Platforms</h2>
-              <p className="text-sm text-gray-600 mb-4">Select platforms you create content on</p>
+              <h2 className="text-xl font-bold text-dark mb-4">Platforms <span className="text-red-500">*</span></h2>
+              <p className="text-sm text-gray-600 mb-4">Select at least one platform you create content on</p>
 
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 {PLATFORMS.map((platform) => (

@@ -294,7 +294,7 @@ def approve_milestone(collaboration_id, milestone_number):
             clearance_required=True,
             clearance_days=30,
             completed_at=milestone.approved_at,
-            available_at=milestone.approved_at + timedelta(days=30),
+            available_at=milestone.approved_at + timedelta(days=14),
             escrow_release_date=milestone.escrow_release_date,
             milestone_id=milestone.id,
             collaboration_id=collaboration.id,

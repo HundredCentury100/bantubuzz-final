@@ -756,7 +756,7 @@ const BrowseCreators = () => {
                   )}
 
                   {/* Platform Icons and Category - On Primary Background */}
-                  <div className="flex justify-between items-center mb-4">
+                  <div className="flex justify-between items-center mb-3">
                     {/* Platform Icons */}
                     <div className="flex gap-2">
                       {creator.platforms && creator.platforms.length > 0 ? (
@@ -813,6 +813,16 @@ const BrowseCreators = () => {
                       {creator.categories?.[0] || 'Model'}
                     </span>
                   </div>
+
+                  {/* Price Display */}
+                  {creator.cheapest_package_price && (
+                    <div className="mb-4 text-center">
+                      <p className="text-xs text-gray-700 mb-1">Starting from</p>
+                      <p className="text-2xl font-bold text-gray-900">
+                        ${creator.cheapest_package_price}
+                      </p>
+                    </div>
+                  )}
 
                   {/* View Profile Button - White on Primary Background */}
                   <Link

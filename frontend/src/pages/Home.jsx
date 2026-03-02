@@ -166,7 +166,7 @@ const Home = () => {
         )}
 
         {/* Platform Icons and Category */}
-        <div className="flex justify-between items-center mb-4">
+        <div className="flex justify-between items-center mb-3">
           {/* Platform Icons */}
           <div className="flex gap-2">
             {creator.platforms && creator.platforms.length > 0 ? (
@@ -223,6 +223,18 @@ const Home = () => {
             {creator.categories?.[0] || 'Lifestyle'}
           </span>
         </div>
+
+        {/* Price Display */}
+        {creator.cheapest_package_price && (
+          <div className="mb-4 text-center">
+            <p className={`text-xs mb-1 ${bgColor === 'primary' ? 'text-gray-700' : 'text-gray-600'}`}>
+              Starting from
+            </p>
+            <p className={`text-2xl font-bold ${bgColor === 'primary' ? 'text-gray-900' : 'text-dark'}`}>
+              ${creator.cheapest_package_price}
+            </p>
+          </div>
+        )}
 
         {/* View Profile Button */}
         <Link

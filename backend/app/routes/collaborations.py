@@ -1227,7 +1227,7 @@ def approve_milestone_deliverable(collab_id, milestone_id, deliverable_id):
 
             # Trigger escrow for this milestone
             milestone.escrow_triggered_at = datetime.utcnow()
-            milestone.escrow_release_date = (datetime.utcnow() + timedelta(days=30)).date()
+            milestone.escrow_release_date = (datetime.utcnow() + timedelta(days=14)).date()
 
             # Release escrow for this specific milestone
             from app.services.payment_service import release_milestone_escrow

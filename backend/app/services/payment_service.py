@@ -796,7 +796,7 @@ def release_milestone_escrow(milestone_id, platform_fee_percentage=15):
         clearance_required=True,
         clearance_days=30,
         completed_at=datetime.utcnow(),
-        available_at=(datetime.utcnow() + timedelta(days=30)),
+        available_at=(datetime.utcnow() + timedelta(days=14)),
         collaboration_id=collaboration.id,
         milestone_id=milestone.id,
         gross_amount=milestone_amount,
