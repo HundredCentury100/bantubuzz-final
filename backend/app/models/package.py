@@ -14,6 +14,8 @@ class Package(db.Model):
     deliverables = db.Column(db.JSON, default=list)  # List of deliverable items
     category = db.Column(db.String(100), nullable=True)  # Kept for backward compatibility
     collaboration_type = db.Column(db.String(100), nullable=True)  # Brand Endorsement, UGC, etc.
+    platform_type = db.Column(db.String(50), nullable=True)  # Instagram, TikTok, YouTube, Twitter, Twitch, UGC
+    content_type = db.Column(db.String(50), nullable=True)  # Reel, Post, Story, Video, Short, etc.
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -33,6 +35,8 @@ class Package(db.Model):
             'deliverables': self.deliverables or [],
             'category': self.category,
             'collaboration_type': self.collaboration_type,
+            'platform_type': self.platform_type,
+            'content_type': self.content_type,
             'is_active': self.is_active,
             'created_at': self.created_at.isoformat(),
             'updated_at': self.updated_at.isoformat()

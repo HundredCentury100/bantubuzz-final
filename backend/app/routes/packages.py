@@ -42,6 +42,7 @@ def get_packages():
         sort_by = request.args.get('sort_by', 'relevance')
         search = request.args.get('search', '')
         platform = request.args.get('platform')
+        platform_type = request.args.get('platform_type')  # NEW: Instagram, TikTok, UGC, etc.
 
         query = Package.query.filter_by(is_active=True)
 
@@ -51,6 +52,9 @@ def get_packages():
 
         if category:
             query = query.filter_by(category=category)
+
+        if platform_type:
+            query = query.filter_by(platform_type=platform_type)
 
         # Handle individual min/max price filters
         if min_price:
@@ -213,6 +217,8 @@ def create_package():
             price=data['price'],
             duration_days=data['duration_days'],
             category=category,
+            platform_type=data.get('platform_type'),
+            content_type=data.get('content_type'),
             deliverables=data.get('deliverables', [])
         )
 
@@ -246,7 +252,7 @@ def update_package(package_id):
 
         data = request.get_json()
         updatable_fields = ['title', 'description', 'price', 'duration_days',
-                          'deliverables', 'category', 'is_active']
+                          'deliverables', 'category', 'platform_type', 'content_type', 'is_active']
 
         for field in updatable_fields:
             if field in data:
