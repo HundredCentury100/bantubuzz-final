@@ -6,6 +6,7 @@ import Avatar from '../components/Avatar';
 import Navbar from '../components/Navbar';
 import SEO from '../components/SEO';
 import { Search, Filter, X } from 'lucide-react';
+import { PLATFORM_CONFIGS, PACKAGE_TYPES as PLATFORM_TYPES } from '../constants/platformConfig';
 
 const CATEGORIES = [
   'Fashion & Beauty',
@@ -18,7 +19,7 @@ const CATEGORIES = [
   'Other'
 ];
 
-const PACKAGE_TYPES = [
+const COLLABORATION_TYPES = [
   'Sponsored Post',
   'Story Feature',
   'Video Content',
@@ -27,17 +28,6 @@ const PACKAGE_TYPES = [
   'Giveaway/Contest',
   'Custom Package',
   'Other'
-];
-
-const PLATFORMS = [
-  'Instagram',
-  'TikTok',
-  'YouTube',
-  'Facebook',
-  'Twitter',
-  'LinkedIn',
-  'Threads',
-  'Twitch'
 ];
 
 const DELIVERY_TIME_RANGES = [
@@ -68,12 +58,12 @@ const BrowsePackages = () => {
     min_price: '',
     max_price: '',
     search: '',
-    platform: '',
+    platform_type: '',
+    collaboration_type: '',
     languages: [],
     follower_range: '',
     min_rating: '',
     price_range: '',
-    package_type: '',
     delivery_time: '',
     sort_by: 'relevance'
   });
@@ -141,12 +131,12 @@ const BrowsePackages = () => {
       min_price: '',
       max_price: '',
       search: '',
-      platform: '',
+      platform_type: '',
+      collaboration_type: '',
       languages: [],
       follower_range: '',
       min_rating: '',
       price_range: '',
-      package_type: '',
       delivery_time: '',
       sort_by: 'relevance'
     });
@@ -247,32 +237,32 @@ const BrowsePackages = () => {
                 </select>
               </div>
 
-              {/* Package Type Filter */}
+              {/* Collaboration Type Filter */}
               <div className="flex-1 min-w-[150px]">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Package Type</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Collaboration Type</label>
                 <select
-                  value={filters.package_type}
-                  onChange={(e) => handleFilterChange('package_type', e.target.value)}
+                  value={filters.collaboration_type}
+                  onChange={(e) => handleFilterChange('collaboration_type', e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                 >
                   <option value="">All Types</option>
-                  {PACKAGE_TYPES.map(type => (
+                  {COLLABORATION_TYPES.map(type => (
                     <option key={type} value={type}>{type}</option>
                   ))}
                 </select>
               </div>
 
-              {/* Platform Filter */}
+              {/* Platform Type Filter */}
               <div className="flex-1 min-w-[150px]">
                 <label className="block text-sm font-medium text-gray-700 mb-2">Platform</label>
                 <select
-                  value={filters.platform}
-                  onChange={(e) => handleFilterChange('platform', e.target.value)}
+                  value={filters.platform_type}
+                  onChange={(e) => handleFilterChange('platform_type', e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                 >
                   <option value="">All Platforms</option>
-                  {PLATFORMS.map(platform => (
-                    <option key={platform} value={platform}>{platform}</option>
+                  {PLATFORM_TYPES.map(platform => (
+                    <option key={platform.value} value={platform.value}>{platform.label}</option>
                   ))}
                 </select>
               </div>
@@ -379,32 +369,32 @@ const BrowsePackages = () => {
                     </select>
                   </div>
 
-                  {/* Package Type Filter */}
+                  {/* Collaboration Type Filter */}
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">Package Type</label>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Collaboration Type</label>
                     <select
-                      value={filters.package_type}
-                      onChange={(e) => handleFilterChange('package_type', e.target.value)}
+                      value={filters.collaboration_type}
+                      onChange={(e) => handleFilterChange('collaboration_type', e.target.value)}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                     >
                       <option value="">All Types</option>
-                      {PACKAGE_TYPES.map(type => (
+                      {COLLABORATION_TYPES.map(type => (
                         <option key={type} value={type}>{type}</option>
                       ))}
                     </select>
                   </div>
 
-                  {/* Platform Filter */}
+                  {/* Platform Type Filter */}
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">Platform</label>
                     <select
-                      value={filters.platform}
-                      onChange={(e) => handleFilterChange('platform', e.target.value)}
+                      value={filters.platform_type}
+                      onChange={(e) => handleFilterChange('platform_type', e.target.value)}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                     >
                       <option value="">All Platforms</option>
-                      {PLATFORMS.map(platform => (
-                        <option key={platform} value={platform}>{platform}</option>
+                      {PLATFORM_TYPES.map(platform => (
+                        <option key={platform.value} value={platform.value}>{platform.label}</option>
                       ))}
                     </select>
                   </div>
@@ -462,7 +452,7 @@ const BrowsePackages = () => {
           </div>
 
           {/* Clear Filters Button */}
-          {(searchInput || filters.search || filters.category || filters.platform || filters.price_range || filters.package_type || filters.delivery_time || filters.follower_range || filters.sort_by !== 'relevance') && (
+          {(searchInput || filters.search || filters.category || filters.platform_type || filters.price_range || filters.collaboration_type || filters.delivery_time || filters.follower_range || filters.sort_by !== 'relevance') && (
             <div className="mt-4 flex justify-end">
               <button
                 onClick={clearFilters}
@@ -541,6 +531,27 @@ const BrowsePackages = () => {
                       </div>
                     </div>
                   </div>
+
+                  {/* Platform Badge */}
+                  {pkg.platform_type && PLATFORM_CONFIGS[pkg.platform_type] && (
+                    <div className="mb-3">
+                      <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg ${PLATFORM_CONFIGS[pkg.platform_type].bgColor}`}>
+                        <svg
+                          className={`w-4 h-4 ${PLATFORM_CONFIGS[pkg.platform_type].color}`}
+                          viewBox="0 0 24 24"
+                          fill="currentColor"
+                        >
+                          {PLATFORM_CONFIGS[pkg.platform_type].icon}
+                        </svg>
+                        <span className={`text-sm font-medium ${PLATFORM_CONFIGS[pkg.platform_type].color}`}>
+                          {pkg.platform_type}
+                        </span>
+                        {pkg.content_type && (
+                          <span className="text-sm text-gray-600">• {pkg.content_type}</span>
+                        )}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Package Title */}
                   <h3 className="font-semibold text-gray-900 mb-2 line-clamp-2">

@@ -102,23 +102,38 @@ const PackageDetails = () => {
     <div className="min-h-screen bg-light py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Navigation */}
-        <div className="mb-6 flex items-center gap-4">
+        <div className="mb-6 flex items-center gap-4 flex-wrap">
+          {pkg.creator && (
+            <>
+              <Link
+                to={`/creators/${pkg.creator.id}`}
+                className="text-gray-600 hover:text-gray-900 flex items-center gap-2"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                </svg>
+                Back to Creator Profile
+              </Link>
+              <span className="text-gray-300">|</span>
+            </>
+          )}
           <Link
             to="/browse/packages"
-            className="text-gray-600 hover:text-gray-900 flex items-center gap-2"
-          >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-            Back to Browse
-          </Link>
-          <span className="text-gray-300">|</span>
-          <Link
-            to={user?.user_type === 'brand' ? '/brand/dashboard' : '/creator/dashboard'}
             className="text-gray-600 hover:text-gray-900"
           >
-            Back to Dashboard
+            Browse Packages
           </Link>
+          {user && (
+            <>
+              <span className="text-gray-300">|</span>
+              <Link
+                to={user.user_type === 'brand' ? '/brand/dashboard' : '/creator/dashboard'}
+                className="text-gray-600 hover:text-gray-900"
+              >
+                Dashboard
+              </Link>
+            </>
+          )}
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
