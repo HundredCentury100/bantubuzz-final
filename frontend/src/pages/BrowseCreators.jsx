@@ -129,8 +129,10 @@ const BrowseCreators = () => {
   };
 
   const handleSaveCreator = async (creatorId) => {
-    if (user?.user_type !== 'brand') {
-      toast.error('Only brands can save creators');
+    // If user is not logged in or not a brand, redirect to signup
+    if (!user || user?.user_type !== 'brand') {
+      toast.error('Please sign up as a brand to save creators');
+      navigate('/signup');
       return;
     }
 
@@ -669,26 +671,24 @@ const BrowseCreators = () => {
                   className="bg-primary p-4 rounded-3xl shadow-sm hover:shadow-md transition-shadow relative"
                 >
                   {/* Save/Unsave Heart Icon - Top Right */}
-                  {user?.user_type === 'brand' && (
-                    <button
-                      onClick={(e) => {
-                        e.preventDefault();
-                        handleSaveCreator(creator.id);
-                      }}
-                      className="absolute top-6 right-6 z-10 w-10 h-10 flex items-center justify-center bg-white/90 hover:bg-white rounded-full shadow-md transition-all hover:scale-110"
-                      title={savedCreatorIds.has(creator.id) ? 'Unsave creator' : 'Save creator'}
-                    >
-                      {savedCreatorIds.has(creator.id) ? (
-                        <svg className="w-6 h-6 text-red-500" fill="currentColor" viewBox="0 0 24 24">
-                          <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
-                        </svg>
-                      ) : (
-                        <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                        </svg>
-                      )}
-                    </button>
-                  )}
+                  <button
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handleSaveCreator(creator.id);
+                    }}
+                    className="absolute top-6 right-6 z-10 w-10 h-10 flex items-center justify-center bg-white/90 hover:bg-white rounded-full shadow-md transition-all hover:scale-110"
+                    title={savedCreatorIds.has(creator.id) ? 'Unsave creator' : 'Save creator'}
+                  >
+                    {savedCreatorIds.has(creator.id) ? (
+                      <svg className="w-6 h-6 text-red-500" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+                      </svg>
+                    ) : (
+                      <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                      </svg>
+                    )}
+                  </button>
 
                   {/* White Inner Container */}
                   <div className="bg-white rounded-2xl overflow-hidden mb-4">
