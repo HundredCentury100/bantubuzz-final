@@ -755,16 +755,6 @@ const BrowseCreators = () => {
                     </div>
                   )}
 
-                  {/* Price Display - Smaller */}
-                  {creator.cheapest_package_price && (
-                    <div className="mb-3 text-center">
-                      <p className="text-xs text-gray-600 mb-0.5">Starting from</p>
-                      <p className="text-lg font-semibold text-gray-900">
-                        ${creator.cheapest_package_price}
-                      </p>
-                    </div>
-                  )}
-
                   {/* Platform Icons and Category - On Primary Background */}
                   <div className="flex justify-between items-center mb-3">
                     {/* Platform Icons */}
@@ -823,6 +813,16 @@ const BrowseCreators = () => {
                       {creator.categories?.[0] || 'Model'}
                     </span>
                   </div>
+
+                  {/* Price Display - Smaller */}
+                  {creator.cheapest_package_price && (
+                    <div className="mb-3 text-center">
+                      <p className="text-xs text-gray-600 mb-0.5">Starting from</p>
+                      <p className="text-lg font-semibold text-gray-900">
+                        ${creator.cheapest_package_price}
+                      </p>
+                    </div>
+                  )}
 
                   {/* View Profile Button - White on Primary Background */}
                   <Link

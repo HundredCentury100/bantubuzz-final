@@ -60,7 +60,9 @@
       "Bash(if exist \"backend\\nul\" del \"backend\\nul\")",
       "Bash(git log:*)",
       "Bash(if exist dist.tar.gz del dist.tar.gz)",
-      "Bash(del \"d:\\Bantubuzz Platform\\dist.tar.gz\")"
+      "Bash(del \"d:\\Bantubuzz Platform\\dist.tar.gz\")",
+      "Bash(if exist \"frontend\\dist.tar.gz\" del \"frontend\\dist.tar.gz\")",
+      "Bash(git rm:*)"
     ],
     "deny": [],
     "ask": []
