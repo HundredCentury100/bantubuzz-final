@@ -10,6 +10,7 @@ import CreatorBadge from '../components/CreatorBadge';
 import CustomPackageRequestModal from '../components/CustomPackageRequestModal';
 import SEO from '../components/SEO';
 import toast from 'react-hot-toast';
+import { PLATFORM_CONFIGS, PACKAGE_TYPES } from '../constants/platformConfig';
 
 const CreatorProfile = () => {
   const { id } = useParams();
@@ -25,6 +26,7 @@ const CreatorProfile = () => {
   const [isSaved, setIsSaved] = useState(false);
   const [selectedImage, setSelectedImage] = useState(null);
   const [showCustomRequestModal, setShowCustomRequestModal] = useState(false);
+  const [activeTab, setActiveTab] = useState('All');
 
   useEffect(() => {
     fetchCreatorData();
@@ -459,64 +461,156 @@ const CreatorProfile = () => {
               <p className="text-gray-500">This creator hasn't created any packages yet</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {packages.filter(pkg => pkg.is_active).map((pkg) => (
-                <div key={pkg.id} className="card hover:shadow-lg transition-shadow">
-                  <h3 className="font-bold text-lg text-dark mb-2">{pkg.title}</h3>
-                  <p className="text-gray-600 text-sm mb-4 line-clamp-2">{pkg.description}</p>
-
-                  <div className="mb-4">
-                    <span className="text-xs px-2 py-1 bg-primary/10 text-primary rounded">
-                      {pkg.category}
+            <>
+              {/* Platform Tabs */}
+              <div className="mb-6 border-b border-gray-200 overflow-x-auto">
+                <div className="flex gap-1 min-w-max">
+                  {/* All Tab */}
+                  <button
+                    onClick={() => setActiveTab('All')}
+                    className={`px-4 py-3 text-sm font-medium transition-colors border-b-2 whitespace-nowrap ${
+                      activeTab === 'All'
+                        ? 'border-primary text-primary'
+                        : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300'
+                    }`}
+                  >
+                    All
+                    <span className="ml-2 px-2 py-0.5 rounded-full text-xs bg-gray-100 text-gray-700">
+                      {packages.filter(pkg => pkg.is_active).length}
                     </span>
-                  </div>
+                  </button>
 
-                  <div className="flex items-baseline gap-2 mb-4">
-                    <span className="text-2xl font-bold text-primary">${pkg.price}</span>
-                    <span className="text-sm text-gray-500">/ {pkg.duration_days} days</span>
-                  </div>
+                  {/* Platform Tabs */}
+                  {PACKAGE_TYPES.map((platform) => {
+                    const platformPackages = packages.filter(
+                      pkg => pkg.is_active && pkg.platform_type === platform.value
+                    );
 
-                  {pkg.deliverables && pkg.deliverables.length > 0 && (
-                    <div className="mb-4">
-                      <p className="text-sm font-medium text-gray-700 mb-2">Includes:</p>
-                      <ul className="text-sm text-gray-600 space-y-1">
-                        {pkg.deliverables.slice(0, 3).map((item, idx) => (
-                          <li key={idx} className="flex items-start gap-2">
-                            <svg className="w-4 h-4 text-primary-dark mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                            </svg>
-                            <span className="line-clamp-1">{item}</span>
-                          </li>
-                        ))}
-                        {pkg.deliverables.length > 3 && (
-                          <li className="text-primary text-xs">+{pkg.deliverables.length - 3} more</li>
-                        )}
-                      </ul>
-                    </div>
-                  )}
+                    // Only show tab if there are packages for this platform
+                    if (platformPackages.length === 0) return null;
 
-                  <div className="flex gap-2">
-                    {(!user || user?.user_type === 'brand') && (
+                    const config = PLATFORM_CONFIGS[platform.value];
+
+                    return (
                       <button
-                        onClick={() => handleAddToCart(pkg)}
-                        className="flex-1 px-4 py-2 rounded-lg border border-primary bg-white text-primary hover:bg-primary hover:text-white transition-colors flex items-center justify-center gap-2"
+                        key={platform.value}
+                        onClick={() => setActiveTab(platform.value)}
+                        className={`px-4 py-3 text-sm font-medium transition-colors border-b-2 flex items-center gap-2 whitespace-nowrap ${
+                          activeTab === platform.value
+                            ? 'border-primary text-primary'
+                            : 'border-transparent text-gray-600 hover:text-gray-900 hover:border-gray-300'
+                        }`}
                       >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
-                        </svg>
-                        Add to Cart
+                        {config && (
+                          <svg
+                            className={`w-4 h-4 ${activeTab === platform.value ? config.color : 'text-gray-500'}`}
+                            viewBox="0 0 24 24"
+                            fill="currentColor"
+                          >
+                            {config.icon}
+                          </svg>
+                        )}
+                        {platform.value}
+                        <span className={`px-2 py-0.5 rounded-full text-xs ${
+                          activeTab === platform.value
+                            ? 'bg-primary/10 text-primary'
+                            : 'bg-gray-100 text-gray-700'
+                        }`}>
+                          {platformPackages.length}
+                        </span>
                       </button>
-                    )}
-                    <Link
-                      to={`/packages/${pkg.id}`}
-                      className={`btn btn-primary text-center ${(!user || user?.user_type === 'brand') ? 'flex-1' : 'w-full'}`}
-                    >
-                      View Details
-                    </Link>
-                  </div>
+                    );
+                  })}
                 </div>
-              ))}
-            </div>
+              </div>
+
+              {/* Packages Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {packages
+                  .filter(pkg => {
+                    if (!pkg.is_active) return false;
+                    if (activeTab === 'All') return true;
+                    return pkg.platform_type === activeTab;
+                  })
+                  .map((pkg) => (
+                    <div key={pkg.id} className="card hover:shadow-lg transition-shadow">
+                      {/* Platform Badge */}
+                      {pkg.platform_type && PLATFORM_CONFIGS[pkg.platform_type] && (
+                        <div className="mb-3">
+                          <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg ${PLATFORM_CONFIGS[pkg.platform_type].bgColor}`}>
+                            <svg
+                              className={`w-4 h-4 ${PLATFORM_CONFIGS[pkg.platform_type].color}`}
+                              viewBox="0 0 24 24"
+                              fill="currentColor"
+                            >
+                              {PLATFORM_CONFIGS[pkg.platform_type].icon}
+                            </svg>
+                            <span className={`text-sm font-medium ${PLATFORM_CONFIGS[pkg.platform_type].color}`}>
+                              {pkg.platform_type}
+                            </span>
+                            {pkg.content_type && (
+                              <span className="text-sm text-gray-600">• {pkg.content_type}</span>
+                            )}
+                          </div>
+                        </div>
+                      )}
+
+                      <h3 className="font-bold text-lg text-dark mb-2">{pkg.title}</h3>
+                      <p className="text-gray-600 text-sm mb-4 line-clamp-2">{pkg.description}</p>
+
+                      <div className="mb-4">
+                        <span className="text-xs px-2 py-1 bg-primary/10 text-primary rounded">
+                          {pkg.collaboration_type || pkg.category}
+                        </span>
+                      </div>
+
+                      <div className="flex items-baseline gap-2 mb-4">
+                        <span className="text-2xl font-bold text-primary">${pkg.price}</span>
+                        <span className="text-sm text-gray-500">/ {pkg.duration_days} days</span>
+                      </div>
+
+                      {pkg.deliverables && pkg.deliverables.length > 0 && (
+                        <div className="mb-4">
+                          <p className="text-sm font-medium text-gray-700 mb-2">Includes:</p>
+                          <ul className="text-sm text-gray-600 space-y-1">
+                            {pkg.deliverables.slice(0, 3).map((item, idx) => (
+                              <li key={idx} className="flex items-start gap-2">
+                                <svg className="w-4 h-4 text-primary-dark mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                </svg>
+                                <span className="line-clamp-1">{item}</span>
+                              </li>
+                            ))}
+                            {pkg.deliverables.length > 3 && (
+                              <li className="text-primary text-xs">+{pkg.deliverables.length - 3} more</li>
+                            )}
+                          </ul>
+                        </div>
+                      )}
+
+                      <div className="flex gap-2">
+                        {(!user || user?.user_type === 'brand') && (
+                          <button
+                            onClick={() => handleAddToCart(pkg)}
+                            className="flex-1 px-4 py-2 rounded-lg border border-primary bg-white text-primary hover:bg-primary hover:text-white transition-colors flex items-center justify-center gap-2"
+                          >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                            </svg>
+                            Add to Cart
+                          </button>
+                        )}
+                        <Link
+                          to={`/packages/${pkg.id}`}
+                          className={`btn btn-primary text-center ${(!user || user?.user_type === 'brand') ? 'flex-1' : 'w-full'}`}
+                        >
+                          View Details
+                        </Link>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            </>
           )}
 
           {/* Custom Package Request Option */}

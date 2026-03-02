@@ -1168,6 +1168,130 @@ Three major updates to improve creator profile quality, reduce payment hold time
 - **Port 8002**: Backend API listening and responding
 - **Features Live**: Required fields, 14-day escrow, price display, package filtering ✅
 
+### Recent: Package Categorization by Platform (Mar 2, 2026)
+Major feature to organize creator packages by social media platform, similar to Collabstr's approach:
+
+**1. Database Schema Update** (Critical - Commit `a8b9c1d`)
+- **New columns added to packages table**:
+  - `platform_type` VARCHAR(50) - Platform where content will be posted (Instagram, TikTok, YouTube, Facebook, Twitter, LinkedIn, Threads, Twitch, UGC)
+  - `content_type` VARCHAR(50) - Type of content (Reel, Post, Story, Video, Short, etc.)
+- **Migration**: `backend/migrations/add_platform_type_to_packages.py`
+  - Uses `ALTER TABLE packages ADD COLUMN IF NOT EXISTS` for safe execution
+  - Nullable fields for backward compatibility with existing packages
+- **Execution**: Ran successfully via Python one-liner on production:
+  ```bash
+  ssh root@173.212.245.22 "cd /var/www/bantubuzz/backend && venv/bin/python3 -c \"
+  import os, sys
+  sys.path.insert(0, os.getcwd())
+  from app import create_app, db
+  from sqlalchemy import text
+  app = create_app()
+  with app.app_context():
+      db.session.execute(text('ALTER TABLE packages ADD COLUMN IF NOT EXISTS platform_type VARCHAR(50)'))
+      db.session.execute(text('ALTER TABLE packages ADD COLUMN IF NOT EXISTS content_type VARCHAR(50)'))
+      db.session.commit()
+  \""
+  ```
+
+**2. Platform Configuration System** (High Priority)
+- **New file**: `frontend/src/constants/platformConfig.jsx` (JSX for icon support)
+- **PLATFORM_CONFIGS object**: Complete configuration for 9 platforms
+  - **Icons**: SVG path elements for each platform (Instagram pink gradient, TikTok black, YouTube red, etc.)
+  - **Colors**: Tailwind classes for text and background (`text-pink-600`, `bg-pink-100`, etc.)
+  - **Content Types**: Platform-specific content types (Instagram: Reel/Post/Story/Carousel, TikTok: Video/Duet/Stitch/Live, etc.)
+  - **UGC Platform**: Camera icon with green color scheme for non-posted content (Video Ad, Photo Ad, Testimonial, Review, Product Demo)
+- **PACKAGE_TYPES array**: Dropdown options for package creation form
+- **Pattern**: Same icons used throughout BrowseCreators.jsx for consistency
+
+**3. Backend API Updates** (High Priority)
+- **Package Model**: Added `platform_type` and `content_type` fields
+  - File: `backend/app/models/package.py`
+  - Updated `to_dict()` method to include new fields in API responses
+- **Package Routes**:
+  - **Create endpoint**: Accepts `platform_type` and `content_type` from request
+  - **Update endpoint**: Added to `updatable_fields` list
+  - **Filter endpoint**: Added `platform_type` query parameter for filtering packages
+  - File: `backend/app/routes/packages.py`
+  - Pattern: `data.get('platform_type')` for optional fields
+
+**4. Package Form Enhancement** (High Priority - Commit `a8b9c1d`)
+- **Dynamic Platform Selector**: Added after Collaboration Type field
+  - Dropdown shows all 9 platform options (Instagram, TikTok, YouTube, Facebook, Twitter, LinkedIn, Threads, Twitch, UGC)
+  - Optional field (packages without platform_type remain valid)
+  - Label: "Choose the platform where content will be posted (or UGC for non-posted content)"
+- **Conditional Content Type Dropdown**:
+  - Only appears when platform_type is selected
+  - Options dynamically loaded from `PLATFORM_CONFIGS[platform_type].contentTypes`
+  - Auto-resets when platform changes to prevent invalid combinations
+  - Pattern: `watch('platform_type')` triggers conditional rendering
+- **Live Preview Badge**:
+  - Shows platform icon + name below dropdowns
+  - Displays content_type if selected (e.g., "Instagram • Reel")
+  - Uses same styling as creator profile badges
+  - Pattern: `bg-pink-100` outer + `text-pink-600` icon/text
+- **File**: `frontend/src/pages/PackageForm.jsx:355-435`
+
+**5. Creator Profile Tab Filtering** (High Priority - Commit `a8b9c1d`)
+- **Tab Navigation UI**: Replaced simple "Available Packages" header with Collabstr-style tabs
+  - **All Tab**: Shows all active packages with total count
+  - **Platform Tabs**: Dynamically generated based on creator's packages
+  - **Tab Display Logic**: Only shows tabs for platforms that have ≥1 package
+  - **Active State**: Bottom border with primary color, bold text
+  - **Package Count Badges**: Shows count in rounded badge (e.g., "Instagram (3)")
+  - **Platform Icons**: SVG icons displayed in each tab
+  - **Mobile Responsive**: Horizontal scroll for overflow tabs
+- **Filtering Logic**:
+  - `activeTab` state controls which packages are displayed
+  - `packages.filter(pkg => pkg.platform_type === activeTab)` for platform-specific display
+  - "All" tab bypasses filter to show everything
+  - Pattern: Same filter approach as BrowseCreators.jsx categories
+- **Package Card Updates**:
+  - **Platform Badge**: Displayed at top of each card when platform_type exists
+  - **Badge Design**: Icon + platform name + content type (if exists)
+  - **Pattern**: `bg-pink-100 px-3 py-1.5 rounded-lg` with platform-specific colors
+  - **Fallback**: Cards without platform_type still display normally
+- **File**: `frontend/src/pages/CreatorProfile.jsx:29, 465-614`
+
+**6. Technical Implementation Details**
+- **Icon Storage**: JSX elements stored in config (requires .jsx extension, not .js)
+- **SVG Rendering**: Icons rendered inline using `<svg>{config.icon}</svg>` pattern
+- **Build System**: Vite handles JSX transformation in constants folder
+- **Import Pattern**:
+  ```javascript
+  import { PLATFORM_CONFIGS, PACKAGE_TYPES } from '../constants/platformConfig';
+  ```
+- **State Management**: React Hook Form `watch()` for real-time platform_type tracking
+- **Backward Compatibility**: All new fields nullable, existing packages unaffected
+
+**7. User Experience Improvements**
+- **Creator Benefits**:
+  - Organize packages by platform for easier management
+  - Clearer service offerings (Instagram Reel vs TikTok Video vs UGC content)
+  - Professional presentation matching industry standards (Collabstr)
+- **Brand Benefits**:
+  - Filter packages by specific platform needs
+  - Understand exact deliverable format before booking
+  - Find platform-specific creators more easily
+- **Visual Clarity**:
+  - Color-coded platform badges (pink for Instagram, red for YouTube, etc.)
+  - Icon recognition for quick platform identification
+  - Tab navigation reduces scrolling on multi-platform creator profiles
+
+**Deployment** (Mar 2, 2026 14:15 CET)
+- **Backend Migration**: PostgreSQL columns added successfully
+- **Backend Files**: Package model + routes updated and uploaded
+- **Gunicorn Restart**: Backend restarted, API serving new fields
+- **Frontend Build**: `index-CYEMp5mv.css`, `index-uzCPA44N.js`
+- **Deploy Method**: Tarball → SCP → extract on server
+- **Frontend Deployment**: Dist files extracted to `/var/www/bantubuzz/frontend/dist/`
+- **Features Live**: Platform selectors in package form, tab filtering on creator profiles ✅
+
+**Impact**:
+- Brings BantuBuzz closer to Collabstr's feature parity
+- Improves marketplace organization and discoverability
+- Sets foundation for platform-specific analytics (future ThunziAI integration)
+- Better package categorization for search and filtering
+
 ### Current State (Mar 2026)
 ✅ Fully functional platform
 ✅ Complete subscription systems (brand + creator)
@@ -1187,6 +1311,8 @@ Three major updates to improve creator profile quality, reduce payment hold time
 ✅ Required creator profile fields (city, country, followers, categories, platforms)
 ✅ 14-day escrow period (reduced from 30 days)
 ✅ Lowest package price displayed on creator cards
+✅ Package categorization by platform (Instagram, TikTok, YouTube, Facebook, Twitter, LinkedIn, Threads, Twitch, UGC)
+✅ Tab filtering on creator profiles by platform
 🔄 Analytics integration planning complete (awaiting implementation)
 
 ---

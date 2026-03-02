@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { packagesAPI } from '../services/api';
+import { PLATFORM_CONFIGS, PACKAGE_TYPES } from '../constants/platformConfig';
 
 const COLLABORATION_TYPES = [
   'Brand Endorsement',
@@ -35,6 +36,8 @@ const PackageForm = () => {
     watch
   } = useForm();
 
+  const selectedPlatformType = watch('platform_type');
+
   useEffect(() => {
     if (isEditMode) {
       fetchPackage();
@@ -54,6 +57,8 @@ const PackageForm = () => {
       setValue('price', pkg.price);
       setValue('duration_days', pkg.duration_days);
       setValue('collaboration_type', pkg.collaboration_type || pkg.category); // Support both old and new
+      setValue('platform_type', pkg.platform_type || '');
+      setValue('content_type', pkg.content_type || '');
       setValue('is_active', pkg.is_active);
 
       // Set deliverables
@@ -82,6 +87,8 @@ const PackageForm = () => {
         price: parseFloat(data.price),
         duration_days: parseInt(data.duration_days),
         collaboration_type: data.collaboration_type,
+        platform_type: data.platform_type || null,
+        content_type: data.content_type || null,
         deliverables: validDeliverables,
         is_active: data.is_active
       };
@@ -343,6 +350,88 @@ const PackageForm = () => {
           <p className="mt-2 text-sm text-gray-500">
             Your niche/category can be set in your profile settings
           </p>
+        </div>
+
+        {/* Platform Type & Content Type */}
+        <div className="bg-white rounded-lg shadow-sm p-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Platform Type */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Platform Type
+              </label>
+              <select
+                {...register('platform_type')}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                onChange={(e) => {
+                  setValue('platform_type', e.target.value);
+                  setValue('content_type', ''); // Reset content type when platform changes
+                }}
+              >
+                <option value="">Select platform (optional)</option>
+                {PACKAGE_TYPES.map((platform) => {
+                  const config = PLATFORM_CONFIGS[platform.value];
+                  return (
+                    <option key={platform.value} value={platform.value}>
+                      {platform.label}
+                    </option>
+                  );
+                })}
+              </select>
+              <p className="mt-2 text-sm text-gray-500">
+                Choose the platform where content will be posted (or UGC for non-posted content)
+              </p>
+            </div>
+
+            {/* Content Type */}
+            {selectedPlatformType && PLATFORM_CONFIGS[selectedPlatformType] && (
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Content Type
+                </label>
+                <select
+                  {...register('content_type')}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                >
+                  <option value="">Select content type (optional)</option>
+                  {PLATFORM_CONFIGS[selectedPlatformType].contentTypes.map((type) => (
+                    <option key={type} value={type}>
+                      {type}
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-2 text-sm text-gray-500">
+                  Specify the type of content for this package
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Platform Preview Badge */}
+          {selectedPlatformType && PLATFORM_CONFIGS[selectedPlatformType] && (
+            <div className="mt-4 pt-4 border-t">
+              <p className="text-xs text-gray-600 mb-2">Preview:</p>
+              <div className="flex items-center gap-2">
+                <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg ${PLATFORM_CONFIGS[selectedPlatformType].bgColor}`}>
+                  <svg
+                    className={`w-4 h-4 ${PLATFORM_CONFIGS[selectedPlatformType].color}`}
+                    viewBox="0 0 24 24"
+                    fill="currentColor"
+                  >
+                    {PLATFORM_CONFIGS[selectedPlatformType].icon}
+                  </svg>
+                  <span className={`text-sm font-medium ${PLATFORM_CONFIGS[selectedPlatformType].color}`}>
+                    {selectedPlatformType}
+                  </span>
+                </div>
+                {watch('content_type') && (
+                  <span className="text-sm text-gray-600">
+                    • {watch('content_type')}
+                  </span>
+                )}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Deliverables */}
