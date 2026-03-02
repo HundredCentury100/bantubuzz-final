@@ -426,8 +426,8 @@ def pay_with_wallet():
         subscription.start_date = datetime.utcnow()
 
         # Set end date based on plan duration
-        if plan.duration_months:
-            subscription.end_date = datetime.utcnow() + timedelta(days=plan.duration_months * 30)
+        if plan.duration_days:
+            subscription.end_date = datetime.utcnow() + timedelta(days=plan.duration_days)
         else:
             # One-time verification
             subscription.end_date = None
