@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
-import api from '../services/api';
+import api, { creatorWalletAPI } from '../services/api';
 import Navbar from '../components/Navbar';
 import toast from 'react-hot-toast';
 import { useAuth } from '../hooks/useAuth';
@@ -18,20 +18,33 @@ const SubscriptionPayment = () => {
   const [paymentMethod, setPaymentMethod] = useState('paynow');
   const [proofFile, setProofFile] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [walletBalance, setWalletBalance] = useState(null);
+  const [loadingWallet, setLoadingWallet] = useState(false);
 
   // Get plan info from location state
   const planInfo = location.state?.plan;
   const billingCycle = location.state?.billingCycle || 'monthly';
+  const stateSubscription = location.state?.subscription;
 
   useEffect(() => {
     if (subscriptionId) {
       fetchSubscription();
+    } else if (stateSubscription) {
+      // Subscription passed from CreatorSubscriptions
+      setSubscription(stateSubscription);
+      setPaymentData(location.state?.paymentData);
+      setLoading(false);
     } else if (location.state?.paymentData) {
       // Payment data passed from SubscriptionManage after initiation
       setPaymentData(location.state.paymentData);
       setLoading(false);
     }
-  }, [subscriptionId]);
+
+    // Fetch wallet balance for creators
+    if (user?.user_type === 'creator') {
+      fetchWalletBalance();
+    }
+  }, [subscriptionId, user, stateSubscription]);
 
   const fetchSubscription = async () => {
     try {
@@ -46,6 +59,57 @@ const SubscriptionPayment = () => {
       toast.error('Failed to load subscription details');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchWalletBalance = async () => {
+    try {
+      setLoadingWallet(true);
+      const response = await creatorWalletAPI.getBalance();
+      if (response.data.success) {
+        setWalletBalance(response.data.wallet);
+      }
+    } catch (error) {
+      console.error('Error fetching wallet balance:', error);
+    } finally {
+      setLoadingWallet(false);
+    }
+  };
+
+  const handleWalletPayment = async () => {
+    const plan = subscription?.plan || planInfo;
+    const amount = billingCycle === 'yearly' ? plan?.price_yearly : plan?.price_monthly;
+
+    if (!walletBalance || walletBalance.available_balance < amount) {
+      toast.error('Insufficient wallet balance');
+      return;
+    }
+
+    // Get subscription ID from various sources
+    const subId = subscription?.id || subscriptionId || paymentData?.subscription_id;
+
+    if (!subId) {
+      toast.error('Subscription ID not found. Please try again.');
+      console.error('Missing subscription ID:', { subscription, subscriptionId, paymentData });
+      return;
+    }
+
+    try {
+      setPaymentLoading(true);
+      const response = await api.post('/creator/subscriptions/pay-with-wallet', {
+        subscription_id: subId,
+        billing_cycle: billingCycle
+      });
+
+      if (response.data.success) {
+        toast.success('Payment successful! Your subscription is now active.');
+        navigate('/subscription/manage');
+      }
+    } catch (error) {
+      console.error('Wallet payment error:', error);
+      toast.error(error.response?.data?.error || 'Failed to process wallet payment');
+    } finally {
+      setPaymentLoading(false);
     }
   };
 
@@ -84,11 +148,19 @@ const SubscriptionPayment = () => {
       return;
     }
 
+    // Get subscription ID from various sources
+    const subId = subscription?.id || subscriptionId || paymentData?.subscription_id;
+
+    if (!subId) {
+      toast.error('Subscription ID not found. Please try again.');
+      return;
+    }
+
     try {
       setUploading(true);
       const formData = new FormData();
       formData.append('file', proofFile);
-      formData.append('subscription_id', subscriptionId || paymentData?.subscription_id);
+      formData.append('subscription_id', subId);
 
       // Use different endpoint based on user type
       const endpoint = user?.user_type === 'creator'
@@ -114,7 +186,7 @@ const SubscriptionPayment = () => {
   };
 
   const handleCheckPaymentStatus = async () => {
-    const subId = subscriptionId || paymentData?.subscription_id;
+    const subId = subscription?.id || subscriptionId || paymentData?.subscription_id;
     if (!subId) {
       toast.error('No subscription ID available');
       return;
@@ -176,8 +248,35 @@ const SubscriptionPayment = () => {
           {/* Header */}
           <div className="mb-12 text-center">
             <h1 className="text-5xl md:text-6xl font-bold text-dark mb-4 leading-tight">Complete Payment</h1>
-            <p className="text-lg md:text-xl text-gray-600 leading-relaxed">Secure payment via Paynow</p>
+            <p className="text-lg md:text-xl text-gray-600 leading-relaxed">Choose your payment method</p>
           </div>
+
+          {/* Wallet Balance Card - Only show for creators */}
+          {user?.user_type === 'creator' && walletBalance && (
+            <div className="bg-gradient-to-r from-primary to-primary-dark rounded-3xl shadow-lg p-6 mb-6 text-white">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm opacity-90 mb-1">Available Wallet Balance</p>
+                  <p className="text-3xl font-bold">${(walletBalance.available_balance || 0).toFixed(2)}</p>
+                </div>
+                <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center">
+                  <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                  </svg>
+                </div>
+              </div>
+              {walletBalance.available_balance < amount && amount > 0 && (
+                <div className="mt-4 pt-4 border-t border-white/20">
+                  <p className="text-sm">
+                    <svg className="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    Insufficient balance. You need ${(amount - walletBalance.available_balance).toFixed(2)} more.
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Subscription Summary Card */}
           <div className="bg-white rounded-3xl shadow-sm p-8 mb-6">
@@ -218,9 +317,45 @@ const SubscriptionPayment = () => {
             <h2 className="text-2xl font-bold text-dark mb-6">Select Payment Method</h2>
 
             <div className="space-y-4 mb-6">
+              {/* Wallet Option - Only for creators with sufficient balance */}
+              {user?.user_type === 'creator' && walletBalance && (
+                <label
+                  className={`flex items-start p-4 border-2 rounded-3xl cursor-pointer transition-colors ${
+                    walletBalance.available_balance < amount ? 'opacity-50 cursor-not-allowed' : 'hover:border-primary'
+                  }`}
+                  style={{ borderColor: paymentMethod === 'wallet' ? '#ccdb53' : '#e5e7eb' }}
+                >
+                  <input
+                    type="radio"
+                    name="paymentMethod"
+                    value="wallet"
+                    checked={paymentMethod === 'wallet'}
+                    onChange={(e) => setPaymentMethod(e.target.value)}
+                    disabled={walletBalance.available_balance < amount}
+                    className="mt-1"
+                  />
+                  <div className="ml-3 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-dark">Pay with Wallet</span>
+                      {walletBalance.available_balance >= amount && (
+                        <span className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full">Recommended</span>
+                      )}
+                    </div>
+                    <p className="text-sm text-gray-600 mt-1">
+                      Use your wallet balance (${(walletBalance.available_balance || 0).toFixed(2)} available)
+                    </p>
+                    {walletBalance.available_balance < amount && (
+                      <p className="text-sm text-red-600 mt-1">
+                        Insufficient balance. You need ${((amount || 0) - (walletBalance.available_balance || 0)).toFixed(2)} more.
+                      </p>
+                    )}
+                  </div>
+                </label>
+              )}
+
               {/* Paynow Option */}
               <label className="flex items-start p-4 border-2 rounded-3xl cursor-pointer hover:border-primary transition-colors"
-                     style={{ borderColor: paymentMethod === 'paynow' ? '#F15A29' : '#e5e7eb' }}>
+                     style={{ borderColor: paymentMethod === 'paynow' ? '#ccdb53' : '#e5e7eb' }}>
                 <input
                   type="radio"
                   name="paymentMethod"
@@ -239,7 +374,7 @@ const SubscriptionPayment = () => {
 
               {/* Bank Transfer Option */}
               <label className="flex items-start p-4 border-2 rounded-3xl cursor-pointer hover:border-primary transition-colors"
-                     style={{ borderColor: paymentMethod === 'bank_transfer' ? '#F15A29' : '#e5e7eb' }}>
+                     style={{ borderColor: paymentMethod === 'bank_transfer' ? '#ccdb53' : '#e5e7eb' }}>
                 <input
                   type="radio"
                   name="paymentMethod"
@@ -309,23 +444,37 @@ const SubscriptionPayment = () => {
 
             {/* Payment Button */}
             <button
-              onClick={paymentMethod === 'paynow' ? handleProceedToPayment : handleManualPayment}
-              disabled={(paymentMethod === 'paynow' && !paymentData?.redirect_url) || (paymentMethod === 'bank_transfer' && !proofFile) || uploading}
+              onClick={
+                paymentMethod === 'wallet'
+                  ? handleWalletPayment
+                  : paymentMethod === 'paynow'
+                    ? handleProceedToPayment
+                    : handleManualPayment
+              }
+              disabled={
+                paymentLoading ||
+                uploading ||
+                (paymentMethod === 'paynow' && !paymentData?.redirect_url) ||
+                (paymentMethod === 'bank_transfer' && !proofFile) ||
+                (paymentMethod === 'wallet' && (!walletBalance || walletBalance.available_balance < amount))
+              }
               className="bg-dark hover:bg-gray-800 text-white font-medium px-6 py-3 rounded-full w-full disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-colors"
             >
-              {uploading ? (
+              {(paymentLoading || uploading) ? (
                 <>
                   <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                  Uploading...
+                  Processing...
                 </>
               ) : (
                 <>
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
                   </svg>
-                  {paymentMethod === 'paynow'
-                    ? (!paymentData?.redirect_url ? 'Initializing Payment...' : 'Proceed to Payment')
-                    : 'Submit Payment'}
+                  {paymentMethod === 'wallet'
+                    ? 'Pay with Wallet'
+                    : paymentMethod === 'paynow'
+                      ? (!paymentData?.redirect_url ? 'Initializing Payment...' : 'Proceed to Payment')
+                      : 'Submit Payment'}
                 </>
               )}
             </button>

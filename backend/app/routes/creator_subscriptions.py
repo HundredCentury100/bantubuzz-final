@@ -357,3 +357,99 @@ def upload_payment_proof():
     except Exception as e:
         db.session.rollback()
         return jsonify({'success': False, 'error': str(e)}), 500
+
+@creator_subscriptions_bp.route('/api/creator/subscriptions/pay-with-wallet', methods=['POST'])
+@jwt_required()
+def pay_with_wallet():
+    """Pay for subscription using wallet balance"""
+    try:
+        current_user_id = get_jwt_identity()
+        user = User.query.get(current_user_id)
+
+        if not user or user.user_type != 'creator':
+            return jsonify({'error': 'Creator account required'}), 403
+
+        creator = CreatorProfile.query.filter_by(user_id=current_user_id).first()
+        if not creator:
+            return jsonify({'error': 'Creator profile not found'}), 404
+
+        data = request.json
+        subscription_id = data.get('subscription_id')
+
+        if not subscription_id:
+            return jsonify({'error': 'Subscription ID is required'}), 400
+
+        # Get the subscription
+        subscription = CreatorSubscription.query.get(subscription_id)
+        if not subscription or subscription.creator_id != creator.id:
+            return jsonify({'error': 'Subscription not found'}), 404
+
+        if subscription.status not in ['pending_payment', 'pending']:
+            return jsonify({'error': 'Subscription already processed'}), 400
+
+        # Get the plan
+        plan = subscription.plan
+        amount = plan.price
+
+        # Get wallet
+        from app.models import Wallet, WalletTransaction
+        wallet = Wallet.query.filter_by(user_id=current_user_id).first()
+        
+        if not wallet:
+            return jsonify({'error': 'Wallet not found'}), 404
+
+        if wallet.available_balance < amount:
+            return jsonify({
+                'error': f'Insufficient wallet balance. Available: ${float(wallet.available_balance):.2f}, Required: ${float(amount):.2f}'
+            }), 400
+
+        # Deduct from wallet
+        wallet.available_balance -= amount
+        
+        # Create wallet transaction
+        transaction = WalletTransaction(
+            wallet_id=wallet.id,
+            user_id=current_user_id,
+            amount=amount,
+            transaction_type='debit',
+            status='completed',
+            description=f'Payment for {plan.name} subscription',
+            clearance_required=False
+        )
+
+        db.session.add(transaction)
+
+        # Activate subscription
+        subscription.payment_verified = True
+        subscription.payment_method = 'wallet'
+        subscription.status = 'active'
+        subscription.start_date = datetime.utcnow()
+
+        # Set end date based on plan duration
+        if plan.duration_months:
+            subscription.end_date = datetime.utcnow() + timedelta(days=plan.duration_months * 30)
+        else:
+            # One-time verification
+            subscription.end_date = None
+
+        # Apply subscription effects
+        if plan.subscription_type == 'verification':
+            creator.is_verified = True
+        elif plan.subscription_type == 'featured':
+            if plan.featured_category == 'homepage':
+                creator.is_featured_homepage = True
+            elif plan.featured_category == 'category':
+                creator.is_featured_category = True
+
+        db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'message': 'Payment successful. Your subscription is now active.',
+            'subscription': subscription.to_dict(),
+            'wallet_balance': float(wallet.available_balance)
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500

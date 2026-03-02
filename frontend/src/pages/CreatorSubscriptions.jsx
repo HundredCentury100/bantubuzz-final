@@ -43,12 +43,17 @@ const CreatorSubscriptions = () => {
         payment_method: 'paynow'
       });
 
-      if (response.data.payment?.redirect_url) {
-        // Redirect to Paynow
-        window.location.href = response.data.payment.redirect_url;
+      if (response.data.subscription) {
+        // Navigate to payment page to choose payment method
+        navigate('/subscription/payment', {
+          state: {
+            subscription: response.data.subscription,
+            plan: response.data.subscription.plan,
+            paymentData: response.data.payment
+          }
+        });
       } else {
-        toast.success(response.data.message);
-        fetchSubscriptionData();
+        toast.error('Failed to create subscription');
       }
     } catch (error) {
       console.error('Error subscribing:', error);

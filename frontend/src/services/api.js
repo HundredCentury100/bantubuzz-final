@@ -270,6 +270,13 @@ export const brandWalletAPI = {
   getTransactions: (params) => api.get('/brand/wallet/transactions', { params }),
 };
 
+// Creator Wallet API
+export const creatorWalletAPI = {
+  getBalance: () => api.get('/wallet/balance'),
+  getTransactions: (params) => api.get('/wallet/transactions', { params }),
+  getStatistics: () => api.get('/wallet/statistics'),
+};
+
 // Payments API
 export const paymentsAPI = {
   createRevisionPayment: (data) => api.post('/payments/revision', data),
