@@ -1292,11 +1292,134 @@ Major feature to organize creator packages by social media platform, similar to 
 - Sets foundation for platform-specific analytics (future ThunziAI integration)
 - Better package categorization for search and filtering
 
+### Recent: Wallet Payment for Creator Subscriptions (Mar 2, 2026)
+Major feature allowing creators to pay for subscriptions using their wallet balance instead of only Paynow/bank transfer:
+
+**1. Payment Method Selection Flow** (Critical - Commit `6b6c6d7`)
+- **Issue**: Subscription buttons at `/creator/subscriptions` redirected directly to Paynow, bypassing payment options
+- **Root cause**: `handleSubscribe` hardcoded `payment_method: 'paynow'` and immediately redirected to `window.location.href = redirect_url`
+- **Solution**: Navigate to `/subscription/payment` page with subscription data in location.state
+- **Pattern**: `navigate('/subscription/payment', { state: { subscription, plan, paymentData } })`
+- **Files**: `frontend/src/pages/CreatorSubscriptions.jsx:38-64`
+
+**2. Wallet Payment Option UI** (High Priority)
+- **Wallet Balance Card**: Gradient primary background card displaying available balance
+  - Shows wallet balance with large text (`text-3xl font-bold`)
+  - Wallet icon in white/20 circular background
+  - Insufficient balance warning when amount > balance
+  - Displays exact shortfall amount
+  - File: `frontend/src/pages/SubscriptionPayment.jsx:231-256`
+- **Payment Method Radio Buttons**: Three options (Wallet, Paynow, Bank Transfer)
+  - Wallet option shows "Recommended" badge when sufficient balance
+  - Disabled state with opacity when insufficient funds
+  - Shows exact shortfall: "You need $X more"
+  - Pattern: `border-primary` for selected option
+  - File: `frontend/src/pages/SubscriptionPayment.jsx:297-331`
+- **Smart Payment Button**: Conditional onClick based on selected method
+  - Wallet → `handleWalletPayment`
+  - Paynow → `handleProceedToPayment`
+  - Bank Transfer → `handleManualPayment`
+  - Disabled states for each method's requirements
+  - Dynamic button text based on payment method
+  - File: `frontend/src/pages/SubscriptionPayment.jsx:423-457`
+
+**3. Frontend API Integration** (High Priority)
+- **Added creatorWalletAPI** to `frontend/src/services/api.js:273-278`
+  - `getBalance()` - Fetch creator wallet balance
+  - `getTransactions(params)` - Fetch transaction history
+  - `getStatistics()` - Fetch wallet statistics
+- **State Management**: Added wallet-specific state variables
+  - `walletBalance` - Stores wallet object from API
+  - `loadingWallet` - Loading state for wallet fetch
+  - `fetchWalletBalance()` - Async function to get balance
+  - Pattern: Fetch on component mount if `user?.user_type === 'creator'`
+
+**4. Subscription ID Extraction Fix** (Critical)
+- **Issue**: "Subscription ID is required" error when paying with wallet
+- **Root cause**: Subscription passed via `location.state.subscription` but handlers only checked URL params
+- **Solution**: Smart ID extraction from multiple sources
+  ```javascript
+  const subId = subscription?.id || subscriptionId || paymentData?.subscription_id;
+  ```
+- **Applied to all payment handlers**: `handleWalletPayment`, `handleManualPayment`, `handleCheckPaymentStatus`
+- **State handling**: Extract `stateSubscription` from location.state and set on mount
+- **Files**: `frontend/src/pages/SubscriptionPayment.jsx:27, 32-36, 89, 152, 189`
+
+**5. Backend Wallet Payment Endpoint** (Critical)
+- **Route**: `POST /api/creator/subscriptions/pay-with-wallet`
+- **Authentication**: JWT required, creator-only (checks `user.user_type === 'creator'`)
+- **Validation**:
+  - Checks creator profile exists
+  - Verifies subscription belongs to creator (`subscription.creator_id == creator.id`)
+  - Ensures subscription status is `pending_payment` or `pending`
+  - Validates wallet has sufficient `available_balance`
+- **Wallet Deduction**:
+  - Deducts amount from `wallet.available_balance`
+  - Creates `WalletTransaction` record (type: `debit`, status: `completed`)
+  - Uses correct WalletTransaction fields (no `reference` or `category`)
+  - Pattern:
+    ```python
+    transaction = WalletTransaction(
+        wallet_id=wallet.id,
+        user_id=current_user_id,
+        amount=amount,
+        transaction_type='debit',
+        status='completed',
+        description=f'Payment for {plan.name} subscription',
+        clearance_required=False
+    )
+    ```
+- **Subscription Activation**:
+  - Sets `payment_verified=True`, `payment_method='wallet'`, `status='active'`
+  - Sets `start_date` to current time
+  - Calculates `end_date` based on plan duration (or `None` for one-time verification)
+  - Applies subscription effects (verification badge, featured placement)
+- **Response**: Returns success message, subscription dict, updated wallet balance
+- **File**: `backend/app/routes/creator_subscriptions.py:361-455`
+
+**6. WalletTransaction Model Compliance** (Critical)
+- **Issue**: Initial implementation used invalid fields `reference` and `category`
+- **Error**: `'reference' is an invalid keyword argument for WalletTransaction`
+- **Solution**: Used only valid WalletTransaction model fields from `backend/app/models/wallet.py`:
+  - `wallet_id`, `user_id`, `amount`, `transaction_type`, `status`
+  - `description`, `clearance_required` (set to False for instant deduction)
+  - Removed: `reference`, `category` (do not exist in model)
+- **Pattern**: Always check model definition before creating instances
+
+**Deployment** (Mar 2, 2026 16:20 CET - Commit `6b6c6d7`)
+- **Frontend Build**: `index-lL2P3NuY.js`, `index-BHCazXQ8.css`
+- **Backend Upload**: Updated `creator_subscriptions.py` with wallet payment endpoint
+- **Gunicorn Restart**: 5 processes running (PID 143558 master + 4 workers)
+- **Features Live**: Wallet payment option, payment method selection, instant subscription activation ✅
+
+**User Experience Flow**:
+1. Creator navigates to `/creator/subscriptions`
+2. Clicks "Subscribe Now" on any plan (verification or featured)
+3. Redirected to `/subscription/payment` with subscription data
+4. Sees wallet balance card (if creator) with available funds
+5. Chooses payment method: Wallet (recommended if sufficient), Paynow, or Bank Transfer
+6. If wallet selected:
+   - Click "Pay with Wallet" button
+   - Backend validates balance and deducts amount
+   - Subscription instantly activated
+   - Creator redirected to `/subscription/manage`
+7. If insufficient wallet balance:
+   - Option disabled with red warning
+   - Shows exact amount needed: "You need $X more"
+   - Creator can top up wallet or choose alternative payment
+
+**Impact**:
+- Improved creator experience with instant payment option
+- Reduced friction (no external redirect for wallet payments)
+- Encourages wallet usage for creators with earned funds
+- Aligns with brand experience (brands already use wallet for collaboration payments)
+- Complete payment method parity: Paynow, Bank Transfer, Wallet
+
 ### Current State (Mar 2026)
 ✅ Fully functional platform
 ✅ Complete subscription systems (brand + creator)
 ✅ Collabstr-style pricing with tiered service fees
-✅ Payment integration (Paynow + manual)
+✅ Payment integration (Paynow + manual + wallet)
 ✅ Admin dashboard
 ✅ Messaging with real-time updates
 ✅ Design system consistency achieved
@@ -1313,6 +1436,7 @@ Major feature to organize creator packages by social media platform, similar to 
 ✅ Lowest package price displayed on creator cards
 ✅ Package categorization by platform (Instagram, TikTok, YouTube, Facebook, Twitter, LinkedIn, Threads, Twitch, UGC)
 ✅ Tab filtering on creator profiles by platform
+✅ Wallet payment for creator subscriptions (instant activation, payment method selection)
 🔄 Analytics integration planning complete (awaiting implementation)
 
 ---
