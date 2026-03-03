@@ -105,10 +105,11 @@ def connect_platform():
             db.session.add(thunzi_account)
             db.session.commit()
 
-        # Add platform to ThunziAI
+        # Add platform to ThunziAI (map twitter to x for ThunziAI API)
+        thunzi_platform_name = 'x' if platform == 'twitter' else platform
         thunzi_platform = thunzi_service.add_platform(
             company_id=thunzi_account.thunzi_company_id,
-            platform=platform,
+            platform=thunzi_platform_name,
             account_name=account_name,
             access_token=access_token
         )
@@ -135,7 +136,7 @@ def connect_platform():
         db.session.add(connected_platform)
 
         # Update creator profile with follower count if this is their primary platform
-        if connected_platform.followers > 0:
+        if connected_platform.followers and connected_platform.followers > 0:
             # Update if this is their first platform or has more followers
             if creator.follower_count is None or connected_platform.followers > creator.follower_count:
                 creator.follower_count = connected_platform.followers
