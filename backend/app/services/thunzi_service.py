@@ -81,7 +81,7 @@ class ThunziAIService:
                 json=payload
             )
 
-            if response.status_code == 200:
+            if response.status_code in [200, 201]:  # Accept both 200 OK and 201 Created
                 data = response.json()
                 return data.get('id')
 
@@ -123,7 +123,7 @@ class ThunziAIService:
                 json=payload
             )
 
-            if response.status_code == 200:
+            if response.status_code in [200, 201]:  # Accept both 200 OK and 201 Created
                 return response.json()
 
             print(f"ThunziAI add platform failed: {response.status_code} - {response.text}")
