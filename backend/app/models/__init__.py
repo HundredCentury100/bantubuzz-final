@@ -22,6 +22,8 @@ from .subscription import Subscription
 from .creator_subscription_plan import CreatorSubscriptionPlan
 from .creator_subscription import CreatorSubscription
 from .verification_application import VerificationApplication
+from .thunzi_account import ThunziAccount
+from .connected_platform import ConnectedPlatform
 
 # Import milestone models BEFORE their parent models
 from .collaboration_milestone import CollaborationMilestone
@@ -68,4 +70,6 @@ __all__ = [
     'Brief',
     'BriefMilestone',
     'CampaignMilestone',
+    'ThunziAccount',
+    'ConnectedPlatform',
 ]

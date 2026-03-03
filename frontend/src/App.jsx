@@ -44,6 +44,7 @@ import GoogleProfileComplete from './pages/GoogleProfileComplete';
 import CreatorSubscriptions from './pages/CreatorSubscriptions';
 import VerificationApplication from './pages/VerificationApplication';
 import VerificationStatus from './pages/VerificationStatus';
+import ConnectPlatforms from './pages/ConnectPlatforms';
 
 // Admin Pages
 import AdminLogin from './pages/AdminLogin';
@@ -331,6 +332,14 @@ function App() {
         element={
           <ProtectedRoute requiredType="creator">
             <VerificationStatus />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/creator/platforms"
+        element={
+          <ProtectedRoute requiredType="creator">
+            <ConnectPlatforms />
           </ProtectedRoute>
         }
       />
