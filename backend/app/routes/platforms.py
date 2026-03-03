@@ -86,7 +86,7 @@ def connect_platform():
 
         if not thunzi_account:
             # Create ThunziAI company for this creator
-            company_name = f"{creator.display_name or user.username} - BantuBuzz"
+            company_name = f"{creator.username or user.username} - BantuBuzz"
             company_id = thunzi_service.create_company(
                 name=company_name,
                 email=user.email,
@@ -137,8 +137,8 @@ def connect_platform():
         # Update creator profile with follower count if this is their primary platform
         if connected_platform.followers > 0:
             # Update if this is their first platform or has more followers
-            if creator.followers is None or connected_platform.followers > creator.followers:
-                creator.followers = connected_platform.followers
+            if creator.follower_count is None or connected_platform.followers > creator.follower_count:
+                creator.follower_count = connected_platform.followers
 
         db.session.commit()
 
@@ -206,8 +206,8 @@ def sync_platform(platform_id):
 
                     # Update creator profile with latest follower count
                     creator = CreatorProfile.query.filter_by(user_id=current_user_id).first()
-                    if creator and platform.followers > (creator.followers or 0):
-                        creator.followers = platform.followers
+                    if creator and platform.followers > (creator.follower_count or 0):
+                        creator.follower_count = platform.followers
 
                     db.session.commit()
 
