@@ -117,6 +117,15 @@ def connect_platform():
         if not thunzi_platform:
             return jsonify({'error': 'Failed to connect platform to ThunziAI'}), 500
 
+        # Connect the platform to enable syncing
+        platform_id = thunzi_platform.get('id')
+        if platform_id:
+            connected = thunzi_service.connect_platform(platform_id)
+            if connected:
+                # Update platform data with connection status
+                thunzi_platform['isConnected'] = connected.get('isConnected', True)
+                thunzi_platform['syncStatus'] = connected.get('syncStatus', 'pending')
+
         # Save connected platform to database
         connected_platform = ConnectedPlatform(
             user_id=current_user_id,
