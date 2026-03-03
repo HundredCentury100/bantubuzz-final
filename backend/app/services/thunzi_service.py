@@ -64,16 +64,15 @@ class ThunziAIService:
             print(f"ThunziAI registration error: {str(e)}")
             return None
 
-    def create_company(self, name: str, email: str, country: str = "Zimbabwe",
-                      industry: str = "Influencer Marketing") -> Optional[int]:
+    def create_company(self, name: str, email: str = None, country: str = "Zimbabwe",
+                      industry: str = None) -> Optional[int]:
         """Create ThunziAI company for BantuBuzz user (creator or brand)"""
         self._ensure_authenticated()
 
         try:
+            # Only send required fields - ThunziAI API doesn't accept contactEmail/industry
             payload = {
                 "name": name,
-                "contactEmail": email,
-                "industry": industry,
                 "country": country
             }
 
