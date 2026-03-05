@@ -1,6 +1,6 @@
 # 🤖 AI Assistant Guide for BantuBuzz Platform
 
-**Last Updated**: March 2, 2026
+**Last Updated**: March 5, 2026
 **Purpose**: Complete context and guidelines for AI assistants working on this project
 
 ---
@@ -301,6 +301,249 @@ Password: P9MYrbtC61MA54t
 OS: Ubuntu
 Location: /var/www/bantubuzz/
 ```
+
+### URL Architecture & Request Flow
+
+**CRITICAL: Understanding how URLs are built in BantuBuzz**
+
+Our platform uses a multi-layer proxy architecture. Understanding this is ESSENTIAL to avoid routing errors.
+
+#### Complete Request Flow:
+
+```
+User Browser (https://bantubuzz.com/admin/bookings)
+    ↓
+Apache2 (Port 80/443) - SSL Termination
+    ↓ ProxyPass /api/* → http://localhost:8002/api/*
+    ↓ ProxyPass /* → http://localhost:8080/*
+    ↓
+├─→ Express.js (Port 8080) - Frontend Server
+│   └─→ Serves /var/www/bantubuzz/frontend/dist/
+│       • React Router handles client-side routing
+│       • /admin/bookings → React component
+│       • React makes API call to /api/admin/bookings
+│
+└─→ Gunicorn (Port 8002) - Backend API
+    └─→ Flask App (Python)
+        • Blueprint-based routing
+        • /api/admin/bookings → admin_extended.bp route
+```
+
+#### URL Construction Rules:
+
+**1. Frontend Routes (React Router)**
+```javascript
+// In App.jsx
+<Route path="/admin/bookings" element={<AdminBookings />} />
+
+// URL: https://bantubuzz.com/admin/bookings
+// Handled by: React Router → AdminBookings component
+```
+
+**2. Backend API Routes (Flask Blueprints)**
+
+**BLUEPRINT URL CONSTRUCTION FORMULA:**
+```
+Final URL = Apache Proxy + Blueprint Registration Prefix + Blueprint Definition Prefix + Route Path
+
+Example:
+Apache:        /api/*        (proxied to port 8002)
+Registration:  /admin        (app.register_blueprint(bp, url_prefix='/admin'))
+Blueprint:     (none)        (bp = Blueprint('name', __name__))
+Route:         /bookings     (@bp.route('/bookings'))
+───────────────────────────────────────────────────────────────
+Final URL:     /api/admin/bookings
+```
+
+**CRITICAL RULES:**
+1. **NEVER define `url_prefix` in both blueprint definition AND registration**
+   - ❌ WRONG:
+   ```python
+   # routes/admin_extended.py
+   bp = Blueprint('admin_extended', __name__, url_prefix='/admin')  # Has prefix
+
+   # app/__init__.py
+   app.register_blueprint(admin_extended.bp, url_prefix='/api')  # Also has prefix
+   # Result: Flask ignores blueprint prefix, uses only registration prefix
+   # Final URL: /api/bookings (WRONG - missing /admin)
+   ```
+
+   - ✅ CORRECT:
+   ```python
+   # routes/admin_extended.py
+   bp = Blueprint('admin_extended', __name__)  # NO prefix
+
+   # app/__init__.py
+   app.register_blueprint(admin_extended.bp, url_prefix='/api/admin')
+   # Final URL: /api/admin/bookings ✓
+   ```
+
+2. **Blueprint Registration Patterns in `app/__init__.py`:**
+   ```python
+   # Standard API routes (direct prefix)
+   app.register_blueprint(auth.bp, url_prefix='/api/auth')
+   # Routes: /api/auth/login, /api/auth/register, etc.
+
+   # Admin routes (nested prefix)
+   app.register_blueprint(admin.bp, url_prefix='/api/admin')
+   app.register_blueprint(admin_extended.bp, url_prefix='/api/admin')
+   # Routes: /api/admin/users, /api/admin/bookings, etc.
+
+   # Routes with blueprint-defined prefix
+   app.register_blueprint(brand_wallet.bp)  # Blueprint has url_prefix='/api/brand/wallet'
+   # Routes: /api/brand/wallet/balance, /api/brand/wallet/transactions, etc.
+   ```
+
+3. **Route Definition Patterns:**
+   ```python
+   # In routes/admin_extended.py
+   bp = Blueprint('admin_extended', __name__)  # No prefix here!
+
+   @bp.route('/bookings', methods=['GET'])  # Just the endpoint path
+   def list_bookings():
+       # This becomes /api/admin/bookings when registered with url_prefix='/api/admin'
+       pass
+
+   @bp.route('/bookings/<int:booking_id>', methods=['GET'])
+   def get_booking(booking_id):
+       # This becomes /api/admin/bookings/123
+       pass
+   ```
+
+#### Common URL Construction Errors:
+
+**Error Type 1: 404 on Valid Endpoint**
+```
+Symptom: Frontend calls /api/admin/bookings, gets 404
+Cause: Blueprint not registered or wrong url_prefix
+Fix: Check app/__init__.py blueprint registration
+```
+
+**Error Type 2: Routes Not Appearing**
+```
+Symptom: curl http://localhost:8002/api/admin/bookings returns 404
+Cause: Blueprint has url_prefix that conflicts with registration
+Fix: Remove url_prefix from Blueprint() definition
+```
+
+**Error Type 3: Import Error Silently Fails**
+```
+Symptom: Blueprint imported but routes don't work
+Cause: Syntax error or missing import in blueprint file
+Fix: Test import manually:
+  ssh root@173.212.245.22 "cd /var/www/bantubuzz/backend && venv/bin/python3 -c 'from app.routes import admin_extended; print(admin_extended.bp.name)'"
+```
+
+#### Debugging URL Issues:
+
+**1. List All Registered Routes:**
+```bash
+ssh root@173.212.245.22 "cd /var/www/bantubuzz/backend && venv/bin/python3 -c \"
+from app import create_app
+app = create_app()
+for rule in app.url_map.iter_rules():
+    print(f'{rule.rule} -> {rule.endpoint}')
+\" | grep admin"
+```
+
+**2. Check Blueprint Registration:**
+```bash
+ssh root@173.212.245.22 "cd /var/www/bantubuzz/backend && venv/bin/python3 -c \"
+from app import create_app
+app = create_app()
+for name, bp in app.blueprints.items():
+    print(f'{name}: {bp.url_prefix if hasattr(bp, \\\"url_prefix\\\") else \\\"None\\\"}')
+\""
+```
+
+**3. Test Endpoint Locally:**
+```bash
+# Without auth (expect 401 or 403)
+ssh root@173.212.245.22 "curl -s -o /dev/null -w '%{http_code}' http://localhost:8002/api/admin/bookings"
+# 404 = route not found
+# 401 = route exists, needs auth ✓
+# 403 = route exists, needs admin role ✓
+```
+
+#### Blueprint Organization:
+
+```
+backend/app/routes/
+├── auth.py                    # /api/auth/*
+├── users.py                   # /api/users/*
+├── creators.py                # /api/creators/*
+├── brands.py                  # /api/brands/*
+├── packages.py                # /api/packages/*
+├── bookings.py                # /api/bookings/*
+├── admin.py                   # /api/admin/* (core admin routes)
+├── admin_extended.py          # /api/admin/* (extended admin routes)
+├── admin/                     # Admin module routes
+│   ├── __init__.py
+│   ├── users.py
+│   ├── disputes.py
+│   └── ...
+└── ...
+
+Registration in app/__init__.py (LINE 58-85):
+• Import all blueprints on line 58
+• Register each with appropriate url_prefix
+• Comment each registration with final URL pattern
+```
+
+#### API Response Flow:
+
+**Successful Request:**
+```
+Browser: GET https://bantubuzz.com/api/admin/bookings
+    ↓
+Apache: Proxy to localhost:8002/api/admin/bookings
+    ↓
+Gunicorn Worker: Receives request
+    ↓
+Flask App: Matches route to admin_extended.list_bookings
+    ↓
+@jwt_required: Validates JWT token
+    ↓
+@admin_required: Checks user.is_admin == True
+    ↓
+Handler Function: Queries database, returns JSON
+    ↓
+Response: {"bookings": [...], "pagination": {...}}
+```
+
+**Failed Request (404):**
+```
+Browser: GET https://bantubuzz.com/api/admin/bookings
+    ↓
+Apache: Proxy to localhost:8002/api/admin/bookings
+    ↓
+Gunicorn Worker: Receives request
+    ↓
+Flask App: NO MATCHING ROUTE ❌
+    ↓
+404 Handler: Returns {"error": "Resource not found"}
+```
+
+**Why 404 happens:**
+1. Blueprint not imported in `app/__init__.py`
+2. Blueprint not registered with `app.register_blueprint()`
+3. Wrong `url_prefix` in registration
+4. Blueprint has conflicting `url_prefix` in definition
+5. Route decorator path doesn't match expected URL
+
+#### Deployment Checklist for New Routes:
+
+When adding new API endpoints, ALWAYS:
+
+1. ✅ Create blueprint file in `backend/app/routes/`
+2. ✅ Define blueprint WITHOUT url_prefix: `bp = Blueprint('name', __name__)`
+3. ✅ Add routes with decorator: `@bp.route('/path', methods=['GET'])`
+4. ✅ Import blueprint in `app/__init__.py`: `from .routes import new_blueprint`
+5. ✅ Register blueprint: `app.register_blueprint(new_blueprint.bp, url_prefix='/api/path')`
+6. ✅ Upload files to server: `scp file.py root@173.212.245.22:/var/www/bantubuzz/backend/app/routes/`
+7. ✅ Restart gunicorn: `ssh root@173.212.245.22 "pkill -f gunicorn && cd /var/www/bantubuzz/backend && venv/bin/gunicorn -w 4 -b 0.0.0.0:8002 --timeout 120 'app:create_app()' --daemon"`
+8. ✅ Test endpoint: `curl http://localhost:8002/api/path/endpoint`
+9. ✅ Verify route exists: Use debugging command from above
 
 ### Complete Directory Structure
 ```
@@ -1415,13 +1658,417 @@ Major feature allowing creators to pay for subscriptions using their wallet bala
 - Aligns with brand experience (brands already use wallet for collaboration payments)
 - Complete payment method parity: Paynow, Bank Transfer, Wallet
 
+### Recent: ThunziAI Platform Connection Integration (Mar 3, 2026)
+Phase 1 of ThunziAI integration completed - allowing creators and brands to connect their social media accounts:
+
+**1. Backend Platform Connection System** (Critical - Commit `f8a9b2c`)
+- **Database Schema**: Two new tables for ThunziAI integration
+  - `thunzi_accounts` table: Stores ThunziAI company/account mapping
+    - Fields: `id`, `user_id`, `company_id` (ThunziAI), `company_name`, `email`, `country`, `created_at`
+    - Links BantuBuzz users to ThunziAI companies (one-to-one relationship)
+  - `connected_platforms` table: Stores individual platform connections
+    - Fields: `id`, `user_id`, `thunzi_account_id`, `platform_name`, `platform_username`, `access_token`, `session_data`, `follower_count`, `is_active`, `connected_at`, `last_synced_at`
+    - Supports: Instagram, TikTok, YouTube, Facebook, Twitter (X)
+  - Migration: `backend/migrations/versions/202603031030_add_thunzi_integration_tables.py`
+
+- **ThunziAI Service Integration**: Created dedicated service class
+  - **File**: `backend/app/services/thunzi_service.py`
+  - **Session Management**: Automatic login/session refresh with cookie persistence
+  - **Company Creation**: Auto-creates ThunziAI company accounts for new users
+  - **Platform Connections**: Handles OAuth-style redirects for each platform
+  - **Pattern**: `ThunziService` singleton class with session caching
+  - **API Base**: `https://app.thunziai.com/api` (production endpoint)
+
+- **Platform Connection Routes**: Complete REST API for platform management
+  - **Creator Routes** (`/api/creator/platforms`):
+    - `GET /` - List connected platforms with follower counts
+    - `POST /connect` - Initiate platform connection (returns ThunziAI redirect URL)
+    - `POST /<id>/sync` - Sync follower data from ThunziAI
+    - `DELETE /<id>` - Disconnect platform
+  - **Brand Routes** (`/api/brand/platforms`):
+    - Same 4 endpoints but use `BrandProfile.company_name` instead of `CreatorProfile.username`
+    - Uses `brand.country` for company creation
+  - **File**: `backend/app/routes/platforms.py`
+
+- **Platform Name Mapping**: Twitter → 'x' for ThunziAI compatibility
+  - Frontend sends 'twitter', backend maps to 'x' before ThunziAI API call
+  - Reverse mapping for display ('x' → 'Twitter' in responses)
+
+**2. Frontend Platform Connection Pages** (High Priority)
+- **Creator Platform Page**: `/creator/platforms`
+  - **File**: `frontend/src/pages/ConnectPlatforms.jsx`
+  - **Platform Grid**: 5 platform cards (Instagram, TikTok, YouTube, Facebook, X)
+  - **Card Design**: Matches BantuBuzz design philosophy
+    - `bg-white rounded-3xl shadow-sm` outer container
+    - Platform-specific brand colors (pink for Instagram, black for TikTok, red for YouTube, etc.)
+    - Connection status: "Connected" (green checkmark) or "Connect" button
+    - Follower count display when connected
+    - Sync and Disconnect actions
+  - **Connection Flow**:
+    1. Click "Connect" → API call to `/creator/platforms/connect`
+    2. Receives ThunziAI redirect URL
+    3. Opens in new tab for OAuth flow
+    4. User returns and clicks "I've Connected" to mark as complete
+  - **Protected Route**: JWT required, creator-only access
+
+- **Brand Platform Page**: `/brand/platforms`
+  - **File**: `frontend/src/pages/BrandConnectPlatforms.jsx`
+  - **Identical UI**: Same design as creator page
+  - **API Endpoints**: Uses `/brand/platforms` routes instead
+  - **Protected Route**: JWT required, brand-only access
+
+**3. Dashboard Integration** (High Priority)
+- **Connection Banners**: Added to both creator and brand dashboards
+  - **Design**: Simple `bg-primary border border-primary rounded-lg` (matches design philosophy)
+  - **Conditional Display**: Only shows when `profileComplete && connectedPlatforms.length === 0`
+  - **Icon**: Globe/network SVG icon (matches other alert banners)
+  - **Message**: Encourages platform connection for analytics and reach showcase
+  - **CTA Button**: `bg-primary text-white rounded-lg` linking to platform connection page
+  - **Files**:
+    - `frontend/src/pages/CreatorDashboard.jsx:234-255`
+    - `frontend/src/pages/BrandDashboard.jsx:215-236`
+
+- **Quick Actions Integration**: "Connect Platforms" added to sidebar quick actions
+  - **Creator Dashboard**: Between "Create Package" and "Browse Briefs"
+  - **Brand Dashboard**: Between "Find Creators" and "Browse Packages"
+  - **Icon**: Same globe/network icon for consistency
+  - **Hover State**: `hover:border-primary hover:bg-primary/5`
+  - **Files**:
+    - `frontend/src/pages/CreatorDashboard.jsx:582-592`
+    - `frontend/src/pages/BrandDashboard.jsx:463-473`
+
+**4. Design Philosophy Compliance** (Critical)
+- **Banner Redesign**: Removed gradient backgrounds from initial implementation
+  - **Before**: `bg-gradient-to-r from-blue-50 to-purple-50`, gradient icons, rounded-3xl
+  - **After**: `bg-primary border border-primary rounded-lg`, simple icon, consistent with profile completion alerts
+- **No Gradients Policy**: All UI elements use solid colors only
+  - Icon backgrounds: `bg-primary/10 rounded-full`
+  - Buttons: Solid `bg-primary` with `hover:bg-primary/90`
+  - Cards: `bg-white rounded-3xl shadow-sm`
+- **Religious Design Adherence**: Every element matches existing patterns from `Home.jsx` and `BrowseCreators.jsx`
+
+**5. Technical Implementation Details**
+- **Session-Based Authentication**: ThunziAI uses cookie-based sessions (not JWT)
+  - Service class handles login and maintains session state
+  - Cookies stored for API requests: `sessionid`, `csrftoken`
+- **Company Creation Pattern**:
+  ```python
+  company_name = f"{creator.username or user.username} - BantuBuzz"
+  company_id = thunzi_service.create_company(
+      name=company_name,
+      email=user.email,
+      country=creator.country or "Zimbabwe"
+  )
+  ```
+- **Platform Connection Flow**:
+  1. Check if user has ThunziAI account (query `thunzi_accounts`)
+  2. If not, create company via ThunziAI API
+  3. Store company_id in `thunzi_accounts` table
+  4. Get redirect URL from ThunziAI for specific platform
+  5. Return URL to frontend for new tab redirect
+  6. User completes OAuth on ThunziAI
+  7. Frontend marks connection as complete
+  8. Backend syncs follower data
+
+- **Data Sync**: Follower count updated on manual sync
+  - Queries ThunziAI API for latest platform metrics
+  - Updates `connected_platforms.follower_count`
+  - Updates `connected_platforms.last_synced_at`
+
+**6. Route Integration**
+- **App.jsx Routes**: Added protected routes for both user types
+  - `/creator/platforms` → `<ConnectPlatforms />`
+  - `/brand/platforms` → `<BrandConnectPlatforms />`
+  - Protected with `ProtectedRoute` component checking `requiredType`
+  - File: `frontend/src/App.jsx:487-494`
+
+**Deployment** (Mar 3, 2026 11:45 CET)
+- **Database Migration**: Ran successfully on production PostgreSQL
+- **Backend Files**: `platforms.py`, `thunzi_service.py`, migration script uploaded
+- **Frontend Build**: `index-DdnTj3Cn.css`, `index-rAu4liz_.js`
+- **Gunicorn Restart**: Backend API restarted with new routes
+- **Features Live**: Platform connection pages, dashboard banners, quick actions ✅
+
+**Next Steps**:
+- Phase 2: Post tracking and analytics dashboard (ThunziAI data integration)
+- Phase 3: Sentiment analysis and brand monitoring
+- Phase 4: Campaign performance tracking
+
+**Impact**:
+- Lays foundation for comprehensive analytics features (Pro/Premium tiers)
+- Creators can showcase verified follower counts
+- Brands can track campaign performance across platforms
+- Differentiates BantuBuzz from competitors with data-driven insights
+- Positions platform for Pro ($120/mo) and Premium ($250/mo) tier value delivery
+
+### Recent: Comprehensive QA Bug Fixes (Mar 5, 2026)
+Major QA testing session resulting in 9 critical bug fixes improving user experience across the platform:
+
+**1. Creator Verification Subscription Check** (Critical - Issue #1)
+- **Problem**: "Failed to check subscription status" error when creators tried to apply for verification
+- **Root Cause**: Frontend incorrectly accessing `response.data.data.subscription` when backend returns either `subscription` or `plan` object
+- **Solution**: Added fallback logic `const subscription = data.subscription || data.plan;` with proper handling for free plans
+- **Added**: Check for `data.is_free` flag to redirect free plan users to subscriptions page
+- **File**: `frontend/src/pages/VerificationApplication.jsx:44-70`
+
+**2. Category Filtering Not Updating UI** (Critical - Issue #2)
+- **Problem**: Homepage category links added URL params but didn't filter creators in BrowseCreators page
+- **Root Cause**: Categories fetched as objects `{id, name, description, image}` but dropdown treated them as strings
+- **Initial Wrong Approach**: Removed URL parameters completely
+- **User Correction**: "Follow what we have already done... see how featured creators filters work"
+- **Final Solution**:
+  - Updated category dropdown to handle object format: `<option key={cat.id || cat} value={cat.name || cat}>`
+  - Maintained URL parameter pattern like platform filtering (`?category=Fashion`)
+  - Read URL params once on mount to set initial filter state
+- **Files**:
+  - `frontend/src/pages/BrowseCreators.jsx:44-55, 269-271, 435-437`
+  - `frontend/src/pages/Home.jsx:482, 526`
+
+**3. Profile Picture Size Requirements & Crop** (High Priority - Issue #3)
+- **Problem**: No size guidance or crop functionality for profile pictures
+- **Solution**: Full image crop implementation with react-easy-crop library
+- **Features**:
+  - Installed `react-easy-crop` package
+  - Created `ImageCropModal` component with zoom slider, grid overlay, circular crop shape
+  - Created `cropImage.js` utility to convert cropped area to blob
+  - Updated upload flow: Select image → Crop → Upload cropped version
+  - Added "Recommended: 400x400px or larger" text
+  - 5MB max file size validation
+- **Technical**: Canvas-based cropping with aspect ratio 1:1, circular shape, zoom 1x-3x
+- **Files**:
+  - `frontend/src/components/ImageCropModal.jsx` (new)
+  - `frontend/src/utils/cropImage.js` (new)
+  - `frontend/src/pages/CreatorProfileEdit.jsx:28-140`
+
+**4. Blank Bookings Page** (Critical - Issue #4)
+- **Problem**: White screen with JavaScript error: `d.toFixed is not a function`
+- **Root Causes** (dual issues):
+  1. Backend crashed when creator/brand profile didn't exist
+  2. Frontend tried to call `.toFixed()` on string value (amount was string, not number)
+- **Backend Solution**: Added null checks returning empty bookings array when profile missing
+- **Frontend Solution**: Changed `booking.amount?.toFixed(2)` to `parseFloat(booking.amount).toFixed(2)`
+- **Files**:
+  - `backend/app/routes/bookings.py:36-44`
+  - `frontend/src/pages/Bookings.jsx:207`
+
+**5. Favorite Creator 404 Error for Guests** (Medium Priority - Issue #5)
+- **Problem**: Non-logged-in users saw 404 error when trying to save creator as favorite
+- **Expected Behavior**: Should redirect to login page with helpful message
+- **Solution**: Updated `handleSaveCreator` to navigate to `/login` instead of showing 404
+- **Added**: Toast message "Please sign in as a brand to save creators"
+- **File**: `frontend/src/pages/CreatorProfile.jsx:88-110`
+
+**6. Messaging Showing "Unknown User"** (Critical - Issue #6)
+- **Problem**: Brand-to-creator conversations showed "Unknown User" instead of creator name
+- **User Question**: "wait does creators have a display name or its a username?" (Critical insight!)
+- **Investigation**: Checked database schema and found creators only have `username` field, not `display_name`
+- **Root Cause**: SQL query used `cpr.display_name` which doesn't exist in CreatorProfile table
+- **Solution**: Changed CASE statement to use `cpr.username` instead
+- **Files**:
+  - `messaging-service/server.js:347, 350` (SQL query CASE statements)
+- **Deployment**: Uploaded fixed file and restarted PM2 messaging service
+
+**7. Replace Twitter Logo with X Logo** (Low Priority - Issue #7)
+- **Problem**: Profile pages still showed old Twitter bird icon
+- **Solution**: Replaced SVG path with official X logo (black color, modern design)
+- **File**: `frontend/src/pages/CreatorProfile.jsx:441-443`
+
+**8. Show/Hide Password Toggle** (High Priority - Issue #8)
+- **Problem**: No password visibility toggle on login and signup forms
+- **Solution**: Implemented eye icon toggle for all password fields
+- **Features**:
+  - Eye icon (show password) / eye-slash icon (hide password)
+  - Toggle input type between "password" and "text"
+  - Positioned absolute right with hover effect
+  - Added to ALL password fields: login, brand signup, creator signup (password + confirm password)
+- **Pattern**:
+  ```jsx
+  const [showPassword, setShowPassword] = useState(false);
+  <div className="relative">
+    <input type={showPassword ? "text" : "password"} className="input pr-10" />
+    <button onClick={() => setShowPassword(!showPassword)}>
+      {showPassword ? <EyeSlashIcon /> : <EyeIcon />}
+    </button>
+  </div>
+  ```
+- **Files**:
+  - `frontend/src/pages/Login.jsx:13, 77-103`
+  - `frontend/src/pages/RegisterCreator.jsx:16-17, 183-217, 224-255`
+  - `frontend/src/pages/RegisterBrand.jsx:12-13, 119-153, 160-191`
+
+**9. Browse Packages - Missing Category & Collaboration Type Filters** (High Priority - Issue #9)
+- **Problem**: Filter dropdowns showed hardcoded values instead of fetching from database
+- **Expected**: Show ALL categories and collaboration types from actual database records
+- **Solution**:
+  - Fetched categories dynamically from `categoriesAPI.getCategories()` API
+  - Fetched collaboration types from unique package categories (no dedicated endpoint)
+  - Added state management with default fallback values
+  - Updated both desktop and mobile filter dropdowns to use dynamic data
+- **Technical**:
+  ```javascript
+  const [categories, setCategories] = useState(DEFAULT_CATEGORIES);
+  const [collaborationTypes, setCollaborationTypes] = useState(DEFAULT_COLLABORATION_TYPES);
+
+  useEffect(() => {
+    fetchFiltersData(); // Fetches from API on mount
+  }, []);
+  ```
+- **Files**:
+  - `frontend/src/pages/BrowsePackages.jsx:1-117, 273-275, 288-290, 369-371, 420-422`
+  - Added `categoriesAPI` import to fetch categories
+
+**10. Admin Bookings Page 404 Error** (Critical - Bonus Issue)
+- **Problem**: `/admin/bookings` endpoint returning "Resource not found"
+- **Root Cause**: `admin_extended` blueprint defined in `routes/admin_extended.py` but NEVER registered in app
+- **Solution**:
+  - Added `admin_extended` to imports in `backend/app/__init__.py`
+  - Registered blueprint with `app.register_blueprint(admin_extended.bp, url_prefix='/api')`
+  - Uploaded updated `__init__.py` to server
+  - Restarted gunicorn backend
+- **Routes Now Available**:
+  - `/api/admin/bookings` - List all bookings with filters
+  - `/api/admin/campaigns` - Campaign management
+  - `/api/admin/reviews` - Review moderation
+  - `/api/admin/collaborations` - Collaboration oversight
+  - `/api/admin/packages` - Package management
+- **Files**: `backend/app/__init__.py:58, 77`
+
+**Deployment** (Mar 5, 2026 07:55 UTC)
+- **Frontend Build**: `index-wxxqw8qA.js`, `index-C-2McU53.css`
+- **Backend Files**: Updated `bookings.py`, `__init__.py`, uploaded to server
+- **Services Restarted**:
+  - Gunicorn backend (PID 254680 master + 4 workers on port 8002)
+  - PM2 messaging-service (restarted for SQL query fix)
+- **Build Method**: Standard tar.gz → SCP → extract workflow
+- **All 10 Issues Fixed**: ✅ Complete and deployed to production
+
+**11. Admin Bookings Blueprint Registration Fix** (Critical - Post-Deployment Issue)
+- **Problem**: `/api/admin/bookings` endpoint still returning 404 even after blueprint registration
+- **Root Cause**: Flask blueprint URL prefix conflict
+  - Blueprint defined with `url_prefix='/admin'` in `admin_extended.py`
+  - Registered with `url_prefix='/api'` in `__init__.py`
+  - Flask doesn't concatenate these - it uses ONLY the registration prefix
+  - Result: Routes were at `/api/bookings` not `/api/admin/bookings`
+- **Solution**:
+  - Removed `url_prefix='/admin'` from blueprint definition
+  - Changed registration to full path: `url_prefix='/api/admin'`
+  - Pattern: Define blueprint WITHOUT prefix, specify full path at registration
+- **Flask Blueprint Behavior** (CRITICAL LEARNING):
+  ```python
+  # ❌ WRONG - Conflicting prefixes
+  bp = Blueprint('name', __name__, url_prefix='/admin')
+  app.register_blueprint(bp, url_prefix='/api')
+  # Flask uses ONLY /api, ignores /admin
+  # Routes become: /api/route (WRONG)
+
+  # ✅ CORRECT - Single prefix at registration
+  bp = Blueprint('name', __name__)  # No prefix
+  app.register_blueprint(bp, url_prefix='/api/admin')
+  # Routes become: /api/admin/route ✓
+  ```
+- **Testing Method**: Used Python one-liner to list all registered routes
+  ```bash
+  ssh root@173.212.245.22 "cd /var/www/bantubuzz/backend && venv/bin/python3 -c \"
+  from app import create_app
+  app = create_app()
+  for rule in app.url_map.iter_rules():
+      if 'admin' in rule.rule:
+          print(f'{rule.rule} -> {rule.endpoint}')
+  \""
+  ```
+- **Files**:
+  - `backend/app/routes/admin_extended.py:17` - Removed url_prefix
+  - `backend/app/__init__.py:77` - Changed to full `/api/admin` prefix
+- **Verification**: `curl http://localhost:8002/api/admin/bookings` returns 401 (auth required) instead of 404 ✓
+
+**12. Deliverable Approval Bug - SQLAlchemy JSON Field Modification** (Critical - March 5, 2026)
+- **Problem**: Brand unable to approve deliverables, error "Can't flag attribute 'submitted_deliverables' modified; it's not present in the object state"
+- **Symptoms**:
+  - Clicking "Approve" on deliverable showed error message
+  - Progress bar updated to 100% but deliverable count showed "1 out of 2"
+  - Approved deliverable didn't appear in approved list
+  - Eventually appeared after Socket.IO update (appearing to approve "on its own")
+  - This specifically happened when approving the last deliverable (triggering 100% completion)
+- **Root Cause**: SQLAlchemy JSON field mutation tracking issue
+  - When `submitted_deliverables` is `None` initially, SQLAlchemy doesn't track it in object state
+  - Code was using `list.append()` then calling `flag_modified()` on untracked attribute
+  - This threw an exception that prevented database commit
+  - The transaction rolled back, but Socket.IO eventually triggered refetch showing stale data
+- **SQLAlchemy JSON Field Behavior** (CRITICAL LEARNING):
+  ```python
+  # ❌ WRONG - Mutating list in place, then flag_modified on untracked attribute
+  collaboration.submitted_deliverables.append(item)  # Mutate in place
+  flag_modified(collaboration, 'submitted_deliverables')  # ERROR if None initially!
+
+  # ❌ ALSO WRONG - Initializing then mutating still causes issues
+  if collaboration.submitted_deliverables is None:
+      collaboration.submitted_deliverables = []
+  collaboration.submitted_deliverables.append(item)  # Still mutating
+  flag_modified(collaboration, 'submitted_deliverables')  # ERROR!
+
+  # ✅ CORRECT - Create new list and assign (triggers automatic change detection)
+  submitted_list = list(collaboration.submitted_deliverables or [])
+  submitted_list.append(item)
+  collaboration.submitted_deliverables = submitted_list  # New object assignment
+  # No flag_modified() needed - SQLAlchemy detects object replacement
+  ```
+- **Solution**:
+  - Create new list objects instead of mutating existing ones
+  - Assign new lists to JSON fields to trigger SQLAlchemy change detection
+  - Remove `flag_modified()` calls (no longer needed)
+  - This pattern works for ALL JSON fields: `deliverables`, `draft_deliverables`, `submitted_deliverables`, `revision_requests`, etc.
+- **Technical Details**:
+  ```python
+  # Before (BROKEN):
+  collaboration.submitted_deliverables.append(deliverable_to_approve)
+  collaboration.draft_deliverables = remaining_drafts
+  flag_modified(collaboration, 'submitted_deliverables')  # THROWS ERROR
+  flag_modified(collaboration, 'draft_deliverables')
+
+  # After (FIXED):
+  submitted_list = list(collaboration.submitted_deliverables or [])
+  submitted_list.append(deliverable_to_approve)
+  collaboration.submitted_deliverables = submitted_list  # Replace entire object
+  collaboration.draft_deliverables = remaining_drafts     # Already a new list
+  # No flag_modified() calls needed
+  ```
+- **Files**:
+  - `backend/app/routes/collaborations.py:298-308` - Fixed deliverable list mutation
+  - `backend/app/routes/collaborations.py:390-391` - Removed flag_modified calls
+- **Enhanced Logging Added**: Comprehensive logging at every step of approval process for debugging
+- **Testing**: Tested with collaboration #50 - worked perfectly ✓
+- **Applies To**: ALL JSON field modifications in Flask-SQLAlchemy models
+
+**User Experience Impact**:
+- Creators can now complete verification application without errors
+- Category filtering works correctly from homepage links
+- Professional profile picture cropping prevents poor quality uploads
+- Bookings page displays correctly for all users
+- Guest users have better experience with clear login prompts
+- Messaging shows correct creator names in conversations
+- Modern X logo aligns with current branding
+- Password visibility toggle improves accessibility and UX
+- Browse packages shows all actual categories and types from database
+- Admin dashboard bookings page is fully functional
+- **Brands can approve deliverables without errors, triggering auto-completion at 100%**
+
+**Technical Learning**:
+- Always check if backend returns different data structures (subscription vs plan)
+- Follow existing patterns in codebase instead of creating new ones
+- Database schema verification is critical - don't assume field names
+- Blueprint registration is required step after creating new route files
+- Flask blueprint prefixes: registration overrides definition
+- **SQLAlchemy JSON fields: assign new objects, never mutate in place**
+- **Error messages reveal exact issues: "Can't flag attribute modified" = JSON field tracking problem**
+- User questions often reveal critical implementation details
+
 ### Current State (Mar 2026)
 ✅ Fully functional platform
 ✅ Complete subscription systems (brand + creator)
 ✅ Collabstr-style pricing with tiered service fees
 ✅ Payment integration (Paynow + manual + wallet)
-✅ Admin dashboard
-✅ Messaging with real-time updates
+✅ Admin dashboard with bookings management (fixed)
+✅ Messaging with real-time updates (creator names fixed)
 ✅ Design system consistency achieved
 ✅ Critical bugs fixed and deployed to production
 ✅ Save Creator feature with dedicated page
@@ -1429,15 +2076,21 @@ Major feature allowing creators to pay for subscriptions using their wallet bala
 ✅ Multi-select languages filter
 ✅ Bio character counter
 ✅ Dynamic service fee calculation per tier (complete)
-✅ Browse Packages responsive redesign with all working filters
-✅ Twitter/X icon update
+✅ Browse Packages responsive redesign with all working filters + dynamic categories
+✅ Twitter/X icon update (modern X logo)
 ✅ Required creator profile fields (city, country, followers, categories, platforms)
 ✅ 14-day escrow period (reduced from 30 days)
 ✅ Lowest package price displayed on creator cards
 ✅ Package categorization by platform (Instagram, TikTok, YouTube, Facebook, Twitter, LinkedIn, Threads, Twitch, UGC)
 ✅ Tab filtering on creator profiles by platform
 ✅ Wallet payment for creator subscriptions (instant activation, payment method selection)
-🔄 Analytics integration planning complete (awaiting implementation)
+✅ ThunziAI platform connection integration - Phase 1 complete (connect Instagram, TikTok, YouTube, Facebook, Twitter)
+✅ Comprehensive QA fixes - All 9 + 1 bonus issues resolved (Mar 5, 2026)
+✅ Profile picture crop functionality with image size guidance
+✅ Password visibility toggles on all auth forms
+✅ Category filtering working with URL params
+✅ Verification subscription check before application
+🔄 ThunziAI analytics dashboards - Phase 2 (in progress)
 
 ---
 
@@ -1571,9 +2224,265 @@ def get_items(current_user):
         }), 500
 ```
 
+### Payment Flow Standards (CRITICAL)
+
+**See `PAYMENT_FLOW_DOCUMENTATION.md` for complete details**
+
+All payment pages MUST support both Paynow and Bank Transfer. Use consistent patterns:
+
+**Frontend Pattern (Reference: CartCheckout.jsx)**:
+```javascript
+import { bookingsAPI } from '../services/api';
+
+// Paynow
+const response = await bookingsAPI.initiatePayment(bookingId);
+window.location.href = response.data.redirect_url;
+
+// Bank Transfer
+const formData = new FormData();
+formData.append('file', proofFile);
+await bookingsAPI.uploadProofOfPayment(bookingId, formData);
+```
+
+**❌ NEVER use raw fetch() or manual token handling**
+
+**Backend Pattern**:
+- `initiate_booking_payment()` MUST handle ALL booking types
+- `verify_bank_transfer_payment()` MUST handle type-specific logic
+- Payment types: `'package'`, `'brief'`, `'campaign_application'`, `'campaign_package'`, `'paid_revision'`
+
+**Admin Dashboard**:
+- Show clear payment_type labels
+- Support POP download and verification
+- Display payment method and status
+
 ---
 
 ## 🔧 Troubleshooting Guide
+
+### Architectural Principles & Common Mistakes
+
+**CRITICAL: Learn from these mistakes to avoid repeating them**
+
+**Summary of 9 Core Principles:**
+1. **Single Source of Truth for URL Prefixes** - Define prefix only at registration
+2. **Blueprint Registration is Required** - Import + register in `__init__.py`
+3. **Always Test Route Registration** - Verify routes exist before debugging
+4. **Database Schema Verification** - Never assume field names
+5. **Follow Existing Patterns** - Copy proven implementations
+6. **Blueprint vs Registration Prefix** - Understand Flask's precedence rules
+7. **SQLAlchemy JSON Field Mutation** - Create new objects, never mutate in place
+8. **Data Type Consistency** - Backend and frontend must agree on types
+9. **Error Messages Are Clues** - Decode common errors instantly
+
+---
+
+#### Principle 1: Single Source of Truth for URL Prefixes
+
+**Rule**: Define URL prefix ONLY at blueprint registration, NOT in blueprint definition.
+
+**Why**: Flask blueprint registration overrides blueprint definition prefix. This causes confusion and 404 errors.
+
+**Pattern**:
+```python
+# ✅ CORRECT PATTERN
+# In routes/endpoint.py
+bp = Blueprint('endpoint_name', __name__)  # NO url_prefix
+
+# In app/__init__.py
+app.register_blueprint(endpoint.bp, url_prefix='/api/endpoint')
+```
+
+**Anti-Pattern**:
+```python
+# ❌ WRONG PATTERN
+# In routes/endpoint.py
+bp = Blueprint('endpoint_name', __name__, url_prefix='/endpoint')  # Has prefix
+
+# In app/__init__.py
+app.register_blueprint(endpoint.bp, url_prefix='/api')  # Another prefix
+# Result: Flask ignores blueprint prefix, routes are at /api/* not /api/endpoint/*
+```
+
+#### Principle 2: Blueprint Registration is Required
+
+**Rule**: Creating a blueprint file is NOT enough. It MUST be imported and registered in `app/__init__.py`.
+
+**Checklist**:
+1. ✅ Blueprint file exists in `backend/app/routes/`
+2. ✅ Blueprint is imported: `from .routes import blueprint_name`
+3. ✅ Blueprint is registered: `app.register_blueprint(blueprint_name.bp, url_prefix='...')`
+4. ✅ Gunicorn restarted after changes
+
+**Common Mistake**: Creating `routes/new_feature.py` but forgetting to add it to `__init__.py`. Routes return 404.
+
+#### Principle 3: Always Test Route Registration
+
+**Rule**: After adding/modifying routes, ALWAYS verify they're registered before debugging frontend.
+
+**Quick Test**:
+```bash
+# 1. List all routes containing keyword
+ssh root@173.212.245.22 "cd /var/www/bantubuzz/backend && venv/bin/python3 -c \"
+from app import create_app
+app = create_app()
+for rule in app.url_map.iter_rules():
+    if 'keyword' in rule.rule:
+        print(rule.rule)
+\""
+
+# 2. Test endpoint response code
+ssh root@173.212.245.22 "curl -s -o /dev/null -w '%{http_code}' http://localhost:8002/api/your/endpoint"
+# 404 = route doesn't exist
+# 401/403 = route exists, auth issue
+# 200 = route works!
+```
+
+#### Principle 4: Database Schema Verification
+
+**Rule**: NEVER assume database field names. Always verify in model files.
+
+**Example from QA Issue #6**:
+```python
+# ❌ WRONG ASSUMPTION
+SELECT cpr.display_name FROM creator_profiles cpr
+# Fails because creator_profiles only has 'username', not 'display_name'
+
+# ✅ CORRECT - Verified in models/creator_profile.py
+SELECT cpr.username FROM creator_profiles cpr
+```
+
+**Verification Steps**:
+1. Check model file: `backend/app/models/model_name.py`
+2. Look for `Column()` definitions
+3. Use exact field names in queries
+4. Test query manually if unsure
+
+#### Principle 5: Follow Existing Patterns
+
+**Rule**: When implementing new features, ALWAYS check how similar features are already implemented.
+
+**Example from QA Issue #2**:
+- User wanted category filtering to work
+- Initially tried removing URL parameters (wrong approach)
+- User corrected: "Follow what we have already done... see how platform filters work"
+- Solution: Copied platform filter pattern for category filtering
+
+**Pattern Discovery Process**:
+1. Identify similar existing feature
+2. Find implementation files (use grep/search)
+3. Copy pattern exactly
+4. Adapt to new use case
+5. Test thoroughly
+
+#### Principle 6: Blueprint vs Registration Prefix
+
+**Understanding**:
+```
+Final URL = Registration Prefix + Route Path
+(Blueprint prefix is IGNORED when registration has prefix)
+
+Example:
+Registration: url_prefix='/api/admin'
+Route: @bp.route('/bookings')
+Final URL: /api/admin/bookings
+```
+
+**Special Case - Blueprint with Prefix, No Registration Prefix**:
+```python
+# Blueprint definition
+bp = Blueprint('name', __name__, url_prefix='/api/brand/wallet')
+
+# Registration WITHOUT prefix
+app.register_blueprint(bp)  # No url_prefix parameter
+
+# Final URL uses blueprint prefix: /api/brand/wallet/*
+```
+
+**Best Practice**: Use blueprint prefix ONLY when no registration prefix is needed.
+
+#### Principle 7: SQLAlchemy JSON Field Mutation Tracking
+
+**Rule**: NEVER mutate JSON fields in place. Always create new objects and assign them.
+
+**Why**: SQLAlchemy can't track mutations inside JSON fields. If field is `None` initially, calling `flag_modified()` throws error: "Can't flag attribute modified; it's not present in object state".
+
+**Pattern**:
+```python
+# ✅ CORRECT PATTERN - Create new list and assign
+submitted_list = list(collaboration.submitted_deliverables or [])
+submitted_list.append(new_item)
+collaboration.submitted_deliverables = submitted_list  # Assign new object
+# No flag_modified() needed - SQLAlchemy detects object replacement
+```
+
+**Anti-Pattern**:
+```python
+# ❌ WRONG PATTERN - Mutating in place + flag_modified
+if collaboration.submitted_deliverables is None:
+    collaboration.submitted_deliverables = []
+collaboration.submitted_deliverables.append(new_item)  # Mutation
+flag_modified(collaboration, 'submitted_deliverables')  # ERROR if was None!
+```
+
+**Real-World Issue from QA #12**:
+- Approving deliverable threw error and failed to save
+- Progress showed 100% but count showed "1 out of 2"
+- Fixed by replacing `append()` + `flag_modified()` with new list assignment
+- Applies to ALL JSON fields: `deliverables`, `draft_deliverables`, `submitted_deliverables`, `revision_requests`, etc.
+
+**Key Insight**: When you assign a new object to a SQLAlchemy column, it automatically marks the field as modified. No `flag_modified()` needed!
+
+#### Principle 8: Data Type Consistency
+
+**Rule**: Backend and frontend must agree on data types.
+
+**Example from QA Issue #4**:
+```javascript
+// ❌ WRONG - Assumes amount is number
+${booking.amount.toFixed(2)}  // Fails when amount is "100.00" (string)
+
+// ✅ CORRECT - Parse to number first
+${parseFloat(booking.amount).toFixed(2)}  // Works for both string and number
+```
+
+**Common Type Issues**:
+- Backend returns string, frontend expects number (use `parseInt()`, `parseFloat()`)
+- Backend returns null, frontend expects empty array (use `|| []`)
+- Backend returns object, frontend expects string (use `obj.field`)
+- Date formats (ISO 8601 string vs Date object)
+
+#### Principle 9: Error Messages Are Clues
+
+**404 "Resource not found"**:
+- Blueprint not registered
+- Wrong URL path
+- Missing route decorator
+
+**401 "Unauthorized"**:
+- Missing JWT token
+- Expired token
+- Token in wrong format
+
+**403 "Forbidden"**:
+- User authenticated but lacks permissions
+- Check `@admin_required` decorator
+- Check `user.user_type` validation
+
+**500 "Internal server error"**:
+- Python exception in handler
+- Database query error
+- Check gunicorn logs
+
+**TypeError: X is not a function**:
+- Wrong data type (string vs number)
+- Missing method on object
+- Undefined variable
+
+**"Can't flag attribute 'X' modified; it's not present in object state"**:
+- SQLAlchemy JSON field was `None` initially
+- Trying to use `flag_modified()` on untracked attribute
+- Fix: Create new list/object and assign instead of mutating in place (see Principle 7)
 
 ### Frontend Issues
 
@@ -1788,6 +2697,111 @@ If you lose context, follow this checklist:
 
 ---
 
+## 📊 ThunziAI Integration (March 2026)
+
+### Overview
+ThunziAI provides social media analytics (followers, posts, engagement) for Facebook, Instagram, YouTube, Twitter/X.
+
+### Key Documentation
+- **API Reference**: `THUNZIAI_API_DOCUMENTATION.md` (complete API specs)
+- **Base URL**: `https://app.thunzi.co`
+- **Authentication**: Session-based (login with email/password)
+
+### Critical Implementation Details
+
+#### Facebook & Instagram Connection
+**IMPORTANT**: User Access Token vs Page Access Token
+- ✅ **CORRECT**: User Access Token from `response.authResponse.accessToken` (line 63 in useFacebookOAuth.js)
+- ❌ **WRONG**: Page Access Token from `/me/accounts` API call
+- ThunziAI requires **User Access Token** to authenticate with Facebook Graph API
+
+#### Facebook OAuth Configuration
+- **App ID**: `1863571634283956`
+- **Config ID**: `1565308301261640` (Facebook Login for Business) - **Updated March 5, 2026**
+- **OAuth Parameters**: `auth_type: 'rerequest'`, `return_scopes: true`
+- **Permissions Required**: `pages_show_list`, `business_management`, `instagram_basic`, `instagram_manage_insights`, `pages_read_engagement`, `pages_read_user_content`
+
+#### Platform Connection Flow (UPDATED March 5, 2026)
+1. **Frontend** (`useFacebookOAuth.js`):
+   - Facebook login → Get User Access Token
+   - Call `/me/accounts` → Get Facebook Pages list
+   - Send **ONLY FACEBOOK** to backend with User Access Token
+   - **DO NOT** send Instagram separately - ThunziAI auto-creates it!
+
+2. **Backend** (`platforms.py` + `thunzi_service.py`):
+   - POST to ThunziAI `/api/platforms` with payload:
+     ```json
+     {
+       "companyId": number,
+       "platform": "facebook",
+       "accountName": string,
+       "accessToken": string  // User Access Token (REQUIRED)
+       // ❌ DO NOT SEND accountId - ThunziAI extracts it from accessToken
+     }
+     ```
+   - ThunziAI auto-connects Facebook AND creates Instagram platform if linked
+   - Returns HTTP 201 with platform data
+
+3. **Syncing Platforms** (GET `/api/creator/platforms`):
+   - Fetches all platforms from ThunziAI API
+   - Auto-creates local records for platforms ThunziAI auto-created (e.g., Instagram)
+   - Updates followers/posts from ThunziAI data
+
+4. **Manual Sync** (POST `/api/creator/platforms/:id/sync`):
+   - Calls ThunziAI `POST /api/sync` with:
+     ```json
+     {
+       "platformId": number  // ThunziAI platform ID (required)
+       // Optional: companyId, platform
+       // ❌ DO NOT send accountId for Meta platforms
+     }
+     ```
+
+5. **Disconnect** (`DELETE /api/creator/platforms/:id`):
+   - Calls ThunziAI `DELETE /api/platforms/:id`
+   - Then deletes from local database
+
+#### ✅ SOLUTION IMPLEMENTED (March 5, 2026)
+**ROOT CAUSE**: ThunziAI expects Meta platforms (Facebook/Instagram) WITHOUT `accountId` field. ThunziAI extracts the account ID from the `accessToken` itself.
+
+**Fix Applied**:
+1. **Frontend**: Removed `accountId` from Facebook/Instagram connection requests
+2. **Frontend**: No longer manually registers Instagram - ThunziAI does it automatically
+3. **Backend**: Removed `accountId` validation requirement for Meta platforms
+4. **ThunziAI Service**:
+   - `add_platform()` - Only sends `accountId` for non-Meta platforms (YouTube, Twitter)
+   - `sync_platform()` - Only sends `accountId` for non-Meta platforms
+5. **Platforms Route**: GET endpoint syncs with ThunziAI to discover auto-created platforms
+
+**Testing Results (Verified)**:
+```bash
+# Facebook Connection - WORKS ✅
+POST /api/platforms
+{"companyId": 16, "platform": "facebook", "accountName": "Page Name", "accessToken": "EAA..."}
+→ HTTP 201 Created (Platform ID 117, 811 followers)
+
+# Instagram Auto-Created - WORKS ✅
+→ ThunziAI automatically creates Instagram platform (Platform ID 154, 100 followers)
+
+# Sync - WORKS ✅
+POST /api/sync
+{"platformId": 117} → HTTP 200 "Successfully synced data"
+{"platformId": 154} → HTTP 200 "Successfully synced data"
+```
+
+#### Code Locations
+- **Frontend OAuth**: `frontend/src/hooks/useFacebookOAuth.js`
+- **Backend Routes**: `backend/app/routes/platforms.py`
+- **ThunziAI Service**: `backend/app/services/thunzi_service.py`
+- **Models**: `backend/app/models/connected_platform.py`, `backend/app/models/thunzi_account.py`
+
+#### Important Pattern
+- Each BantuBuzz user (creator/brand) gets their own ThunziAI company
+- Company ID stored in `thunzi_accounts` table
+- Platforms linked via `thunzi_platform_id` in `connected_platforms`
+
+---
+
 **Remember**: This platform serves real users. Every change should maintain consistency, functionality, and the professional design we've established. When in doubt, refer to Home.jsx and this guide.
 
-🤖 **Generated for AI Assistants** | **Maintained by**: Development Team | **Last Review**: Feb 24, 2026
+🤖 **Generated for AI Assistants** | **Maintained by**: Development Team | **Last Review**: Mar 5, 2026
