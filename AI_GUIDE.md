@@ -302,6 +302,89 @@ OS: Ubuntu
 Location: /var/www/bantubuzz/
 ```
 
+### Database Configuration
+
+**CRITICAL: BantuBuzz uses PostgreSQL, NOT SQLite**
+
+**Database Credentials:**
+```bash
+Database Type: PostgreSQL
+Database Name: bantubuzz
+Database User: bantubuzz_user
+Database Password: BantuBuzz2024!
+Host: localhost
+Port: 5432
+```
+
+**Environment Configuration:**
+```bash
+# CORRECT Database URL (Production)
+DATABASE_URL=postgresql://bantubuzz_user:BantuBuzz2024!@localhost:5432/bantubuzz
+
+# WRONG - NEVER use SQLite in production
+# DATABASE_URL=sqlite:///app.db  ❌ DO NOT USE
+# DATABASE_URL=sqlite:///bantubuzz.db  ❌ DO NOT USE
+```
+
+**Important Notes:**
+- ⚠️ **ALWAYS verify** `.env` file on server has the correct PostgreSQL connection string
+- ⚠️ **NEVER change** the database URL to SQLite - this will break production
+- ⚠️ The `.env.backup` file contains the original correct configuration
+- ✅ All user data, creators, bookings, collaborations are stored in PostgreSQL
+- ✅ PostgreSQL handles JSON fields, full-text search, and complex queries
+
+**Common Database Operations:**
+```bash
+# Check database connection
+ssh root@173.212.245.22 "cd /var/www/bantubuzz/backend && source venv/bin/activate && python -c 'from app import create_app, db; app = create_app(); app.app_context().push(); from app.models import User; print(f\"Users: {User.query.count()}\")'"
+
+# Access PostgreSQL CLI
+ssh root@173.212.245.22 "sudo -u postgres psql bantubuzz"
+
+# PostgreSQL useful commands (once in psql):
+\dt              # List all tables
+\d users         # Describe users table schema
+\d+ users        # Detailed table info with indexes
+SELECT COUNT(*) FROM users;                    # Count users
+SELECT COUNT(*) FROM creator_profiles;         # Count creators
+SELECT email, user_type FROM users LIMIT 5;    # Sample users
+\q              # Quit psql
+
+# Backup database
+ssh root@173.212.245.22 "sudo -u postgres pg_dump bantubuzz > /tmp/bantubuzz_backup.sql"
+
+# Download backup
+scp root@173.212.245.22:/tmp/bantubuzz_backup.sql "D:\Backups\"
+
+# Restore database (CAREFUL!)
+ssh root@173.212.245.22 "sudo -u postgres psql bantubuzz < /tmp/bantubuzz_backup.sql"
+```
+
+**Database Schema:**
+- BantuBuzz uses **Alembic** for database migrations (Flask-Migrate)
+- Migration files located in: `/var/www/bantubuzz/backend/migrations/versions/`
+- Never run `db.create_all()` on production - use migrations instead
+- Models defined in: `/var/www/bantubuzz/backend/app/models/`
+
+**Troubleshooting Database Issues:**
+```bash
+# If you see "no such table" errors:
+# 1. Check DATABASE_URL is correct
+ssh root@173.212.245.22 "grep DATABASE_URL /var/www/bantubuzz/backend/.env"
+
+# 2. Verify PostgreSQL is running
+ssh root@173.212.245.22 "systemctl status postgresql"
+
+# 3. Test database connection
+ssh root@173.212.245.22 "cd /var/www/bantubuzz/backend && source venv/bin/activate && python -c 'from app import db; from app import create_app; app = create_app(); print(db.engine.url)'"
+
+# 4. If DATABASE_URL is wrong, restore from backup
+ssh root@173.212.245.22 "cp /var/www/bantubuzz/backend/.env.backup /var/www/bantubuzz/backend/.env"
+
+# 5. Restart backend
+ssh root@173.212.245.22 "pkill -f gunicorn && cd /var/www/bantubuzz/backend && source venv/bin/activate && gunicorn --bind 127.0.0.1:8002 --workers 4 --timeout 120 --error-logfile gunicorn_error.log --access-logfile gunicorn_access.log 'app:create_app()' --daemon"
+```
+
 ### URL Architecture & Request Flow
 
 **CRITICAL: Understanding how URLs are built in BantuBuzz**
@@ -742,7 +825,7 @@ ssh root@173.212.245.22 "systemctl restart postgresql"
 ssh root@173.212.245.22 "cd /var/www/bantubuzz/backend && source venv/bin/activate && python migrations/migration_script.py"
 
 # Access PostgreSQL console
-ssh root@173.212.245.22 "sudo -u postgres psql bantubuzz_db"
+ssh root@173.212.245.22 "sudo -u postgres psql bantubuzz"
 ```
 
 **6. Apache2 Management:**
