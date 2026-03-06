@@ -274,6 +274,9 @@ def approve_deliverable(collab_id, deliverable_id):
         if collaboration.brand_id != brand.id:
             return jsonify({'error': 'Unauthorized'}), 403
 
+        print(f"[APPROVE_DELIVERABLE] Starting approval for collaboration {collab_id}, deliverable {deliverable_id}")
+        print(f"[APPROVE_DELIVERABLE] Current state - Drafts: {len(collaboration.draft_deliverables or [])}, Submitted: {len(collaboration.submitted_deliverables or [])}, Expected: {len(collaboration.deliverables or [])}")
+
         # Find the draft deliverable
         draft_deliverables = collaboration.draft_deliverables or []
         deliverable_to_approve = None
@@ -284,24 +287,34 @@ def approve_deliverable(collab_id, deliverable_id):
                 deliverable_to_approve = d.copy()
                 deliverable_to_approve['status'] = 'approved'
                 deliverable_to_approve['approved_at'] = datetime.utcnow().isoformat()
+                print(f"[APPROVE_DELIVERABLE] Found deliverable to approve: {deliverable_to_approve['title']}")
             else:
                 remaining_drafts.append(d)
 
         if not deliverable_to_approve:
+            print(f"[APPROVE_DELIVERABLE] ERROR: Deliverable {deliverable_id} not found in drafts")
             return jsonify({'error': 'Deliverable not found'}), 404
 
         # Move to submitted deliverables
-        if collaboration.submitted_deliverables is None:
-            collaboration.submitted_deliverables = []
+        # CRITICAL: Create new lists to ensure SQLAlchemy tracks changes
+        # This avoids the "Can't flag attribute modified; it's not present in object state" error
+        submitted_list = list(collaboration.submitted_deliverables or [])
+        submitted_list.append(deliverable_to_approve)
 
-        collaboration.submitted_deliverables.append(deliverable_to_approve)
+        # Assign new lists to trigger SQLAlchemy change detection
+        collaboration.submitted_deliverables = submitted_list
         collaboration.draft_deliverables = remaining_drafts
 
+        print(f"[APPROVE_DELIVERABLE] After move - Drafts: {len(collaboration.draft_deliverables)}, Submitted: {len(collaboration.submitted_deliverables)}")
+
         # Auto-calculate progress
+        old_progress = collaboration.progress_percentage
         collaboration.progress_percentage = collaboration.calculate_progress()
+        print(f"[APPROVE_DELIVERABLE] Progress updated: {old_progress}% -> {collaboration.progress_percentage}%")
 
         # Auto-complete if progress reaches 100%
         if collaboration.progress_percentage >= 100 and collaboration.status == 'in_progress':
+            print(f"[APPROVE_DELIVERABLE] Triggering auto-completion for collaboration {collaboration.id}")
             collaboration.status = 'completed'
             collaboration.actual_completion_date = datetime.utcnow()
             collaboration.last_update = "Collaboration automatically completed (100% progress reached)"
@@ -312,12 +325,15 @@ def approve_deliverable(collab_id, deliverable_id):
                 from app.models import Booking
                 booking = Booking.query.get(collaboration.booking_id)
                 if booking and booking.status != 'completed':
+                    print(f"[APPROVE_DELIVERABLE] Marking booking {booking.id} as completed")
                     booking.status = 'completed'
                     booking.completion_date = datetime.utcnow()
                     booking.escrow_status = 'escrowed'
                     booking.escrowed_at = datetime.utcnow()
 
             # Release funds to wallet
+            escrow_released = False
+            escrow_error = None
             try:
                 from app.services.payment_service import release_escrow_to_wallet
                 from app.utils.subscription_helper import get_brand_platform_fee_percentage
@@ -325,65 +341,127 @@ def approve_deliverable(collab_id, deliverable_id):
                 # Get brand's platform fee based on subscription tier
                 platform_fee = get_brand_platform_fee_percentage(collaboration.brand.user_id)
 
+                print(f"[APPROVE_DELIVERABLE] Attempting to release escrow with fee {platform_fee}%")
                 transaction = release_escrow_to_wallet(collaboration.id, platform_fee_percentage=platform_fee)
-                print(f"Auto-completion: Escrow released for collaboration {collaboration.id}. Fee: {platform_fee}%. Transaction: {transaction.id}")
+                print(f"[APPROVE_DELIVERABLE] SUCCESS: Escrow released. Transaction ID: {transaction.id}")
+                escrow_released = True
+
+                # Update collaboration to mark escrow as released
+                collaboration.escrow_status = 'released'
+                collaboration.last_update = "Collaboration completed - Funds released to creator wallet"
+
             except Exception as e:
-                print(f"Warning: Failed to auto-release escrow: {str(e)}")
+                escrow_error = str(e)
+                print(f"[APPROVE_DELIVERABLE] ERROR: Failed to auto-release escrow: {escrow_error}")
+                import traceback
+                traceback.print_exc()
+
+                # Mark escrow as failed so admin can manually release
+                collaboration.escrow_status = 'failed'
+                collaboration.last_update = f"Collaboration completed - ESCROW RELEASE FAILED: {escrow_error[:200]}"
+
+                # Store error details in notes for admin investigation
+                error_note = f"\n\n[AUTO-ESCROW FAILURE - {datetime.utcnow().isoformat()}]\n"
+                error_note += f"Error: {escrow_error}\n"
+                error_note += "ADMIN ACTION REQUIRED: Manually release escrow to creator wallet"
+                collaboration.notes = (collaboration.notes or '') + error_note
+
+                # Don't fail the approval - collaboration is still completed
+                # Admin will need to manually release escrow later
 
             # Notify both parties
-            creator_user = User.query.get(collaboration.creator.user_id)
-            brand_user = User.query.get(collaboration.brand.user_id)
+            try:
+                creator_user = User.query.get(collaboration.creator.user_id)
+                brand_user = User.query.get(collaboration.brand.user_id)
 
-            if creator_user:
-                notify_collaboration_status(
-                    user_id=creator_user.id,
-                    status='completed',
-                    collaboration_title=collaboration.title,
-                    collaboration_id=collaboration.id,
-                    user_type='creator'
-                )
+                if creator_user:
+                    # Customize notification based on escrow status
+                    if escrow_released:
+                        notify_collaboration_status(
+                            user_id=creator_user.id,
+                            status='completed',
+                            collaboration_title=collaboration.title,
+                            collaboration_id=collaboration.id,
+                            user_type='creator'
+                        )
+                    else:
+                        # Escrow failed - notify creator about the delay
+                        notify_collaboration_update(
+                            user_id=creator_user.id,
+                            collaboration_title=collaboration.title,
+                            collaboration_id=collaboration.id,
+                            update_message="Collaboration completed! Payment processing encountered an issue. Our team has been notified and will process your payment manually within 24 hours."
+                        )
+                    print(f"[APPROVE_DELIVERABLE] Notified creator user {creator_user.id} (escrow_released={escrow_released})")
 
-            if brand_user:
-                notify_collaboration_status(
-                    user_id=brand_user.id,
-                    status='completed',
-                    collaboration_title=collaboration.title,
-                    collaboration_id=collaboration.id,
-                    user_type='brand'
-                )
+                if brand_user:
+                    notify_collaboration_status(
+                        user_id=brand_user.id,
+                        status='completed',
+                        collaboration_title=collaboration.title,
+                        collaboration_id=collaboration.id,
+                        user_type='brand'
+                    )
+                    print(f"[APPROVE_DELIVERABLE] Notified brand user {brand_user.id}")
+
+                # If escrow failed, also notify admin/support
+                if not escrow_released and escrow_error:
+                    # TODO: Send email or create support ticket for admin
+                    print(f"[APPROVE_DELIVERABLE] ADMIN ALERT: Escrow release failed for collaboration {collaboration.id}")
+                    print(f"[APPROVE_DELIVERABLE] ADMIN ALERT: Error - {escrow_error}")
+
+            except Exception as e:
+                print(f"[APPROVE_DELIVERABLE] WARNING: Failed to send notifications: {str(e)}")
+                # Don't fail the approval
         else:
             # Normal update
             collaboration.last_update = f"Deliverable approved: {deliverable_to_approve['title']}"
+            print(f"[APPROVE_DELIVERABLE] Normal approval (progress at {collaboration.progress_percentage}%)")
 
         collaboration.last_update_date = datetime.utcnow()
         collaboration.updated_at = datetime.utcnow()
 
-        # Mark the flags as modified for JSON fields
-        from sqlalchemy.orm.attributes import flag_modified
-        flag_modified(collaboration, 'submitted_deliverables')
-        flag_modified(collaboration, 'draft_deliverables')
+        # Note: No need for flag_modified() since we assigned new list objects
+        # SQLAlchemy automatically detects changes when entire objects are replaced
 
+        print(f"[APPROVE_DELIVERABLE] Committing to database...")
         db.session.commit()
+        print(f"[APPROVE_DELIVERABLE] Database commit successful")
+
+        # Verify the state after commit
+        print(f"[APPROVE_DELIVERABLE] Final state - Drafts: {len(collaboration.draft_deliverables or [])}, Submitted: {len(collaboration.submitted_deliverables or [])}, Progress: {collaboration.progress_percentage}%")
 
         # Emit Socket.IO update
-        emit_collaboration_update(collaboration.id)
+        try:
+            emit_collaboration_update(collaboration.id)
+            print(f"[APPROVE_DELIVERABLE] Socket.IO update emitted")
+        except Exception as e:
+            print(f"[APPROVE_DELIVERABLE] WARNING: Failed to emit Socket.IO update: {str(e)}")
 
         # Notify creator about approval
-        creator_user = User.query.get(collaboration.creator.user_id)
-        if creator_user:
-            notify_collaboration_update(
-                user_id=creator_user.id,
-                collaboration_title=collaboration.title,
-                collaboration_id=collaboration.id,
-                update_message=f"Your deliverable '{deliverable_to_approve['title']}' has been approved!"
-            )
+        try:
+            creator_user = User.query.get(collaboration.creator.user_id)
+            if creator_user:
+                notify_collaboration_update(
+                    user_id=creator_user.id,
+                    collaboration_title=collaboration.title,
+                    collaboration_id=collaboration.id,
+                    update_message=f"Your deliverable '{deliverable_to_approve['title']}' has been approved!"
+                )
+                print(f"[APPROVE_DELIVERABLE] Approval notification sent to creator")
+        except Exception as e:
+            print(f"[APPROVE_DELIVERABLE] WARNING: Failed to notify creator: {str(e)}")
 
+        print(f"[APPROVE_DELIVERABLE] SUCCESS: Returning response to client")
         return jsonify({
             'message': 'Deliverable approved successfully',
             'collaboration': collaboration.to_dict()
         }), 200
 
     except Exception as e:
+        print(f"[APPROVE_DELIVERABLE] FATAL ERROR: {str(e)}")
+        import traceback
+        traceback.print_exc()
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
@@ -925,6 +1003,8 @@ def complete_collaboration(collab_id):
         db.session.commit()
 
         # Release escrow to creator wallet with 24-hour countdown
+        escrow_released = False
+        escrow_error = None
         try:
             from app.services.payment_service import release_escrow_to_wallet
             from app.utils.subscription_helper import get_brand_platform_fee_percentage
@@ -933,25 +1013,57 @@ def complete_collaboration(collab_id):
             platform_fee = get_brand_platform_fee_percentage(collaboration.brand.user_id)
 
             transaction = release_escrow_to_wallet(collaboration.id, platform_fee_percentage=platform_fee)
+            escrow_released = True
 
-            # Transaction created successfully with 24-hour countdown
+            # Update escrow status
+            collaboration.escrow_status = 'released'
+            collaboration.last_update = "Collaboration completed - Funds released to creator wallet"
+            db.session.commit()
+
             print(f"Escrow released to wallet for collaboration {collaboration.id}. Fee: {platform_fee}%. Transaction ID: {transaction.id}")
-        except Exception as e:
-            # Log error but don't fail the completion
-            print(f"Warning: Failed to release escrow to wallet: {str(e)}")
-            # We don't rollback here because the collaboration is still completed
-            # Admin can manually release escrow later if needed
 
-        # Notify creator that collaboration is completed
+        except Exception as e:
+            escrow_error = str(e)
+            print(f"[COMPLETE_COLLABORATION] ERROR: Failed to release escrow: {escrow_error}")
+            import traceback
+            traceback.print_exc()
+
+            # Mark escrow as failed
+            collaboration.escrow_status = 'failed'
+            collaboration.last_update = f"Collaboration completed - ESCROW RELEASE FAILED: {escrow_error[:200]}"
+
+            # Store error details for admin
+            error_note = f"\n\n[AUTO-ESCROW FAILURE - {datetime.utcnow().isoformat()}]\n"
+            error_note += f"Error: {escrow_error}\n"
+            error_note += "ADMIN ACTION REQUIRED: Manually release escrow to creator wallet"
+            collaboration.notes = (collaboration.notes or '') + error_note
+
+            db.session.commit()
+
+        # Notify creator - customize based on escrow status
         creator_user = User.query.get(collaboration.creator.user_id)
         if creator_user:
-            notify_collaboration_status(
-                user_id=creator_user.id,
-                status='completed',
-                collaboration_title=collaboration.title,
-                collaboration_id=collaboration.id,
-                user_type='creator'
-            )
+            if escrow_released:
+                notify_collaboration_status(
+                    user_id=creator_user.id,
+                    status='completed',
+                    collaboration_title=collaboration.title,
+                    collaboration_id=collaboration.id,
+                    user_type='creator'
+                )
+            else:
+                # Escrow failed - notify about delay
+                notify_collaboration_update(
+                    user_id=creator_user.id,
+                    collaboration_title=collaboration.title,
+                    collaboration_id=collaboration.id,
+                    update_message="Collaboration completed! Payment processing encountered an issue. Our team has been notified and will process your payment manually within 24 hours."
+                )
+
+        # Alert admin if escrow failed
+        if not escrow_released and escrow_error:
+            print(f"[COMPLETE_COLLABORATION] ADMIN ALERT: Escrow release failed for collaboration {collaboration.id}")
+            print(f"[COMPLETE_COLLABORATION] ADMIN ALERT: Error - {escrow_error}")
 
         return jsonify({
             'message': 'Collaboration marked as completed',

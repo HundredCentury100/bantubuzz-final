@@ -63,7 +63,9 @@
       "Bash(del \"d:\\Bantubuzz Platform\\dist.tar.gz\")",
       "Bash(if exist \"frontend\\dist.tar.gz\" del \"frontend\\dist.tar.gz\")",
       "Bash(git rm:*)",
-      "Bash(del \"d:\\Bantubuzz Platform\\frontend\\src\\constants\\platformConfig.js\")"
+      "Bash(del \"d:\\Bantubuzz Platform\\frontend\\src\\constants\\platformConfig.js\")",
+      "Bash(if exist \"d:\\Bantubuzz Platform\\frontend\\dist.tar.gz\" del \"d:\\Bantubuzz Platform\\frontend\\dist.tar.gz\")",
+      "Bash(del \"d:\\Bantubuzz Platform\\frontend-dist.tar.gz\")"
     ],
     "deny": [],
     "ask": []

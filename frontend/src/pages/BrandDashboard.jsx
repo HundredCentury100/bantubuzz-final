@@ -14,6 +14,7 @@ const BrandDashboard = () => {
   const [savedCreators, setSavedCreators] = useState([]);
   const [bookings, setBookings] = useState([]);
   const [subscription, setSubscription] = useState(null);
+  const [connectedPlatforms, setConnectedPlatforms] = useState([]);
   const [stats, setStats] = useState({
     totalBookings: 0,
     activeBookings: 0,
@@ -47,6 +48,17 @@ const BrandDashboard = () => {
       } catch (error) {
         console.error('Error fetching subscription:', error);
         // Don't fail dashboard load if subscription fails
+      }
+
+      // Fetch connected platforms
+      try {
+        const platformsRes = await api.get('/brand/platforms');
+        if (platformsRes.data.success) {
+          setConnectedPlatforms(platformsRes.data.platforms || []);
+        }
+      } catch (error) {
+        console.error('Error fetching connected platforms:', error);
+        // Don't fail dashboard load if platforms fail
       }
 
       // Fetch saved creators
@@ -194,6 +206,29 @@ const BrandDashboard = () => {
                   className="inline-block mt-3 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary transition-colors text-sm font-medium"
                 >
                   Complete Profile
+                </Link>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Social Media Connection Banner */}
+        {profileComplete && connectedPlatforms.length === 0 && (
+          <div className="mb-6 p-4 bg-primary border border-primary rounded-lg">
+            <div className="flex items-start">
+              <svg className="w-5 h-5 text-primary-dark mt-0.5 mr-3" fill="currentColor" viewBox="0 0 20 20">
+                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM4.332 8.027a6.012 6.012 0 011.912-2.706C6.512 5.73 6.974 6 7.5 6A1.5 1.5 0 019 7.5V8a2 2 0 004 0 2 2 0 011.523-1.943A5.977 5.977 0 0116 10c0 .34-.028.675-.083 1H15a2 2 0 00-2 2v2.197A5.973 5.973 0 0110 16v-2a2 2 0 00-2-2 2 2 0 01-2-2 2 2 0 00-1.668-1.973z" clipRule="evenodd" />
+              </svg>
+              <div className="flex-1">
+                <h3 className="font-medium text-primary-dark leading-snug">Connect Your Social Media Platforms</h3>
+                <p className="text-sm text-primary-dark leading-relaxed mt-1">
+                  Link your Instagram, TikTok, YouTube, Facebook, and X accounts to showcase your brand's social presence.
+                </p>
+                <Link
+                  to="/brand/platforms"
+                  className="inline-block mt-3 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary transition-colors text-sm font-medium"
+                >
+                  Connect Platforms
                 </Link>
               </div>
             </div>
@@ -422,6 +457,18 @@ const BrandDashboard = () => {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                     </svg>
                     <span className="font-medium text-dark">Find Creators</span>
+                  </div>
+                </Link>
+
+                <Link
+                  to="/brand/platforms"
+                  className="block p-3 border border-gray-200 rounded-lg hover:border-primary hover:bg-primary/5 transition-colors"
+                >
+                  <div className="flex items-center">
+                    <svg className="w-5 h-5 text-primary mr-3" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM4.332 8.027a6.012 6.012 0 011.912-2.706C6.512 5.73 6.974 6 7.5 6A1.5 1.5 0 019 7.5V8a2 2 0 004 0 2 2 0 011.523-1.943A5.977 5.977 0 0116 10c0 .34-.028.675-.083 1H15a2 2 0 00-2 2v2.197A5.973 5.973 0 0110 16v-2a2 2 0 00-2-2 2 2 0 01-2-2 2 2 0 00-1.668-1.973z" clipRule="evenodd" />
+                    </svg>
+                    <span className="font-medium text-dark">Connect Platforms</span>
                   </div>
                 </Link>
 

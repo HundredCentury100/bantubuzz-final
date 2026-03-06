@@ -306,10 +306,8 @@ def accept_proposal(proposal_id):
         # Mark proposal as accepted
         proposal.status = 'accepted'
 
-        # Close the brief
+        # Get brief (don't close it yet - brand will choose after payment)
         brief = proposal.brief
-        brief.status = 'closed'
-        brief.closed_at = datetime.utcnow()
 
         # Create booking with full brief/proposal details
         booking = Booking(

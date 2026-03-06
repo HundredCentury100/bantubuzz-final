@@ -77,23 +77,36 @@ const CampaignDetails = () => {
       return;
     }
 
-    // Store payment context and redirect to payment page
-    localStorage.setItem('payment_context', JSON.stringify({
-      package_id: packageId,
-      campaign_id: id,
-      creator_id: pkg.creator_id || pkg.creator?.id,
-      type: 'campaign_package',
-      amount: pkg.price,
-      payment_category: 'package',
-      booking_type: 'campaign_package'
-    }));
+    try {
+      // Add package to campaign (this creates booking on backend)
+      const response = await campaignsAPI.addPackageToCampaign(id, packageId);
 
-    // Close modal and navigate to payment
-    setShowAddPackageModal(false);
-    setSelectedPackage('');
-    setSearchQuery('');
-    setCategoryFilter('all');
-    navigate(`/brand/campaigns/payment/${id}`);
+      if (response.data.booking_id) {
+        // Store payment context with booking_id and redirect to payment page
+        localStorage.setItem('payment_context', JSON.stringify({
+          package_id: packageId,
+          campaign_id: id,
+          booking_id: response.data.booking_id,
+          creator_id: pkg.creator_id || pkg.creator?.id,
+          type: 'campaign_package',
+          amount: pkg.price,
+          payment_category: 'package',
+          booking_type: 'campaign_package'
+        }));
+
+        // Close modal and navigate to payment
+        setShowAddPackageModal(false);
+        setSelectedPackage('');
+        setSearchQuery('');
+        setCategoryFilter('all');
+        navigate(`/brand/campaigns/payment/${id}`);
+      } else {
+        toast.error('Failed to create payment booking');
+      }
+    } catch (error) {
+      console.error('Error adding package:', error);
+      toast.error(error.response?.data?.error || 'Failed to add package');
+    }
   };
 
   const handleRemovePackage = async (packageId) => {
@@ -113,18 +126,31 @@ const CampaignDetails = () => {
 
   const handleUpdateApplication = async (applicationId, status, application) => {
     if (status === 'accepted') {
-      // Redirect to payment page for acceptance
-      const app = applications.find(a => a.id === applicationId) || application;
-      localStorage.setItem('payment_context', JSON.stringify({
-        application_id: applicationId,
-        campaign_id: id,
-        creator_id: app.creator_id,
-        type: 'campaign_application',
-        amount: app.proposed_price,
-        payment_category: 'campaign',
-        booking_type: 'campaign_application'
-      }));
-      navigate(`/brand/campaigns/payment/${id}`);
+      // Accept application (this creates booking on backend)
+      try {
+        const response = await campaignsAPI.updateApplicationStatus(id, applicationId, status);
+
+        if (response.data.booking_id) {
+          // Redirect to payment page with booking_id
+          const app = applications.find(a => a.id === applicationId) || application;
+          localStorage.setItem('payment_context', JSON.stringify({
+            application_id: applicationId,
+            campaign_id: id,
+            booking_id: response.data.booking_id,
+            creator_id: app.creator_id,
+            type: 'campaign_application',
+            amount: app.proposed_price,
+            payment_category: 'campaign',
+            booking_type: 'campaign_application'
+          }));
+          navigate(`/brand/campaigns/payment/${id}`);
+        } else {
+          toast.error('Failed to create payment booking');
+        }
+      } catch (error) {
+        console.error('Error accepting application:', error);
+        toast.error(error.response?.data?.error || 'Failed to accept application');
+      }
       return;
     }
 

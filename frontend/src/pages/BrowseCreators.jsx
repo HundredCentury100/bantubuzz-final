@@ -40,25 +40,19 @@ const BrowseCreators = () => {
     total: 0
   });
 
-  // Initialize filters from URL params on mount
+  // Read URL params ONCE on mount and set initial filters
   useEffect(() => {
     const categoryParam = searchParams.get('category');
     const platformParam = searchParams.get('platform');
-    const searchParam = searchParams.get('search');
 
-    if (categoryParam || platformParam || searchParam) {
+    if (categoryParam || platformParam) {
       setFilters(prev => ({
         ...prev,
         category: categoryParam || '',
-        platform: platformParam || '',
-        search: searchParam || ''
+        platform: platformParam || ''
       }));
-      // Also set searchInput if search param exists
-      if (searchParam) {
-        setSearchInput(searchParam);
-      }
     }
-  }, [searchParams]);
+  }, []); // Empty deps - only run once on mount
 
   useEffect(() => {
     fetchCategories();
@@ -267,7 +261,7 @@ const BrowseCreators = () => {
                 >
                   <option value="">All Categories</option>
                   {categories.map(cat => (
-                    <option key={cat} value={cat}>{cat}</option>
+                    <option key={cat.id || cat} value={cat.name || cat}>{cat.name || cat}</option>
                   ))}
                 </select>
               </div>
@@ -433,7 +427,7 @@ const BrowseCreators = () => {
                 >
                   <option value="">All Categories</option>
                   {categories.map(cat => (
-                    <option key={cat} value={cat}>{cat}</option>
+                    <option key={cat.id || cat} value={cat.name || cat}>{cat.name || cat}</option>
                   ))}
                 </select>
               </div>

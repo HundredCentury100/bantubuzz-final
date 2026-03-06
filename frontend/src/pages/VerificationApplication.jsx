@@ -41,11 +41,19 @@ const VerificationApplication = () => {
       const response = await api.get('/creator/subscriptions/my-subscription');
 
       if (response.data.success) {
-        const subscription = response.data.data.subscription;
+        const data = response.data.data;
+        const subscription = data.subscription || data.plan; // Handle both subscription and free plan
+
         // Check if user has active verification subscription
-        if (subscription && subscription.plan?.subscription_type === 'verification' &&
+        if (data.has_subscription && subscription &&
+            subscription.plan?.subscription_type === 'verification' &&
             subscription.status === 'active' && subscription.payment_verified) {
           setHasActiveSubscription(true);
+        } else if (data.is_free) {
+          // User is on free plan - cannot apply for verification
+          setHasActiveSubscription(false);
+          toast.error('You need an active verification subscription to apply. Redirecting to subscriptions...');
+          setTimeout(() => navigate('/creator/subscriptions'), 2000);
         } else {
           setHasActiveSubscription(false);
           toast.error('You need an active verification subscription to apply. Redirecting to subscriptions...');

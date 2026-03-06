@@ -6,7 +6,7 @@ import os
 from app import db
 from app.models import (
     Booking, Package, Campaign, BrandProfile, CreatorProfile, User, Collaboration,
-    Proposal, CollaborationMilestone, Subscription, SubscriptionPlan
+    Proposal, CollaborationMilestone, Subscription, SubscriptionPlan, Brief
 )
 from app.services.payment_service import initiate_payment, check_payment_status, process_payment_webhook
 from app.utils.notifications import notify_new_booking, notify_booking_status
@@ -35,9 +35,13 @@ def get_bookings():
 
         if user.user_type == 'creator':
             creator = CreatorProfile.query.filter_by(user_id=user_id).first()
+            if not creator:
+                return jsonify({'bookings': [], 'total': 0, 'pages': 0, 'current_page': 1}), 200
             query = Booking.query.filter_by(creator_id=creator.id)
         else:
             brand = BrandProfile.query.filter_by(user_id=user_id).first()
+            if not brand:
+                return jsonify({'bookings': [], 'total': 0, 'pages': 0, 'current_page': 1}), 200
             query = Booking.query.filter_by(brand_id=brand.id)
 
         pagination = query.order_by(Booking.created_at.desc()).paginate(
@@ -274,12 +278,32 @@ def initiate_booking_payment(booking_id):
         if booking.payment_status == 'paid':
             return jsonify({'error': 'Booking already paid'}), 400
 
-        # Get package title for payment description
-        package = Package.query.get(booking.package_id)
-        package_title = package.title if package else f'Booking {booking_id}'
+        # Get appropriate title based on booking type
+        payment_title = f'Booking {booking_id}'
+        if booking.booking_type == 'brief' and booking.brief:
+            payment_title = f"Brief: {booking.brief.title}"
+        elif booking.booking_type == 'campaign_application':
+            from app.models import CampaignApplication
+            application = CampaignApplication.query.filter_by(booking_id=booking.id).first()
+            if application and application.campaign:
+                payment_title = f"Campaign Application: {application.campaign.title}"
+        elif booking.booking_type == 'campaign_package' and booking.package:
+            payment_title = f"Campaign Package: {booking.package.title}"
+        elif booking.booking_type == 'paid_revision':
+            # Parse revision data from notes
+            import json
+            try:
+                revision_data = json.loads(booking.notes)
+                deliverable_title = revision_data.get('deliverable_title', 'Revision')
+                payment_title = f"Paid Revision: {deliverable_title}"
+            except:
+                payment_title = "Paid Revision"
+        elif booking.package_id:
+            package = Package.query.get(booking.package_id)
+            payment_title = package.title if package else f'Package Booking {booking_id}'
 
         # Initiate payment
-        payment_result = initiate_payment(booking, user.email, package_title)
+        payment_result = initiate_payment(booking, user.email, payment_title)
 
         if payment_result['success']:
             return jsonify({
@@ -855,7 +879,95 @@ def verify_bank_transfer_payment(booking_id):
             existing_payment.held_amount = booking.total_price if hasattr(booking, 'total_price') else booking.amount
 
         # Handle different booking types after payment verification
-        if booking.booking_type == 'campaign_application':
+        if booking.booking_type == 'paid_revision':
+            # For paid revisions: Automatically trigger the revision request
+            print(f"[VERIFY_PAYMENT] Handling paid revision for booking {booking_id}")
+
+            # Extract revision data from booking notes
+            import json
+            try:
+                revision_data = json.loads(booking.notes)
+                collaboration_id = revision_data.get('collaboration_id')
+                deliverable_id = revision_data.get('deliverable_id')
+                revision_notes = revision_data.get('revision_notes')
+                deliverable_title = revision_data.get('deliverable_title')
+
+                print(f"[VERIFY_PAYMENT] Revision data - Collab: {collaboration_id}, Deliverable: {deliverable_id}")
+
+                if collaboration_id and deliverable_id and revision_notes:
+                    collaboration = Collaboration.query.get(collaboration_id)
+
+                    if collaboration:
+                        # Mark deliverable as revision_requested
+                        draft_deliverables = collaboration.draft_deliverables or []
+                        for d in draft_deliverables:
+                            if d.get('id') == deliverable_id:
+                                d['status'] = 'revision_requested'
+                                d['revision_notes'] = revision_notes
+                                d['revision_requested_at'] = datetime.utcnow().isoformat()
+                                print(f"[VERIFY_PAYMENT] Marked deliverable {deliverable_id} as revision_requested")
+                                break
+
+                        # Create new list to trigger SQLAlchemy change detection
+                        collaboration.draft_deliverables = list(draft_deliverables)
+
+                        # Track revision request
+                        total_revisions = collaboration.total_revisions_used or 0
+
+                        revision_request = {
+                            'deliverable_id': deliverable_id,
+                            'deliverable_title': deliverable_title,
+                            'notes': revision_notes,
+                            'requested_at': datetime.utcnow().isoformat(),
+                            'is_paid': True,
+                            'fee': float(booking.amount),
+                            'booking_id': booking_id,
+                            'payment_verified_at': datetime.utcnow().isoformat()
+                        }
+
+                        if collaboration.revision_requests is None:
+                            collaboration.revision_requests = []
+
+                        # Create new list to trigger SQLAlchemy change detection
+                        revision_requests_list = list(collaboration.revision_requests)
+                        revision_requests_list.append(revision_request)
+                        collaboration.revision_requests = revision_requests_list
+
+                        collaboration.total_revisions_used = total_revisions + 1
+                        collaboration.paid_revisions = (collaboration.paid_revisions or 0) + 1
+
+                        # Update last update
+                        collaboration.last_update = f"Paid revision requested for: {deliverable_title}"
+                        collaboration.last_update_date = datetime.utcnow()
+                        collaboration.updated_at = datetime.utcnow()
+
+                        print(f"[VERIFY_PAYMENT] Revision request added to collaboration {collaboration_id}")
+
+                        # Notify creator about revision request
+                        from app.utils.notifications import notify_collaboration_update
+                        creator_user = User.query.get(collaboration.creator.user_id)
+                        if creator_user:
+                            notify_collaboration_update(
+                                user_id=creator_user.id,
+                                collaboration_title=collaboration.title,
+                                collaboration_id=collaboration.id,
+                                update_message=f"Paid revision requested for '{deliverable_title}'"
+                            )
+                            print(f"[VERIFY_PAYMENT] Notified creator {creator_user.id} about revision request")
+
+                        # Emit Socket.IO update
+                        from app.routes.collaborations import emit_collaboration_update
+                        emit_collaboration_update(collaboration.id)
+                        print(f"[VERIFY_PAYMENT] Socket.IO update emitted for collaboration {collaboration_id}")
+                    else:
+                        print(f"[VERIFY_PAYMENT] ERROR: Collaboration {collaboration_id} not found")
+                else:
+                    print(f"[VERIFY_PAYMENT] ERROR: Missing revision data in booking notes")
+
+            except (json.JSONDecodeError, KeyError) as e:
+                print(f"[VERIFY_PAYMENT] ERROR: Failed to parse revision data from booking notes: {str(e)}")
+
+        elif booking.booking_type == 'campaign_application':
             # For campaign applications: Update application status to 'accepted'
             from app.models import CampaignApplication
             application = CampaignApplication.query.filter_by(booking_id=booking.id).first()

@@ -7,6 +7,8 @@ import Navbar from '../components/Navbar';
 import toast from 'react-hot-toast';
 import { PLATFORMS, ZIMBABWE_LANGUAGES, COUNTRIES } from '../constants/options';
 import axios from 'axios';
+import ImageCropModal from '../components/ImageCropModal';
+import { createCroppedImage } from '../utils/cropImage';
 
 const CreatorProfileEdit = () => {
   const navigate = useNavigate();
@@ -22,6 +24,9 @@ const CreatorProfileEdit = () => {
   const [uploadingGallery, setUploadingGallery] = useState(false);
   const [deletingGalleryIndex, setDeletingGalleryIndex] = useState(null);
   const [categories, setCategories] = useState([]);
+  const [showCropModal, setShowCropModal] = useState(false);
+  const [imageToCrop, setImageToCrop] = useState(null);
+  const [originalFileName, setOriginalFileName] = useState('');
 
   const {
     register,
@@ -123,7 +128,7 @@ const CreatorProfileEdit = () => {
     setValue('platforms', updated);
   };
 
-  const handlePictureUpload = async (e) => {
+  const handlePictureSelect = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -139,18 +144,58 @@ const CreatorProfileEdit = () => {
       return;
     }
 
-    setUploadingPicture(true);
+    // Store the file name for later use
+    setOriginalFileName(file.name);
+
+    // Create a URL for the image to show in crop modal
+    const reader = new FileReader();
+    reader.onload = () => {
+      setImageToCrop(reader.result);
+      setShowCropModal(true);
+    };
+    reader.readAsDataURL(file);
+
+    // Reset the file input so the same file can be selected again if needed
+    e.target.value = '';
+  };
+
+  const handleCropComplete = async (croppedAreaPixels) => {
     try {
-      const response = await creatorsAPI.uploadProfilePicture(file);
+      setShowCropModal(false);
+      setUploadingPicture(true);
+
+      // Create cropped image blob
+      const croppedBlob = await createCroppedImage(imageToCrop, croppedAreaPixels);
+
+      // Create a File object from the blob
+      const croppedFile = new File([croppedBlob], originalFileName, {
+        type: 'image/jpeg',
+        lastModified: Date.now()
+      });
+
+      // Upload the cropped image
+      const response = await creatorsAPI.uploadProfilePicture(croppedFile);
+
       // Add timestamp to force browser cache refresh
       const picturePath = response.data.profile_picture;
       setProfilePicture(`${picturePath}?t=${Date.now()}`);
       toast.success('Profile picture updated!');
+
+      // Clear crop modal data
+      setImageToCrop(null);
+      setOriginalFileName('');
     } catch (err) {
+      console.error('Error uploading cropped image:', err);
       toast.error(err.response?.data?.error || 'Failed to upload profile picture');
     } finally {
       setUploadingPicture(false);
     }
+  };
+
+  const handleCropCancel = () => {
+    setShowCropModal(false);
+    setImageToCrop(null);
+    setOriginalFileName('');
   };
 
   const handleGalleryUpload = async (e) => {
@@ -360,7 +405,7 @@ const CreatorProfileEdit = () => {
                     <input
                       type="file"
                       accept="image/*"
-                      onChange={handlePictureUpload}
+                      onChange={handlePictureSelect}
                       className="hidden"
                       disabled={uploadingPicture}
                     />
@@ -369,6 +414,7 @@ const CreatorProfileEdit = () => {
                     </div>
                   </label>
                   <p className="text-sm text-gray-600 mt-2">
+                    Recommended: 400x400px or larger<br />
                     JPG, PNG or GIF (max. 5MB)
                   </p>
                 </div>
@@ -851,6 +897,17 @@ const CreatorProfileEdit = () => {
           </form>
         </div>
       </div>
+
+      {/* Image Crop Modal */}
+      {showCropModal && imageToCrop && (
+        <ImageCropModal
+          image={imageToCrop}
+          onCropComplete={handleCropComplete}
+          onCancel={handleCropCancel}
+          aspectRatio={1}
+          cropShape="round"
+        />
+      )}
     </div>
   );
 };

@@ -45,6 +45,7 @@ import CreatorSubscriptions from './pages/CreatorSubscriptions';
 import VerificationApplication from './pages/VerificationApplication';
 import VerificationStatus from './pages/VerificationStatus';
 import ConnectPlatforms from './pages/ConnectPlatforms';
+import BrandConnectPlatforms from './pages/BrandConnectPlatforms';
 
 // Admin Pages
 import AdminLogin from './pages/AdminLogin';
@@ -480,6 +481,14 @@ function App() {
         element={
           <ProtectedRoute requiredType="brand">
             <BrandWallet />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/brand/platforms"
+        element={
+          <ProtectedRoute requiredType="brand">
+            <BrandConnectPlatforms />
           </ProtectedRoute>
         }
       />

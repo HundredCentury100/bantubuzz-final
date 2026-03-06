@@ -11,7 +11,7 @@ class ConnectedPlatform(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    thunzi_platform_id = db.Column(db.Integer)  # ThunziAI platform ID
+    thunzi_platform_id = db.Column(db.Integer)  # ThunziAI platform ID from their API
     platform = db.Column(db.String(20), nullable=False)  # instagram, tiktok, youtube, facebook, twitter
     account_name = db.Column(db.String(255))
     account_id = db.Column(db.String(255))
@@ -27,10 +27,10 @@ class ConnectedPlatform(db.Model):
     sync_status = db.Column(db.String(20), default='pending')  # pending, in_progress, success, failure
     last_synced_at = db.Column(db.DateTime)
 
-    # Tokens (encrypted in production)
-    access_token = db.Column(db.Text)
-    refresh_token = db.Column(db.Text)
-    token_expiry = db.Column(db.DateTime)
+    # OAuth Tokens (encrypted in production)
+    access_token = db.Column(db.Text)  # User's OAuth access token from Facebook/YouTube/Twitter
+    refresh_token = db.Column(db.Text)  # OAuth refresh token for token renewal
+    token_expiry = db.Column(db.DateTime)  # When the access token expires
 
     # Timestamps
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -53,6 +53,7 @@ class ConnectedPlatform(db.Model):
             'is_connected': self.is_connected,
             'sync_status': self.sync_status,
             'last_synced_at': self.last_synced_at.isoformat() if self.last_synced_at else None,
+            'token_expiry': self.token_expiry.isoformat() if self.token_expiry else None,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }

@@ -8,6 +8,8 @@ from app import db
 from app.models import User, CreatorProfile, BrandProfile, ThunziAccount, ConnectedPlatform
 from app.services.thunzi_service import thunzi_service
 from datetime import datetime
+import requests
+import os
 
 platforms_bp = Blueprint('platforms', __name__)
 
@@ -232,6 +234,77 @@ def connect_platform():
 
     except Exception as e:
         db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@platforms_bp.route('/api/creator/platforms/facebook/exchange-code', methods=['POST'])
+@jwt_required()
+def exchange_facebook_code():
+    """
+    Exchange Facebook authorization code for access token
+
+    This endpoint is used for Facebook Login for Business with authorization code grant flow.
+    The code is exchanged for a long-lived access token.
+
+    Request body:
+    {
+        "code": "authorization_code_from_facebook"
+    }
+    """
+    try:
+        current_user_id = get_jwt_identity()
+        user = User.query.get(current_user_id)
+
+        if not user or user.user_type != 'creator':
+            return jsonify({'error': 'Creator account required'}), 403
+
+        data = request.json
+        auth_code = data.get('code')
+
+        if not auth_code:
+            return jsonify({'error': 'Authorization code is required'}), 400
+
+        # Get Facebook App credentials from environment
+        app_id = os.getenv('FACEBOOK_APP_ID', '1863571634283956')
+        app_secret = os.getenv('FACEBOOK_APP_SECRET')
+
+        if not app_secret:
+            return jsonify({'error': 'Facebook App Secret not configured'}), 500
+
+        # Get the redirect_uri from request (must match the one used in OAuth dialog)
+        redirect_uri = data.get('redirect_uri', f"{os.getenv('FRONTEND_URL', 'https://bantubuzz.com')}/creator/platforms")
+
+        # Exchange authorization code for access token
+        # Reference: https://developers.facebook.com/docs/facebook-login/guides/advanced/manual-flow#confirm
+        token_url = 'https://graph.facebook.com/v19.0/oauth/access_token'
+        params = {
+            'client_id': app_id,
+            'client_secret': app_secret,
+            'redirect_uri': redirect_uri,
+            'code': auth_code
+        }
+
+        response = requests.get(token_url, params=params)
+
+        if response.status_code != 200:
+            error_data = response.json()
+            error_message = error_data.get('error', {}).get('message', 'Failed to exchange code')
+            return jsonify({'error': f'Facebook API error: {error_message}'}), 400
+
+        token_data = response.json()
+        access_token = token_data.get('access_token')
+
+        if not access_token:
+            return jsonify({'error': 'No access token received from Facebook'}), 400
+
+        # Return the access token to the frontend
+        return jsonify({
+            'success': True,
+            'accessToken': access_token,
+            'tokenType': token_data.get('token_type', 'bearer')
+        }), 200
+
+    except Exception as e:
         return jsonify({'error': str(e)}), 500
 
 

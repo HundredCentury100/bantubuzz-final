@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Navbar from '../components/Navbar';
 import { Link, useNavigate } from 'react-router-dom';
 import { briefsAPI, proposalsAPI } from '../services/api';
+import toast from 'react-hot-toast';
 import {
   Plus,
   AlertCircle,
@@ -72,27 +73,32 @@ const ManageBriefs = () => {
     try {
       const response = await proposalsAPI.acceptProposal(acceptModalData.proposalId);
 
-      // If user chose to keep brief open (as campaign), convert to campaign
-      if (!closeBrief && response.data.booking_id) {
-        try {
-          const campaignResponse = await briefsAPI.convertToCampaign(acceptModalData.briefId);
-          console.log('Brief converted to campaign:', campaignResponse.data);
-          alert(`Brief converted to campaign! You can now accept more proposals. View it in the Campaigns section.`);
-        } catch (err) {
-          console.error('Error converting brief to campaign:', err);
-          alert('Proposal accepted, but failed to convert to campaign. Please try converting manually.');
-        }
+      if (!response.data.booking_id) {
+        toast.error('Failed to create booking for payment');
+        setAcceptModalData(null);
+        return;
       }
 
+      // Store the brief action choice for after payment
+      localStorage.setItem('brief_after_payment', JSON.stringify({
+        briefId: acceptModalData.briefId,
+        closeBrief: closeBrief,
+        bookingId: response.data.booking_id
+      }));
+
+      // Close modal and navigate to payment
       setAcceptModalData(null);
       setSelectedBrief(null);
 
-      if (response.data.booking_id) {
+      // Navigate to payment page
+      toast.loading('Redirecting to payment...');
+      setTimeout(() => {
         navigate(`/bookings/${response.data.booking_id}/payment`);
-      }
+      }, 500);
+
     } catch (err) {
       console.error('Error accepting proposal:', err);
-      alert(err.response?.data?.error || 'Failed to accept proposal');
+      toast.error(err.response?.data?.error || 'Failed to accept proposal');
       setAcceptModalData(null);
     }
   };

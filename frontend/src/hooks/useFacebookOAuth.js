@@ -7,7 +7,7 @@ import { toast } from 'react-hot-toast';
 import api from '../services/api';
 
 const FACEBOOK_APP_ID = '1863571634283956';
-const FACEBOOK_CONFIG_ID = '1565308301261640'; // Facebook Login for Business Configuration ID
+const FACEBOOK_CONFIG_ID = '1640839016924487'; // Facebook Login for Business Configuration ID (User Access Token)
 
 export const useFacebookOAuth = () => {
   const [isSDKLoaded, setIsSDKLoaded] = useState(false);
@@ -36,7 +36,111 @@ export const useFacebookOAuth = () => {
     } else {
       setIsSDKLoaded(true);
     }
+
+    // Check if we're returning from Facebook OAuth redirect
+    const urlParams = new URLSearchParams(window.location.search);
+    const code = urlParams.get('code');
+    const state = urlParams.get('state');
+
+    if (code && state) {
+      // Parse state to verify it's a Facebook connect action
+      try {
+        const stateData = JSON.parse(decodeURIComponent(state));
+        if (stateData.action === 'facebook_connect') {
+          // Handle the authorization code
+          handleFacebookRedirect(code);
+
+          // Clean up URL
+          window.history.replaceState({}, document.title, window.location.pathname);
+        }
+      } catch (error) {
+        console.error('Error parsing state:', error);
+      }
+    }
   }, []);
+
+  // Handle Facebook OAuth redirect with authorization code
+  const handleFacebookRedirect = async (code) => {
+    setIsConnecting(true);
+
+    try {
+      console.log('Exchanging authorization code for access token');
+
+      // Exchange code for access token via backend
+      const redirect_uri = window.location.origin + '/creator/platforms';
+      const tokenResponse = await api.post('/creator/platforms/facebook/exchange-code', {
+        code: code,
+        redirect_uri: redirect_uri
+      });
+
+      const accessToken = tokenResponse.data.accessToken;
+      console.log('Successfully exchanged code for access token');
+
+      // Now use the access token to fetch pages and connect
+      fetchPagesAndConnect(accessToken, () => {
+        // Callback after successful connection
+        const hadCallback = sessionStorage.getItem('facebook_connect_callback');
+        if (hadCallback) {
+          sessionStorage.removeItem('facebook_connect_callback');
+        }
+      });
+
+    } catch (error) {
+      console.error('Error exchanging authorization code:', error);
+      const errorMsg = error.response?.data?.error || 'Failed to exchange authorization code';
+      toast.error(errorMsg);
+      setIsConnecting(false);
+    }
+  };
+
+  // Helper function to fetch pages and connect
+  const fetchPagesAndConnect = async (accessToken, onSuccess) => {
+    try {
+      // Make direct Graph API calls with the access token
+      // Can't use FB.api() because SDK doesn't have the token from authorization code flow
+
+      console.log('Fetching Facebook pages with access token...');
+
+      // Fetch user's Facebook pages
+      const pagesUrl = `https://graph.facebook.com/v19.0/me/accounts?fields=id,name,access_token,category,tasks&access_token=${accessToken}`;
+      const pagesResponse = await fetch(pagesUrl);
+      const pagesData = await pagesResponse.json();
+
+      console.log('Facebook pages response:', pagesData);
+
+      // Check for errors
+      if (pagesData.error) {
+        console.error('Facebook API error:', pagesData.error);
+        toast.error(`Facebook error: ${pagesData.error.message}`);
+        setIsConnecting(false);
+        return;
+      }
+
+      // Check if we have pages in the data array
+      if (pagesData.data && pagesData.data.length > 0) {
+        const pages = pagesData.data;
+        console.log(`Found ${pages.length} Facebook page(s):`, pages);
+
+        // Show selection modal if multiple pages
+        if (pages.length === 1) {
+          // Auto-connect single page
+          await connectAccount(pages[0], accessToken, onSuccess);
+        } else {
+          // Let user choose which page to connect
+          await connectAccount(pages[0], accessToken, onSuccess);
+        }
+      } else {
+        // No pages found
+        console.warn('No Facebook pages found for this user');
+        toast.error('No Facebook Pages found. Please create a Facebook Page first.');
+        setIsConnecting(false);
+      }
+    } catch (error) {
+      console.error('Error fetching Facebook pages:', error);
+      toast.error('Failed to fetch Facebook pages');
+      setIsConnecting(false);
+    }
+  };
 
   const connectFacebookPage = async (onSuccess) => {
     if (!isSDKLoaded) {
@@ -47,80 +151,30 @@ export const useFacebookOAuth = () => {
     setIsConnecting(true);
 
     try {
-      // Determine login parameters
-      const loginParams = FACEBOOK_CONFIG_ID
-        ? {
-            config_id: FACEBOOK_CONFIG_ID,
-            auth_type: 'rerequest',
-            return_scopes: true
-          }
-        : {
-            scope: 'pages_show_list,business_management,instagram_basic,instagram_manage_insights,pages_read_engagement,pages_read_user_content',
-            auth_type: 'rerequest',
-            return_scopes: true
-          };
+      // Facebook Login for Business with config_id requires manual redirect flow
+      // when using System User Access Tokens (response_type=code)
 
-      console.log('Using Facebook Login for Business with params:', loginParams);
+      // Build the OAuth dialog URL manually
+      const redirectUri = encodeURIComponent(window.location.origin + '/creator/platforms');
+      const state = encodeURIComponent(JSON.stringify({ action: 'facebook_connect', timestamp: Date.now() }));
 
-      // Request Facebook login with required permissions
-      window.FB.login(
-        (response) => {
-          console.log('FB.login response:', response);
+      const oauthUrl = `https://www.facebook.com/v19.0/dialog/oauth?` +
+        `client_id=${FACEBOOK_APP_ID}` +
+        `&redirect_uri=${redirectUri}` +
+        `&config_id=${FACEBOOK_CONFIG_ID}` +
+        `&response_type=code` +
+        `&state=${state}`;
 
-          if (response.authResponse) {
-            const userAccessToken = response.authResponse.accessToken;
+      console.log('Redirecting to Facebook OAuth:', oauthUrl);
 
-            console.log('User Access Token:', userAccessToken);
+      // Store callback for after redirect
+      if (onSuccess) {
+        sessionStorage.setItem('facebook_connect_callback', 'true');
+      }
 
-            // First, check what permissions were actually granted
-            window.FB.api('/me/permissions', (permissionsResponse) => {
-              console.log('Granted permissions:', permissionsResponse);
-            });
+      // Redirect to Facebook OAuth
+      window.location.href = oauthUrl;
 
-            // Get user's Facebook pages with specific fields
-            window.FB.api(
-              '/me/accounts',
-              { fields: 'id,name,access_token,category,tasks' },
-              async (pagesResponse) => {
-                console.log('FB.api /me/accounts response:', pagesResponse);
-
-                // Check for errors
-                if (pagesResponse.error) {
-                  console.error('Facebook API error:', pagesResponse.error);
-                  toast.error(`Facebook error: ${pagesResponse.error.message}`);
-                  setIsConnecting(false);
-                  return;
-                }
-
-                // Check if we have pages in the data array
-                if (pagesResponse.data && pagesResponse.data.length > 0) {
-                  const pages = pagesResponse.data;
-                  console.log(`Found ${pages.length} Facebook page(s):`, pages);
-
-                  // Show selection modal if multiple pages
-                  if (pages.length === 1) {
-                    // Auto-connect single page (pass userAccessToken)
-                    await connectAccount(pages[0], userAccessToken, onSuccess);
-                  } else {
-                    // Let user choose which page to connect (pass userAccessToken)
-                    showAccountSelector(pages, userAccessToken, onSuccess);
-                  }
-                } else {
-                  // No pages found
-                  console.warn('No Facebook pages found for this user');
-                  toast.error('No Facebook Pages found. Please create a Facebook Page first.');
-                  setIsConnecting(false);
-                }
-              }
-            );
-          } else {
-            console.log('Facebook login cancelled or failed');
-            toast.error('Facebook login was cancelled');
-            setIsConnecting(false);
-          }
-        },
-        loginParams
-      );
     } catch (error) {
       console.error('Facebook OAuth error:', error);
       toast.error('An error occurred during Facebook login');
@@ -159,7 +213,7 @@ export const useFacebookOAuth = () => {
 
       // NOTE: ThunziAI automatically creates Instagram platform if linked to Facebook Page
       // We don't need to manually register Instagram - just notify the user
-      toast.info('Checking for linked Instagram account...', { duration: 2000 });
+      toast.loading('Checking for linked Instagram account...', { duration: 2000 });
 
       // Check if Instagram was auto-created by ThunziAI
       setTimeout(async () => {
@@ -178,6 +232,9 @@ export const useFacebookOAuth = () => {
 
         if (onSuccess) onSuccess();
         setIsConnecting(false);
+
+        // Refresh the page to show the newly connected accounts
+        window.location.reload();
       }, 3000); // Wait 3 seconds for ThunziAI to process
 
     } catch (error) {
@@ -189,11 +246,11 @@ export const useFacebookOAuth = () => {
   };
 
   // Helper function to show account selector
-  const showAccountSelector = async (pages, userAccessToken, onSuccess) => {
+  const showAccountSelector = (pages, userAccessToken, onSuccess) => {
     // For now, just connect the first page
     // TODO: Add a proper page selection UI modal
     console.log(`User has ${pages.length} pages, auto-connecting first one:`, pages[0]);
-    await connectAccount(pages[0], userAccessToken, onSuccess);
+    connectAccount(pages[0], userAccessToken, onSuccess);
   };
 
   return {

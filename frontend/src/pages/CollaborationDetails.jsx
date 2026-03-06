@@ -27,6 +27,7 @@ const CollaborationDetails = () => {
   const [selectedDeliverableForRevision, setSelectedDeliverableForRevision] = useState(null);
   const [revisionNotes, setRevisionNotes] = useState('');
   const [requestingRevision, setRequestingRevision] = useState(false);
+  const [approvingDeliverable, setApprovingDeliverable] = useState(null); // Track which deliverable is being approved
 
   const { socket } = useMessaging();
   const [editingDeliverable, setEditingDeliverable] = useState(null);
@@ -118,13 +119,32 @@ const CollaborationDetails = () => {
   };
 
   const handleApproveDeliverable = async (deliverableId) => {
+    // Prevent double-clicking
+    if (approvingDeliverable === deliverableId) {
+      return;
+    }
+
     try {
-      await collaborationsAPI.approveDeliverable(id, deliverableId);
+      setApprovingDeliverable(deliverableId);
+      const response = await collaborationsAPI.approveDeliverable(id, deliverableId);
       toast.success('Deliverable approved! Progress updated automatically.');
       fetchCollaboration();
     } catch (error) {
       console.error('Error approving deliverable:', error);
-      toast.error('Failed to approve deliverable');
+
+      // Check if this is a real error or just a timeout after success
+      const errorMessage = error.response?.data?.error || error.message;
+
+      // If error is network/timeout related, don't show error - just refetch
+      if (error.code === 'ECONNABORTED' || error.message?.includes('timeout') || !error.response) {
+        console.log('Network issue but approval may have succeeded. Refetching data...');
+        fetchCollaboration();
+      } else {
+        // Real error from backend
+        toast.error(errorMessage || 'Failed to approve deliverable');
+      }
+    } finally {
+      setApprovingDeliverable(null);
     }
   };
 
@@ -464,16 +484,18 @@ const CollaborationDetails = () => {
                           <div className="ml-auto flex gap-2">
                             <button
                               onClick={() => handleApproveDeliverable(deliverable.id)}
-                              className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition-colors"
+                              disabled={approvingDeliverable === deliverable.id}
+                              className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                              Approve
+                              {approvingDeliverable === deliverable.id ? 'Approving...' : 'Approve'}
                             </button>
                             <button
                               onClick={() => {
                                 setSelectedDeliverableForRevision(deliverable);
                                 setShowRevisionModal(true);
                               }}
-                              className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white text-sm font-medium rounded-lg transition-colors"
+                              disabled={approvingDeliverable === deliverable.id}
+                              className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                               Request Revision
                             </button>

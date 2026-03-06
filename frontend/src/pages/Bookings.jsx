@@ -204,7 +204,7 @@ const Bookings = () => {
                           <div className="flex flex-col gap-1">
                             <span className="text-gray-600">Amount</span>
                             <span className="font-medium text-gray-900">
-                              ${booking.amount?.toFixed(2) || '0.00'}
+                              ${booking.amount ? parseFloat(booking.amount).toFixed(2) : '0.00'}
                             </span>
                           </div>
                           <div className="flex flex-col gap-1">

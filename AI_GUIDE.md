@@ -2148,6 +2148,70 @@ Major QA testing session resulting in 9 critical bug fixes improving user experi
 - **Build Method**: Standard tar.gz → SCP → extract workflow
 - **All 10 Issues Fixed**: ✅ Complete and deployed to production
 
+### Recent: Briefs & Custom Package Payment Flow Fixes (Mar 6, 2026)
+
+Fixed critical payment flow issues for briefs and custom packages that were showing white pages instead of payment screens.
+
+**1. Briefs Payment Flow Issue** (Critical)
+- **Problem**: When accepting proposals, brands got white page instead of payment page
+- **Root Cause**: Blocking `alert()` calls prevented navigation + logic tried to convert to campaign BEFORE payment
+- **User Requirement**: Brand should choose "close brief" or "turn into campaign" AFTER successful payment
+- **Solution**:
+  - **Frontend** (`ManageBriefs.jsx:69-103`):
+    - Removed blocking `alert()` calls, replaced with `toast` notifications
+    - Store brief action choice in `localStorage` as `brief_after_payment` with `{briefId, closeBrief, bookingId}`
+    - Navigate to payment page immediately: `/bookings/${bookingId}/payment`
+  - **Backend** (`proposals.py:306-311`):
+    - Removed auto-close logic that closed brief immediately on acceptance
+    - Brief now stays open for brand to choose action after payment
+  - **Post-Payment Handler** (`PaymentReturn.jsx:15-40`):
+    - Added `handleBriefPostPayment()` function to process brief action after successful payment
+    - Reads `brief_after_payment` from localStorage
+    - If `closeBrief === true`: Calls `briefsAPI.closeBrief(briefId)`
+    - If `closeBrief === false`: Calls `briefsAPI.convertToCampaign(briefId)` to turn into campaign
+    - Cleans up localStorage after processing
+- **Flow**:
+  1. Brand accepts proposal → Backend creates booking → Returns `booking_id`
+  2. Frontend stores choice in localStorage → Navigates to payment page
+  3. Brand completes payment → Redirected to PaymentReturn page
+  4. PaymentReturn checks payment status → If successful, executes chosen brief action
+  5. Brief either closed OR converted to campaign based on brand's choice
+
+**2. Brief Acceptance Backend Logic** (Critical)
+- **Before**: Proposal acceptance auto-closed brief (lines 309-312)
+- **After**: Brief remains open, allowing brand to decide post-payment
+- **File**: `backend/app/routes/proposals.py:309-311`
+- **Comment Added**: "Get brief (don't close it yet - brand will choose after payment)"
+
+**3. Custom Package Payment** (Status: Verified Working)
+- **Route**: `/bookings/${bookingId}/payment` → Loads `Payment.jsx`
+- **Component**: `frontend/src/pages/Payment.jsx` - handles both Paynow and bank transfer
+- **Verified**: Payment page exists and functions correctly for custom packages
+- **No Changes Required**: White page issue likely same as briefs (now fixed)
+
+**Backend Endpoints Utilized**:
+- `POST /api/proposals/<proposal_id>/accept` - Creates booking, returns `booking_id`
+- `POST /api/briefs/<brief_id>/close` - Closes brief after payment
+- `POST /api/briefs/<brief_id>/convert-to-campaign` - Converts brief to campaign after payment
+
+**Frontend Files Modified**:
+- `frontend/src/pages/ManageBriefs.jsx` - Fixed navigation and modal logic
+- `frontend/src/pages/PaymentReturn.jsx` - Added post-payment brief handler
+- `frontend/src/pages/Payment.jsx` - Verified (no changes needed)
+
+**Technical Pattern for Future Reference**:
+When payment requires post-payment actions:
+1. Store action data in `localStorage` before navigating to payment
+2. Navigate to payment page immediately (don't block with alerts)
+3. In `PaymentReturn.jsx`, check for stored data when payment succeeds
+4. Execute the stored action, then clean up localStorage
+
+**Deployment** (Mar 6, 2026)
+- **Frontend Build**: Built with briefs payment fixes
+- **Backend Files**: Updated `proposals.py` with brief acceptance fix
+- **Services Restarted**: Gunicorn backend reloaded with `pkill -HUP gunicorn`
+- **Status**: ✅ Deployed to production
+
 **11. Admin Bookings Blueprint Registration Fix** (Critical - Post-Deployment Issue)
 - **Problem**: `/api/admin/bookings` endpoint still returning 404 even after blueprint registration
 - **Root Cause**: Flask blueprint URL prefix conflict

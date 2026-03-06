@@ -5,13 +5,11 @@ import Footer from '../components/Footer';
 import api from '../services/api';
 import toast from 'react-hot-toast';
 import { useAuth } from '../hooks/useAuth';
-import { useFacebookOAuth } from '../hooks/useFacebookOAuth';
 import { LinkIcon, ArrowPathIcon, XMarkIcon, CheckCircleIcon, ClockIcon } from '@heroicons/react/24/outline';
 
 const ConnectPlatforms = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { isSDKLoaded, isConnecting: isFacebookConnecting, connectFacebookPage } = useFacebookOAuth();
   const [platforms, setPlatforms] = useState([]);
   const [loading, setLoading] = useState(true);
   const [connecting, setConnecting] = useState(null);
@@ -90,7 +88,7 @@ const ConnectPlatforms = () => {
   ];
 
   useEffect(() => {
-    if (user?.user_type !== 'creator') {
+    if (user?.user_type !== 'brand') {
       navigate('/');
       return;
     }
@@ -100,7 +98,7 @@ const ConnectPlatforms = () => {
   const fetchPlatforms = async () => {
     try{
       setLoading(true);
-      const response = await api.get('/creator/platforms');
+      const response = await api.get('/brand/platforms');
       if (response.data.success) {
         setPlatforms(response.data.platforms);
       }
@@ -144,7 +142,7 @@ const ConnectPlatforms = () => {
         payload.accessToken = accessToken;
       }
 
-      const response = await api.post('/creator/platforms/connect', payload);
+      const response = await api.post('/brand/platforms/connect', payload);
 
       if (response.data.success) {
         toast.success(response.data.message);
@@ -162,7 +160,7 @@ const ConnectPlatforms = () => {
   const handleSyncPlatform = async (platformId) => {
     try {
       setSyncing(platformId);
-      const response = await api.post(`/creator/platforms/${platformId}/sync`);
+      const response = await api.post(`/brand/platforms/${platformId}/sync`);
 
       if (response.data.success) {
         toast.success('Sync completed successfully');
@@ -182,7 +180,7 @@ const ConnectPlatforms = () => {
     }
 
     try {
-      const response = await api.delete(`/creator/platforms/${platformId}`);
+      const response = await api.delete(`/brand/platforms/${platformId}`);
 
       if (response.data.success) {
         toast.success('Platform disconnected successfully');
@@ -218,7 +216,7 @@ const ConnectPlatforms = () => {
         <div className="max-w-4xl mx-auto mb-8 md:mb-12">
           <div className="flex items-center justify-between mb-4 md:mb-6">
             <button
-              onClick={() => navigate('/creator/dashboard')}
+              onClick={() => navigate('/brand/dashboard')}
               className="inline-flex items-center gap-1 md:gap-2 px-3 md:px-4 py-2 text-primary hover:text-primary-dark transition-colors"
             >
               <svg className="w-4 h-4 md:w-5 md:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -342,31 +340,17 @@ const ConnectPlatforms = () => {
                       </div>
                       <h3 className="text-lg md:text-xl font-bold text-dark">{platform.name}</h3>
                     </div>
-                    {platform.id === 'facebook' ? (
-                      <button
-                        onClick={() => connectFacebookPage(fetchPlatforms)}
-                        disabled={connected || isFacebookConnecting || !isSDKLoaded}
-                        className={`w-full py-2.5 md:py-3 rounded-full font-medium transition-colors text-sm md:text-base ${
-                          connected
-                            ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
-                            : 'bg-dark text-white hover:bg-gray-800 disabled:opacity-50'
-                        }`}
-                      >
-                        {connected ? 'Already Connected' : isFacebookConnecting ? 'Connecting...' : !isSDKLoaded ? 'Loading Facebook...' : 'Connect with Facebook'}
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => handleOpenConnectModal(platform.id)}
-                        disabled={connected}
-                        className={`w-full py-2.5 md:py-3 rounded-full font-medium transition-colors text-sm md:text-base ${
-                          connected
-                            ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
-                            : 'bg-dark text-white hover:bg-gray-800'
-                        }`}
-                      >
-                        {connected ? 'Already Connected' : 'Connect'}
-                      </button>
-                    )}
+                    <button
+                      onClick={() => handleOpenConnectModal(platform.id)}
+                      disabled={connected}
+                      className={`w-full py-2.5 md:py-3 rounded-full font-medium transition-colors text-sm md:text-base ${
+                        connected
+                          ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                          : 'bg-dark text-white hover:bg-gray-800'
+                      }`}
+                    >
+                      {connected ? 'Already Connected' : 'Connect'}
+                    </button>
                   </div>
                 </div>
               );

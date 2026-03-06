@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
-import { collaborationsAPI, paymentsAPI, BASE_URL } from '../services/api';
+import { collaborationsAPI, paymentsAPI, bookingsAPI } from '../services/api';
 import { useAuth } from '../hooks/useAuth';
 
 const RevisionPayment = () => {
@@ -94,36 +94,12 @@ const RevisionPayment = () => {
           throw new Error('Payment URL not received');
         }
       } else {
-        // Bank transfer - upload POP
+        // Bank transfer - upload POP to the booking (same as CartCheckout flow)
         const formData = new FormData();
         formData.append('file', proofFile);
-        formData.append('deliverable_id', revisionData.deliverable_id);
-        formData.append('notes', revisionData.notes);
-        formData.append('fee', revisionData.fee);
 
-        // Upload proof of payment
-        const response = await fetch(
-          `${BASE_URL}/api/payments/revision/${revisionData.collaboration_id}/upload-pop`,
-          {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${localStorage.getItem('token')}`
-            },
-            body: formData
-          }
-        );
-
-        if (!response.ok) {
-          let errorMessage = 'Upload failed';
-          try {
-            const errorData = await response.json();
-            errorMessage = errorData.error || errorMessage;
-          } catch (e) {
-            // If response isn't JSON, use status text
-            errorMessage = `Upload failed: ${response.statusText || response.status}`;
-          }
-          throw new Error(errorMessage);
-        }
+        // Use the bookingsAPI which handles authentication correctly
+        await bookingsAPI.uploadProofOfPayment(revisionData.booking_id, formData);
 
         // Clear localStorage
         localStorage.removeItem('pending_revision_request');

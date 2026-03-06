@@ -14,7 +14,7 @@ from app.models import (
     CampaignApplication, Package, CreatorProfile, BrandProfile
 )
 
-bp = Blueprint('admin_extended', __name__, url_prefix='/admin')
+bp = Blueprint('admin_extended', __name__)
 
 
 def admin_required(fn):

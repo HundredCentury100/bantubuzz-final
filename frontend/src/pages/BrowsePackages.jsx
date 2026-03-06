@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { packagesAPI, BASE_URL } from '../services/api';
+import { packagesAPI, categoriesAPI, BASE_URL } from '../services/api';
 import { toast } from 'react-hot-toast';
 import Avatar from '../components/Avatar';
 import Navbar from '../components/Navbar';
@@ -8,7 +8,8 @@ import SEO from '../components/SEO';
 import { Search, Filter, X } from 'lucide-react';
 import { PLATFORM_CONFIGS, PACKAGE_TYPES as PLATFORM_TYPES } from '../constants/platformConfig';
 
-const CATEGORIES = [
+// Default fallback values
+const DEFAULT_CATEGORIES = [
   'Fashion & Beauty',
   'Tech & Gaming',
   'Food & Beverage',
@@ -19,7 +20,7 @@ const CATEGORIES = [
   'Other'
 ];
 
-const COLLABORATION_TYPES = [
+const DEFAULT_COLLABORATION_TYPES = [
   'Sponsored Post',
   'Story Feature',
   'Video Content',
@@ -53,6 +54,8 @@ const BrowsePackages = () => {
   const [loading, setLoading] = useState(true);
   const [showMoreFilters, setShowMoreFilters] = useState(false);
   const [searchInput, setSearchInput] = useState('');
+  const [categories, setCategories] = useState(DEFAULT_CATEGORIES);
+  const [collaborationTypes, setCollaborationTypes] = useState(DEFAULT_COLLABORATION_TYPES);
   const [filters, setFilters] = useState({
     category: '',
     min_price: '',
@@ -73,9 +76,45 @@ const BrowsePackages = () => {
     pages: 0
   });
 
+  // Fetch categories and collaboration types on mount
+  useEffect(() => {
+    fetchFiltersData();
+  }, []);
+
   useEffect(() => {
     fetchPackages();
   }, [filters, pagination.current_page]);
+
+  const fetchFiltersData = async () => {
+    try {
+      // Fetch categories from API
+      const categoriesResponse = await categoriesAPI.getCategories();
+      if (categoriesResponse.data && categoriesResponse.data.categories) {
+        const categoryNames = categoriesResponse.data.categories.map(cat => cat.name);
+        if (categoryNames.length > 0) {
+          setCategories(categoryNames);
+        }
+      }
+
+      // Fetch unique collaboration types from packages
+      // Since there's no dedicated endpoint, we'll use the distinct category values from all packages
+      const allPackagesResponse = await packagesAPI.getPackages({ per_page: 1000 });
+      if (allPackagesResponse.data && allPackagesResponse.data.packages) {
+        const uniqueCollabTypes = [...new Set(
+          allPackagesResponse.data.packages
+            .map(pkg => pkg.category)
+            .filter(cat => cat && cat.trim() !== '')
+        )].sort();
+
+        if (uniqueCollabTypes.length > 0) {
+          setCollaborationTypes(uniqueCollabTypes);
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching filter data:', error);
+      // Use defaults if API fails
+    }
+  };
 
   const fetchPackages = async () => {
     try {
@@ -231,7 +270,7 @@ const BrowsePackages = () => {
                   className="w-full px-3 py-2 border border-gray-300 rounded-full focus:ring-2 focus:ring-primary focus:border-transparent"
                 >
                   <option value="">All Categories</option>
-                  {CATEGORIES.map(cat => (
+                  {categories.map(cat => (
                     <option key={cat} value={cat}>{cat}</option>
                   ))}
                 </select>
@@ -246,7 +285,7 @@ const BrowsePackages = () => {
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                 >
                   <option value="">All Types</option>
-                  {COLLABORATION_TYPES.map(type => (
+                  {collaborationTypes.map(type => (
                     <option key={type} value={type}>{type}</option>
                   ))}
                 </select>
@@ -327,7 +366,7 @@ const BrowsePackages = () => {
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                 >
                   <option value="">All Categories</option>
-                  {CATEGORIES.map(cat => (
+                  {categories.map(cat => (
                     <option key={cat} value={cat}>{cat}</option>
                   ))}
                 </select>
@@ -378,7 +417,7 @@ const BrowsePackages = () => {
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                     >
                       <option value="">All Types</option>
-                      {COLLABORATION_TYPES.map(type => (
+                      {collaborationTypes.map(type => (
                         <option key={type} value={type}>{type}</option>
                       ))}
                     </select>

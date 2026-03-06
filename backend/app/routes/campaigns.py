@@ -2,7 +2,7 @@ from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from datetime import datetime
 from app import db
-from app.models import Campaign, BrandProfile, CreatorProfile, Package, CampaignApplication, Collaboration, User
+from app.models import Campaign, BrandProfile, CreatorProfile, Package, CampaignApplication, Collaboration, User, Booking
 from app.models.campaign import campaign_packages
 from app.utils.notifications import notify_campaign_application, notify_campaign_status
 
@@ -197,10 +197,25 @@ def add_package_to_campaign(campaign_id):
 
         campaign.packages.append(package)
 
-        # Create a collaboration for this package booking in the campaign
-        # This allows the creator to see it as a booking in their collaborations
+        # Create booking first (required for payment processing)
+        booking = Booking(
+            package_id=package.id,
+            campaign_id=campaign.id,
+            creator_id=package.creator_id,
+            brand_id=brand.id,
+            amount=package.price,
+            total_price=package.price,
+            status='pending',  # Will be 'accepted' after payment
+            payment_status='pending',  # User needs to pay
+            payment_reference=f"PKG_{package.id}_C{campaign.id}_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
+        )
+        db.session.add(booking)
+        db.session.flush()  # Get booking.id
+
+        # Create collaboration linked to booking
         collaboration = Collaboration(
             collaboration_type='package',
+            booking_id=booking.id,
             brand_id=brand.id,
             creator_id=package.creator_id,
             title=f"{campaign.title} - {package.title}",
@@ -209,7 +224,7 @@ def add_package_to_campaign(campaign_id):
             deliverables=package.deliverables or [],
             start_date=campaign.start_date,
             expected_completion_date=campaign.end_date,
-            status='in_progress',
+            status='pending_payment',  # Changed from 'in_progress' until payment
             progress_percentage=0,
             notes=f"Package added to campaign: {campaign.title}"
         )
@@ -220,7 +235,9 @@ def add_package_to_campaign(campaign_id):
         return jsonify({
             'message': 'Package added to campaign successfully',
             'package': package.to_dict(),
-            'collaboration': collaboration.to_dict()
+            'collaboration': collaboration.to_dict(),
+            'booking_id': booking.id,
+            'requires_payment': True
         }), 200
 
     except Exception as e:
@@ -481,7 +498,7 @@ def update_application_status(campaign_id, application_id):
         application.status = status
         application.updated_at = datetime.utcnow()
 
-        # If accepted, create a collaboration
+        # If accepted, create a booking and collaboration
         if status == 'accepted':
             # Check if collaboration already exists
             existing_collab = Collaboration.query.filter_by(
@@ -489,9 +506,25 @@ def update_application_status(campaign_id, application_id):
             ).first()
 
             if not existing_collab:
+                # Create booking first (required for payment processing)
+                booking = Booking(
+                    campaign_id=campaign.id,
+                    creator_id=application.creator_id,
+                    brand_id=brand.id,
+                    amount=application.proposed_price,
+                    total_price=application.proposed_price,
+                    status='pending',  # Will be 'accepted' after payment
+                    payment_status='pending',  # User needs to pay
+                    payment_reference=f"APP_{application_id}_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
+                )
+                db.session.add(booking)
+                db.session.flush()  # Get booking.id
+
+                # Create collaboration linked to booking
                 collaboration = Collaboration(
                     collaboration_type='campaign',
                     campaign_application_id=application_id,
+                    booking_id=booking.id,
                     brand_id=brand.id,
                     creator_id=application.creator_id,
                     title=campaign.title,
@@ -500,10 +533,13 @@ def update_application_status(campaign_id, application_id):
                     deliverables=application.deliverables,
                     start_date=campaign.start_date,
                     expected_completion_date=campaign.end_date,
-                    status='in_progress',
+                    status='pending_payment',  # Changed from 'in_progress' until payment
                     progress_percentage=0
                 )
                 db.session.add(collaboration)
+
+                # Return booking_id in response for payment processing
+                booking_id = booking.id
 
         db.session.commit()
 
@@ -517,9 +553,14 @@ def update_application_status(campaign_id, application_id):
                 campaign_id=campaign.id
             )
 
-        return jsonify({
-            'message': f'Application {status} successfully'
-        }), 200
+        response_data = {'message': f'Application {status} successfully'}
+
+        # Include booking_id if application was accepted (for payment flow)
+        if status == 'accepted' and 'booking_id' in locals():
+            response_data['booking_id'] = booking_id
+            response_data['requires_payment'] = True
+
+        return jsonify(response_data), 200
 
     except Exception as e:
         db.session.rollback()

@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import Navbar from '../components/Navbar';
+import { briefsAPI } from '../services/api';
+import toast from 'react-hot-toast';
 
 const PaymentReturn = () => {
   const [searchParams] = useSearchParams();
@@ -9,6 +11,33 @@ const PaymentReturn = () => {
     title: 'Payment Pending',
     message: 'Thank you! We are confirming your payment.'
   });
+
+  // Handle brief post-payment actions
+  const handleBriefPostPayment = async () => {
+    const briefAfterPayment = localStorage.getItem('brief_after_payment');
+    if (!briefAfterPayment) return;
+
+    try {
+      const { briefId, closeBrief, bookingId } = JSON.parse(briefAfterPayment);
+
+      if (closeBrief) {
+        // User chose to close the brief
+        await briefsAPI.closeBrief(briefId);
+        toast.success('Brief closed successfully');
+      } else {
+        // User chose to turn into campaign
+        await briefsAPI.convertToCampaign(briefId);
+        toast.success('Brief converted to campaign! You can now accept more proposals.');
+      }
+
+      // Clean up localStorage
+      localStorage.removeItem('brief_after_payment');
+
+    } catch (error) {
+      console.error('Error handling brief post-payment:', error);
+      toast.error(error.response?.data?.error || 'Failed to process brief action');
+    }
+  };
 
   useEffect(() => {
     // Log all URL parameters for debugging
@@ -37,6 +66,9 @@ const PaymentReturn = () => {
           title: 'Payment Successful!',
           message: 'Your payment has been confirmed. Your booking is now active.'
         });
+
+        // Handle brief post-payment actions
+        handleBriefPostPayment();
       } else if (status === 'Cancelled') {
         setPageData({
           status: 'cancelled',
