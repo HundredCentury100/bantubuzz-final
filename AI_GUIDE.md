@@ -2234,6 +2234,101 @@ All payment page navigations MUST use the route format: `/bookings/${bookingId}/
 - **Frontend Build**: Built with custom package payment route fixes
 - **Status**: ✅ Deployed to production
 
+**5. Frontend Deployment Issue - Empty Dist Folder** (Critical)
+- **Problem**: Internal Server Error on all pages after deployment
+- **Root Cause**: Frontend dist folder was empty after tar extraction
+  - Used `tar -xzf /tmp/dist.tar.gz --strip-components=1` which stripped the dist/ folder itself
+  - Left only empty directory structure
+- **Solution**: Fixed tar command sequence
+  - Create: `tar -czf dist.tar.gz -C dist .` (create from inside dist)
+  - Extract: `cd /var/www/bantubuzz/frontend/dist && tar -xzf /tmp/dist.tar.gz` (extract into dist)
+- **Files**: Deployment scripts
+
+---
+
+### Recent: Facebook App Availability Error (Mar 6, 2026)
+
+**Problem**: Some users see "This app isn't available - contact ThunziAI" when trying to connect Facebook/Instagram.
+
+**Root Cause**: Facebook App is in **Development Mode**
+- App ID: `1863571634283956`
+- Only accessible to:
+  - App developers/admins
+  - Users added as "App Testers"
+  - Test users specifically added
+- All other users are blocked with "app not available" error
+
+**Solutions**:
+
+**Immediate Fix - Add Users as Testers**:
+1. Go to [Facebook Developers Console](https://developers.facebook.com/apps/1863571634283956/)
+2. Navigate to **Roles** → **Testers**
+3. Click **Add Testers**
+4. Enter user's Facebook email/username
+5. User must accept invitation to get access
+6. **Limitation**: Max ~25 test users, not scalable
+
+**Long-term Solution - Make App Public**:
+
+1. **Complete App Review Requirements**:
+   - **Privacy Policy URL**: Must be publicly accessible
+   - **Terms of Service URL**: Must be publicly accessible
+   - **App Icon**: 1024x1024px
+   - **Business Verification**: May be required (submit documents)
+   - **Contact Email**: Valid support email
+
+2. **Request Permissions** (App Review → Permissions and Features):
+   - `pages_show_list` - See list of Pages user manages
+   - `instagram_basic` - Access Instagram accounts
+   - `instagram_manage_insights` - View Instagram insights
+   - `pages_read_engagement` - Read Page engagement data
+
+3. **Provide Review Materials** for each permission:
+   ```
+   Use Case: "BantuBuzz is an influencer marketing platform. Creators
+   connect their Facebook Pages and Instagram Business accounts to
+   showcase their social media reach and engagement metrics to brands
+   for collaboration opportunities."
+
+   Screen Recording: 2-3 minute video showing:
+   - Creator logs into BantuBuzz
+   - Navigates to "Connect Platforms"
+   - Clicks "Connect Facebook"
+   - Grants permissions
+   - System displays page/Instagram metrics
+
+   Test Instructions:
+   1. Create test account at bantubuzz.com/register-creator
+   2. Login with provided credentials
+   3. Navigate to "Connect Platforms" page
+   4. Click "Connect Facebook" button
+   5. Grant requested permissions
+   6. Verify Facebook/Instagram data appears
+   ```
+
+4. **Submit for Review**:
+   - Click **Submit for Review**
+   - Review typically takes 3-7 business days
+   - Respond promptly to any follow-up questions
+
+5. **After Approval - Switch to Live Mode**:
+   - Go to **Settings** → **Basic**
+   - Toggle **App Mode** from "Development" to "Live"
+   - App becomes publicly available to ALL Facebook users
+
+**Current Configuration**:
+- **Facebook App ID**: `1863571634283956`
+- **Config ID**: `1640839016924487` (Facebook Login for Business)
+- **SDK Version**: v19.0
+- **Permissions Needed**: `pages_show_list`, `instagram_basic`, `instagram_manage_insights`, `pages_read_engagement`
+- **Files**: `frontend/src/hooks/useFacebookOAuth.js`
+
+**Important Notes**:
+- ThunziAI integration requires Facebook app to be public for production use
+- Temporary workaround: Add specific creators as testers (max ~25 users)
+- App review is one-time process, typically takes less than 1 week
+- After going live, no user restrictions apply
+
 ---
 
 **11. Admin Bookings Blueprint Registration Fix** (Critical - Post-Deployment Issue)
