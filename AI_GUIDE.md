@@ -385,6 +385,129 @@ ssh root@173.212.245.22 "cp /var/www/bantubuzz/backend/.env.backup /var/www/bant
 ssh root@173.212.245.22 "pkill -f gunicorn && cd /var/www/bantubuzz/backend && source venv/bin/activate && gunicorn --bind 127.0.0.1:8002 --workers 4 --timeout 120 --error-logfile gunicorn_error.log --access-logfile gunicorn_access.log 'app:create_app()' --daemon"
 ```
 
+### Google OAuth Configuration
+
+**CRITICAL: Google OAuth credentials are required for Google signup/login**
+
+**OAuth Credentials:**
+```bash
+GOOGLE_CLIENT_ID=<your-google-client-id>.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=GOCSPX-<your-google-client-secret>
+```
+
+**Environment Configuration:**
+```bash
+# Google OAuth Configuration (Required for Google signup)
+GOOGLE_CLIENT_ID=<your-google-client-id>.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=GOCSPX-<your-google-client-secret>
+```
+
+**Note**: Actual credentials are stored in `/var/www/bantubuzz/backend/.env` on production server (not committed to git for security)
+
+**Important Notes:**
+- ⚠️ These credentials MUST be in `/var/www/bantubuzz/backend/.env` for Google signup to work
+- ✅ Used by: `backend/app/routes/auth.py` - `/api/auth/google/creator` endpoint
+- ✅ Google Cloud Project: Configured for `bantubuzz.com` domain
+- ❌ Without these credentials, users will see: **"Google OAuth not configured"** error
+
+**Google OAuth Flow:**
+1. User clicks "Continue with Google" on signup/login page
+2. Frontend sends Google ID token to backend `/api/auth/google/creator`
+3. Backend verifies token using `GOOGLE_CLIENT_ID` (see `auth.py:430-440`)
+4. For new users: Returns `needs_profile_completion=True` + temp token
+5. For existing users: Returns full auth tokens (access + refresh)
+
+**Troubleshooting Google OAuth:**
+```bash
+# Check if credentials are configured
+ssh root@173.212.245.22 "grep GOOGLE_CLIENT_ID /var/www/bantubuzz/backend/.env"
+
+# Test Google OAuth endpoint
+curl -X POST https://bantubuzz.com/api/auth/google/creator \
+  -H "Content-Type: application/json" \
+  -d '{"credential":"fake-token"}'
+# Should return error about invalid token, NOT "Google OAuth not configured"
+
+# If missing, add credentials and reload backend
+ssh root@173.212.245.22 "cd /var/www/bantubuzz/backend && echo 'GOOGLE_CLIENT_ID=<your-client-id>' >> .env && echo 'GOOGLE_CLIENT_SECRET=<your-client-secret>' >> .env && pkill -HUP gunicorn"
+```
+
+### Email Configuration (OTP & Notifications)
+
+**CRITICAL: Email server must be configured for OTP verification to work**
+
+**Email Server Credentials:**
+```bash
+MAIL_SERVER=premium222.web-hosting.com
+MAIL_PORT=465
+MAIL_USE_SSL=True
+MAIL_USE_TLS=False
+MAIL_USERNAME=user@bantubuzz.com
+MAIL_PASSWORD=-=hdZ!J_pd^s
+MAIL_DEFAULT_SENDER=user@bantubuzz.com
+```
+
+**Environment Configuration:**
+```bash
+# Email Configuration - BantuBuzz SMTP
+MAIL_SERVER=premium222.web-hosting.com
+MAIL_PORT=465
+MAIL_USE_SSL=True
+MAIL_USE_TLS=False
+MAIL_USERNAME=user@bantubuzz.com
+MAIL_PASSWORD=-=hdZ!J_pd^s
+MAIL_DEFAULT_SENDER=user@bantubuzz.com
+```
+
+**Important Notes:**
+- ⚠️ **MAIL_SERVER must be `premium222.web-hosting.com`** - NOT `bantubuzz.com` (refuses connections)
+- ✅ Used by: `backend/app/services/email_service.py` - sends OTP codes for registration
+- ✅ Email templates include: OTP verification, password reset, booking confirmations
+- ❌ Wrong server = users won't receive OTP codes and can't verify accounts
+
+**Email Flow:**
+1. User registers with email/password
+2. Backend generates 6-digit OTP code (valid 10 minutes)
+3. `send_otp_email()` sends styled HTML email via `premium222.web-hosting.com`
+4. User enters OTP code to verify account
+5. Account activated and user can login
+
+**Troubleshooting Email Issues:**
+```bash
+# Check email configuration
+ssh root@173.212.245.22 "grep MAIL_SERVER /var/www/bantubuzz/backend/.env"
+
+# Test email sending
+ssh root@173.212.245.22 "cd /var/www/bantubuzz/backend && source venv/bin/activate && python3 << 'PYTHON_EOF'
+from app import create_app, mail
+from flask_mail import Message
+
+app = create_app()
+with app.app_context():
+    print(f'MAIL_SERVER: {app.config.get(\"MAIL_SERVER\")}')
+    msg = Message(
+        subject='Test Email',
+        recipients=['your-email@gmail.com'],
+        sender=app.config['MAIL_DEFAULT_SENDER'],
+        body='This is a test email from BantuBuzz.'
+    )
+    mail.send(msg)
+    print('✓ Email sent successfully!')
+PYTHON_EOF"
+
+# If email fails, verify:
+# 1. MAIL_SERVER is premium222.web-hosting.com
+# 2. Credentials are correct
+# 3. Port 465 is accessible from server
+# 4. Backend has been reloaded after config changes
+```
+
+**Common Email Errors:**
+- **`[Errno 111] Connection refused`**: Wrong MAIL_SERVER (use `premium222.web-hosting.com`)
+- **Authentication failed**: Wrong username/password
+- **Timeout**: Firewall blocking port 465 or server unreachable
+- **No email received**: Check spam folder, verify recipient email address
+
 ### URL Architecture & Request Flow
 
 **CRITICAL: Understanding how URLs are built in BantuBuzz**
