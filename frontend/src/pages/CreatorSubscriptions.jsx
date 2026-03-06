@@ -24,7 +24,7 @@ const CreatorSubscriptions = () => {
       const [plansRes, subsRes, profileRes] = await Promise.all([
         api.get('/creator/subscriptions/plans'),
         api.get('/creator/subscriptions'),
-        api.get('/creator/profile')
+        api.get('/creators/profile')
       ]);
 
       setPlans(plansRes.data.plans || []);
