@@ -26,7 +26,7 @@ const CustomPackageOfferCard = ({ offer, onUpdate }) => {
         const bookingId = response.data.booking?.id;
         if (bookingId) {
           setTimeout(() => {
-            navigate(`/payment/${bookingId}`);
+            navigate(`/bookings/${bookingId}/payment`);
           }, 1000);
         } else {
           toast.error('Booking created but ID not found');

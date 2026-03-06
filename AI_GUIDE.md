@@ -2212,6 +2212,30 @@ When payment requires post-payment actions:
 - **Services Restarted**: Gunicorn backend reloaded with `pkill -HUP gunicorn`
 - **Status**: ✅ Deployed to production
 
+**4. Custom Package Payment Route Fix** (Critical - Follow-up Issue)
+- **Problem**: Custom package acceptance showed white page instead of payment screen
+- **Root Cause**: Two components had incorrect payment navigation routes
+  - `CustomPackageOfferCard.jsx:29` - Used `/payment/${bookingId}` (wrong)
+  - `CustomOfferCard.jsx:42` - Used `/payment/${bookingId}` (wrong)
+- **Correct Route**: `/bookings/${bookingId}/payment` (matches Payment.jsx component)
+- **Solution**:
+  - Fixed navigation in `CustomPackageOfferCard.jsx` (line 29)
+  - Fixed navigation in `CustomOfferCard.jsx` (line 42)
+- **Files Modified**:
+  - `frontend/src/components/CustomPackageOfferCard.jsx:29`
+  - `frontend/src/components/CustomOfferCard.jsx:42`
+
+**Important Pattern**:
+All payment page navigations MUST use the route format: `/bookings/${bookingId}/payment`
+- ✅ Correct: `navigate(\`/bookings/${bookingId}/payment\`)`
+- ❌ Wrong: `navigate(\`/payment/${bookingId}\`)`
+
+**Deployment** (Mar 6, 2026 - Second Deployment)
+- **Frontend Build**: Built with custom package payment route fixes
+- **Status**: ✅ Deployed to production
+
+---
+
 **11. Admin Bookings Blueprint Registration Fix** (Critical - Post-Deployment Issue)
 - **Problem**: `/api/admin/bookings` endpoint still returning 404 even after blueprint registration
 - **Root Cause**: Flask blueprint URL prefix conflict
