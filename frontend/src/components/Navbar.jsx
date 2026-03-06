@@ -86,6 +86,13 @@ const Navbar = () => {
 
             {isAuthenticated ? (
               <div className="flex items-center space-x-6">
+                {/* Dashboard Link - First and prominent */}
+                <Link
+                  to={`/${user?.user_type}/dashboard`}
+                  className="text-primary hover:text-primary-dark transition-colors text-sm font-bold"
+                >
+                  Dashboard
+                </Link>
                 {user?.user_type === 'brand' && (
                   <Link
                     to="/brand/campaigns"
@@ -173,19 +180,6 @@ const Navbar = () => {
                   >
                     <Menu.Items className="absolute right-0 mt-2 w-48 origin-top-right bg-white rounded-lg shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
                       <div className="p-1">
-                        <Menu.Item>
-                          {({ active }) => (
-                            <Link
-                              to={`/${user?.user_type}/dashboard`}
-                              className={`${
-                                active ? 'bg-light' : ''
-                              } flex items-center space-x-2 px-4 py-2 text-sm text-gray-700 rounded-lg`}
-                            >
-                              <Cog6ToothIcon className="h-5 w-5" />
-                              <span>Dashboard</span>
-                            </Link>
-                          )}
-                        </Menu.Item>
                         <Menu.Item>
                           {({ active }) => (
                             <button
@@ -290,6 +284,19 @@ const Navbar = () => {
 
                     {isAuthenticated ? (
                       <>
+                        {/* Dashboard Link - First and prominent in mobile too */}
+                        <Menu.Item>
+                          {({ active }) => (
+                            <Link
+                              to={`/${user?.user_type}/dashboard`}
+                              className={`${
+                                active ? 'bg-primary/10' : ''
+                              } block px-4 py-2 text-sm text-primary font-bold rounded-lg`}
+                            >
+                              Dashboard
+                            </Link>
+                          )}
+                        </Menu.Item>
                         <Menu.Item>
                           {({ active }) => (
                             <Link
@@ -347,18 +354,6 @@ const Navbar = () => {
                             )}
                           </Menu.Item>
                         )}
-                        <Menu.Item>
-                          {({ active }) => (
-                            <Link
-                              to={`/${user?.user_type}/dashboard`}
-                              className={`${
-                                active ? 'bg-light' : ''
-                              } block px-4 py-2 text-sm text-gray-700 rounded-lg`}
-                            >
-                              Dashboard
-                            </Link>
-                          )}
-                        </Menu.Item>
                         <Menu.Item>
                           {({ active }) => (
                             <button

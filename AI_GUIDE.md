@@ -1,6 +1,6 @@
 # 🤖 AI Assistant Guide for BantuBuzz Platform
 
-**Last Updated**: March 5, 2026
+**Last Updated**: March 6, 2026
 **Purpose**: Complete context and guidelines for AI assistants working on this project
 
 ---
@@ -1376,6 +1376,95 @@ Major bug fix session addressing critical UX issues before ThunziAI integration:
 - Fixed 5 high/medium priority UX issues
 - Improved mobile experience significantly
 - Platform ready for ThunziAI integration
+
+### Recent: Creator Dashboard UI/UX Improvements (March 6, 2026)
+Comprehensive UX enhancement session focused on improving creator onboarding and navigation:
+
+**1. Profile Picture Upload Warning** (High Priority)
+- Added prominent blue info banner in profile edit page
+- Banner explains that profile picture is the main display image visible to all brands
+- Positioned above upload section for maximum visibility
+- File: `frontend/src/pages/CreatorProfileEdit.jsx:379-390`
+- Pattern:
+  ```jsx
+  <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+    <div className="flex items-start gap-2">
+      <svg className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0">...</svg>
+      <div>
+        <p className="text-sm font-medium text-blue-900">This is your main display picture</p>
+        <p className="text-xs text-blue-700 mt-1">This photo will be visible to brands...</p>
+      </div>
+    </div>
+  </div>
+  ```
+
+**2. Dashboard Prominence in Navigation** (Critical)
+- Moved Dashboard link from hidden user dropdown menu to main navigation bar
+- Now first item after logo, styled with primary color and bold font
+- Applied to both desktop and mobile views
+- Removed duplicate Dashboard link from user dropdown (now only shows Logout)
+- File: `frontend/src/components/Navbar.jsx:87-95, 287-298`
+- Desktop: `<Link to={`/${user?.user_type}/dashboard`} className="text-primary hover:text-primary-dark font-bold">`
+- Mobile: Same styling with `bg-primary/10` hover state
+
+**3. Dismissible Verification/Featured Banners** (High Priority)
+- Added close (X) button to both verification and featured banners
+- Uses localStorage to persist dismissal state
+- Banner state keys: `verificationBannerDismissed`, `featuredBannerDismissed`
+- Close button positioned top-right with hover transition
+- File: `frontend/src/pages/CreatorDashboard.jsx:27-32, 45-53, 146-181, 184-219`
+- Pattern:
+  ```jsx
+  const [verificationBannerDismissed, setVerificationBannerDismissed] = useState(
+    localStorage.getItem('verificationBannerDismissed') === 'true'
+  );
+  const handleDismissVerificationBanner = () => {
+    localStorage.setItem('verificationBannerDismissed', 'true');
+    setVerificationBannerDismissed(true);
+  };
+  ```
+
+**4. Onboarding Journey Guide** (Critical)
+- Created comprehensive step-by-step onboarding guide in dashboard
+- Shows 3 clear steps with progress indicators and checkmarks:
+  - Step 1: Complete Your Profile (bio, categories, follower count)
+  - Step 2: Connect Your Social Media (Instagram, TikTok, YouTube, Facebook, X)
+  - Step 3: Create Your Packages (appear in search results)
+- Each step shows completion status (green checkmark vs blue numbered badge)
+- Direct action links to complete each step
+- Final "You're All Set!" success state with links to briefs and campaigns
+- Guide automatically hides when all steps are complete
+- File: `frontend/src/pages/CreatorDashboard.jsx:227-386`
+- Visual design: Blue for pending steps, green for completed steps, primary gradient for success
+- Conditional rendering: `{(!profileComplete || connectedPlatforms.length === 0 || stats.totalPackages === 0) && (...)}`
+
+**5. Location Display Format Consistency** (Medium Priority)
+- Updated profile summary location to match creator card format
+- Format: `"City, Country"` when both available (e.g., "Cape Town, ZA")
+- Cascading fallback: `city + country` → `location` → `city` → `country` → "Not set"
+- Matches pattern from `CreatorCardHome.jsx` for platform-wide consistency
+- File: `frontend/src/pages/CreatorDashboard.jsx:862-869`
+- Pattern:
+  ```jsx
+  {profile?.city && profile?.country
+    ? `${profile.city}, ${profile.country}`
+    : profile?.location || profile?.city || profile?.country || 'Not set'}
+  ```
+
+**Design Patterns Used**:
+- Info banners: `bg-blue-50 border border-blue-200 rounded-lg`
+- Dismissible elements: Close button with `absolute top-4 right-4` positioning
+- Success indicators: Green badges with `bg-green-500` and white checkmark SVG
+- Pending indicators: Blue badges with `bg-blue-500` and white number
+- Step cards: Dynamic backgrounds (`bg-green-50` vs `bg-blue-50`) based on completion status
+- Progressive disclosure: Guide only shows when user has incomplete steps
+
+**Impact**:
+- Reduced creator onboarding friction with clear guidance
+- Improved navigation accessibility (Dashboard always visible)
+- Cleaner dashboard experience with dismissible promotional banners
+- Consistent location display across all platform views
+- Better user awareness of profile picture visibility
 
 **9. Multi-select Languages Filter** (Medium Priority - Commit `a2f0c1d`)
 - Changed language filter from single-select dropdown to multi-select checkboxes
