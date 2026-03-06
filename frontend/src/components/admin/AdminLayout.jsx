@@ -17,6 +17,7 @@ import {
   ScaleIcon,
   ChartBarIcon,
   CreditCardIcon,
+  CheckBadgeIcon,
 } from '@heroicons/react/24/outline';
 
 const AdminLayout = ({ children }) => {
@@ -29,6 +30,7 @@ const AdminLayout = ({ children }) => {
     { name: 'Dashboard', href: '/admin/dashboard', icon: HomeIcon },
     { name: 'Users', href: '/admin/users', icon: UsersIcon },
     { name: 'Verification Queue', href: '/admin/verification', icon: ShieldCheckIcon },
+    { name: 'Creator Verifications', href: '/admin/verification-applications', icon: CheckBadgeIcon },
     { name: 'Activity Feed', href: '/admin/activity', icon: BoltIcon },
     { name: 'Disputes', href: '/admin/disputes', icon: ScaleIcon },
     { name: 'Subscriptions', href: '/admin/subscriptions', icon: CreditCardIcon },

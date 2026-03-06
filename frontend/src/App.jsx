@@ -54,6 +54,7 @@ import AdminUsers from './pages/admin/Users';
 import AdminUserProfile from './pages/admin/UserProfile';
 import VerificationQueue from './pages/admin/VerificationQueue';
 import CreatorVerifications from './pages/admin/CreatorVerifications';
+import CreatorVerificationApplications from './pages/admin/CreatorVerificationApplications';
 import AdminActivity from './pages/admin/Activity';
 import AdminDisputes from './pages/admin/Disputes';
 import AdminReports from './pages/admin/Reports';
@@ -604,6 +605,14 @@ function App() {
         element={
           <AdminRoute>
             <CreatorVerifications />
+          </AdminRoute>
+        }
+      />
+      <Route
+        path="/admin/verification-applications"
+        element={
+          <AdminRoute>
+            <CreatorVerificationApplications />
           </AdminRoute>
         }
       />
