@@ -8,9 +8,10 @@ import { SparklesIcon, StarIcon, CheckBadgeIcon, ArrowRightIcon } from '@heroico
 
 const CreatorSubscriptions = () => {
   const navigate = useNavigate();
-  const { profile } = useAuth();
+  const { profile: authProfile } = useAuth();
   const [plans, setPlans] = useState([]);
   const [mySubscriptions, setMySubscriptions] = useState([]);
+  const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [subscribing, setSubscribing] = useState(null);
 
@@ -20,13 +21,15 @@ const CreatorSubscriptions = () => {
 
   const fetchSubscriptionData = async () => {
     try {
-      const [plansRes, subsRes] = await Promise.all([
+      const [plansRes, subsRes, profileRes] = await Promise.all([
         api.get('/creator/subscriptions/plans'),
-        api.get('/creator/subscriptions')
+        api.get('/creator/subscriptions'),
+        api.get('/creator/profile')
       ]);
 
       setPlans(plansRes.data.plans || []);
       setMySubscriptions(subsRes.data.subscriptions || []);
+      setProfile(profileRes.data?.profile || authProfile);
     } catch (error) {
       console.error('Error fetching subscription data:', error);
       toast.error('Failed to load subscription plans');

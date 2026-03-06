@@ -457,11 +457,11 @@ export default function SubscriptionManage() {
                               <div>
                                 <div className="flex items-baseline gap-1">
                                   <span className="text-4xl font-bold text-dark">
-                                    ${price.toFixed(2)}
+                                    ${(price || 0).toFixed(2)}
                                   </span>
                                   <span className="text-gray-600">/mo</span>
                                 </div>
-                                {billingCycle === 'yearly' && (
+                                {billingCycle === 'yearly' && totalPrice && (
                                   <p className="text-sm text-gray-500 mt-1">
                                     Billed ${totalPrice.toFixed(2)} yearly
                                   </p>
