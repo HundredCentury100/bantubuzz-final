@@ -71,6 +71,54 @@ def get_my_subscriptions():
         return jsonify({'error': str(e)}), 500
 
 
+@creator_subscriptions_bp.route('/api/creator/subscriptions/my-subscription', methods=['GET'])
+@jwt_required()
+def get_my_subscription_status():
+    """Get current user's active verification subscription status"""
+    try:
+        current_user_id = get_jwt_identity()
+        user = User.query.get(current_user_id)
+
+        if not user or user.user_type != 'creator':
+            return jsonify({'success': False, 'error': 'Creator account required'}), 403
+
+        creator = CreatorProfile.query.filter_by(user_id=current_user_id).first()
+        if not creator:
+            return jsonify({'success': False, 'error': 'Creator profile not found'}), 404
+
+        # Get active verification subscription
+        verification_subscription = CreatorSubscription.query.join(
+            CreatorSubscriptionPlan
+        ).filter(
+            CreatorSubscription.creator_id == creator.id,
+            CreatorSubscription.status == 'active',
+            CreatorSubscriptionPlan.subscription_type == 'verification',
+            CreatorSubscription.payment_verified == True,
+            CreatorSubscription.end_date > datetime.utcnow()
+        ).first()
+
+        if verification_subscription:
+            return jsonify({
+                'success': True,
+                'data': {
+                    'has_subscription': True,
+                    'subscription': verification_subscription.to_dict(),
+                    'plan': verification_subscription.plan.to_dict() if verification_subscription.plan else None
+                }
+            }), 200
+        else:
+            return jsonify({
+                'success': True,
+                'data': {
+                    'has_subscription': False,
+                    'is_free': True
+                }
+            }), 200
+
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 @creator_subscriptions_bp.route('/api/creator/subscriptions/subscribe', methods=['POST'])
 @jwt_required()
 def subscribe_to_plan():
