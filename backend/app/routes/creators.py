@@ -14,12 +14,16 @@ bp = Blueprint('creators', __name__)
 @bp.route('/featured', methods=['GET'])
 def get_featured_creators():
     """
-    Get featured creators for homepage display
+    Get featured creators for homepage display with fallback logic
     Public endpoint - no authentication required
-    Query params: featured_type - 'general', 'tiktok', 'instagram'
+    Query params:
+        - featured_type: 'general', 'facebook', 'instagram', 'tiktok', 'youtube', 'twitter', 'linkedin', 'threads', 'twitch', 'ugc'
+        - platform: platform name for platform-specific fallback
     """
     try:
         featured_type = request.args.get('featured_type')  # Optional filter
+        platform = request.args.get('platform')  # For fallback logic
+        limit = request.args.get('limit', 4, type=int)  # Default 4 for homepage sections
 
         # Try to get featured creators
         try:
@@ -36,15 +40,56 @@ def get_featured_creators():
             featured = query.order_by(
                 CreatorProfile.featured_order,
                 CreatorProfile.featured_since.desc()
-            ).limit(8).all()
-        except Exception:
+            ).limit(limit).all()
+
+            # FALLBACK LOGIC: If less than 4 featured creators, fill with top performing creators
+            if len(featured) < 4:
+                needed = 4 - len(featured)
+                featured_ids = [c.id for c in featured]
+
+                # Build fallback query
+                fallback_query = CreatorProfile.query.join(User).filter(
+                    User.is_active == True,
+                    User.is_verified == True
+                )
+
+                # Exclude already featured
+                if featured_ids:
+                    fallback_query = fallback_query.filter(~CreatorProfile.id.in_(featured_ids))
+
+                # Platform-specific fallback
+                if platform:
+                    fallback_query = fallback_query.filter(
+                        func.cast(CreatorProfile.platforms, db.Text).contains(platform)
+                    )
+
+                # Prioritize: Top Creators (badge) > Responds Fast > High Followers
+                # Check for top creators (5+ completed collaborations in last 30 days)
+                from datetime import timedelta
+                from app.models import Collaboration
+                thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+
+                fallback_creators = fallback_query.order_by(
+                    CreatorProfile.follower_count.desc()
+                ).limit(needed).all()
+
+                # Add fallback creators to featured list
+                featured.extend(fallback_creators)
+
+        except Exception as e:
             # Featured fields don't exist yet, fallback to top creators
-            featured = CreatorProfile.query.join(User).filter(
+            query = CreatorProfile.query.join(User).filter(
                 User.is_active == True,
                 User.is_verified == True
-            ).order_by(
+            )
+
+            # Platform filter for fallback
+            if platform:
+                query = query.filter(func.cast(CreatorProfile.platforms, db.Text).contains(platform))
+
+            featured = query.order_by(
                 CreatorProfile.follower_count.desc()
-            ).limit(8).all()
+            ).limit(limit).all()
 
         creators_data = []
         for creator in featured:

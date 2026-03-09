@@ -9,7 +9,18 @@ import SEO from '../components/SEO';
 
 const Home = () => {
   const navigate = useNavigate();
-  const [featuredCreators, setFeaturedCreators] = useState([]);
+  const [featuredSections, setFeaturedSections] = useState({
+    general: [],
+    facebook: [],
+    instagram: [],
+    tiktok: [],
+    youtube: [],
+    twitter: [],
+    linkedin: [],
+    threads: [],
+    twitch: [],
+    ugc: []
+  });
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('search');
@@ -20,16 +31,53 @@ const Home = () => {
   const scrollContainerRef = useRef(null);
 
   useEffect(() => {
-    fetchFeaturedCreators();
+    fetchAllFeaturedCreators();
     fetchCategories();
   }, []);
 
-  const fetchFeaturedCreators = async () => {
+  const fetchAllFeaturedCreators = async () => {
     try {
       setLoading(true);
-      const response = await creatorsAPI.getCreators({ per_page: 12 });
-      const creators = response.data.creators || [];
-      setFeaturedCreators(creators);
+
+      // Fetch featured creators for each section
+      const sections = [
+        { key: 'general', featured_type: 'general', platform: null },
+        { key: 'facebook', featured_type: 'facebook', platform: 'Facebook' },
+        { key: 'instagram', featured_type: 'instagram', platform: 'Instagram' },
+        { key: 'tiktok', featured_type: 'tiktok', platform: 'TikTok' },
+        { key: 'youtube', featured_type: 'youtube', platform: 'YouTube' },
+        { key: 'twitter', featured_type: 'twitter', platform: 'Twitter' },
+        { key: 'linkedin', featured_type: 'linkedin', platform: 'LinkedIn' },
+        { key: 'threads', featured_type: 'threads', platform: 'Threads' },
+        { key: 'twitch', featured_type: 'twitch', platform: 'Twitch' },
+        { key: 'ugc', featured_type: 'ugc', platform: null }
+      ];
+
+      const results = await Promise.all(
+        sections.map(async (section) => {
+          try {
+            const params = {
+              featured_type: section.featured_type,
+              limit: 4
+            };
+            if (section.platform) {
+              params.platform = section.platform;
+            }
+            const response = await creatorsAPI.getFeatured(params);
+            return { key: section.key, creators: response.data.creators || [] };
+          } catch (error) {
+            console.error(`Error fetching ${section.key} featured creators:`, error);
+            return { key: section.key, creators: [] };
+          }
+        })
+      );
+
+      // Update state with all featured sections
+      const newFeaturedSections = {};
+      results.forEach(result => {
+        newFeaturedSections[result.key] = result.creators;
+      });
+      setFeaturedSections(newFeaturedSections);
     } catch (error) {
       console.error('Error fetching featured creators:', error);
     } finally {
@@ -403,41 +451,115 @@ const Home = () => {
         </div>
       ) : (
         <>
-          {/* Featured Section */}
-          <PlatformSection
-            title="Featured"
-            subtitle="Hire Top Influencers across all Platforms"
-            linkTo="/browse/creators"
-            bgColor="white"
-            creators={featuredCreators}
-          />
+          {/* General Featured Section */}
+          {featuredSections.general.length > 0 && (
+            <PlatformSection
+              title="Featured"
+              subtitle="Hire Top Influencers across all Platforms"
+              linkTo="/browse/creators"
+              bgColor="white"
+              creators={featuredSections.general}
+            />
+          )}
 
           {/* Facebook Section */}
-          <PlatformSection
-            title="Facebook"
-            subtitle="Hire Facebook influencers"
-            linkTo="/browse/creators?platform=Facebook"
-            bgColor="primary"
-            creators={featuredCreators}
-          />
+          {featuredSections.facebook.length > 0 && (
+            <PlatformSection
+              title="Facebook"
+              subtitle="Hire Facebook influencers"
+              linkTo="/browse/creators?platform=Facebook"
+              bgColor="primary"
+              creators={featuredSections.facebook}
+            />
+          )}
 
           {/* Instagram Section */}
-          <PlatformSection
-            title="Instagram"
-            subtitle="Hire Instagram influencers"
-            linkTo="/browse/creators?platform=Instagram"
-            bgColor="primary"
-            creators={featuredCreators}
-          />
+          {featuredSections.instagram.length > 0 && (
+            <PlatformSection
+              title="Instagram"
+              subtitle="Hire Instagram influencers"
+              linkTo="/browse/creators?platform=Instagram"
+              bgColor="white"
+              creators={featuredSections.instagram}
+            />
+          )}
 
           {/* TikTok Section */}
-          <PlatformSection
-            title="TikTok"
-            subtitle="Hire TikTok influencers"
-            linkTo="/browse/creators?platform=TikTok"
-            bgColor="white"
-            creators={featuredCreators}
-          />
+          {featuredSections.tiktok.length > 0 && (
+            <PlatformSection
+              title="TikTok"
+              subtitle="Hire TikTok influencers"
+              linkTo="/browse/creators?platform=TikTok"
+              bgColor="primary"
+              creators={featuredSections.tiktok}
+            />
+          )}
+
+          {/* YouTube Section */}
+          {featuredSections.youtube.length > 0 && (
+            <PlatformSection
+              title="YouTube"
+              subtitle="Hire YouTube creators"
+              linkTo="/browse/creators?platform=YouTube"
+              bgColor="white"
+              creators={featuredSections.youtube}
+            />
+          )}
+
+          {/* Twitter Section */}
+          {featuredSections.twitter.length > 0 && (
+            <PlatformSection
+              title="X (Twitter)"
+              subtitle="Hire Twitter influencers"
+              linkTo="/browse/creators?platform=Twitter"
+              bgColor="primary"
+              creators={featuredSections.twitter}
+            />
+          )}
+
+          {/* LinkedIn Section */}
+          {featuredSections.linkedin.length > 0 && (
+            <PlatformSection
+              title="LinkedIn"
+              subtitle="Hire LinkedIn professionals"
+              linkTo="/browse/creators?platform=LinkedIn"
+              bgColor="white"
+              creators={featuredSections.linkedin}
+            />
+          )}
+
+          {/* Threads Section */}
+          {featuredSections.threads.length > 0 && (
+            <PlatformSection
+              title="Threads"
+              subtitle="Hire Threads creators"
+              linkTo="/browse/creators?platform=Threads"
+              bgColor="primary"
+              creators={featuredSections.threads}
+            />
+          )}
+
+          {/* Twitch Section */}
+          {featuredSections.twitch.length > 0 && (
+            <PlatformSection
+              title="Twitch"
+              subtitle="Hire Twitch streamers"
+              linkTo="/browse/creators?platform=Twitch"
+              bgColor="white"
+              creators={featuredSections.twitch}
+            />
+          )}
+
+          {/* UGC Section */}
+          {featuredSections.ugc.length > 0 && (
+            <PlatformSection
+              title="UGC Creators"
+              subtitle="Hire User Generated Content creators"
+              linkTo="/browse/creators"
+              bgColor="primary"
+              creators={featuredSections.ugc}
+            />
+          )}
         </>
       )}
 

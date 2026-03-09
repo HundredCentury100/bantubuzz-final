@@ -15,10 +15,12 @@ class CreatorSubscription(db.Model):
     status = db.Column(db.String(20), default='active')  # active, expired, cancelled, pending_payment
 
     # Payment Info
-    payment_method = db.Column(db.String(30))  # paynow, manual
+    payment_method = db.Column(db.String(30))  # paynow, manual, wallet
     payment_reference = db.Column(db.String(100))
     paynow_poll_url = db.Column(db.Text)
     payment_verified = db.Column(db.Boolean, default=False)
+    payment_status = db.Column(db.String(30))  # pending_verification, verified, rejected
+    payment_proof_path = db.Column(db.String(255))  # Path to uploaded proof of payment
 
     # Subscription Period
     start_date = db.Column(db.DateTime)
@@ -65,6 +67,8 @@ class CreatorSubscription(db.Model):
             'payment_method': self.payment_method,
             'payment_reference': self.payment_reference,
             'payment_verified': self.payment_verified,
+            'payment_status': self.payment_status,
+            'payment_proof_path': self.payment_proof_path,
             'start_date': self.start_date.isoformat() if self.start_date else None,
             'end_date': self.end_date.isoformat() if self.end_date else None,
             'days_remaining': self.days_remaining(),

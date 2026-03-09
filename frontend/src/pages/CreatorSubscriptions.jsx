@@ -159,17 +159,30 @@ const CreatorSubscriptions = () => {
 
                   <div className="flex-shrink-0 w-full md:w-auto">
                     {isSubscribed(verificationPlan.slug) ? (
-                      <div className="px-8 py-4 bg-white/20 rounded-2xl text-center">
-                        <CheckBadgeIcon className="h-8 w-8 text-white mx-auto mb-2" />
-                        <p className="font-semibold">Active</p>
-                      </div>
-                    ) : (
                       <button
                         onClick={() => navigate('/creator/verification/apply')}
                         className="w-full md:w-auto px-8 py-4 bg-white text-primary rounded-2xl font-bold hover:shadow-2xl transform hover:scale-105 transition-all duration-200 flex items-center justify-center gap-2"
                       >
                         Apply for Verification
                         <ArrowRightIcon className="h-5 w-5" />
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => handleSubscribe(verificationPlan.id)}
+                        disabled={subscribing === verificationPlan.id}
+                        className="w-full md:w-auto px-8 py-4 bg-white text-primary rounded-2xl font-bold hover:shadow-2xl transform hover:scale-105 transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                      >
+                        {subscribing === verificationPlan.id ? (
+                          <>
+                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary"></div>
+                            Processing...
+                          </>
+                        ) : (
+                          <>
+                            Subscribe & Apply
+                            <ArrowRightIcon className="h-5 w-5" />
+                          </>
+                        )}
                       </button>
                     )}
                   </div>

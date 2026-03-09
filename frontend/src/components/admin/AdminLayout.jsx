@@ -34,6 +34,7 @@ const AdminLayout = ({ children }) => {
     { name: 'Activity Feed', href: '/admin/activity', icon: BoltIcon },
     { name: 'Disputes', href: '/admin/disputes', icon: ScaleIcon },
     { name: 'Subscriptions', href: '/admin/subscriptions', icon: CreditCardIcon },
+    { name: 'Payments', href: '/admin/payments', icon: BanknotesIcon },
     { name: 'Reports', href: '/admin/reports', icon: ChartBarIcon },
     { name: 'Bookings', href: '/admin/bookings', icon: CalendarDaysIcon },
     { name: 'Cashouts', href: '/admin/cashouts', icon: BanknotesIcon },

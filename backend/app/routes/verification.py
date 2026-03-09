@@ -248,11 +248,14 @@ def get_verification_applications():
         for app in applications:
             app_dict = app.to_dict()
             if app.creator:
+                creator_user = app.creator.user if hasattr(app.creator, 'user') else None
                 app_dict['creator'] = {
                     'id': app.creator.id,
-                    'display_name': app.creator.display_name,
                     'username': app.creator.username,
-                    'profile_image': app.creator.profile_image
+                    'profile_picture': app.creator.profile_picture,
+                    'bio': app.creator.bio,
+                    'email': creator_user.email if creator_user else 'N/A',
+                    'phone': creator_user.phone if creator_user and hasattr(creator_user, 'phone') else 'N/A'
                 }
             result.append(app_dict)
 

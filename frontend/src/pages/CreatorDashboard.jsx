@@ -15,6 +15,7 @@ const CreatorDashboard = () => {
   const [applications, setApplications] = useState([]);
   const [subscription, setSubscription] = useState(null);
   const [verificationStatus, setVerificationStatus] = useState(null);
+  const [verificationSubscription, setVerificationSubscription] = useState(null);
   const [connectedPlatforms, setConnectedPlatforms] = useState([]);
   const [stats, setStats] = useState({
     totalPackages: 0,
@@ -74,6 +75,17 @@ const CreatorDashboard = () => {
       } catch (error) {
         console.error('Error fetching verification:', error);
         // Don't fail dashboard load if verification fails
+      }
+
+      // Fetch verification subscription status
+      try {
+        const verSubRes = await api.get('/creator/subscriptions/my-subscription');
+        if (verSubRes.data.success && verSubRes.data.data.has_subscription) {
+          setVerificationSubscription(verSubRes.data.data.subscription);
+        }
+      } catch (error) {
+        console.error('Error fetching verification subscription:', error);
+        // Don't fail dashboard load if verification subscription fails
       }
 
       // Fetch connected platforms
@@ -142,6 +154,42 @@ const CreatorDashboard = () => {
       <Navbar />
 
       <div className="container-custom section-padding">
+        {/* Verification Subscription Payment Verified Banner - Highest Priority */}
+        {verificationSubscription && verificationSubscription.payment_verified &&
+         verificationSubscription.status === 'active' &&
+         (!verificationStatus || !verificationStatus.has_pending_application) &&
+         (!verificationStatus || !verificationStatus.is_verified) && (
+          <div className="mb-8 p-6 bg-green-50 border-2 border-green-500 rounded-3xl relative animate-pulse-slow">
+            <div className="flex items-start gap-3">
+              <div className="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center flex-shrink-0">
+                <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 20 20">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="flex-1">
+                <h3 className="font-bold text-green-900 text-xl mb-2">Payment Verified! Complete Your Verification Application</h3>
+                <p className="text-green-800 mb-4 leading-relaxed">
+                  Great news! Your verification subscription payment has been confirmed. You can now proceed to fill out your verification application form and upload your identity documents.
+                </p>
+                <div className="flex flex-wrap gap-3">
+                  <Link
+                    to="/creator/verification/apply"
+                    className="inline-flex items-center px-6 py-3 bg-green-600 text-white rounded-full hover:bg-green-700 transition-colors font-semibold shadow-lg hover:shadow-xl"
+                  >
+                    Complete Application Form →
+                  </Link>
+                  <Link
+                    to="/creator/verification/pending"
+                    className="inline-flex items-center px-6 py-3 bg-white text-green-700 border-2 border-green-600 rounded-full hover:bg-green-50 transition-colors font-semibold"
+                  >
+                    View Details
+                  </Link>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Verification Banner - Priority 1: Show if not verified */}
         {(!verificationStatus || !verificationStatus.is_verified) && !verificationBannerDismissed && (
           <div className="mb-8 p-6 bg-primary border border-primary rounded-3xl relative">
@@ -170,10 +218,10 @@ const CreatorDashboard = () => {
                   <span className="text-xs px-3 py-1 bg-white/50 text-primary-dark rounded-full font-medium">$5/month</span>
                 </div>
                 <Link
-                  to="/creator/verification/apply"
+                  to="/creator/subscriptions"
                   className="inline-block px-6 py-2 bg-dark text-white rounded-full hover:bg-gray-800 transition-colors text-sm font-semibold"
                 >
-                  Apply for Verification →
+                  Subscribe to Verification →
                 </Link>
               </div>
             </div>

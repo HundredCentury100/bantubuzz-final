@@ -92,6 +92,7 @@ export const usersAPI = {
 export const creatorsAPI = {
   getCreators: (params) => api.get('/creators', { params }),
   getCategories: () => api.get('/creators/categories'),
+  getFeatured: (params) => api.get('/creators/featured', { params }),
   getCreator: (id) => api.get(`/creators/${id}`),
   getOwnProfile: () => api.get('/creators/profile'),
   updateProfile: (data) => api.put('/creators/profile', data),

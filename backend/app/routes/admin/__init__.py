@@ -27,5 +27,6 @@ from . import activity
 from . import disputes
 from . import reports
 from . import subscriptions
+from . import payments
 
 __all__ = ['bp']

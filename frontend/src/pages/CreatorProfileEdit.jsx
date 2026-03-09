@@ -8,6 +8,7 @@ import toast from 'react-hot-toast';
 import { PLATFORMS, ZIMBABWE_LANGUAGES, COUNTRIES } from '../constants/options';
 import axios from 'axios';
 import ImageCropModal from '../components/ImageCropModal';
+import ProfilePreviewModal from '../components/ProfilePreviewModal';
 import { createCroppedImage } from '../utils/cropImage';
 
 const CreatorProfileEdit = () => {
@@ -27,6 +28,7 @@ const CreatorProfileEdit = () => {
   const [showCropModal, setShowCropModal] = useState(false);
   const [imageToCrop, setImageToCrop] = useState(null);
   const [originalFileName, setOriginalFileName] = useState('');
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
 
   const {
     register,
@@ -352,9 +354,22 @@ const CreatorProfileEdit = () => {
           </div>
 
           {/* Header */}
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold text-dark mb-2">Edit Your Profile</h1>
-            <p className="text-gray-600">Update your creator profile to attract more brands</p>
+          <div className="mb-8 flex items-start justify-between gap-4">
+            <div>
+              <h1 className="text-3xl font-bold text-dark mb-2">Edit Your Profile</h1>
+              <p className="text-gray-600">Update your creator profile to attract more brands</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowPreviewModal(true)}
+              className="px-6 py-3 bg-white border-2 border-primary text-primary hover:bg-primary hover:text-dark font-medium rounded-full transition-colors flex items-center gap-2 whitespace-nowrap"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+              </svg>
+              Preview Profile
+            </button>
           </div>
 
           {/* Success Message */}
@@ -919,6 +934,33 @@ const CreatorProfileEdit = () => {
           onCancel={handleCropCancel}
           aspectRatio={1}
           cropShape="round"
+        />
+      )}
+
+      {/* Profile Preview Modal */}
+      {showPreviewModal && (
+        <ProfilePreviewModal
+          profile={{
+            username: watch('username') || profile?.username,
+            bio: watch('bio') || profile?.bio,
+            location: watch('location') || profile?.location,
+            city: watch('city') || profile?.city,
+            country: watch('country') || profile?.country,
+            profile_picture: profilePicture,
+            follower_count: watch('follower_count') || profile?.follower_count || 0,
+            categories: watch('categories') || profile?.categories || [],
+            languages: watch('languages') || profile?.languages || [],
+            platforms: watch('platforms') || profile?.platforms || [],
+            availability_status: watch('availability_status') || profile?.availability_status,
+            social_links: {
+              instagram: watch('instagram') || profile?.social_links?.instagram,
+              tiktok: watch('tiktok') || profile?.social_links?.tiktok,
+              youtube: watch('youtube') || profile?.social_links?.youtube,
+              twitter: watch('twitter') || profile?.social_links?.twitter
+            },
+            is_verified: profile?.is_verified || false
+          }}
+          onClose={() => setShowPreviewModal(false)}
         />
       )}
     </div>

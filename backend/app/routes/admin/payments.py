@@ -6,7 +6,7 @@ Handles verification, viewing, and management of all payments and bookings
 from flask import jsonify, request
 from datetime import datetime, timedelta
 from app import db
-from app.models import Payment, Booking, User, BrandProfile, CreatorProfile, PaymentVerification
+from app.models import Payment, Booking, User, BrandProfile, CreatorProfile, PaymentVerification, CreatorSubscription, CreatorSubscriptionPlan
 from app.decorators.admin import admin_required
 from flask_jwt_extended import get_jwt_identity
 from . import bp
@@ -85,6 +85,12 @@ def get_pending_payments():
             Booking.payment_method.in_(['bank_transfer', 'manual'])
         ).all()
 
+        # Get creator subscriptions with pending payment proof
+        pending_creator_subs = CreatorSubscription.query.filter(
+            CreatorSubscription.payment_status == 'pending_verification',
+            CreatorSubscription.payment_proof_path.isnot(None)
+        ).all()
+
         # Format payment data with user information
         payments_data = []
         for payment in payments:
@@ -121,6 +127,30 @@ def get_pending_payments():
                 'created_at': booking.created_at.isoformat(),
                 'creator_name': creator.username if creator else 'Unknown',
                 'creator_email': creator.user.email if creator and creator.user else 'unknown@email.com'
+            })
+
+        # Format creator subscription data
+        for creator_sub in pending_creator_subs:
+            creator = CreatorProfile.query.get(creator_sub.creator_id)
+            creator_user = creator.user if creator else None
+
+            payments_data.append({
+                'id': f'creator_sub_{creator_sub.id}',
+                'creator_subscription_id': creator_sub.id,
+                'user_id': creator_user.id if creator_user else None,
+                'user_name': creator_user.name if creator_user and hasattr(creator_user, 'name') else (creator_user.email if creator_user else 'Unknown'),
+                'user_email': creator_user.email if creator_user else 'unknown@email.com',
+                'user_type': 'creator',
+                'amount': float(creator_sub.plan.price) if creator_sub.plan else 0,
+                'payment_method': creator_sub.payment_method,
+                'payment_proof_url': creator_sub.payment_proof_path,
+                'status': 'pending_verification',
+                'payment_category': 'creator_subscription',
+                'subscription_type': creator_sub.plan.subscription_type if creator_sub.plan else 'unknown',
+                'subscription_plan': creator_sub.plan.name if creator_sub.plan else 'Unknown Plan',
+                'created_at': creator_sub.created_at.isoformat(),
+                'creator_name': creator.username if creator else 'Unknown',
+                'creator_email': creator_user.email if creator_user else 'unknown@email.com'
             })
 
         return jsonify({
@@ -412,6 +442,126 @@ def add_manual_payment():
             'message': 'Manual payment added successfully',
             'payment': payment.to_dict()
         }), 201
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@bp.route('/payments/creator-subscription/<int:subscription_id>/verify', methods=['PUT'])
+@admin_required
+def verify_creator_subscription_payment(subscription_id):
+    """
+    Verify a creator subscription manual payment
+    Body: notes (optional)
+    """
+    try:
+        from app.models import Notification
+        admin_id = int(get_jwt_identity())
+        subscription = CreatorSubscription.query.get(subscription_id)
+
+        if not subscription:
+            return jsonify({
+                'success': False,
+                'error': 'Subscription not found'
+            }), 404
+
+        data = request.get_json() or {}
+        notes = data.get('notes', '')
+
+        # Activate subscription
+        subscription.payment_verified = True
+        subscription.payment_status = 'verified'
+        subscription.status = 'active'
+        subscription.start_date = datetime.utcnow()
+
+        # Set end date based on plan duration
+        if subscription.plan and subscription.plan.duration_days:
+            subscription.end_date = datetime.utcnow() + timedelta(days=subscription.plan.duration_days)
+
+        subscription.updated_at = datetime.utcnow()
+
+        # Auto-add to featured if this is a featured subscription
+        if subscription.plan and subscription.plan.subscription_type == 'featured':
+            creator = CreatorProfile.query.get(subscription.creator_id)
+            if creator:
+                creator.is_featured = True
+                creator.featured_type = subscription.plan.featured_category or 'general'
+                creator.featured_since = datetime.utcnow()
+
+                # Calculate featured order based on existing featured creators of same type
+                existing_featured = CreatorProfile.query.filter(
+                    CreatorProfile.is_featured == True,
+                    CreatorProfile.featured_type == creator.featured_type
+                ).count()
+                creator.featured_order = existing_featured
+
+                # Send notification
+                notification = Notification(
+                    user_id=creator.user_id,
+                    title=f'You are now Featured!',
+                    message=f'Your profile has been featured on the BantuBuzz homepage ({creator.featured_type.title()} section). This will give you increased visibility to brands.',
+                    type='success'
+                )
+                db.session.add(notification)
+
+        db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'message': 'Creator subscription payment verified successfully',
+            'subscription': subscription.to_dict()
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@bp.route('/payments/creator-subscription/<int:subscription_id>/reject', methods=['PUT'])
+@admin_required
+def reject_creator_subscription_payment(subscription_id):
+    """
+    Reject a creator subscription manual payment
+    Body: notes (required)
+    """
+    try:
+        admin_id = int(get_jwt_identity())
+        subscription = CreatorSubscription.query.get(subscription_id)
+
+        if not subscription:
+            return jsonify({
+                'success': False,
+                'error': 'Subscription not found'
+            }), 404
+
+        data = request.get_json()
+        notes = data.get('notes')
+
+        if not notes:
+            return jsonify({
+                'success': False,
+                'error': 'Rejection notes are required'
+            }), 400
+
+        # Update subscription status
+        subscription.payment_status = 'rejected'
+        subscription.status = 'cancelled'
+        subscription.updated_at = datetime.utcnow()
+
+        db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'message': 'Creator subscription payment rejected',
+            'subscription': subscription.to_dict()
+        }), 200
 
     except Exception as e:
         db.session.rollback()

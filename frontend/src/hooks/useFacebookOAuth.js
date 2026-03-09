@@ -7,7 +7,7 @@ import { toast } from 'react-hot-toast';
 import api from '../services/api';
 
 const FACEBOOK_APP_ID = '1863571634283956';
-const FACEBOOK_CONFIG_ID = '1640839016924487'; // Facebook Login for Business Configuration ID (User Access Token)
+const FACEBOOK_CONFIG_ID = '1233734415390648'; // TEST: Using "Thunzi" config instead of BantuBuzz
 
 export const useFacebookOAuth = () => {
   const [isSDKLoaded, setIsSDKLoaded] = useState(false);
@@ -158,11 +158,15 @@ export const useFacebookOAuth = () => {
       const redirectUri = encodeURIComponent(window.location.origin + '/creator/platforms');
       const state = encodeURIComponent(JSON.stringify({ action: 'facebook_connect', timestamp: Date.now() }));
 
+      // Required scopes - MUST match ALL permissions in the Facebook configuration
+      const scope = 'business_management,email,instagram_basic,instagram_manage_insights,pages_manage_ads,pages_manage_metadata,pages_messaging,pages_read_engagement,pages_read_user_content,pages_show_list,read_insights';
+
       const oauthUrl = `https://www.facebook.com/v19.0/dialog/oauth?` +
         `client_id=${FACEBOOK_APP_ID}` +
         `&redirect_uri=${redirectUri}` +
         `&config_id=${FACEBOOK_CONFIG_ID}` +
         `&response_type=code` +
+        `&scope=${scope}` +
         `&state=${state}`;
 
       console.log('Redirecting to Facebook OAuth:', oauthUrl);

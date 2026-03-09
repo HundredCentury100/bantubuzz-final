@@ -1,6 +1,6 @@
 # 🤖 AI Assistant Guide for BantuBuzz Platform
 
-**Last Updated**: March 6, 2026
+**Last Updated**: March 9, 2026
 **Purpose**: Complete context and guidelines for AI assistants working on this project
 
 ---
@@ -1165,11 +1165,13 @@ Understanding what's been implemented helps maintain consistency and avoid rewor
 
 ### Phase 6: Creator Subscriptions & Verification (Complete)
 - Creator subscription plans (Featured, Verification)
-- Featured placement (General, Facebook, Instagram, TikTok) - $5-$10/week
+- Featured placement (General, Facebook, Instagram, TikTok, YouTube, Twitter, LinkedIn, Threads, Twitch, UGC) - $10/week
 - Verification badge system - $5/month
 - Document upload for verification
 - Admin verification queue
 - Platform fees based on brand subscription tier
+- Auto-feature creators on payment verification
+- Homepage platform-specific featured sections with fallback logic
 
 ### Recent: Design System Alignment (Complete - Feb 23, 2026)
 - **Homepage design as reference** (Home.jsx is the source of truth)
@@ -1277,6 +1279,51 @@ Understanding what's been implemented helps maintain consistency and avoid rewor
 - **Hide verification banner for verified creators**:
   - CreatorSubscriptions page now checks `profile.badges` for `verified_creator`
   - Verification banner only shows if creator is NOT already verified
+
+### Recent: Featured Creators System Expansion (March 9, 2026)
+- **Complete featured creators system implementation**:
+  - Auto-add to featured on payment verification (subscription type: 'featured')
+  - Created subscription plans for all platforms:
+    - General Featured, Facebook, Instagram, TikTok (existing)
+    - **NEW**: YouTube, Twitter, LinkedIn, Threads, Twitch, UGC (added March 9)
+  - All featured plans: $10/week (7 days duration)
+- **Homepage platform-specific sections**:
+  - Fetches featured creators for each platform separately
+  - Supports 10 platform sections: General, Facebook, Instagram, TikTok, YouTube, Twitter, LinkedIn, Threads, Twitch, UGC
+  - Only shows section if creators exist for that platform
+  - Each section displays 4 creators
+- **Fallback logic for featured sections**:
+  - If platform has < 4 featured creators, fills remaining slots with top performers
+  - Prioritizes by follower count and badges (top_creator, responds_fast)
+  - Ensures all sections always show 4 quality creators
+  - Backend: `backend/app/routes/creators.py` `/featured` endpoint (lines 14-128)
+- **Admin featured management**:
+  - Manual feature/unfeature at `/admin/featured`
+  - Set featured type (general shows in all sections, platform-specific shows in one)
+  - Reorder featured creators by `featured_order` field
+  - View all featured creators filtered by type
+  - Files: `backend/app/routes/admin/featured.py`
+- **Auto-featuring on payment verification**:
+  - When admin verifies featured subscription payment, creator automatically featured
+  - Sets `is_featured=True`, `featured_type` from plan, `featured_since` timestamp
+  - Calculates `featured_order` based on existing featured count
+  - Sends notification to creator
+  - File: `backend/app/routes/admin/payments.py` (lines 487-509)
+- **Profile preview feature**:
+  - Added "Preview Profile" button to creator profile edit page
+  - Shows two views: Creator Card (how they appear in search) and Full Profile (complete profile page)
+  - Real-time preview using form values (via `watch()` from react-hook-form)
+  - Displays badges if applicable (creator, verified_creator)
+  - Component: `frontend/src/components/ProfilePreviewModal.jsx`
+  - Integration: `frontend/src/pages/CreatorProfileEdit.jsx` (lines 357-373, 941-965)
+- **Technical details**:
+  - Featured creators stored in `creator_profiles` table with fields:
+    - `is_featured` (boolean)
+    - `featured_type` (string: 'general', 'facebook', 'instagram', etc.)
+    - `featured_order` (integer: display order)
+    - `featured_since` (datetime: when featured started)
+  - Featured subscription plans stored in `creator_subscription_plans` table
+  - Browse creators gives precedence to featured when sorted by relevance
   - Prevents redundant subscription prompts for verified creators
   - File: `frontend/src/pages/CreatorSubscriptions.jsx`
 - **Remove subscription link from creator navbar**:

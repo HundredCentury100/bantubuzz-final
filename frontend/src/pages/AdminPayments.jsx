@@ -70,7 +70,16 @@ export default function AdminPayments() {
   const handleVerifySubmit = async (e) => {
     e.preventDefault();
     try {
-      await api.put(`/admin/payments/${selectedPayment.id}/verify`, verifyData);
+      // Check if this is a creator subscription payment
+      if (selectedPayment.creator_subscription_id) {
+        await api.put(`/admin/payments/creator-subscription/${selectedPayment.creator_subscription_id}/verify`, { notes: verifyData.notes });
+      } else if (selectedPayment.brand_subscription_id) {
+        // Handle brand subscriptions (if needed in the future)
+        await api.put(`/admin/payments/brand-subscription/${selectedPayment.brand_subscription_id}/verify`, { notes: verifyData.notes });
+      } else {
+        // Regular payment/booking
+        await api.put(`/admin/payments/${selectedPayment.id}/verify`, verifyData);
+      }
       setSuccess('Payment verified successfully!');
       setShowVerifyModal(false);
       fetchData();
@@ -120,6 +129,17 @@ export default function AdminPayments() {
   };
 
   const getPaymentTypeDisplay = (payment) => {
+    // Handle creator subscriptions
+    if (payment.payment_category === 'creator_subscription') {
+      return payment.subscription_plan || 'Creator Subscription';
+    }
+
+    // Handle brand subscriptions
+    if (payment.payment_category === 'brand_subscription') {
+      return payment.subscription_plan || 'Brand Subscription';
+    }
+
+    // Handle bookings
     const category = payment.payment_category || 'package';
     const type = payment.booking_type || 'direct';
 
@@ -150,7 +170,7 @@ export default function AdminPayments() {
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-3xl font-bold text-gray-900">Payment Verification</h1>
-            <p className="mt-2 text-gray-600">Manage and verify brand payments</p>
+            <p className="mt-2 text-gray-600">Manage and verify manual payments (brands & creators)</p>
           </div>
           <button
             onClick={() => setShowAddModal(true)}
@@ -221,8 +241,7 @@ export default function AdminPayments() {
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ID</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Brand</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Creator</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">User</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Method</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Created</th>
@@ -232,21 +251,23 @@ export default function AdminPayments() {
                 <tbody className="bg-white divide-y divide-gray-200">
                   {pendingPayments.map((payment) => (
                     <tr key={payment.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 text-sm font-medium text-gray-900">#{payment.booking_id}</td>
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900">
+                        {payment.booking_id ? `#${payment.booking_id}` : payment.id}
+                      </td>
                       <td className="px-6 py-4 text-sm">
                         <span className="inline-flex px-3 py-1 rounded-full text-xs font-medium bg-primary/10 text-dark">
                           {getPaymentTypeDisplay(payment)}
                         </span>
+                        {payment.user_type && (
+                          <span className={`ml-2 inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${payment.user_type === 'creator' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'}`}>
+                            {payment.user_type}
+                          </span>
+                        )}
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-900">
-                        {payment.user_name || `User ${payment.user_id}`}
+                        {payment.user_name || payment.creator_name || `User ${payment.user_id}`}
                         <br />
-                        <span className="text-xs text-gray-500">{payment.user_email}</span>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-900">
-                        {payment.creator_name || 'N/A'}
-                        <br />
-                        <span className="text-xs text-gray-500">{payment.creator_email || ''}</span>
+                        <span className="text-xs text-gray-500">{payment.user_email || payment.creator_email}</span>
                       </td>
                       <td className="px-6 py-4 text-sm font-semibold text-gray-900">{formatCurrency(payment.amount)}</td>
                       <td className="px-6 py-4 text-sm text-gray-600 capitalize">{payment.payment_method || 'manual'}</td>

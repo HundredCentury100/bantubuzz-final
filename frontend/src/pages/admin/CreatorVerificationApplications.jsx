@@ -193,19 +193,19 @@ export default function CreatorVerificationApplications() {
                           {app.creator?.profile_picture ? (
                             <img
                               src={app.creator.profile_picture}
-                              alt={app.creator.display_name}
+                              alt={app.creator.username}
                               className="w-10 h-10 rounded-full object-cover"
                             />
                           ) : (
                             <div className="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center">
                               <span className="text-gray-500 text-sm font-medium">
-                                {app.creator?.display_name?.charAt(0) || '?'}
+                                {app.creator?.username?.charAt(0)?.toUpperCase() || '?'}
                               </span>
                             </div>
                           )}
                           <div>
-                            <p className="font-medium text-gray-900">{app.creator?.display_name || 'Unknown'}</p>
-                            <p className="text-xs text-gray-500">@{app.creator?.username || 'N/A'}</p>
+                            <p className="font-medium text-gray-900">@{app.creator?.username || 'Unknown'}</p>
+                            <p className="text-xs text-gray-500">{app.creator?.email || 'N/A'}</p>
                           </div>
                         </div>
                       </td>
@@ -274,20 +274,24 @@ export default function CreatorVerificationApplications() {
                   <svg className="w-5 h-5 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
                   </svg>
-                  Creator Information
+                  Creator Contact Information
                 </h4>
-                <div className="grid grid-cols-3 gap-4 text-sm">
+                <div className="grid grid-cols-2 gap-4 text-sm">
                   <div>
-                    <p className="text-gray-500 mb-1">Display Name</p>
-                    <p className="font-medium text-gray-900">{selectedApp.creator?.display_name}</p>
+                    <p className="text-gray-500 mb-1">Real Name (from application)</p>
+                    <p className="font-medium text-gray-900">{selectedApp.real_name}</p>
                   </div>
                   <div>
-                    <p className="text-gray-500 mb-1">Username</p>
-                    <p className="font-medium text-gray-900">@{selectedApp.creator?.username}</p>
+                    <p className="text-gray-500 mb-1">BantuBuzz Username</p>
+                    <p className="font-medium text-gray-900">@{selectedApp.creator?.username || 'N/A'}</p>
                   </div>
                   <div>
-                    <p className="text-gray-500 mb-1">Email</p>
+                    <p className="text-gray-500 mb-1">Email Address</p>
                     <p className="font-medium text-gray-900">{selectedApp.creator?.email || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-500 mb-1">Phone Number</p>
+                    <p className="font-medium text-gray-900">{selectedApp.creator?.phone || 'N/A'}</p>
                   </div>
                 </div>
               </div>
@@ -331,15 +335,15 @@ export default function CreatorVerificationApplications() {
                   Uploaded Documents
                 </h4>
                 <div className="grid grid-cols-2 gap-4">
-                  {selectedApp.id_document_front && (
+                  {selectedApp.documents?.id_front && (
                     <div className="border-2 border-gray-200 rounded-xl p-3 hover:border-primary transition">
                       <p className="text-sm font-medium text-gray-700 mb-2">ID/Passport Front</p>
                       <div
-                        onClick={() => setPreviewDoc(getDocumentUrl(selectedApp.id_document_front))}
+                        onClick={() => setPreviewDoc(getDocumentUrl(selectedApp.documents.id_front))}
                         className="cursor-pointer group relative"
                       >
                         <img
-                          src={getDocumentUrl(selectedApp.id_document_front)}
+                          src={getDocumentUrl(selectedApp.documents.id_front)}
                           alt="ID Front"
                           className="w-full h-48 object-cover rounded-lg"
                         />
@@ -348,7 +352,7 @@ export default function CreatorVerificationApplications() {
                         </div>
                       </div>
                       <a
-                        href={getDocumentUrl(selectedApp.id_document_front)}
+                        href={getDocumentUrl(selectedApp.documents.id_front)}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="mt-2 text-xs text-primary hover:underline flex items-center gap-1"
@@ -360,15 +364,15 @@ export default function CreatorVerificationApplications() {
                       </a>
                     </div>
                   )}
-                  {selectedApp.selfie_with_id && (
+                  {selectedApp.documents?.selfie && (
                     <div className="border-2 border-gray-200 rounded-xl p-3 hover:border-primary transition">
                       <p className="text-sm font-medium text-gray-700 mb-2">Selfie with ID</p>
                       <div
-                        onClick={() => setPreviewDoc(getDocumentUrl(selectedApp.selfie_with_id))}
+                        onClick={() => setPreviewDoc(getDocumentUrl(selectedApp.documents.selfie))}
                         className="cursor-pointer group relative"
                       >
                         <img
-                          src={getDocumentUrl(selectedApp.selfie_with_id)}
+                          src={getDocumentUrl(selectedApp.documents.selfie)}
                           alt="Selfie"
                           className="w-full h-48 object-cover rounded-lg"
                         />
@@ -377,7 +381,7 @@ export default function CreatorVerificationApplications() {
                         </div>
                       </div>
                       <a
-                        href={getDocumentUrl(selectedApp.selfie_with_id)}
+                        href={getDocumentUrl(selectedApp.documents.selfie)}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="mt-2 text-xs text-primary hover:underline flex items-center gap-1"

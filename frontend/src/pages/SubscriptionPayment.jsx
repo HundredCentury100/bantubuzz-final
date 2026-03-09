@@ -78,7 +78,8 @@ const SubscriptionPayment = () => {
 
   const handleWalletPayment = async () => {
     const plan = subscription?.plan || planInfo;
-    const amount = billingCycle === 'yearly' ? plan?.price_yearly : plan?.price_monthly;
+    // Creator subscriptions use 'price', brand subscriptions use 'price_monthly'/'price_yearly'
+    const amount = plan?.price || (billingCycle === 'yearly' ? plan?.price_yearly : plan?.price_monthly);
 
     if (!walletBalance || walletBalance.available_balance < amount) {
       toast.error('Insufficient wallet balance');
@@ -103,7 +104,15 @@ const SubscriptionPayment = () => {
 
       if (response.data.success) {
         toast.success('Payment successful! Your subscription is now active.');
-        navigate('/subscription/manage');
+
+        // Check if this is a verification subscription
+        const plan = subscription?.plan || planInfo;
+        if (plan?.subscription_type === 'verification' || plan?.slug?.includes('verification')) {
+          navigate('/creator/verification/apply');
+        } else {
+          // For brand subscriptions
+          navigate('/subscription/manage');
+        }
       }
     } catch (error) {
       console.error('Wallet payment error:', error);
@@ -175,7 +184,17 @@ const SubscriptionPayment = () => {
 
       if (response.data.success) {
         toast.success('Proof of payment uploaded successfully. Awaiting admin verification.');
-        navigate('/subscription/manage');
+
+        // Check if this is a verification subscription
+        const plan = subscription?.plan || planInfo;
+        if (plan?.subscription_type === 'verification' || plan?.slug?.includes('verification')) {
+          navigate('/creator/verification/pending', {
+            state: { subscription: subscription || stateSubscription }
+          });
+        } else {
+          // For brand subscriptions
+          navigate('/subscription/manage');
+        }
       }
     } catch (error) {
       console.error('Upload error:', error);
@@ -198,10 +217,28 @@ const SubscriptionPayment = () => {
 
       if (response.data.success && response.data.data.payment.paid) {
         toast.success('Payment confirmed! Your subscription is now active.');
-        navigate('/subscription/manage');
+
+        // Check if this is a verification subscription
+        const plan = subscription?.plan || planInfo;
+        if (plan?.subscription_type === 'verification' || plan?.slug?.includes('verification')) {
+          navigate('/creator/verification/apply');
+        } else {
+          // For brand subscriptions
+          navigate('/subscription/manage');
+        }
       } else {
         const status = response.data.data.payment.status || 'pending';
         toast.info(`Payment status: ${status}`);
+
+        // If still pending and it's a verification subscription, offer to go to pending page
+        const plan = subscription?.plan || planInfo;
+        if (plan?.subscription_type === 'verification' || plan?.slug?.includes('verification')) {
+          setTimeout(() => {
+            navigate('/creator/verification/pending', {
+              state: { subscription: subscription || stateSubscription }
+            });
+          }, 2000);
+        }
       }
     } catch (error) {
       console.error('Error checking payment status:', error);
@@ -223,8 +260,11 @@ const SubscriptionPayment = () => {
   }
 
   const plan = subscription?.plan || planInfo;
-  const amount = billingCycle === 'yearly' ? plan?.price_yearly : plan?.price_monthly;
-  const reference = `SUB-${subscriptionId || paymentData?.subscription_id || 'PENDING'}`;
+  // Creator subscriptions use 'price', brand subscriptions use 'price_monthly'/'price_yearly'
+  const amount = plan?.price || (billingCycle === 'yearly' ? plan?.price_yearly : plan?.price_monthly);
+  // Use appropriate reference format based on subscription type
+  const refId = subscription?.id || subscriptionId || paymentData?.subscription_id || 'PENDING';
+  const reference = user?.user_type === 'creator' ? `CREATOR_SUB_${refId}` : `SUB-${refId}`;
 
   return (
     <div className="min-h-screen bg-light">
@@ -235,13 +275,13 @@ const SubscriptionPayment = () => {
           {/* Navigation */}
           <div className="mb-6">
             <Link
-              to="/subscription/manage"
+              to={user?.user_type === 'creator' ? '/creator/subscriptions' : '/subscription/manage'}
               className="text-gray-600 hover:text-gray-900 flex items-center gap-2 w-fit"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
               </svg>
-              Back to Subscription
+              Back to Subscriptions
             </Link>
           </div>
 

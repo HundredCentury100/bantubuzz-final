@@ -44,6 +44,7 @@ import GoogleProfileComplete from './pages/GoogleProfileComplete';
 import CreatorSubscriptions from './pages/CreatorSubscriptions';
 import VerificationApplication from './pages/VerificationApplication';
 import VerificationStatus from './pages/VerificationStatus';
+import VerificationPending from './pages/VerificationPending';
 import ConnectPlatforms from './pages/ConnectPlatforms';
 import BrandConnectPlatforms from './pages/BrandConnectPlatforms';
 
@@ -334,6 +335,14 @@ function App() {
         element={
           <ProtectedRoute requiredType="creator">
             <VerificationStatus />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/creator/verification/pending"
+        element={
+          <ProtectedRoute requiredType="creator">
+            <VerificationPending />
           </ProtectedRoute>
         }
       />

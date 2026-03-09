@@ -30,44 +30,11 @@ const VerificationApplication = () => {
     facebook_followers: 0
   });
 
-  // Check for active verification subscription on mount
+  // Remove subscription check - backend will verify when submitting
   useEffect(() => {
-    checkVerificationSubscription();
+    setCheckingSubscription(false);
+    setHasActiveSubscription(true);
   }, []);
-
-  const checkVerificationSubscription = async () => {
-    try {
-      setCheckingSubscription(true);
-      const response = await api.get('/creator/subscriptions/my-subscription');
-
-      if (response.data.success) {
-        const data = response.data.data;
-        const subscription = data.subscription || data.plan; // Handle both subscription and free plan
-
-        // Check if user has active verification subscription
-        if (data.has_subscription && subscription &&
-            subscription.plan?.subscription_type === 'verification' &&
-            subscription.status === 'active' && subscription.payment_verified) {
-          setHasActiveSubscription(true);
-        } else if (data.is_free) {
-          // User is on free plan - cannot apply for verification
-          setHasActiveSubscription(false);
-          toast.error('You need an active verification subscription to apply. Redirecting to subscriptions...');
-          setTimeout(() => navigate('/creator/subscriptions'), 2000);
-        } else {
-          setHasActiveSubscription(false);
-          toast.error('You need an active verification subscription to apply. Redirecting to subscriptions...');
-          setTimeout(() => navigate('/creator/subscriptions'), 2000);
-        }
-      }
-    } catch (error) {
-      console.error('Error checking subscription:', error);
-      toast.error('Failed to check subscription status');
-      navigate('/creator/subscriptions');
-    } finally {
-      setCheckingSubscription(false);
-    }
-  };
 
   // Get document type label
   const getDocumentLabel = () => {
