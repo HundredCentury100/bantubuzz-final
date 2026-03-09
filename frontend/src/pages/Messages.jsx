@@ -8,6 +8,10 @@ import CustomPackageMessage from '../components/CustomPackageMessage';
 import { BASE_URL } from '../services/api';
 import { useAuth } from '../hooks/useAuth';
 import toast from 'react-hot-toast';
+import BlockUserModal from '../components/BlockUserModal';
+import ReportMessageModal from '../components/ReportMessageModal';
+import SafetyWarningModal from '../components/SafetyWarningModal';
+import { checkMessageSafety } from '../utils/messageSafety';
 
 const Messages = () => {
   const location = useLocation();
@@ -32,6 +36,14 @@ const Messages = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false); // Desktop sidebar toggle
   const messagesEndRef = useRef(null);
   const typingTimeoutRef = useRef(null);
+
+  // Trust & Safety modals state
+  const [showBlockModal, setShowBlockModal] = useState(false);
+  const [showReportModal, setShowReportModal] = useState(false);
+  const [showSafetyWarning, setShowSafetyWarning] = useState(false);
+  const [safetyWarningData, setSafetyWarningData] = useState(null);
+  const [reportMessageData, setReportMessageData] = useState(null);
+  const [showActionsMenu, setShowActionsMenu] = useState(false);
 
   // Load all conversations on mount
   useEffect(() => {
@@ -75,6 +87,18 @@ const Messages = () => {
   useEffect(() => {
     scrollToBottom();
   }, [messages, selectedConversation]);
+
+  // Close actions menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showActionsMenu && !event.target.closest('.actions-menu-container')) {
+        setShowActionsMenu(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showActionsMenu]);
 
   // Mark messages as read when conversation is selected
   useEffect(() => {
@@ -152,12 +176,72 @@ const Messages = () => {
       return;
     }
 
+    // Check message safety before sending
+    const safetyCheck = checkMessageSafety(messageText.trim());
+    if (safetyCheck.needsWarning) {
+      setSafetyWarningData({
+        type: safetyCheck.warningType,
+        message: messageText.trim(),
+        patterns: safetyCheck.patterns
+      });
+      setShowSafetyWarning(true);
+      return;
+    }
+
+    // Send message if no safety issues
     const success = sendMessage(selectedConversation.id, messageText.trim());
 
     if (success) {
       setMessageText('');
       sendTypingIndicator(selectedConversation.id, false);
     }
+  };
+
+  const handleSendAnywayAfterWarning = () => {
+    // User chose to send message despite warning
+    const success = sendMessage(selectedConversation.id, safetyWarningData.message);
+
+    if (success) {
+      setMessageText('');
+      sendTypingIndicator(selectedConversation.id, false);
+      setShowSafetyWarning(false);
+      setSafetyWarningData(null);
+    }
+  };
+
+  const handleEditMessageAfterWarning = () => {
+    // User chose to edit - just close modal and let them edit
+    setShowSafetyWarning(false);
+    // Keep the message text so they can edit it
+  };
+
+  const handleBlockUser = () => {
+    setShowActionsMenu(false);
+    setShowBlockModal(true);
+  };
+
+  const handleReportConversation = () => {
+    setShowActionsMenu(false);
+    // Get the last message from the other user to report
+    const lastOtherMessage = conversationMessages
+      .filter(msg => msg.sender_id !== currentUserId)
+      .slice(-1)[0];
+
+    if (lastOtherMessage) {
+      setReportMessageData(lastOtherMessage);
+      setShowReportModal(true);
+    } else {
+      toast.error('No messages to report yet');
+    }
+  };
+
+  const handleBlockSuccess = () => {
+    toast.success('User blocked successfully');
+    // Refresh conversations to update UI
+    loadConversations();
+    // Go back to conversation list
+    setSelectedConversation(null);
+    setShowMobileChat(false);
   };
 
   const handleTyping = (e) => {
@@ -355,42 +439,81 @@ const Messages = () => {
               <>
                 {/* Conversation Header */}
                 <div className="p-4 border-b border-gray-200 bg-light">
-                  <div className="flex items-center space-x-3">
-                    {/* Back button - Only visible on mobile */}
-                    <button
-                      onClick={handleBackToConversations}
-                      className="lg:hidden text-gray-600 hover:text-gray-900 mr-2"
-                    >
-                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                      </svg>
-                    </button>
-                    <div className="relative">
-                      {selectedConversation.profile_picture ? (
-                        <img
-                          src={`${BASE_URL}${selectedConversation.profile_picture}`}
-                          alt={selectedConversation.display_name || selectedConversation.username || selectedConversation.company_name}
-                          className="w-10 h-10 rounded-full object-cover"
-                        />
-                      ) : (
-                        <Avatar
-                          name={selectedConversation.display_name || selectedConversation.username || selectedConversation.company_name || selectedConversation.email}
-                          size="sm"
-                        />
-                      )}
-                      {isUserOnline(selectedConversation.id) && (
-                        <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
-                      )}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-3 flex-1">
+                      {/* Back button - Only visible on mobile */}
+                      <button
+                        onClick={handleBackToConversations}
+                        className="lg:hidden text-gray-600 hover:text-gray-900 mr-2"
+                      >
+                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                        </svg>
+                      </button>
+                      <div className="relative">
+                        {selectedConversation.profile_picture ? (
+                          <img
+                            src={`${BASE_URL}${selectedConversation.profile_picture}`}
+                            alt={selectedConversation.display_name || selectedConversation.username || selectedConversation.company_name}
+                            className="w-10 h-10 rounded-full object-cover"
+                          />
+                        ) : (
+                          <Avatar
+                            name={selectedConversation.display_name || selectedConversation.username || selectedConversation.company_name || selectedConversation.email}
+                            size="sm"
+                          />
+                        )}
+                        {isUserOnline(selectedConversation.id) && (
+                          <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
+                        )}
+                      </div>
+                      <div>
+                        <p className="font-semibold text-gray-900">
+                          {selectedConversation.display_name || selectedConversation.username || selectedConversation.company_name || selectedConversation.email || 'Unknown User'}
+                        </p>
+                        <p className="text-sm text-gray-500">
+                          {isUserOnline(selectedConversation.id)
+                            ? 'Online'
+                            : 'Offline'}
+                        </p>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-semibold text-gray-900">
-                        {selectedConversation.display_name || selectedConversation.username || selectedConversation.company_name || selectedConversation.email || 'Unknown User'}
-                      </p>
-                      <p className="text-sm text-gray-500">
-                        {isUserOnline(selectedConversation.id)
-                          ? 'Online'
-                          : 'Offline'}
-                      </p>
+
+                    {/* Actions Menu */}
+                    <div className="relative actions-menu-container">
+                      <button
+                        onClick={() => setShowActionsMenu(!showActionsMenu)}
+                        className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                        title="More actions"
+                      >
+                        <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+                        </svg>
+                      </button>
+
+                      {/* Actions Dropdown */}
+                      {showActionsMenu && (
+                        <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border border-gray-200 py-1 z-10">
+                          <button
+                            onClick={handleReportConversation}
+                            className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9" />
+                            </svg>
+                            Report User
+                          </button>
+                          <button
+                            onClick={handleBlockUser}
+                            className="w-full px-4 py-2 text-left text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                            </svg>
+                            Block User
+                          </button>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -489,6 +612,39 @@ const Messages = () => {
           </div>
         </div>
       </div>
+
+      {/* Trust & Safety Modals */}
+      <BlockUserModal
+        isOpen={showBlockModal}
+        onClose={() => setShowBlockModal(false)}
+        user={selectedConversation}
+        onBlockSuccess={handleBlockSuccess}
+      />
+
+      <ReportMessageModal
+        isOpen={showReportModal}
+        onClose={() => {
+          setShowReportModal(false);
+          setReportMessageData(null);
+        }}
+        message={reportMessageData}
+        conversationId={selectedConversation?.id}
+        reportedUser={selectedConversation}
+      />
+
+      <SafetyWarningModal
+        isOpen={showSafetyWarning}
+        onClose={() => {
+          setShowSafetyWarning(false);
+          setSafetyWarningData(null);
+          setMessageText(''); // Clear message on cancel
+        }}
+        warningType={safetyWarningData?.type}
+        message={safetyWarningData?.message}
+        detectedPatterns={safetyWarningData?.patterns}
+        onEdit={handleEditMessageAfterWarning}
+        onSendAnyway={handleSendAnywayAfterWarning}
+      />
     </div>
   );
 };

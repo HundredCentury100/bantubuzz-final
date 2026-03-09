@@ -65,7 +65,8 @@
       "Bash(git rm:*)",
       "Bash(del \"d:\\Bantubuzz Platform\\frontend\\src\\constants\\platformConfig.js\")",
       "Bash(if exist \"d:\\Bantubuzz Platform\\frontend\\dist.tar.gz\" del \"d:\\Bantubuzz Platform\\frontend\\dist.tar.gz\")",
-      "Bash(del \"d:\\Bantubuzz Platform\\frontend-dist.tar.gz\")"
+      "Bash(del \"d:\\Bantubuzz Platform\\frontend-dist.tar.gz\")",
+      "Bash(flask db:*)"
     ],
     "deny": [],
     "ask": []

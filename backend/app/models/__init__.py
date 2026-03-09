@@ -25,6 +25,12 @@ from .verification_application import VerificationApplication
 from .thunzi_account import ThunziAccount
 from .connected_platform import ConnectedPlatform
 
+# Trust & Safety models
+from .user_block import UserBlock
+from .message_risk_signal import MessageRiskSignal
+from .message_safety_warning import MessageSafetyWarning
+from .message_report import MessageReport
+
 # Import milestone models BEFORE their parent models
 from .collaboration_milestone import CollaborationMilestone
 from .milestone_deliverable import MilestoneDeliverable
@@ -72,4 +78,8 @@ __all__ = [
     'CampaignMilestone',
     'ThunziAccount',
     'ConnectedPlatform',
+    'UserBlock',
+    'MessageRiskSignal',
+    'MessageSafetyWarning',
+    'MessageReport',
 ]
