@@ -55,64 +55,63 @@ const CreatorDashboard = () => {
 
   const fetchDashboardData = async () => {
     try {
-      // Fetch profile
-      const profileRes = await creatorsAPI.getOwnProfile();
-      setProfile(profileRes.data);
+      // Fetch all data in parallel for faster loading
+      const [
+        profileRes,
+        packagesRes,
+        bookingsRes,
+        applicationsRes,
+        subsRes,
+        verRes,
+        verSubRes,
+        platformsRes
+      ] = await Promise.allSettled([
+        creatorsAPI.getOwnProfile(),
+        packagesAPI.getMyPackages(),
+        bookingsAPI.getMyBookings(),
+        campaignsAPI.getMyApplications({ limit: 5 }),
+        api.get('/subscriptions/my-subscription'),
+        api.get('/creator/verification/status'),
+        api.get('/creator/subscriptions/my-subscription'),
+        api.get('/creator/platforms')
+      ]);
 
-      // Fetch subscription
-      try {
-        const subsRes = await api.get('/subscriptions/my-subscription');
-        setSubscription(subsRes.data.data);
-      } catch (error) {
-        console.error('Error fetching subscription:', error);
-        // Don't fail dashboard load if subscription fails
+      // Handle profile
+      if (profileRes.status === 'fulfilled') {
+        setProfile(profileRes.value.data);
       }
 
-      // Fetch verification status
-      try {
-        const verRes = await api.get('/creator/verification/status');
-        setVerificationStatus(verRes.data);
-      } catch (error) {
-        console.error('Error fetching verification:', error);
-        // Don't fail dashboard load if verification fails
-      }
-
-      // Fetch verification subscription status
-      try {
-        const verSubRes = await api.get('/creator/subscriptions/my-subscription');
-        if (verSubRes.data.success && verSubRes.data.data.has_subscription) {
-          setVerificationSubscription(verSubRes.data.data.subscription);
-        }
-      } catch (error) {
-        console.error('Error fetching verification subscription:', error);
-        // Don't fail dashboard load if verification subscription fails
-      }
-
-      // Fetch connected platforms
-      try {
-        const platformsRes = await api.get('/creator/platforms');
-        if (platformsRes.data.success) {
-          setConnectedPlatforms(platformsRes.data.platforms || []);
-        }
-      } catch (error) {
-        console.error('Error fetching connected platforms:', error);
-        // Don't fail dashboard load if platforms fail
-      }
-
-      // Fetch packages
-      const packagesRes = await packagesAPI.getMyPackages();
-      const pkgs = packagesRes.data.packages || [];
+      // Handle packages
+      const pkgs = packagesRes.status === 'fulfilled' ? (packagesRes.value.data.packages || []) : [];
       setPackages(pkgs.slice(0, 3)); // Show only 3 recent
 
-      // Fetch bookings
-      const bookingsRes = await bookingsAPI.getMyBookings();
-      const bks = bookingsRes.data.bookings || [];
+      // Handle bookings
+      const bks = bookingsRes.status === 'fulfilled' ? (bookingsRes.value.data.bookings || []) : [];
       setBookings(bks.slice(0, 5)); // Show only 5 recent
 
-      // Fetch campaign applications
-      const applicationsRes = await campaignsAPI.getMyApplications({ limit: 5 });
-      const apps = applicationsRes.data.applications || [];
+      // Handle applications
+      const apps = applicationsRes.status === 'fulfilled' ? (applicationsRes.value.data.applications || []) : [];
       setApplications(apps);
+
+      // Handle subscription
+      if (subsRes.status === 'fulfilled') {
+        setSubscription(subsRes.value.data.data);
+      }
+
+      // Handle verification status
+      if (verRes.status === 'fulfilled') {
+        setVerificationStatus(verRes.value.data);
+      }
+
+      // Handle verification subscription
+      if (verSubRes.status === 'fulfilled' && verSubRes.value.data.success && verSubRes.value.data.data.has_subscription) {
+        setVerificationSubscription(verSubRes.value.data.data.subscription);
+      }
+
+      // Handle connected platforms
+      if (platformsRes.status === 'fulfilled' && platformsRes.value.data.success) {
+        setConnectedPlatforms(platformsRes.value.data.platforms || []);
+      }
 
       // Calculate stats
       const activePackages = pkgs.filter(p => p.is_active).length;
