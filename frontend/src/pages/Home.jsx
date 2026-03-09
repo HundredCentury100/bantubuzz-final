@@ -95,45 +95,7 @@ const Home = () => {
     }
   };
 
-  // Auto-scroll functionality for categories (desktop only)
-  useEffect(() => {
-    const scrollContainer = scrollContainerRef.current;
-    if (!scrollContainer || categories.length === 0) return;
-
-    // Only enable auto-scroll on desktop (width >= 1024px)
-    const isDesktop = window.innerWidth >= 1024;
-    if (!isDesktop) return;
-
-    let scrollAmount = 0;
-    const scrollSpeed = 1; // pixels per frame
-    const maxScroll = scrollContainer.scrollWidth - scrollContainer.clientWidth;
-
-    const autoScroll = () => {
-      scrollAmount += scrollSpeed;
-      if (scrollAmount >= maxScroll) {
-        scrollAmount = 0; // Reset to beginning
-      }
-      scrollContainer.scrollLeft = scrollAmount;
-    };
-
-    const interval = setInterval(autoScroll, 30);
-
-    // Pause auto-scroll on hover
-    const handleMouseEnter = () => clearInterval(interval);
-    const handleMouseLeave = () => {
-      const newInterval = setInterval(autoScroll, 30);
-      return () => clearInterval(newInterval);
-    };
-
-    scrollContainer.addEventListener('mouseenter', handleMouseEnter);
-    scrollContainer.addEventListener('mouseleave', handleMouseLeave);
-
-    return () => {
-      clearInterval(interval);
-      scrollContainer.removeEventListener('mouseenter', handleMouseEnter);
-      scrollContainer.removeEventListener('mouseleave', handleMouseLeave);
-    };
-  }, [categories]);
+  // Removed auto-scroll - categories now scroll manually only on all devices
 
   const handleSearch = (e) => {
     e.preventDefault();
