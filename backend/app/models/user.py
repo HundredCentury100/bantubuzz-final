@@ -24,6 +24,11 @@ class User(db.Model):
     google_profile_picture = db.Column(db.String(500), nullable=True)
     # Phone number
     phone_number = db.Column(db.String(20), nullable=True)
+    # Trust & Safety - Moderation restrictions
+    is_messaging_restricted = db.Column(db.Boolean, default=False, nullable=False)
+    messaging_restricted_until = db.Column(db.DateTime, nullable=True)
+    is_account_suspended = db.Column(db.Boolean, default=False, nullable=False)
+    account_suspended_until = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -79,6 +84,10 @@ class User(db.Model):
             'phone_number': self.phone_number,
             'has_google_oauth': bool(self.google_oauth_id),
             'google_profile_picture': self.google_profile_picture,
+            'is_messaging_restricted': self.is_messaging_restricted,
+            'messaging_restricted_until': self.messaging_restricted_until.isoformat() if self.messaging_restricted_until else None,
+            'is_account_suspended': self.is_account_suspended,
+            'account_suspended_until': self.account_suspended_until.isoformat() if self.account_suspended_until else None,
             'last_login': self.last_login.isoformat() if self.last_login else None,
             'created_at': self.created_at.isoformat(),
             'updated_at': self.updated_at.isoformat()
