@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
 import api from '../services/api';
+import AdminLayout from '../components/admin/AdminLayout';
 import AdminReportReviewModal from '../components/AdminReportReviewModal';
 
 const AdminModeration = () => {
@@ -117,18 +118,20 @@ const AdminModeration = () => {
 
   if (!stats) {
     return (
-      <div className="min-h-screen bg-light flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p className="text-dark">Loading moderation dashboard...</p>
+      <AdminLayout>
+        <div className="flex items-center justify-center min-h-[60vh]">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-dark">Loading moderation dashboard...</p>
+          </div>
         </div>
-      </div>
+      </AdminLayout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-light py-8">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <AdminLayout>
+      <div className="space-y-6">
         {/* Header */}
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-dark">Trust & Safety Moderation</h1>
@@ -352,17 +355,17 @@ const AdminModeration = () => {
             </div>
           )}
         </div>
-      </div>
 
-      {/* Report Review Modal */}
-      {showReviewModal && selectedReport && (
-        <AdminReportReviewModal
-          report={selectedReport}
-          onClose={() => setShowReviewModal(false)}
-          onActionTaken={handleActionTaken}
-        />
-      )}
-    </div>
+        {/* Report Review Modal */}
+        {showReviewModal && selectedReport && (
+          <AdminReportReviewModal
+            report={selectedReport}
+            onClose={() => setShowReviewModal(false)}
+            onActionTaken={handleActionTaken}
+          />
+        )}
+      </div>
+    </AdminLayout>
   );
 };
 
