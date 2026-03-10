@@ -29,7 +29,7 @@ const ReportMessageModal = ({ isOpen, onClose, message, conversationId, reported
       setLoading(true);
 
       const token = localStorage.getItem('token');
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/messaging/report`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/messaging/report`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,

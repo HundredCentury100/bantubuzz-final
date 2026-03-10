@@ -31,7 +31,7 @@ const SafetyWarningModal = ({ isOpen, onClose, warningType, message, detectedPat
     try {
       // Log warning to backend
       const token = localStorage.getItem('token');
-      await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/messaging/safety/log-warning`, {
+      await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/messaging/safety/log-warning`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -56,7 +56,7 @@ const SafetyWarningModal = ({ isOpen, onClose, warningType, message, detectedPat
   const handleEdit = () => {
     // Log that user chose to edit
     const token = localStorage.getItem('token');
-    fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/messaging/safety/log-warning`, {
+    fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/messaging/safety/log-warning`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,
@@ -77,7 +77,7 @@ const SafetyWarningModal = ({ isOpen, onClose, warningType, message, detectedPat
   const handleCancel = () => {
     // Log that user cancelled
     const token = localStorage.getItem('token');
-    fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/messaging/safety/log-warning`, {
+    fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/messaging/safety/log-warning`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${token}`,

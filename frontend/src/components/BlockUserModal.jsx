@@ -11,7 +11,7 @@ const BlockUserModal = ({ isOpen, onClose, user, onBlockSuccess }) => {
       setLoading(true);
 
       const token = localStorage.getItem('token');
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/messaging/block/${user.id}`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/messaging/block/${user.id}`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,

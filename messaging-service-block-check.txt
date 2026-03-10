@@ -1,0 +1,97 @@
+  // Handle sending messages
+  socket.on('send_message', async (data) => {
+    try {
+      const { receiverId, content, bookingId } = data;
+
+      if (!socket.userId) {
+        socket.emit('error', { message: 'Not authenticated' });
+        return;
+      }
+
+      // ============ NEW: Check for block status ============
+      const blockCheckQuery = `
+        SELECT EXISTS (
+          SELECT 1 FROM user_blocks
+          WHERE (
+            (blocker_user_id = $1 AND blocked_user_id = $2) OR
+            (blocker_user_id = $2 AND blocked_user_id = $1)
+          )
+          AND is_active = true
+        ) as is_blocked
+      `;
+
+      const blockCheckResult = await pool.query(blockCheckQuery, [socket.userId, receiverId]);
+
+      if (blockCheckResult.rows[0].is_blocked) {
+        socket.emit('error', {
+          message: 'Cannot send message. This conversation has been blocked.',
+          code: 'BLOCKED'
+        });
+        return;
+      }
+      // ============ END NEW CODE ============
+
+      // Save message to database (PostgreSQL)
+      const insertQuery = `
+        INSERT INTO messages (sender_id, receiver_id, booking_id, content, is_read, created_at)
+        VALUES ($1, $2, $3, $4, $5, NOW())
+        RETURNING id
+      `;
+
+      const insertResult = await pool.query(insertQuery, [socket.userId, receiverId, bookingId || null, content, false]);
+      const messageId = insertResult.rows[0].id;
+
+      // Fetch the complete message with sender info
+      const fetchQuery = `
+        SELECT m.*,
+               u.email as sender_email,
+               u.user_type as sender_type,
+               CASE
+                 WHEN u.user_type = 'brand' THEN bp.company_name
+                 WHEN u.user_type = 'creator' THEN cpr.username
+                 ELSE NULL
+               END as sender_name
+        FROM messages m
+        JOIN users u ON m.sender_id = u.id
+        LEFT JOIN brand_profiles bp ON bp.user_id = u.id AND u.user_type = 'brand'
+        LEFT JOIN creator_profiles cpr ON cpr.user_id = u.id AND u.user_type = 'creator'
+        WHERE m.id = $1
+      `;
+
+      const fetchResult = await pool.query(fetchQuery, [messageId]);
+      const message = fetchResult.rows[0];
+
+      const messageData = {
+        id: message.id,
+        sender_id: message.sender_id,
+        receiver_id: message.receiver_id,
+        booking_id: message.booking_id,
+        custom_request_id: message.custom_request_id,
+        custom_offer_id: message.custom_offer_id,
+        message_type: message.message_type || 'text',
+        content: message.content,
+        is_read: message.is_read,
+        attachment_url: message.attachment_url,
+        created_at: message.created_at,
+        sender: {
+          email: message.sender_email,
+          user_type: message.sender_type,
+          name: message.sender_name
+        }
+      };
+
+      // Send to sender (confirmation)
+      socket.emit('message_sent', messageData);
+
+      // Send to receiver if online
+      const receiverSocketId = activeUsers.get(receiverId.toString());
+      if (receiverSocketId) {
+        io.to(receiverSocketId).emit('new_message', messageData);
+      }
+
+      console.log(`Message ${messageId} sent from ${socket.userId} to ${receiverId}`);
+    } catch (error) {
+      console.error('Error in send_message:', error);
+      socket.emit('error', { message: 'Server error' });
+    }
+  });
