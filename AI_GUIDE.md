@@ -1,6 +1,6 @@
 # 🤖 AI Assistant Guide for BantuBuzz Platform
 
-**Last Updated**: March 9, 2026
+**Last Updated**: March 10, 2026
 **Purpose**: Complete context and guidelines for AI assistants working on this project
 
 ---
@@ -2587,6 +2587,278 @@ All payment page navigations MUST use the route format: `/bookings/${bookingId}/
 - **Error messages reveal exact issues: "Can't flag attribute modified" = JSON field tracking problem**
 - User questions often reveal critical implementation details
 
+### Phase 7: Trust & Safety System (Complete - March 10, 2026)
+
+**Complete messaging safety infrastructure implementation providing user protection and content moderation.**
+
+#### Backend Implementation (100% Complete)
+
+**Safety Detection Engine**:
+- AI-powered content analysis for harmful language, PII, scams, and inappropriate content
+- Pattern-based detection using regex for URLs, emails, phone numbers, addresses
+- Keyword-based flagging for violence, harassment, sexual content, drugs, threats
+- Scam detection (prize claims, urgent requests, fake identity, financial schemes)
+- Returns severity (low/medium/high) and detected pattern types
+- File: `backend/app/services/messaging_safety.py` (360+ lines)
+
+**Database Schema**:
+```sql
+-- User-reported messages
+CREATE TABLE message_reports (
+    id SERIAL PRIMARY KEY,
+    conversation_id INTEGER REFERENCES conversations(id),
+    reporter_user_id INTEGER REFERENCES users(id),
+    reported_user_id INTEGER REFERENCES users(id),
+    category VARCHAR(50),  -- harassment, spam, scam, inappropriate, other
+    description TEXT,
+    status VARCHAR(20) DEFAULT 'pending',  -- pending, reviewed, action_taken, dismissed
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- User blocking relationships
+CREATE TABLE user_blocks (
+    id SERIAL PRIMARY KEY,
+    blocker_user_id INTEGER REFERENCES users(id),
+    blocked_user_id INTEGER REFERENCES users(id),
+    conversation_id INTEGER REFERENCES conversations(id),
+    reason TEXT,
+    is_active BOOLEAN DEFAULT true,
+    created_at TIMESTAMP DEFAULT NOW(),
+    UNIQUE(blocker_user_id, blocked_user_id)
+);
+
+-- Safety warning logs
+CREATE TABLE safety_warnings (
+    id SERIAL PRIMARY KEY,
+    sender_user_id INTEGER REFERENCES users(id),
+    receiver_user_id INTEGER REFERENCES users(id),
+    conversation_id INTEGER REFERENCES conversations(id),
+    message_content TEXT,
+    detected_issues JSONB,  -- {severity, patterns, reasons}
+    user_action VARCHAR(20),  -- edited, cancelled, sent_anyway
+    created_at TIMESTAMP DEFAULT NOW()
+);
+```
+
+**API Endpoints** (`backend/app/routes/messaging_safety.py`):
+```python
+POST   /api/messaging/report           # Report conversation/user
+POST   /api/messaging/block/:userId    # Block user
+DELETE /api/messaging/block/:userId    # Unblock user
+GET    /api/messaging/blocked          # List blocked users
+GET    /api/messaging/blocked/:userId  # Check if user is blocked
+POST   /api/messaging/safety/analyze   # Analyze message content (real-time)
+POST   /api/messaging/safety/log-warning  # Log safety warning interaction
+```
+
+#### Frontend Implementation (100% Complete)
+
+**Safety Warning Modal** (`frontend/src/components/SafetyWarningModal.jsx`):
+- Red warning modal appears when harmful content detected
+- Shows severity level and detected patterns
+- Three action options:
+  - "Edit Message" - Returns to conversation with message in input
+  - "Cancel" - Clears message and closes modal
+  - "Send Anyway" - Logs warning and sends message
+- Real-time content analysis before sending
+- Prevents accidental harmful messages
+
+**Report Message Modal** (`frontend/src/components/ReportMessageModal.jsx`):
+- Accessible from conversation 3-dot menu
+- Category selection: harassment, spam, scam, inappropriate, other
+- Optional description field
+- Submits report to admin review queue
+- Success toast confirmation
+- Fixed API URL duplication bug (March 10)
+
+**Block User Modal** (`frontend/src/components/BlockUserModal.jsx`):
+- Confirmation modal with warning about blocking effects
+- Blocks bidirectional messaging (both users can't message each other)
+- Optional reason field
+- Success toast confirmation
+- Fixed API URL duplication bug (March 10)
+
+**Blocked Users Management Page** (`frontend/src/pages/BlockedUsers.jsx`, 262 lines, NEW):
+- Dedicated page at `/blocked-users` route
+- Lists all blocked users with avatars and usernames
+- Unblock functionality with confirmation
+- Empty state UI when no users are blocked
+- Loading states and error handling
+- Responsive design matching platform theme
+- Proper API URL pattern (no duplication)
+
+**Integration Points**:
+- Messages page: Report and Block options in conversation menu
+- Navbar: Link to blocked users management (for authenticated users)
+- Real-time: Safety check runs before every message send
+- Route: `/blocked-users` added to App.jsx (line 563)
+
+#### Messaging Service Integration (100% Complete)
+
+**Real-Time Block Checking** (`messaging-service/server.js`, lines 108-128):
+```javascript
+// Check if either user has blocked the other
+const blockCheckQuery = `
+  SELECT EXISTS (
+    SELECT 1 FROM user_blocks
+    WHERE (
+      (blocker_user_id = $1 AND blocked_user_id = $2) OR
+      (blocker_user_id = $2 AND blocked_user_id = $1)
+    )
+    AND is_active = true
+  ) as is_blocked
+`;
+
+const blockCheckResult = await pool.query(blockCheckQuery, [socket.userId, receiverId]);
+
+if (blockCheckResult.rows[0].is_blocked) {
+  socket.emit('error', {
+    message: 'Cannot send message. This conversation has been blocked.',
+    code: 'BLOCKED'
+  });
+  return;
+}
+```
+
+**Features**:
+- Block check runs BEFORE message saves to database
+- Bidirectional check (works if either user blocks the other)
+- Immediate error response to sender
+- Silent blocking (blocked user not notified)
+- PM2 managed service (always running)
+
+#### Critical Bug Fix - API URL Duplication (March 10, 2026)
+
+**Problem**: "Resource not found" (404) when trying to report messages
+
+**Root Cause**:
+```javascript
+// Environment variable:
+VITE_API_URL=https://bantubuzz.com/api  // Already includes /api
+
+// Code was adding /api again:
+fetch(`${VITE_API_URL}/api/messaging/report`)  // ❌ Results in /api/api/messaging/report
+
+// Correct pattern:
+fetch(`${VITE_API_URL}/messaging/report`)  // ✅ Results in /api/messaging/report
+```
+
+**Files Fixed** (4 files, 7 fetch calls):
+1. `frontend/src/components/ReportMessageModal.jsx:32` - URL fix
+2. `frontend/src/components/BlockUserModal.jsx:14` - URL fix
+3. `frontend/src/components/SafetyWarningModal.jsx:34,59,80` - URL fixes (3 instances)
+4. `frontend/src/pages/BlockedUsers.jsx:30,54` - Correct pattern used from creation
+
+**Pattern for Future Development**:
+```javascript
+// ✅ CORRECT - VITE_API_URL already has /api
+fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/messaging/report`)
+// Result: https://bantubuzz.com/api/messaging/report
+
+// ❌ WRONG - Duplicate /api
+fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/messaging/report`)
+// Result: https://bantubuzz.com/api/api/messaging/report (404)
+```
+
+**Note**: Axios uses `baseURL` from `api.js` (includes `/api`), so routes don't need prefix. Fetch needs full URL but VITE_API_URL already has `/api` - don't add it again.
+
+#### Deployment Status
+
+**Git**:
+- Branch: `feature/trust-safety-system`
+- Commit: `5657528` - "Complete Phase 1B: Fix API URL bugs, add blocked users page, integrate messaging service block checking"
+- 11 files changed, 2,291 insertions, 5 deletions
+- Pushed to remote: March 10, 2026
+
+**Production**:
+- Frontend: Deployed March 10, 13:37 (tar.gz method)
+- Backend: Already active (Flask routes working)
+- Messaging Service: Online (PM2 running, block checking active)
+- All features tested and working
+
+**Files Modified/Created**:
+- Modified: ReportMessageModal.jsx, BlockUserModal.jsx, SafetyWarningModal.jsx, App.jsx, messaging-server.js
+- Created: BlockedUsers.jsx (NEW page, 262 lines)
+
+#### Known Limitations & Future Work
+
+**Not in Phase 1 Scope** (requires Phase 4 Admin Dashboard):
+- ❌ No admin dashboard to review reports
+- ❌ No enforcement actions from reports (warnings, restrictions, bans)
+- ❌ No message-level reporting (only conversation-level)
+- ❌ No blocked status indicator in conversation UI
+- ❌ No user risk profiles
+- ❌ No automated enforcement
+
+**Why These Are Acceptable**:
+- Reports are being collected and stored correctly
+- Users can block problematic users immediately (self-protection)
+- Safety warnings prevent accidental harmful messages
+- Admin dashboard (Phase 4) will make reports actionable
+- All data is logged for future enforcement
+
+#### Testing Checklist
+
+1. **Report Message**: https://bantubuzz.com/messages
+   - Open conversation → 3-dot menu → "Report User"
+   - Select category and submit
+   - Verify no 404 error, success toast appears
+
+2. **Block User**: https://bantubuzz.com/messages
+   - Open conversation → 3-dot menu → "Block User"
+   - Confirm block
+   - Verify success toast
+
+3. **Blocked Users Page**: https://bantubuzz.com/blocked-users
+   - View blocked users list
+   - Test unblock functionality
+   - Check empty state
+
+4. **Safety Warnings**: https://bantubuzz.com/messages
+   - Type harmful message (e.g., "I will kill you")
+   - Verify red warning modal appears
+   - Test edit/cancel/send anyway options
+
+5. **Real-Time Blocking**: https://bantubuzz.com/messages
+   - Block a user
+   - Try sending them a message
+   - Verify error: "Cannot send message. This conversation has been blocked."
+
+#### Technical Patterns & Learnings
+
+**Content Safety Detection**:
+- Run analysis client-side before sending (better UX)
+- Show warnings proactively (educate users)
+- Allow override with logging (track risky behavior)
+- Never block legitimate messages (false positives exist)
+
+**Block Checking**:
+- Always bidirectional (either user blocking prevents both)
+- Use EXISTS for performance (vs COUNT)
+- Check BEFORE database writes (prevent any data creation)
+- Silent blocking (don't notify blocked user)
+
+**API URL Patterns**:
+- Environment variables may already include path prefixes
+- Check .env before adding paths in code
+- Axios baseURL vs fetch URL handling differs
+- Test with full URLs in production to catch duplications
+
+**User Safety Philosophy**:
+- Empower users with self-protection tools (blocking)
+- Warn before harmful actions (safety modal)
+- Log everything for admin review (future enforcement)
+- Balance safety with free expression (allow override)
+
+#### Documentation Created
+
+- `PHASE_1B_DEPLOYMENT_STATUS.md` - Full deployment status, testing guide
+- `DEBUGGING_REPORT_ISSUE.md` - URL bug investigation details
+- `TEST_SAFETY_DETECTION.md` - Safety detection test cases
+- `REMAINING_WORK.md` - Full phase breakdown
+
+---
+
 ### Current State (Mar 2026)
 ✅ Fully functional platform
 ✅ Complete subscription systems (brand + creator)
@@ -2615,6 +2887,11 @@ All payment page navigations MUST use the route format: `/bookings/${bookingId}/
 ✅ Password visibility toggles on all auth forms
 ✅ Category filtering working with URL params
 ✅ Verification subscription check before application
+✅ **Trust & Safety System - Phase 1 & 1B complete (March 10, 2026)**
+  - Message reporting, user blocking, blocked users management
+  - Content safety detection with warnings
+  - Real-time block checking in messaging service
+  - All production bugs fixed (API URL duplication)
 🔄 ThunziAI analytics dashboards - Phase 2 (in progress)
 
 ---

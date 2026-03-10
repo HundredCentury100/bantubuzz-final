@@ -71,6 +71,7 @@ import AdminBookings from './pages/AdminBookings';
 import AdminCampaigns from './pages/AdminCampaigns';
 import AdminPayments from './pages/AdminPayments';
 import AdminReviews from './pages/AdminReviews';
+import AdminModeration from './pages/AdminModeration';
 
 // Wallet Pages
 import Wallet from './pages/Wallet';
@@ -727,6 +728,14 @@ function App() {
         element={
           <AdminRoute>
             <AdminReviews />
+          </AdminRoute>
+        }
+      />
+      <Route
+        path="/admin/moderation"
+        element={
+          <AdminRoute>
+            <AdminModeration />
           </AdminRoute>
         }
       />
