@@ -29,5 +29,6 @@ from . import reports
 from . import subscriptions
 from . import payments
 from . import moderation
+from . import support
 
 __all__ = ['bp']
