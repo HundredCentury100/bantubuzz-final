@@ -158,6 +158,12 @@ const Navbar = () => {
                     Wallet
                   </Link>
                 )}
+                <Link
+                  to="/my-tickets"
+                  className="text-gray-700 hover:text-gray-900 transition-colors text-sm font-medium"
+                >
+                  Support
+                </Link>
 
                 {/* Notification Bell */}
                 <NotificationBell />
@@ -354,6 +360,18 @@ const Navbar = () => {
                             )}
                           </Menu.Item>
                         )}
+                        <Menu.Item>
+                          {({ active }) => (
+                            <Link
+                              to="/my-tickets"
+                              className={`${
+                                active ? 'bg-light' : ''
+                              } block px-4 py-2 text-sm text-gray-700 rounded-lg`}
+                            >
+                              Support
+                            </Link>
+                          )}
+                        </Menu.Item>
                         <Menu.Item>
                           {({ active }) => (
                             <button
