@@ -19,6 +19,7 @@ import {
   CreditCardIcon,
   CheckBadgeIcon,
   ShieldExclamationIcon,
+  LifebuoyIcon,
 } from '@heroicons/react/24/outline';
 
 const AdminLayout = ({ children }) => {
@@ -35,6 +36,7 @@ const AdminLayout = ({ children }) => {
     { name: 'Activity Feed', href: '/admin/activity', icon: BoltIcon },
     { name: 'Disputes', href: '/admin/disputes', icon: ScaleIcon },
     { name: 'Moderation', href: '/admin/moderation', icon: ShieldExclamationIcon },
+    { name: 'Support Tickets', href: '/admin/support', icon: LifebuoyIcon },
     { name: 'Subscriptions', href: '/admin/subscriptions', icon: CreditCardIcon },
     { name: 'Payments', href: '/admin/payments', icon: BanknotesIcon },
     { name: 'Reports', href: '/admin/reports', icon: ChartBarIcon },
