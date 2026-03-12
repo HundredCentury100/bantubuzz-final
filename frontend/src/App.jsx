@@ -97,6 +97,13 @@ import SubscriptionPaymentReturn from './pages/SubscriptionPaymentReturn';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfService from './pages/TermsOfService';
 
+// Support Pages
+import HelpCenter from './pages/HelpCenter';
+import SubmitTicket from './pages/SubmitTicket';
+import MyTickets from './pages/MyTickets';
+import TicketDetail from './pages/TicketDetail';
+import AdminSupport from './pages/AdminSupport';
+
 // Protected Route Component
 const ProtectedRoute = ({ children, requiredType }) => {
   const { isAuthenticated, user, loading } = useAuth();
@@ -739,6 +746,14 @@ function App() {
           </AdminRoute>
         }
       />
+      <Route
+        path="/admin/support"
+        element={
+          <AdminRoute>
+            <AdminSupport />
+          </AdminRoute>
+        }
+      />
       <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
 
       {/* Public Info Pages */}
@@ -770,6 +785,33 @@ function App() {
       <Route
         path="/subscription/payment/return"
         element={<SubscriptionPaymentReturn />}
+      />
+
+      {/* Support Routes */}
+      <Route path="/help-center" element={<HelpCenter />} />
+      <Route
+        path="/help-center/submit"
+        element={
+          <ProtectedRoute>
+            <SubmitTicket />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/my-tickets"
+        element={
+          <ProtectedRoute>
+            <MyTickets />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/tickets/:id"
+        element={
+          <ProtectedRoute>
+            <TicketDetail />
+          </ProtectedRoute>
+        }
       />
 
       {/* 404 */}
