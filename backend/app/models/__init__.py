@@ -31,6 +31,11 @@ from .message_risk_signal import MessageRiskSignal
 from .message_safety_warning import MessageSafetyWarning
 from .message_report import MessageReport
 
+# Support Ticket models
+from .support_ticket import SupportTicket
+from .support_ticket_message import SupportTicketMessage
+from .support_ticket_attachment import SupportTicketAttachment
+
 # Import milestone models BEFORE their parent models
 from .collaboration_milestone import CollaborationMilestone
 from .milestone_deliverable import MilestoneDeliverable
@@ -82,4 +87,7 @@ __all__ = [
     'MessageRiskSignal',
     'MessageSafetyWarning',
     'MessageReport',
+    'SupportTicket',
+    'SupportTicketMessage',
+    'SupportTicketAttachment',
 ]
