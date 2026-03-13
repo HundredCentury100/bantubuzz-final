@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
-import { toast } from 'react-toastify';
+import toast from 'react-hot-toast';
 import { collaborationsAPI } from '../services/api';
 import MetricCard from './MetricCard';
 import SentimentChart from './SentimentChart';
