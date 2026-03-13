@@ -1408,3 +1408,361 @@ def approve_milestone_deliverable(collab_id, milestone_id, deliverable_id):
         import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
+
+
+@bp.route('/<int:collab_id>/deliverables/<int:deliverable_id>/submit-url', methods=['PUT'])
+@jwt_required()
+def submit_package_deliverable_url(collab_id, deliverable_id):
+    """
+    Submit post URL for a package deliverable (creator only)
+
+    For package-based collaborations, deliverables are stored in JSON.
+    This endpoint updates the deliverable's URL and parses it for analytics.
+
+    Part of: Brand Analytics Implementation - Phase 1
+    """
+    try:
+        from flask import current_app
+        from app.utils.post_url_parser import PostURLParser
+        import traceback
+
+        user_id = int(get_jwt_identity())
+        creator = CreatorProfile.query.filter_by(user_id=user_id).first()
+
+        if not creator:
+            return jsonify({'error': 'Creator profile not found'}), 404
+
+        collaboration = Collaboration.query.get(collab_id)
+        if not collaboration:
+            return jsonify({'error': 'Collaboration not found'}), 404
+
+        if collaboration.creator_id != creator.id:
+            return jsonify({'error': 'Unauthorized'}), 403
+
+        data = request.get_json()
+        post_url = data.get('post_url')
+
+        if not post_url:
+            return jsonify({'error': 'Post URL is required'}), 400
+
+        # Find the deliverable in submitted_deliverables
+        submitted_deliverables = collaboration.submitted_deliverables or []
+        deliverable = None
+        deliverable_index = None
+
+        for idx, d in enumerate(submitted_deliverables):
+            if d.get('id') == deliverable_id:
+                deliverable = d
+                deliverable_index = idx
+                break
+
+        if not deliverable:
+            return jsonify({'error': 'Deliverable not found'}), 404
+
+        # Parse and validate URL using PostURLParser
+        parsed = PostURLParser.parse_url(post_url)
+
+        if parsed:
+            # Update deliverable with parsed data
+            deliverable['url'] = post_url
+            deliverable['post_platform'] = parsed['platform']
+            deliverable['post_id'] = parsed['post_id']
+            deliverable['post_url_validated'] = True
+            deliverable['url_submitted_at'] = datetime.utcnow().isoformat()
+
+            # Update the deliverable in the list
+            submitted_deliverables[deliverable_index] = deliverable
+            collaboration.submitted_deliverables = submitted_deliverables
+
+            # Mark as modified for SQLAlchemy
+            from sqlalchemy.orm.attributes import flag_modified
+            flag_modified(collaboration, 'submitted_deliverables')
+
+            db.session.commit()
+
+            current_app.logger.info(
+                f"Package deliverable URL submitted: CollabID={collab_id}, DeliverableID={deliverable_id}, "
+                f"Platform={parsed['platform']}, PostID={parsed['post_id']}"
+            )
+
+            return jsonify({
+                'success': True,
+                'message': 'Post URL submitted and validated successfully',
+                'deliverable': deliverable,
+                'parsed': {
+                    'platform': parsed['platform'],
+                    'post_id': parsed['post_id'],
+                    'validated': True
+                }
+            }), 200
+        else:
+            current_app.logger.warning(
+                f"Failed to parse package deliverable URL: CollabID={collab_id}, DeliverableID={deliverable_id}, URL={post_url}"
+            )
+
+            return jsonify({
+                'success': False,
+                'error': 'Invalid social media URL',
+                'message': 'Please enter a valid URL from Instagram, Facebook, YouTube, TikTok, or Twitter/X'
+            }), 400
+
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(
+            f"Error submitting package deliverable URL: {str(e)}\n{traceback.format_exc()}"
+        )
+        return jsonify({'error': str(e)}), 500
+
+
+@bp.route('/<int:collab_id>/milestones/<int:milestone_id>/deliverables/<int:deliverable_id>/submit-url', methods=['PUT'])
+@jwt_required()
+def submit_deliverable_url(collab_id, milestone_id, deliverable_id):
+    """
+    Submit post URL for a deliverable (creator only)
+
+    This endpoint allows creators to paste social media post URLs (Instagram, Facebook,
+    YouTube, TikTok, Twitter) which are then validated and parsed to extract platform
+    and post ID for analytics tracking via ThunziAI.
+
+    Part of: Brand Analytics Implementation - Phase 1
+    """
+    try:
+        from flask import current_app
+        import traceback
+
+        user_id = int(get_jwt_identity())
+        creator = CreatorProfile.query.filter_by(user_id=user_id).first()
+
+        if not creator:
+            return jsonify({'error': 'Creator profile not found'}), 404
+
+        collaboration = Collaboration.query.get(collab_id)
+        if not collaboration:
+            return jsonify({'error': 'Collaboration not found'}), 404
+
+        if collaboration.creator_id != creator.id:
+            return jsonify({'error': 'Unauthorized'}), 403
+
+        milestone = CollaborationMilestone.query.get(milestone_id)
+        if not milestone or milestone.collaboration_id != collab_id:
+            return jsonify({'error': 'Milestone not found'}), 404
+
+        deliverable = MilestoneDeliverable.query.get(deliverable_id)
+        if not deliverable or deliverable.collaboration_milestone_id != milestone.id:
+            return jsonify({'error': 'Deliverable not found'}), 404
+
+        data = request.get_json()
+        post_url = data.get('post_url')
+
+        if not post_url:
+            return jsonify({'error': 'Post URL is required'}), 400
+
+        # Update deliverable URL
+        deliverable.url = post_url
+
+        # Parse and validate URL
+        if deliverable.parse_and_validate_url():
+            db.session.commit()
+
+            current_app.logger.info(
+                f"Deliverable URL submitted: ID={deliverable_id}, "
+                f"Platform={deliverable.post_platform}, PostID={deliverable.post_id}"
+            )
+
+            return jsonify({
+                'success': True,
+                'message': 'Post URL submitted and validated successfully',
+                'deliverable': deliverable.to_dict(),
+                'parsed': {
+                    'platform': deliverable.post_platform,
+                    'post_id': deliverable.post_id,
+                    'validated': deliverable.post_url_validated
+                }
+            }), 200
+        else:
+            current_app.logger.warning(
+                f"Failed to parse deliverable URL: ID={deliverable_id}, URL={post_url}"
+            )
+
+            return jsonify({
+                'success': False,
+                'error': 'Invalid social media URL',
+                'message': 'Please enter a valid URL from Instagram, Facebook, YouTube, TikTok, or Twitter/X'
+            }), 400
+
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(
+            f"Error submitting deliverable URL: {str(e)}\n{traceback.format_exc()}"
+        )
+        return jsonify({'error': str(e)}), 500
+
+
+# ============================================================================
+# POST METRICS SYNC ENDPOINTS (Brand Analytics - Phase 2)
+# ============================================================================
+
+@bp.route('/<int:collab_id>/milestones/<int:milestone_id>/deliverables/<int:deliverable_id>/sync-metrics', methods=['POST'])
+@jwt_required()
+def sync_deliverable_metrics(collab_id, milestone_id, deliverable_id):
+    """
+    Manually sync post metrics for a milestone deliverable from ThunziAI
+
+    This endpoint fetches the latest metrics from ThunziAI for a specific deliverable.
+    Accessible by both brand and creator.
+
+    Part of: Brand Analytics Implementation - Phase 2
+    """
+    try:
+        from flask import current_app
+        from app.services.post_metrics_service import PostMetricsService
+        import traceback
+
+        user_id = int(get_jwt_identity())
+        user = User.query.get(user_id)
+
+        collaboration = Collaboration.query.get(collab_id)
+        if not collaboration:
+            return jsonify({'error': 'Collaboration not found'}), 404
+
+        # Check authorization (both brand and creator can sync)
+        if user.user_type == 'creator':
+            creator = CreatorProfile.query.filter_by(user_id=user_id).first()
+            if collaboration.creator_id != creator.id:
+                return jsonify({'error': 'Unauthorized'}), 403
+        else:
+            brand = BrandProfile.query.filter_by(user_id=user_id).first()
+            if collaboration.brand_id != brand.id:
+                return jsonify({'error': 'Unauthorized'}), 403
+
+        # Verify deliverable exists and belongs to this collaboration
+        deliverable = MilestoneDeliverable.query.get(deliverable_id)
+        if not deliverable or deliverable.milestone.collaboration_id != collab_id:
+            return jsonify({'error': 'Deliverable not found'}), 404
+
+        # Sync metrics
+        result = PostMetricsService.sync_deliverable_metrics(deliverable_id)
+
+        if result['success']:
+            return jsonify({
+                'success': True,
+                'message': result['message'],
+                'metrics': result['metrics']
+            }), 200
+        else:
+            return jsonify({
+                'success': False,
+                'error': result['error'],
+                'message': result['message']
+            }), 400
+
+    except Exception as e:
+        current_app.logger.error(
+            f"Error in sync_deliverable_metrics: {str(e)}\n{traceback.format_exc()}"
+        )
+        return jsonify({'error': str(e)}), 500
+
+
+@bp.route('/<int:collab_id>/sync-all-metrics', methods=['POST'])
+@jwt_required()
+def sync_all_collaboration_metrics(collab_id):
+    """
+    Sync metrics for all deliverables in a collaboration
+
+    This endpoint fetches metrics for all deliverables with submitted post URLs.
+    Accessible by both brand and creator.
+
+    Part of: Brand Analytics Implementation - Phase 2
+    """
+    try:
+        from flask import current_app
+        from app.services.post_metrics_service import PostMetricsService
+        import traceback
+
+        user_id = int(get_jwt_identity())
+        user = User.query.get(user_id)
+
+        collaboration = Collaboration.query.get(collab_id)
+        if not collaboration:
+            return jsonify({'error': 'Collaboration not found'}), 404
+
+        # Check authorization
+        if user.user_type == 'creator':
+            creator = CreatorProfile.query.filter_by(user_id=user_id).first()
+            if collaboration.creator_id != creator.id:
+                return jsonify({'error': 'Unauthorized'}), 403
+        else:
+            brand = BrandProfile.query.filter_by(user_id=user_id).first()
+            if collaboration.brand_id != brand.id:
+                return jsonify({'error': 'Unauthorized'}), 403
+
+        # Sync all deliverables
+        result = PostMetricsService.sync_collaboration_metrics(collab_id)
+
+        return jsonify({
+            'success': result['success'],
+            'message': result.get('message', f"Synced {result['synced']} of {result['total']} deliverables"),
+            'total': result['total'],
+            'synced': result['synced'],
+            'failed': result['failed'],
+            'results': result['results']
+        }), 200
+
+    except Exception as e:
+        current_app.logger.error(
+            f"Error in sync_all_collaboration_metrics: {str(e)}\n{traceback.format_exc()}"
+        )
+        return jsonify({'error': str(e)}), 500
+
+
+@bp.route('/<int:collab_id>/deliverables/<int:deliverable_id>/metrics', methods=['GET'])
+@jwt_required()
+def get_deliverable_metrics(collab_id, deliverable_id):
+    """
+    Get cached metrics for a deliverable
+
+    Returns the most recently synced metrics from the database.
+    Accessible by both brand and creator.
+
+    Part of: Brand Analytics Implementation - Phase 2
+    """
+    try:
+        from flask import current_app
+        from app.services.post_metrics_service import PostMetricsService
+
+        user_id = int(get_jwt_identity())
+        user = User.query.get(user_id)
+
+        collaboration = Collaboration.query.get(collab_id)
+        if not collaboration:
+            return jsonify({'error': 'Collaboration not found'}), 404
+
+        # Check authorization
+        if user.user_type == 'creator':
+            creator = CreatorProfile.query.filter_by(user_id=user_id).first()
+            if collaboration.creator_id != creator.id:
+                return jsonify({'error': 'Unauthorized'}), 403
+        else:
+            brand = BrandProfile.query.filter_by(user_id=user_id).first()
+            if collaboration.brand_id != brand.id:
+                return jsonify({'error': 'Unauthorized'}), 403
+
+        # Get cached metrics
+        metrics = PostMetricsService.get_deliverable_metrics(deliverable_id)
+
+        if metrics:
+            return jsonify({
+                'success': True,
+                'metrics': metrics
+            }), 200
+        else:
+            return jsonify({
+                'success': False,
+                'message': 'No metrics found for this deliverable'
+            }), 404
+
+    except Exception as e:
+        current_app.logger.error(
+            f"Error in get_deliverable_metrics: {str(e)}"
+        )
+        return jsonify({'error': str(e)}), 500

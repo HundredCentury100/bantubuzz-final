@@ -12,7 +12,7 @@ Created: March 11, 2026
 Part of: Trust, Safety & Support Implementation Plan - Phase 2
 """
 
-from flask import request, jsonify
+from flask import request, jsonify, current_app
 from flask_jwt_extended import get_jwt_identity
 from app import db
 from app.models.user import User
@@ -20,6 +20,7 @@ from app.models.support_ticket import SupportTicket
 from app.models.support_ticket_message import SupportTicketMessage
 from app.decorators.admin import admin_required
 from datetime import datetime
+import traceback
 from . import bp
 
 
@@ -82,7 +83,7 @@ def get_all_tickets():
         }), 200
 
     except Exception as e:
-        print(f"Error fetching tickets: {str(e)}")
+        current_app.logger.error(f"Error fetching tickets: {str(e)}\n{traceback.format_exc()}")
         return jsonify({'success': False, 'error': 'Failed to fetch tickets'}), 500
 
 
@@ -104,13 +105,17 @@ def get_ticket_details(ticket_id):
         ).update({'read_by_admin': True})
         db.session.commit()
 
+        # Get messages separately for frontend compatibility
+        messages = [msg.to_dict() for msg in ticket.messages.order_by(SupportTicketMessage.created_at.asc()).all()]
+
         return jsonify({
             'success': True,
-            'ticket': ticket.to_admin_dict()
+            'ticket': ticket.to_dict(),
+            'messages': messages
         }), 200
 
     except Exception as e:
-        print(f"Error fetching ticket details: {str(e)}")
+        current_app.logger.error(f"Error fetching ticket details: {str(e)}\n{traceback.format_exc()}")
         return jsonify({'success': False, 'error': 'Failed to fetch ticket details'}), 500
 
 
@@ -149,7 +154,7 @@ def assign_ticket(ticket_id):
 
     except Exception as e:
         db.session.rollback()
-        print(f"Error assigning ticket: {str(e)}")
+        current_app.logger.error(f"Error assigning ticket: {str(e)}\n{traceback.format_exc()}")
         return jsonify({'success': False, 'error': 'Failed to assign ticket'}), 500
 
 
@@ -193,7 +198,7 @@ def update_ticket_status(ticket_id):
 
     except Exception as e:
         db.session.rollback()
-        print(f"Error updating ticket status: {str(e)}")
+        current_app.logger.error(f"Error updating ticket status: {str(e)}\n{traceback.format_exc()}")
         return jsonify({'success': False, 'error': 'Failed to update ticket status'}), 500
 
 
@@ -258,7 +263,7 @@ def respond_to_ticket(ticket_id):
 
     except Exception as e:
         db.session.rollback()
-        print(f"Error responding to ticket: {str(e)}")
+        current_app.logger.error(f"Error responding to ticket: {str(e)}\n{traceback.format_exc()}")
         return jsonify({'success': False, 'error': 'Failed to send response'}), 500
 
 
@@ -285,7 +290,7 @@ def resolve_ticket(ticket_id):
 
     except Exception as e:
         db.session.rollback()
-        print(f"Error resolving ticket: {str(e)}")
+        current_app.logger.error(f"Error resolving ticket: {str(e)}\n{traceback.format_exc()}")
         return jsonify({'success': False, 'error': 'Failed to resolve ticket'}), 500
 
 
@@ -312,7 +317,7 @@ def close_ticket_admin(ticket_id):
 
     except Exception as e:
         db.session.rollback()
-        print(f"Error closing ticket: {str(e)}")
+        current_app.logger.error(f"Error closing ticket: {str(e)}\n{traceback.format_exc()}")
         return jsonify({'success': False, 'error': 'Failed to close ticket'}), 500
 
 
@@ -362,5 +367,5 @@ def get_support_stats():
         }), 200
 
     except Exception as e:
-        print(f"Error fetching support stats: {str(e)}")
+        current_app.logger.error(f"Error fetching support stats: {str(e)}\n{traceback.format_exc()}")
         return jsonify({'success': False, 'error': 'Failed to fetch stats'}), 500

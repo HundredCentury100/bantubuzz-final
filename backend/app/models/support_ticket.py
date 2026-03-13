@@ -81,8 +81,6 @@ class SupportTicket(db.Model):
             'user': {
                 'id': self.user.id,
                 'email': self.user.email,
-                'first_name': self.user.first_name,
-                'last_name': self.user.last_name,
                 'user_type': self.user.user_type
             } if self.user else None,
             'category': self.category,
@@ -97,9 +95,7 @@ class SupportTicket(db.Model):
             'assigned_to': self.assigned_to,
             'assigned_admin': {
                 'id': self.assigned_admin.id,
-                'email': self.assigned_admin.email,
-                'first_name': self.assigned_admin.first_name,
-                'last_name': self.assigned_admin.last_name
+                'email': self.assigned_admin.email
             } if self.assigned_admin else None,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,
@@ -112,6 +108,9 @@ class SupportTicket(db.Model):
 
     def to_admin_dict(self):
         """Convert ticket to dictionary with admin details"""
+        from app.models.support_ticket_message import SupportTicketMessage
+        from app.models.support_ticket_attachment import SupportTicketAttachment
+
         data = self.to_dict()
         data['messages'] = [msg.to_dict() for msg in self.messages.order_by(SupportTicketMessage.created_at.asc()).all()]
         data['attachments'] = [att.to_dict() for att in self.attachments.all()]

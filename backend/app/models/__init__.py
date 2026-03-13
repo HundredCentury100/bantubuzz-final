@@ -24,6 +24,7 @@ from .creator_subscription import CreatorSubscription
 from .verification_application import VerificationApplication
 from .thunzi_account import ThunziAccount
 from .connected_platform import ConnectedPlatform
+from .post_metrics import PostMetrics
 
 # Trust & Safety models
 from .user_block import UserBlock
@@ -83,6 +84,7 @@ __all__ = [
     'CampaignMilestone',
     'ThunziAccount',
     'ConnectedPlatform',
+    'PostMetrics',
     'UserBlock',
     'MessageRiskSignal',
     'MessageSafetyWarning',

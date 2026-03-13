@@ -52,8 +52,6 @@ class SupportTicketMessage(db.Model):
             'user': {
                 'id': self.user.id,
                 'email': self.user.email,
-                'first_name': self.user.first_name,
-                'last_name': self.user.last_name,
                 'user_type': self.user.user_type
             } if self.user else None
         }

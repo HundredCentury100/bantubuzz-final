@@ -1,4 +1,4 @@
-from flask import Flask
+from flask import Flask, request
 from flask_sqlalchemy import SQLAlchemy
 from flask_jwt_extended import JWTManager
 from flask_cors import CORS
@@ -6,6 +6,8 @@ from flask_mail import Mail
 from flask_socketio import SocketIO
 from flask_migrate import Migrate
 from .config import config
+from .logging_config import setup_logging, log_exception
+import traceback
 
 # Initialize extensions
 db = SQLAlchemy()
@@ -35,6 +37,28 @@ def create_app(config_name='development'):
          expose_headers=['Content-Type', 'Authorization'])
     socketio.init_app(app, cors_allowed_origins=app.config['CORS_ORIGINS'], async_mode='threading')
     migrate.init_app(app, db)
+
+    # Setup comprehensive logging
+    setup_logging(app)
+
+    # Request/Response logging middleware
+    @app.before_request
+    def log_request_info():
+        """Log every incoming request"""
+        app.logger.info(
+            f"→ {request.method} {request.path} | "
+            f"IP: {request.remote_addr} | "
+            f"User-Agent: {request.headers.get('User-Agent', 'Unknown')[:80]}"
+        )
+
+    @app.after_request
+    def log_response_info(response):
+        """Log every outgoing response"""
+        app.logger.info(
+            f"← {response.status_code} | {request.method} {request.path} | "
+            f"Size: {response.content_length or 0}B"
+        )
+        return response
 
     # JWT error handlers
     @jwt.expired_token_loader
@@ -101,15 +125,38 @@ def create_app(config_name='development'):
     def health_check():
         return {'status': 'healthy', 'message': 'BantuBuzz API is running'}
 
-    # Error handlers
+    # Error handlers with comprehensive logging
     @app.errorhandler(404)
     def not_found(error):
+        app.logger.warning(
+            f'404 NOT FOUND | {request.method} {request.path} | '
+            f'IP: {request.remote_addr}'
+        )
         return {'error': 'Resource not found'}, 404
 
     @app.errorhandler(500)
     def internal_error(error):
+        log_exception(app, error, context=f"{request.method} {request.path}")
         db.session.rollback()
-        return {'error': 'Internal server error'}, 500
+        return {
+            'error': 'Internal server error',
+            'details': str(error) if app.debug else 'Check server logs for details'
+        }, 500
+
+    @app.errorhandler(Exception)
+    def handle_exception(error):
+        """Catch all unhandled exceptions"""
+        # Don't handle HTTP exceptions (let Flask handle them normally)
+        if hasattr(error, 'code'):
+            return error
+
+        log_exception(app, error, context=f"{request.method} {request.path}")
+        db.session.rollback()
+        return {
+            'error': 'An unexpected error occurred',
+            'type': type(error).__name__,
+            'details': str(error) if app.debug else 'Check server logs for details'
+        }, 500
 
     # Register Socket.IO handlers
     with app.app_context():

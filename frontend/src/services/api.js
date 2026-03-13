@@ -240,6 +240,29 @@ export const collaborationsAPI = {
   requestMilestoneRevision: (collabId, milestoneId, deliverableId, notes) =>
     api.post(`/collaborations/${collabId}/milestones/${milestoneId}/deliverables/${deliverableId}/request-revision`, { notes }),
 
+  // Deliverable URL Submission (for analytics tracking)
+  // For package-based collaborations (deliverables stored in JSON)
+  submitPackageDeliverableURL: (collabId, deliverableId, data) =>
+    api.put(`/collaborations/${collabId}/deliverables/${deliverableId}/submit-url`, data),
+  // For milestone-based collaborations (briefs/campaigns with separate deliverable table)
+  submitMilestoneDeliverableURL: (collabId, milestoneId, deliverableId, data) =>
+    api.put(`/collaborations/${collabId}/milestones/${milestoneId}/deliverables/${deliverableId}/submit-url`, data),
+
+  // Post Metrics Sync (Phase 2 Analytics)
+  // Sync metrics for a single deliverable from ThunziAI
+  syncDeliverableMetrics: (collabId, milestoneId, deliverableId) => {
+    const endpoint = milestoneId
+      ? `/collaborations/${collabId}/milestones/${milestoneId}/deliverables/${deliverableId}/sync-metrics`
+      : `/collaborations/${collabId}/deliverables/${deliverableId}/sync-metrics`;
+    return api.post(endpoint);
+  },
+  // Get cached metrics for a deliverable
+  getDeliverableMetrics: (collabId, deliverableId) =>
+    api.get(`/collaborations/${collabId}/deliverables/${deliverableId}/metrics`),
+  // Sync metrics for all deliverables in a collaboration
+  syncAllCollaborationMetrics: (collabId) =>
+    api.post(`/collaborations/${collabId}/sync-all-metrics`),
+
   // Paid Revision
   createRevisionBooking: (id, data) => api.post(`/collaborations/${id}/revision/create-booking`, data),
   completeRevisionPayment: (id, bookingId) => api.post(`/collaborations/${id}/revision/complete-payment`, { booking_id: bookingId }),

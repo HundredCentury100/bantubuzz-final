@@ -6,6 +6,8 @@ import { useMessaging } from '../contexts/MessagingContext';
 import useAutoRefresh from '../hooks/useAutoRefresh';
 import Navbar from '../components/Navbar';
 import Avatar from '../components/Avatar';
+import DeliverableURLInput from '../components/DeliverableURLInput';
+import PostMetricsDisplay from '../components/PostMetricsDisplay';
 import toast from 'react-hot-toast';
 
 const CollaborationDetails = () => {
@@ -583,9 +585,34 @@ const CollaborationDetails = () => {
                         >
                           View Deliverable
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                           </svg>
                         </a>
+
+                        {/* Post URL Input for Analytics (Creator Only) */}
+                        {!isBrand && (
+                          <DeliverableURLInput
+                            collaborationId={parseInt(id)}
+                            deliverableId={deliverable.id}
+                            deliverable={deliverable}
+                            onSuccess={(updatedDeliverable) => {
+                              // Refresh collaboration data to show updated deliverable
+                              fetchCollaboration();
+                            }}
+                          />
+                        )}
+
+                        {/* Post Performance Metrics (Phase 3 Analytics) */}
+                        {deliverable.post_url && deliverable.url_validation_status === 'valid' && (
+                          <PostMetricsDisplay
+                            collaborationId={parseInt(id)}
+                            deliverableId={deliverable.id}
+                            deliverable={deliverable}
+                            milestoneId={null}
+                            isBrand={isBrand}
+                            collaborationAmount={collaboration.amount}
+                          />
+                        )}
                       </div>
                     ))}
                   </div>

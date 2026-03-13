@@ -1,6 +1,6 @@
 # 🤖 AI Assistant Guide for BantuBuzz Platform
 
-**Last Updated**: March 10, 2026
+**Last Updated**: March 12, 2026
 **Purpose**: Complete context and guidelines for AI assistants working on this project
 
 ---
@@ -3160,6 +3160,205 @@ SELECT cpr.username FROM creator_profiles cpr
 3. Use exact field names in queries
 4. Test query manually if unsure
 
+---
+
+### 📝 Comprehensive Logging System (March 2026)
+
+**CRITICAL: Debugging Made Instant**
+
+We implemented a comprehensive logging infrastructure across the entire platform to make debugging instant instead of spending hours searching for errors. The logging system captures EVERY request, response, and error with full context.
+
+#### Logging Architecture
+
+**Flask Backend Logging** (`backend/app/logging_config.py`):
+- **3 Log Files** in `/var/www/bantubuzz/backend/logs/`:
+  - `app_error.log` - All errors with full tracebacks and request context
+  - `app_access.log` - Every HTTP request/response with timing info
+  - `app_debug.log` - Detailed debugging information
+
+**Node.js Messaging Service** (`messaging-service/logger.js`):
+- **3 Log Files** in `/var/www/bantubuzz/messaging-service/logs/`:
+  - `messaging_error.log` - Socket.io and messaging errors
+  - `messaging_access.log` - Connection events and message routing
+  - `messaging_debug.log` - Detailed socket debugging
+
+#### How to Use the Logging System
+
+**1. Check Flask Errors (Most Common)**
+```bash
+# View recent errors
+ssh root@173.212.245.22 "tail -50 /var/www/bantubuzz/backend/logs/app_error.log"
+
+# Search for specific error
+ssh root@173.212.245.22 "grep -A 20 'AttributeError' /var/www/bantubuzz/backend/logs/app_error.log"
+
+# Monitor errors in real-time
+ssh root@173.212.245.22 "tail -f /var/www/bantubuzz/backend/logs/app_error.log"
+```
+
+**2. Check HTTP Request Flow**
+```bash
+# See all recent requests
+ssh root@173.212.245.22 "tail -100 /var/www/bantubuzz/backend/logs/app_access.log"
+
+# Find requests to specific endpoint
+ssh root@173.212.245.22 "grep '/api/support/tickets' /var/www/bantubuzz/backend/logs/app_access.log | tail -20"
+```
+
+**3. Debug Detailed Behavior**
+```bash
+# View debug logs
+ssh root@173.212.245.22 "tail -100 /var/www/bantubuzz/backend/logs/app_debug.log"
+```
+
+#### Error Log Format
+
+Every error in `app_error.log` includes:
+```
+[2026-03-12 21:22:30,381] ERROR in support [respond_to_ticket]:
+URL: http://bantubuzz.com/api/admin/support/tickets/7/respond | Method: POST | IP: 127.0.0.1
+Message: Error responding to ticket: 'User' object has no attribute 'first_name'
+Traceback (most recent call last):
+  File "/var/www/bantubuzz/backend/app/routes/admin/support.py", line 260, in respond_to_ticket
+    'ticket_message': message.to_dict(),
+  File "/var/www/bantubuzz/backend/app/models/support_ticket_message.py", line 55, in to_dict
+    'first_name': self.user.first_name,
+AttributeError: 'User' object has no attribute 'first_name'
+---
+```
+
+**What You Get**:
+- ✅ Exact timestamp
+- ✅ Module and function name
+- ✅ Full URL and HTTP method
+- ✅ Client IP address
+- ✅ Error message
+- ✅ Complete stack trace
+- ✅ Line numbers for exact location
+
+#### Access Log Format
+
+Every request in `app_access.log`:
+```
+[2026-03-12 21:22:30,123] INFO: → POST /api/support/tickets | IP: 127.0.0.1 | User-Agent: Mozilla/5.0...
+[2026-03-12 21:22:30,456] INFO: ← 201 | POST /api/support/tickets | Size: 1523B
+```
+
+#### Using Logging in Your Code
+
+**Flask Routes** (ALWAYS use `current_app.logger`):
+```python
+from flask import current_app
+import traceback
+
+@bp.route('/api/endpoint', methods=['POST'])
+def endpoint():
+    try:
+        # Your code
+        current_app.logger.info(f"Processing request for user {user_id}")
+        return jsonify({'success': True}), 200
+    except Exception as e:
+        current_app.logger.error(
+            f"Error in endpoint: {str(e)}\n{traceback.format_exc()}"
+        )
+        return jsonify({'error': 'Failed to process'}), 500
+```
+
+**❌ NEVER use `print()` for errors:**
+```python
+# WRONG - Won't appear in logs
+print(f"Error: {e}")
+print(error_msg, file=sys.stderr, flush=True)
+
+# CORRECT - Appears in app_error.log
+current_app.logger.error(f"Error: {str(e)}\n{traceback.format_exc()}")
+```
+
+#### Common Debugging Workflow
+
+**Problem**: Getting 500 error on API endpoint
+
+**Solution** (takes 30 seconds):
+```bash
+# 1. Check error logs
+ssh root@173.212.245.22 "tail -100 /var/www/bantubuzz/backend/logs/app_error.log"
+
+# 2. Find the exact error with full traceback
+# Output shows: AttributeError: 'User' object has no attribute 'first_name'
+# Location: support_ticket_message.py line 55
+
+# 3. Fix the issue in model file
+
+# 4. Deploy and restart
+scp fixed_file.py root@173.212.245.22:/path/
+ssh root@173.212.245.22 "killall gunicorn && cd /var/www/bantubuzz/backend && source venv/bin/activate && gunicorn -b 0.0.0.0:8002 -w 4 'app:create_app()' --daemon"
+
+# 5. Verify fix by checking logs again
+```
+
+**Before Logging System**: Hours spent adding print statements, checking terminal output, restarting servers
+**After Logging System**: 30 seconds to identify and fix the issue
+
+#### Log File Management
+
+**Log Rotation**: Automatic rotation when files reach 10MB (keeps last 10 files)
+
+**Manual Log Cleanup** (if needed):
+```bash
+# Clear old logs
+ssh root@173.212.245.22 "rm /var/www/bantubuzz/backend/logs/*.log.*"
+
+# Archive logs
+ssh root@173.212.245.22 "tar -czf logs-backup-$(date +%Y%m%d).tar.gz /var/www/bantubuzz/backend/logs/"
+```
+
+#### Integration with Flask Application
+
+The logging system is automatically initialized in `backend/app/__init__.py`:
+```python
+from .logging_config import setup_logging, log_exception
+
+def create_app(config_name='default'):
+    app = Flask(__name__)
+    # ... other initialization ...
+
+    # Setup comprehensive logging (CRITICAL - Must be after extensions)
+    setup_logging(app)
+
+    # Middleware logs every request/response
+    @app.before_request
+    def log_request_info():
+        app.logger.info(f"→ {request.method} {request.path} | IP: {request.remote_addr}")
+
+    @app.after_request
+    def log_response_info(response):
+        app.logger.info(f"← {response.status_code} | {request.method} {request.path}")
+        return response
+
+    # Error handlers use logging
+    @app.errorhandler(Exception)
+    def handle_exception(error):
+        log_exception(app, error, context=f"{request.method} {request.path}")
+        # ... return error response ...
+```
+
+#### Key Files
+
+1. **`backend/app/logging_config.py`** (189 lines) - Core logging infrastructure
+2. **`backend/app/__init__.py`** - Logging initialization and middleware
+3. **`messaging-service/logger.js`** (175 lines) - Node.js logging (ready to deploy)
+
+#### Benefits
+
+✅ **Instant Debugging** - Find errors in seconds, not hours
+✅ **Full Context** - Every error includes URL, IP, user agent, stack trace
+✅ **Request Tracking** - See every API call and response
+✅ **Production Safe** - Logs rotate automatically, never fill disk
+✅ **Historical Data** - Keep last 10 rotations of each log file
+✅ **Centralized** - All logs in one place per service
+
+**CRITICAL**: Always check the error logs FIRST when debugging any issue. The comprehensive logging system will show you exactly what went wrong, where, and why
+
 #### Principle 5: Follow Existing Patterns
 
 **Rule**: When implementing new features, ALWAYS check how similar features are already implemented.
@@ -3604,6 +3803,531 @@ POST /api/sync
 
 ---
 
+## 📈 Brand Analytics Dashboard (March 2026)
+
+### Overview
+Brand Analytics Dashboard provides brands with real-time performance metrics for influencer collaborations. BantuBuzz aggregates post performance data from creator's ThunziAI accounts and displays it within collaboration context.
+
+### Architecture Pattern (CRITICAL)
+**✅ CORRECT Architecture**:
+- Each creator has their own ThunziAI account with connected platforms
+- Each brand has their own ThunziAI account
+- BantuBuzz stores OAuth access tokens for all platforms
+- BantuBuzz uses **creator's access tokens** to fetch post analytics
+- BantuBuzz aggregates and presents data to brands within collaboration context
+- Same data can be shown to creator in their analytics dashboard
+
+**❌ INCORRECT** (Do NOT implement):
+- ❌ Registering creators under brand's ThunziAI company
+- ❌ Using brand's tokens to fetch creator's data
+- ❌ Sharing ThunziAI accounts between users
+
+### Implementation Phases
+
+#### Phase 1: Deliverable URL Tracking (DEPLOYED ✅)
+**Status**: Deployed March 12, 2026
+**Location**: [PHASE1_PROGRESS.md](PHASE1_PROGRESS.md)
+
+**What it does**:
+- Creators submit post URLs for approved deliverables
+- System parses URL to extract platform and native post ID
+- Validates URL format and extracts post metadata
+- Stores in `milestone_deliverables` table
+
+**New Database Fields** (`milestone_deliverables` table):
+```sql
+post_url VARCHAR(500)           -- Full URL (e.g., https://instagram.com/p/ABC123)
+post_platform VARCHAR(50)       -- Platform (instagram/facebook/youtube/tiktok/twitter)
+post_id VARCHAR(255)            -- Native platform ID (e.g., ABC123 for Instagram)
+url_validation_status ENUM      -- pending/valid/invalid
+validated_at TIMESTAMP          -- When URL was validated
+```
+
+**API Endpoints**:
+```python
+# Submit URL for milestone-based collaboration
+POST /api/collaborations/:id/milestones/:mid/deliverables/:did/submit-url
+Body: { "post_url": "https://instagram.com/p/ABC123" }
+
+# Submit URL for package-based collaboration
+POST /api/collaborations/:id/deliverables/:did/submit-url
+Body: { "post_url": "https://instagram.com/p/ABC123" }
+```
+
+**Frontend Component**:
+- `frontend/src/components/DeliverableURLInput.jsx`
+- Integrated into `CollaborationDetails.jsx`
+- Shows for creators only after deliverable is approved
+
+**URL Parser**:
+- `backend/app/utils/post_url_parser.py`
+- Supports Instagram, Facebook, YouTube, TikTok, Twitter
+- Regex patterns for each platform
+
+#### Phase 2: Post Metrics Fetching & Storage (DEPLOYED ✅)
+**Status**: Deployed March 13, 2026
+**Location**: [PHASE2_POST_METRICS_COMPLETE.md](PHASE2_POST_METRICS_COMPLETE.md), [PHASE2_DEPLOYMENT_STATUS.md](PHASE2_DEPLOYMENT_STATUS.md)
+
+**What it does**:
+- Fetches post performance metrics from ThunziAI
+- Matches posts by native platform ID
+- Stores comprehensive analytics in database
+- Provides sync endpoints for manual/automatic updates
+
+**New Database Table**: `post_metrics`
+```sql
+CREATE TABLE post_metrics (
+    id SERIAL PRIMARY KEY,
+
+    -- Links
+    collaboration_id INTEGER REFERENCES collaborations(id),
+    deliverable_id INTEGER REFERENCES milestone_deliverables(id) UNIQUE,
+    creator_id INTEGER REFERENCES users(id),
+
+    -- ThunziAI IDs
+    thunzi_platform_id INTEGER,
+    thunzi_post_id VARCHAR(255),
+
+    -- Post Info
+    post_url TEXT NOT NULL,
+    post_platform VARCHAR(50) NOT NULL,
+    post_id VARCHAR(255) NOT NULL,
+    post_title TEXT,
+    post_description TEXT,
+    published_at TIMESTAMP,
+
+    -- Core Metrics
+    reach BIGINT DEFAULT 0,
+    impressions BIGINT DEFAULT 0,
+    likes INTEGER DEFAULT 0,
+    comments INTEGER DEFAULT 0,
+    shares INTEGER DEFAULT 0,
+    saves INTEGER DEFAULT 0,
+
+    -- Calculated Metrics
+    total_engagement INTEGER DEFAULT 0,
+    engagement_rate NUMERIC(5,2) DEFAULT 0,  -- (engagement / reach) * 100
+
+    -- Sentiment Analysis
+    sentiment VARCHAR(50),  -- positive/negative/neutral
+    sentiment_score NUMERIC(5,2),
+    positive_comments INTEGER DEFAULT 0,
+    negative_comments INTEGER DEFAULT 0,
+    neutral_comments INTEGER DEFAULT 0,
+
+    -- Video Metrics (optional)
+    video_views BIGINT DEFAULT 0,
+    video_duration INTEGER,
+    average_watch_time INTEGER,
+    completion_rate NUMERIC(5,2),
+
+    -- Sync Status
+    last_synced_at TIMESTAMP,
+    sync_status VARCHAR(50) DEFAULT 'pending',  -- pending/synced/failed
+    sync_error TEXT,
+
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Indexes for performance
+CREATE INDEX idx_post_metrics_collaboration ON post_metrics(collaboration_id);
+CREATE INDEX idx_post_metrics_creator ON post_metrics(creator_id);
+CREATE INDEX idx_post_metrics_platform ON post_metrics(post_platform);
+CREATE INDEX idx_post_metrics_post_id ON post_metrics(post_id);
+CREATE INDEX idx_post_metrics_published_at ON post_metrics(published_at);
+CREATE INDEX idx_post_metrics_sync_status ON post_metrics(sync_status);
+```
+
+**New Service**: `backend/app/services/post_metrics_service.py`
+```python
+class PostMetricsService:
+    @staticmethod
+    def sync_deliverable_metrics(deliverable_id: int) -> Dict:
+        """
+        Sync metrics for a specific deliverable from ThunziAI
+
+        Flow:
+        1. Get deliverable with post URL and post_id
+        2. Find creator's connected platform for this platform type
+        3. Fetch all posts from creator's ThunziAI platform
+        4. Match post by post_id (native platform ID)
+        5. Fetch detailed insights with sentiment analysis
+        6. Store/update metrics in post_metrics table
+        7. Calculate engagement rate automatically
+        """
+
+    @staticmethod
+    def sync_collaboration_metrics(collaboration_id: int) -> Dict:
+        """Sync metrics for all deliverables in a collaboration"""
+
+    @staticmethod
+    def get_deliverable_metrics(deliverable_id: int) -> Dict:
+        """Get cached metrics from database"""
+```
+
+**ThunziAI Service Extensions** (`backend/app/services/thunzi_service.py`):
+```python
+# New methods added in Phase 2:
+def get_platform_posts(self, platform_id: int) -> List[Dict]:
+    """GET /api/platforms/:id/posts - Get all posts from a platform"""
+
+def get_post_by_id(self, post_id: int) -> Optional[Dict]:
+    """GET /api/posts/:id - Get specific post details"""
+
+def get_post_insights(self, post_id: int) -> Optional[Dict]:
+    """GET /api/posts/:id/insights - Get detailed metrics + sentiment"""
+
+def get_post_comments(self, post_id: int, start_date=None, end_date=None) -> Optional[Dict]:
+    """GET /api/posts/:id/comments - Get comments with sentiment analysis"""
+```
+
+**API Endpoints**:
+```python
+# Sync metrics for single deliverable
+POST /api/collaborations/:id/milestones/:mid/deliverables/:did/sync-metrics
+Returns: { "success": true, "metrics": {...} }
+
+# Sync all deliverables in collaboration
+POST /api/collaborations/:id/sync-all-metrics
+Returns: { "success": true, "total": 5, "synced": 4, "failed": 1, "results": [...] }
+
+# Get cached metrics
+GET /api/collaborations/:id/deliverables/:did/metrics
+Returns: { "success": true, "metrics": {...} }
+```
+
+**How It Works**:
+1. Creator submits post URL (Phase 1)
+2. Creator/Brand clicks "Sync Metrics"
+3. Backend fetches posts from creator's ThunziAI platform
+4. Matches post by native platform ID (e.g., Instagram shortcode)
+5. Gets detailed insights including sentiment
+6. Stores in `post_metrics` table
+7. Auto-calculates `total_engagement` and `engagement_rate`
+
+**Post Matching Logic**:
+```python
+# Extract post_id from URL (Phase 1)
+deliverable.post_id = "ABC123"  # Instagram shortcode
+
+# Fetch creator's posts from ThunziAI
+posts = thunzi_service.get_platform_posts(connected_platform.thunzi_platform_id)
+
+# Match by native platform ID
+for post in posts:
+    if str(post.get('postId')) == str(deliverable.post_id):
+        matching_post = post
+        break
+```
+
+#### Phase 3: Frontend Metrics Display (IN PROGRESS 🚧)
+**Status**: Planning Complete, Implementation Next
+**Location**: This section
+
+**What we're building**:
+UI components to display post performance metrics in the Collaboration Details page for both brands and creators.
+
+**Design Philosophy for Analytics Components**:
+
+1. **Metric Cards** - Follow BantuBuzz card patterns:
+```jsx
+// ✅ CORRECT - Metrics card following design system
+<div className="bg-white rounded-3xl shadow-sm hover:shadow-md p-6">
+  <div className="flex items-center justify-between mb-4">
+    <h3 className="text-lg font-semibold text-dark">Post Performance</h3>
+    <button
+      onClick={handleSync}
+      className="px-4 py-2 bg-primary text-dark rounded-full font-medium hover:bg-primary/90 transition-colors"
+    >
+      🔄 Sync Metrics
+    </button>
+  </div>
+
+  {/* Metrics Grid */}
+  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+    <MetricCard title="Reach" value={15000} icon="👥" />
+    <MetricCard title="Impressions" value={18000} icon="👁️" />
+    <MetricCard title="Engagement" value={1357} icon="💖" />
+    <MetricCard title="Eng. Rate" value="9.05%" icon="📈" />
+  </div>
+</div>
+
+// Individual Metric Card
+<div className="bg-primary/10 rounded-2xl p-4">
+  <div className="flex items-center gap-2 mb-2">
+    <span className="text-2xl">{icon}</span>
+    <span className="text-sm text-gray-600">{title}</span>
+  </div>
+  <p className="text-2xl font-bold text-dark">{formattedValue}</p>
+</div>
+```
+
+2. **Sentiment Chart** - Clean, minimal design:
+```jsx
+// ✅ CORRECT - Sentiment visualization
+<div className="bg-white rounded-2xl p-6 mt-4">
+  <h4 className="text-lg font-semibold text-dark mb-4">💬 Comment Sentiment</h4>
+
+  <div className="flex items-center gap-8">
+    {/* Donut chart - use Chart.js with primary colors */}
+    <div className="w-32 h-32">
+      <Doughnut
+        data={{
+          labels: ['Positive', 'Neutral', 'Negative'],
+          datasets: [{
+            data: [65, 5, 15],
+            backgroundColor: [
+              '#ccdb53',  // primary (positive)
+              '#9ca3af',  // gray-400 (neutral)
+              '#ef4444',  // red-500 (negative)
+            ],
+            borderWidth: 0
+          }]
+        }}
+      />
+    </div>
+
+    {/* Breakdown */}
+    <div className="flex-1 space-y-2">
+      <div className="flex items-center justify-between">
+        <span className="text-dark">😊 Positive</span>
+        <span className="font-semibold text-dark">65 (76%)</span>
+      </div>
+      <div className="flex items-center justify-between">
+        <span className="text-gray-600">😐 Neutral</span>
+        <span className="font-medium text-gray-600">5 (6%)</span>
+      </div>
+      <div className="flex items-center justify-between">
+        <span className="text-gray-600">😞 Negative</span>
+        <span className="font-medium text-gray-600">15 (18%)</span>
+      </div>
+    </div>
+  </div>
+</div>
+```
+
+3. **Loading & Error States**:
+```jsx
+// Loading state
+{isLoading && (
+  <div className="flex items-center justify-center py-12">
+    <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full"></div>
+    <span className="ml-3 text-gray-600">Syncing metrics from ThunziAI...</span>
+  </div>
+)}
+
+// Error state
+{error && (
+  <div className="bg-red-50 border border-red-200 rounded-2xl p-4">
+    <p className="text-red-800 font-medium">❌ {error}</p>
+    <button
+      onClick={retrySync}
+      className="mt-2 px-4 py-2 bg-red-600 text-white rounded-full text-sm hover:bg-red-700"
+    >
+      Retry
+    </button>
+  </div>
+)}
+
+// Empty state
+{!metrics && !isLoading && (
+  <div className="text-center py-12">
+    <p className="text-gray-600 mb-4">No metrics available yet</p>
+    <button
+      onClick={handleSync}
+      className="px-6 py-3 bg-primary text-dark rounded-full font-medium hover:bg-primary/90"
+    >
+      Sync Metrics
+    </button>
+  </div>
+)}
+```
+
+4. **Cost Per Engagement** (Brand View Only):
+```jsx
+// Show ROI calculation for brands
+{isBrand && metrics && (
+  <div className="bg-primary/10 rounded-2xl p-4 mt-4">
+    <h4 className="text-sm font-medium text-gray-700 mb-1">Cost Per Engagement</h4>
+    <p className="text-3xl font-bold text-dark">
+      ${(collaboration.total_amount / metrics.total_engagement).toFixed(2)}
+    </p>
+    <p className="text-xs text-gray-600 mt-1">
+      ${collaboration.total_amount} ÷ {metrics.total_engagement.toLocaleString()} engagements
+    </p>
+  </div>
+)}
+```
+
+**Components to Create**:
+
+1. **`frontend/src/components/PostMetricsDisplay.jsx`** (~350 lines)
+   - Main container component
+   - Handles API calls for sync and fetch
+   - Manages loading/error states
+   - Conditionally renders based on data availability
+
+2. **`frontend/src/components/MetricCard.jsx`** (~100 lines)
+   - Reusable card for individual metrics
+   - Props: `title`, `value`, `icon`, `trend` (optional)
+   - Follows `bg-primary/10 rounded-2xl` pattern
+
+3. **`frontend/src/components/SentimentChart.jsx`** (~150 lines)
+   - Donut chart using Chart.js
+   - Color scheme: primary (positive), gray (neutral), red (negative)
+   - Shows percentage breakdown
+
+4. **`frontend/src/utils/metricsFormatter.js`** (~80 lines)
+   - Format large numbers: `15000` → `"15K"`
+   - Calculate percentages
+   - Format dates: `"2 hours ago"`
+   - Round decimals
+
+**Integration Location**:
+```jsx
+// frontend/src/pages/CollaborationDetails.jsx
+
+{/* After DeliverableURLInput component */}
+{deliverable.post_url && deliverable.url_validation_status === 'valid' && (
+  <PostMetricsDisplay
+    collaborationId={collaboration.id}
+    deliverableId={deliverable.id}
+    deliverable={deliverable}
+    isBrand={user.user_type === 'brand'}
+    collaborationAmount={collaboration.total_amount}
+  />
+)}
+```
+
+**API Service Methods** (`frontend/src/services/collaborationsAPI.js`):
+```javascript
+// Add these methods
+syncDeliverableMetrics: async (collabId, milestoneId, deliverableId) => {
+  const endpoint = milestoneId
+    ? `/collaborations/${collabId}/milestones/${milestoneId}/deliverables/${deliverableId}/sync-metrics`
+    : `/collaborations/${collabId}/deliverables/${deliverableId}/sync-metrics`;
+  return api.post(endpoint);
+},
+
+getDeliverableMetrics: async (collabId, deliverableId) => {
+  return api.get(`/collaborations/${collabId}/deliverables/${deliverableId}/metrics`);
+},
+
+syncAllCollaborationMetrics: async (collabId) => {
+  return api.post(`/collaborations/${collabId}/sync-all-metrics`);
+}
+```
+
+**Metrics Display Layout**:
+```
+┌─────────────────────────────────────────────────────────┐
+│ 📊 Post Performance Metrics                   [Sync]   │
+├─────────────────────────────────────────────────────────┤
+│                                                           │
+│  Post: instagram.com/p/ABC123                            │
+│  Last synced: 2 hours ago                                │
+│                                                           │
+│  ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐                    │
+│  │ 👥   │ │ 👁️   │ │ 💖   │ │ 📈   │                    │
+│  │REACH │ │VIEWS │ │ENGAGE│ │ RATE │                    │
+│  │ 15K  │ │ 18K  │ │ 1.4K │ │9.05% │                    │
+│  └──────┘ └──────┘ └──────┘ └──────┘                    │
+│                                                           │
+│  ┌──────┐ ┌──────┐ ┌──────┐ ┌──────┐                    │
+│  │ 👍   │ │ 💬   │ │ 🔄   │ │ 🔖   │                    │
+│  │LIKES │ │CMNTS │ │SHARES│ │SAVES │                    │
+│  │ 1.2K │ │  85  │ │  42  │ │  30  │                    │
+│  └──────┘ └──────┘ └──────┘ └──────┘                    │
+│                                                           │
+│  ┌───────────────────────────────────────────┐           │
+│  │ 💬 Comment Sentiment                      │           │
+│  │  [Donut]   😊 Positive  65 (76%)         │           │
+│  │            😐 Neutral    5  (6%)         │           │
+│  │            😞 Negative  15 (18%)         │           │
+│  └───────────────────────────────────────────┘           │
+│                                                           │
+│  💰 Cost Per Engagement: $0.37  (Brand only)            │
+│                                                           │
+└─────────────────────────────────────────────────────────┘
+```
+
+**Video Metrics** (Conditional - YouTube/TikTok only):
+```jsx
+{metrics.video_views > 0 && (
+  <div className="bg-white rounded-2xl p-6 mt-4">
+    <h4 className="text-lg font-semibold text-dark mb-4">🎥 Video Performance</h4>
+    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      <MetricCard title="Views" value={metrics.video_views} icon="▶️" />
+      <MetricCard title="Avg Watch" value={formatDuration(metrics.average_watch_time)} icon="⏱️" />
+      <MetricCard title="Completion" value={`${metrics.completion_rate}%`} icon="✓" />
+      <MetricCard title="Duration" value={formatDuration(metrics.video_duration)} icon="🎬" />
+    </div>
+  </div>
+)}
+```
+
+**Sync Status Indicator**:
+```jsx
+<div className="flex items-center gap-2 text-sm">
+  {metrics.sync_status === 'synced' && (
+    <>
+      <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+      <span className="text-gray-600">
+        Synced {formatTimeAgo(metrics.last_synced_at)}
+      </span>
+    </>
+  )}
+  {metrics.sync_status === 'failed' && (
+    <>
+      <span className="w-2 h-2 bg-red-500 rounded-full"></span>
+      <span className="text-red-600">Sync failed: {metrics.sync_error}</span>
+    </>
+  )}
+  {metrics.sync_status === 'pending' && (
+    <>
+      <span className="w-2 h-2 bg-yellow-500 rounded-full"></span>
+      <span className="text-gray-600">Pending sync</span>
+    </>
+  )}
+</div>
+```
+
+**Key Design Rules for Analytics**:
+1. ✅ Use `rounded-3xl` for outer cards, `rounded-2xl` for inner containers
+2. ✅ Use `shadow-sm hover:shadow-md` (never `shadow-lg`)
+3. ✅ Buttons ALWAYS `rounded-full`
+4. ✅ Use `bg-primary/10` for metric card backgrounds
+5. ✅ Use primary color (`#ccdb53`) for positive metrics
+6. ✅ NO gradients - solid colors only
+7. ✅ Follow spacing: `p-6` for cards, `gap-4` for grids
+8. ✅ Text colors: `text-dark` for primary, `text-gray-600` for secondary
+
+**Dependencies**:
+```bash
+npm install chart.js react-chartjs-2
+```
+
+**Next Steps** (Phase 3 Implementation):
+1. Install Chart.js dependencies
+2. Create `MetricCard.jsx` component
+3. Create `SentimentChart.jsx` component
+4. Create `PostMetricsDisplay.jsx` component
+5. Add API methods to `collaborationsAPI.js`
+6. Create `metricsFormatter.js` utility
+7. Integrate into `CollaborationDetails.jsx`
+8. Test with real collaboration data
+9. Deploy to production
+
+**Future Phases** (Post Phase 3):
+- **Phase 4**: Scheduled background jobs for auto-sync
+- **Phase 5**: Campaign-level analytics (aggregate multiple creators)
+- **Phase 6**: Creator tier spend distribution
+- **Phase 7**: Date range filtering
+- **Phase 8**: Export analytics reports (PDF/CSV)
+
+---
+
 **Remember**: This platform serves real users. Every change should maintain consistency, functionality, and the professional design we've established. When in doubt, refer to Home.jsx and this guide.
 
-🤖 **Generated for AI Assistants** | **Maintained by**: Development Team | **Last Review**: Mar 5, 2026
+🤖 **Generated for AI Assistants** | **Maintained by**: Development Team | **Last Review**: Mar 13, 2026

@@ -103,6 +103,7 @@ import SubmitTicket from './pages/SubmitTicket';
 import MyTickets from './pages/MyTickets';
 import TicketDetail from './pages/TicketDetail';
 import AdminSupport from './pages/AdminSupport';
+import AdminSupportTicketDetail from './pages/AdminSupportTicketDetail';
 
 // Protected Route Component
 const ProtectedRoute = ({ children, requiredType }) => {
@@ -751,6 +752,14 @@ function App() {
         element={
           <AdminRoute>
             <AdminSupport />
+          </AdminRoute>
+        }
+      />
+      <Route
+        path="/admin/support/:id"
+        element={
+          <AdminRoute>
+            <AdminSupportTicketDetail />
           </AdminRoute>
         }
       />

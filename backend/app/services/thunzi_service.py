@@ -333,6 +333,182 @@ class ThunziAIService:
             print(f"ThunziAI delete platform error: {str(e)}")
             return False
 
+    def get_platform_posts(self, platform_id: int) -> List[Dict]:
+        """
+        Get all posts from a specific platform
+
+        This endpoint returns all posts that ThunziAI has synced from the platform.
+        Posts are automatically synced when platforms are connected with OAuth tokens.
+
+        Args:
+            platform_id: ThunziAI platform ID
+
+        Returns:
+            List of posts with metrics:
+            [
+                {
+                    "id": number,  # ThunziAI's internal post ID
+                    "platformId": number,
+                    "title": string,
+                    "description": string,
+                    "platform": string,
+                    "postId": string,  # Original platform post ID
+                    "url": string,
+                    "thumbnailUrl": string,
+                    "likes": number,
+                    "comments": number,
+                    "shares": number,
+                    "saves": number,
+                    "reach": number,
+                    "impressions": number,
+                    "engagement": number,
+                    "engagementRate": number,
+                    "videoViews": number,
+                    "publishedAt": string,
+                    "createdAt": string
+                },
+                ...
+            ]
+        """
+        self._ensure_authenticated()
+
+        try:
+            response = self.session.get(
+                f"{self.BASE_URL}/api/platforms/{platform_id}/posts"
+            )
+
+            if response.status_code == 200:
+                return response.json()
+
+            print(f"ThunziAI get platform posts failed: {response.status_code} - {response.text}")
+            return []
+        except Exception as e:
+            print(f"ThunziAI get platform posts error: {str(e)}")
+            return []
+
+    def get_post_by_id(self, post_id: int) -> Optional[Dict]:
+        """
+        Get a specific post by ThunziAI post ID
+
+        Args:
+            post_id: ThunziAI's internal post ID
+
+        Returns:
+            Post data with all metrics, or None if not found
+        """
+        self._ensure_authenticated()
+
+        try:
+            response = self.session.get(
+                f"{self.BASE_URL}/api/posts/{post_id}"
+            )
+
+            if response.status_code == 200:
+                return response.json()
+
+            print(f"ThunziAI get post failed: {response.status_code}")
+            return None
+        except Exception as e:
+            print(f"ThunziAI get post error: {str(e)}")
+            return None
+
+    def get_post_insights(self, post_id: int) -> Optional[Dict]:
+        """
+        Get detailed insights for a post including sentiment analysis
+
+        Args:
+            post_id: ThunziAI's internal post ID
+
+        Returns:
+            {
+                "postId": number,
+                "post": {
+                    "id": number,
+                    "title": string,
+                    "description": string,
+                    "platform": string,
+                    "likes": number,
+                    "comments": number,
+                    "shares": number,
+                    "reach": number,
+                    "impressions": number,
+                    "sentiment": string,
+                    "sentimentScore": number,
+                    ...
+                },
+                "commentSentiment": {
+                    "positive": number,
+                    "neutral": number,
+                    "negative": number,
+                    "critical": number
+                }
+            }
+        """
+        self._ensure_authenticated()
+
+        try:
+            response = self.session.get(
+                f"{self.BASE_URL}/api/posts/{post_id}/insights"
+            )
+
+            if response.status_code == 200:
+                return response.json()
+
+            print(f"ThunziAI get post insights failed: {response.status_code}")
+            return None
+        except Exception as e:
+            print(f"ThunziAI get post insights error: {str(e)}")
+            return None
+
+    def get_post_comments(self, post_id: int, start_date: str = None, end_date: str = None) -> Optional[Dict]:
+        """
+        Get comments for a post with sentiment analysis
+
+        Args:
+            post_id: ThunziAI's internal post ID
+            start_date: Optional start date (YYYY-MM-DD)
+            end_date: Optional end date (YYYY-MM-DD)
+
+        Returns:
+            {
+                "postId": number,
+                "comments": [
+                    {
+                        "id": number,
+                        "text": string,
+                        "author": string,
+                        "likes": number,
+                        "sentiment": string,
+                        "sentimentScore": number,
+                        "createdAt": string
+                    },
+                    ...
+                ]
+            }
+        """
+        self._ensure_authenticated()
+
+        try:
+            params = {}
+            if start_date:
+                params['startDate'] = start_date
+            if end_date:
+                params['endDate'] = end_date
+
+            response = self.session.get(
+                f"{self.BASE_URL}/api/posts/{post_id}/comments",
+                params=params if params else None
+            )
+
+            if response.status_code == 200:
+                return response.json()
+
+            print(f"ThunziAI get post comments failed: {response.status_code}")
+            return None
+        except Exception as e:
+            print(f"ThunziAI get post comments error: {str(e)}")
+            return None
+
 
 # Singleton instance
 thunzi_service = ThunziAIService()

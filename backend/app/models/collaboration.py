@@ -113,6 +113,12 @@ class Collaboration(db.Model):
             if self.booking:
                 data['booking'] = self.booking.to_dict(include_relations=True)
 
+            # Include milestones for campaign-type collaborations
+            if self.collaboration_type == 'campaign':
+                from app.models.collaboration_milestone import CollaborationMilestone
+                milestones = CollaborationMilestone.query.filter_by(collaboration_id=self.id).order_by(CollaborationMilestone.milestone_number).all()
+                data['milestones'] = [milestone.to_dict(include_deliverables=True) for milestone in milestones]
+
         return data
 
     def __repr__(self):

@@ -8,7 +8,7 @@ Created: March 11, 2026
 Part of: Trust, Safety & Support Implementation Plan - Phase 2
 """
 
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from app import db
 from app.models.user import User
@@ -16,6 +16,7 @@ from app.models.support_ticket import SupportTicket
 from app.models.support_ticket_message import SupportTicketMessage
 from app.models.support_ticket_attachment import SupportTicketAttachment
 from datetime import datetime
+import traceback
 
 bp = Blueprint('support', __name__)
 
@@ -90,8 +91,11 @@ def create_ticket():
 
     except Exception as e:
         db.session.rollback()
-        print(f"Error creating support ticket: {str(e)}")
-        return jsonify({'success': False, 'error': 'Failed to create support ticket'}), 500
+        import traceback
+        from flask import current_app
+        error_msg = f"Error creating support ticket: {str(e)}\n{traceback.format_exc()}"
+        current_app.logger.error(f"SUPPORT TICKET CREATION FAILED:\n{error_msg}")
+        return jsonify({'success': False, 'error': 'Failed to create support ticket', 'details': str(e)}), 500
 
 
 @bp.route('/support/tickets', methods=['GET'])
@@ -143,7 +147,7 @@ def get_my_tickets():
         }), 200
 
     except Exception as e:
-        print(f"Error fetching tickets: {str(e)}")
+        current_app.logger.error(f"Error fetching tickets: {str(e)}\n{traceback.format_exc()}")
         return jsonify({'success': False, 'error': 'Failed to fetch tickets'}), 500
 
 
@@ -181,7 +185,7 @@ def get_ticket(ticket_id):
         }), 200
 
     except Exception as e:
-        print(f"Error fetching ticket: {str(e)}")
+        current_app.logger.error(f"Error fetching ticket: {str(e)}\n{traceback.format_exc()}")
         return jsonify({'success': False, 'error': 'Failed to fetch ticket'}), 500
 
 
@@ -244,7 +248,7 @@ def add_ticket_message(ticket_id):
 
     except Exception as e:
         db.session.rollback()
-        print(f"Error adding message: {str(e)}")
+        current_app.logger.error(f"Error adding message: {str(e)}\n{traceback.format_exc()}")
         return jsonify({'success': False, 'error': 'Failed to add message'}), 500
 
 
@@ -284,7 +288,7 @@ def close_ticket(ticket_id):
 
     except Exception as e:
         db.session.rollback()
-        print(f"Error closing ticket: {str(e)}")
+        current_app.logger.error(f"Error closing ticket: {str(e)}\n{traceback.format_exc()}")
         return jsonify({'success': False, 'error': 'Failed to close ticket'}), 500
 
 
@@ -324,7 +328,7 @@ def reopen_ticket(ticket_id):
 
     except Exception as e:
         db.session.rollback()
-        print(f"Error reopening ticket: {str(e)}")
+        current_app.logger.error(f"Error reopening ticket: {str(e)}\n{traceback.format_exc()}")
         return jsonify({'success': False, 'error': 'Failed to reopen ticket'}), 500
 
 
