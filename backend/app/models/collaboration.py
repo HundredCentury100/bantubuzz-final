@@ -68,7 +68,17 @@ class Collaboration(db.Model):
             return 0
 
         total_expected = len(self.deliverables)
-        total_approved = len(self.submitted_deliverables or [])
+
+        # For package collaborations, count approved deliverables from database
+        if self.collaboration_type == 'package':
+            from app.models.package_deliverable import PackageDeliverable
+            total_approved = PackageDeliverable.query.filter_by(
+                collaboration_id=self.id,
+                status='approved'
+            ).count()
+        else:
+            # For legacy or campaign collaborations, use JSON
+            total_approved = len(self.submitted_deliverables or [])
 
         return int((total_approved / total_expected) * 100)
 
@@ -118,6 +128,18 @@ class Collaboration(db.Model):
                 from app.models.collaboration_milestone import CollaborationMilestone
                 milestones = CollaborationMilestone.query.filter_by(collaboration_id=self.id).order_by(CollaborationMilestone.milestone_number).all()
                 data['milestones'] = [milestone.to_dict(include_deliverables=True) for milestone in milestones]
+
+            # Include package deliverables from database for package-type collaborations
+            if self.collaboration_type == 'package':
+                from app.models.package_deliverable import PackageDeliverable
+                package_deliverables = PackageDeliverable.query.filter_by(
+                    collaboration_id=self.id
+                ).order_by(PackageDeliverable.submitted_at).all()
+                data['package_deliverables'] = [d.to_dict() for d in package_deliverables]
+
+                # Separate by status for frontend convenience
+                data['draft_deliverables'] = [d.to_dict() for d in package_deliverables if d.status in ['pending_review', 'revision_requested']]
+                data['submitted_deliverables'] = [d.to_dict() for d in package_deliverables if d.status == 'approved']
 
         return data
 

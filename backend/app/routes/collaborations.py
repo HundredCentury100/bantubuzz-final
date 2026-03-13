@@ -2,7 +2,7 @@ from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from datetime import datetime, timedelta
 from app import db, socketio
-from app.models import Collaboration, BrandProfile, CreatorProfile, User, CollaborationMilestone, MilestoneDeliverable
+from app.models import Collaboration, BrandProfile, CreatorProfile, User, CollaborationMilestone, MilestoneDeliverable, PackageDeliverable
 from app.utils.notifications import notify_collaboration_status, notify_collaboration_update
 
 bp = Blueprint('collaborations', __name__)
@@ -178,12 +178,20 @@ def submit_draft_deliverable(collab_id):
         # The limit is determined by the number of deliverables specified in the package/campaign
         expected_deliverables_count = len(collaboration.deliverables or [])
 
-        # Count only unique deliverables (not counting revision_requested status which are edits)
-        draft_count = len([d for d in (collaboration.draft_deliverables or []) if d.get('status') != 'revision_requested'])
-        submitted_count = len(collaboration.submitted_deliverables or [])
-        total_unique_deliverables = draft_count + submitted_count
+        # Count deliverables from database (package collaborations)
+        draft_count = PackageDeliverable.query.filter_by(
+            collaboration_id=collab_id,
+            status='pending_review'
+        ).count()
 
-        print(f"[SUBMIT_DRAFT] Expected: {expected_deliverables_count}, Draft: {draft_count}, Submitted: {submitted_count}, Total: {total_unique_deliverables}")
+        approved_count = PackageDeliverable.query.filter_by(
+            collaboration_id=collab_id,
+            status='approved'
+        ).count()
+
+        total_unique_deliverables = draft_count + approved_count
+
+        print(f"[SUBMIT_DRAFT] Expected: {expected_deliverables_count}, Draft: {draft_count}, Approved: {approved_count}, Total: {total_unique_deliverables}")
 
         if total_unique_deliverables >= expected_deliverables_count:
             return jsonify({
@@ -191,41 +199,21 @@ def submit_draft_deliverable(collab_id):
                 'message': f'You have already submitted {total_unique_deliverables} of {expected_deliverables_count} expected deliverables. You can only edit existing deliverables that need revision.'
             }), 400
 
-        # Generate unique ID for deliverable
-        # Find the max ID from both draft and submitted deliverables
-        existing_ids = []
-        if collaboration.draft_deliverables:
-            existing_ids.extend([d.get('id', 0) for d in collaboration.draft_deliverables])
-        if collaboration.submitted_deliverables:
-            existing_ids.extend([d.get('id', 0) for d in collaboration.submitted_deliverables])
-
-        next_id = max(existing_ids) + 1 if existing_ids else 1
-
-        # Create deliverable object
-        deliverable = {
-            'id': next_id,
-            'title': data['title'],
-            'url': data['url'],
-            'description': data.get('description', ''),
-            'submitted_at': datetime.utcnow().isoformat(),
-            'type': data.get('type', 'file'),
-            'status': 'pending_review'
-        }
-
-        # Add to draft deliverables
-        if collaboration.draft_deliverables is None:
-            collaboration.draft_deliverables = []
-
-        collaboration.draft_deliverables.append(deliverable)
+        # Create PackageDeliverable database record (NOT JSON)
+        deliverable = PackageDeliverable(
+            collaboration_id=collab_id,
+            title=data['title'],
+            url=data['url'],
+            description=data.get('description', ''),
+            status='pending_review'
+        )
+        db.session.add(deliverable)
+        db.session.flush()  # Get the deliverable ID
 
         # Update last update
         collaboration.last_update = f"Submitted deliverable for review: {data['title']}"
         collaboration.last_update_date = datetime.utcnow()
         collaboration.updated_at = datetime.utcnow()
-
-        # Mark the flag as modified for JSON field
-        from sqlalchemy.orm.attributes import flag_modified
-        flag_modified(collaboration, 'draft_deliverables')
 
         db.session.commit()
 
@@ -244,7 +232,7 @@ def submit_draft_deliverable(collab_id):
 
         return jsonify({
             'message': 'Deliverable submitted for review',
-            'deliverable': deliverable,
+            'deliverable': deliverable.to_dict(),
             'collaboration': collaboration.to_dict()
         }), 201
 
@@ -275,37 +263,29 @@ def approve_deliverable(collab_id, deliverable_id):
             return jsonify({'error': 'Unauthorized'}), 403
 
         print(f"[APPROVE_DELIVERABLE] Starting approval for collaboration {collab_id}, deliverable {deliverable_id}")
-        print(f"[APPROVE_DELIVERABLE] Current state - Drafts: {len(collaboration.draft_deliverables or [])}, Submitted: {len(collaboration.submitted_deliverables or [])}, Expected: {len(collaboration.deliverables or [])}")
 
-        # Find the draft deliverable
-        draft_deliverables = collaboration.draft_deliverables or []
-        deliverable_to_approve = None
-        remaining_drafts = []
-
-        for d in draft_deliverables:
-            if d.get('id') == deliverable_id:
-                deliverable_to_approve = d.copy()
-                deliverable_to_approve['status'] = 'approved'
-                deliverable_to_approve['approved_at'] = datetime.utcnow().isoformat()
-                print(f"[APPROVE_DELIVERABLE] Found deliverable to approve: {deliverable_to_approve['title']}")
-            else:
-                remaining_drafts.append(d)
-
-        if not deliverable_to_approve:
-            print(f"[APPROVE_DELIVERABLE] ERROR: Deliverable {deliverable_id} not found in drafts")
+        # Get deliverable from database (NOT JSON)
+        deliverable_to_approve = PackageDeliverable.query.get(deliverable_id)
+        if not deliverable_to_approve or deliverable_to_approve.collaboration_id != collab_id:
+            print(f"[APPROVE_DELIVERABLE] ERROR: Deliverable {deliverable_id} not found")
             return jsonify({'error': 'Deliverable not found'}), 404
 
-        # Move to submitted deliverables
-        # CRITICAL: Create new lists to ensure SQLAlchemy tracks changes
-        # This avoids the "Can't flag attribute modified; it's not present in object state" error
-        submitted_list = list(collaboration.submitted_deliverables or [])
-        submitted_list.append(deliverable_to_approve)
+        if deliverable_to_approve.status != 'pending_review':
+            return jsonify({'error': 'Can only approve deliverables pending review'}), 400
 
-        # Assign new lists to trigger SQLAlchemy change detection
-        collaboration.submitted_deliverables = submitted_list
-        collaboration.draft_deliverables = remaining_drafts
+        print(f"[APPROVE_DELIVERABLE] Found deliverable to approve: {deliverable_to_approve.title}")
 
-        print(f"[APPROVE_DELIVERABLE] After move - Drafts: {len(collaboration.draft_deliverables)}, Submitted: {len(collaboration.submitted_deliverables)}")
+        # Approve deliverable by updating status
+        deliverable_to_approve.status = 'approved'
+        deliverable_to_approve.approved_at = datetime.utcnow()
+
+        # Count approved deliverables
+        approved_count = PackageDeliverable.query.filter_by(
+            collaboration_id=collab_id,
+            status='approved'
+        ).count()
+
+        print(f"[APPROVE_DELIVERABLE] After approval - Approved: {approved_count}, Expected: {len(collaboration.deliverables or [])}")
 
         # Auto-calculate progress
         old_progress = collaboration.progress_percentage
@@ -415,7 +395,7 @@ def approve_deliverable(collab_id, deliverable_id):
                 # Don't fail the approval
         else:
             # Normal update
-            collaboration.last_update = f"Deliverable approved: {deliverable_to_approve['title']}"
+            collaboration.last_update = f"Deliverable approved: {deliverable_to_approve.title}"
             print(f"[APPROVE_DELIVERABLE] Normal approval (progress at {collaboration.progress_percentage}%)")
 
         collaboration.last_update_date = datetime.utcnow()
@@ -490,21 +470,16 @@ def request_revision(collab_id, deliverable_id):
         if not revision_notes:
             return jsonify({'error': 'Revision notes are required'}), 400
 
-        # Find the draft deliverable
-        draft_deliverables = collaboration.draft_deliverables or []
-        deliverable_found = False
-
-        for d in draft_deliverables:
-            if d.get('id') == deliverable_id:
-                d['status'] = 'revision_requested'
-                d['revision_notes'] = revision_notes
-                d['revision_requested_at'] = datetime.utcnow().isoformat()
-                deliverable_found = True
-                deliverable_title = d['title']
-                break
-
-        if not deliverable_found:
+        # Get deliverable from database (NOT JSON)
+        deliverable = PackageDeliverable.query.get(deliverable_id)
+        if not deliverable or deliverable.collaboration_id != collab_id:
             return jsonify({'error': 'Deliverable not found'}), 404
+
+        # Update deliverable status
+        deliverable.status = 'revision_requested'
+        deliverable.revision_notes = revision_notes
+        deliverable.revision_requested_at = datetime.utcnow()
+        deliverable_title = deliverable.title
 
         # Track revision request
         creator = collaboration.creator
@@ -534,9 +509,8 @@ def request_revision(collab_id, deliverable_id):
         collaboration.last_update_date = datetime.utcnow()
         collaboration.updated_at = datetime.utcnow()
 
-        # Mark the flags as modified for JSON fields
+        # Mark the flags as modified for JSON fields (only revision_requests)
         from sqlalchemy.orm.attributes import flag_modified
-        flag_modified(collaboration, 'draft_deliverables')
         flag_modified(collaboration, 'revision_requests')
 
         db.session.commit()
@@ -778,41 +752,30 @@ def update_deliverable(collab_id, deliverable_id):
         if 'title' not in data or 'url' not in data:
             return jsonify({'error': 'Title and URL are required'}), 400
 
-        # Find the draft deliverable
-        draft_deliverables = collaboration.draft_deliverables or []
-        deliverable_updated = False
-
-        for d in draft_deliverables:
-            if d.get('id') == deliverable_id:
-                # Only allow editing if status is revision_requested
-                if d.get('status') != 'revision_requested':
-                    return jsonify({'error': 'Can only edit deliverables with revision requested'}), 400
-
-                # Update the deliverable
-                d['title'] = data['title']
-                d['url'] = data['url']
-                d['description'] = data.get('description', '')
-                d['type'] = data.get('type', 'file')
-                d['status'] = 'pending_review'  # Reset to pending review after update
-                d['submitted_at'] = datetime.utcnow().isoformat()
-                # Clear revision notes
-                d.pop('revision_notes', None)
-                d.pop('revision_requested_at', None)
-                deliverable_updated = True
-                deliverable_title = d['title']
-                break
-
-        if not deliverable_updated:
+        # Get deliverable from database (NOT JSON)
+        deliverable = PackageDeliverable.query.get(deliverable_id)
+        if not deliverable or deliverable.collaboration_id != collab_id:
             return jsonify({'error': 'Deliverable not found'}), 404
+
+        # Only allow editing if status is revision_requested
+        if deliverable.status != 'revision_requested':
+            return jsonify({'error': 'Can only edit deliverables with revision requested'}), 400
+
+        # Update the deliverable
+        deliverable.title = data['title']
+        deliverable.url = data['url']
+        deliverable.description = data.get('description', '')
+        deliverable.status = 'pending_review'  # Reset to pending review after update
+        deliverable.submitted_at = datetime.utcnow()
+        # Clear revision notes
+        deliverable.revision_notes = None
+        deliverable.revision_requested_at = None
+        deliverable_title = deliverable.title
 
         # Update last update
         collaboration.last_update = f"Updated deliverable: {deliverable_title}"
         collaboration.last_update_date = datetime.utcnow()
         collaboration.updated_at = datetime.utcnow()
-
-        # Mark the flag as modified for JSON field
-        from sqlalchemy.orm.attributes import flag_modified
-        flag_modified(collaboration, 'draft_deliverables')
 
         db.session.commit()
 
@@ -1416,14 +1379,13 @@ def submit_package_deliverable_url(collab_id, deliverable_id):
     """
     Submit post URL for a package deliverable (creator only)
 
-    For package-based collaborations, deliverables are stored in JSON.
+    For package-based collaborations, deliverables are now stored in database.
     This endpoint updates the deliverable's URL and parses it for analytics.
 
-    Part of: Brand Analytics Implementation - Phase 1
+    Part of: Brand Analytics Implementation - Phase 1 (Updated for database storage)
     """
     try:
         from flask import current_app
-        from app.utils.post_url_parser import PostURLParser
         import traceback
 
         user_id = int(get_jwt_identity())
@@ -1445,54 +1407,31 @@ def submit_package_deliverable_url(collab_id, deliverable_id):
         if not post_url:
             return jsonify({'error': 'Post URL is required'}), 400
 
-        # Find the deliverable in submitted_deliverables
-        submitted_deliverables = collaboration.submitted_deliverables or []
-        deliverable = None
-        deliverable_index = None
-
-        for idx, d in enumerate(submitted_deliverables):
-            if d.get('id') == deliverable_id:
-                deliverable = d
-                deliverable_index = idx
-                break
-
-        if not deliverable:
+        # Get deliverable from database (NOT JSON)
+        deliverable = PackageDeliverable.query.get(deliverable_id)
+        if not deliverable or deliverable.collaboration_id != collab_id:
             return jsonify({'error': 'Deliverable not found'}), 404
 
-        # Parse and validate URL using PostURLParser
-        parsed = PostURLParser.parse_url(post_url)
+        # Update URL
+        deliverable.url = post_url
 
-        if parsed:
-            # Update deliverable with parsed data
-            deliverable['url'] = post_url
-            deliverable['post_platform'] = parsed['platform']
-            deliverable['post_id'] = parsed['post_id']
-            deliverable['post_url_validated'] = True
-            deliverable['url_submitted_at'] = datetime.utcnow().isoformat()
-
-            # Update the deliverable in the list
-            submitted_deliverables[deliverable_index] = deliverable
-            collaboration.submitted_deliverables = submitted_deliverables
-
-            # Mark as modified for SQLAlchemy
-            from sqlalchemy.orm.attributes import flag_modified
-            flag_modified(collaboration, 'submitted_deliverables')
-
+        # Parse and validate URL
+        if deliverable.parse_and_validate_url():
             db.session.commit()
 
             current_app.logger.info(
                 f"Package deliverable URL submitted: CollabID={collab_id}, DeliverableID={deliverable_id}, "
-                f"Platform={parsed['platform']}, PostID={parsed['post_id']}"
+                f"Platform={deliverable.post_platform}, PostID={deliverable.post_id}"
             )
 
             return jsonify({
                 'success': True,
                 'message': 'Post URL submitted and validated successfully',
-                'deliverable': deliverable,
+                'deliverable': deliverable.to_dict(),
                 'parsed': {
-                    'platform': parsed['platform'],
-                    'post_id': parsed['post_id'],
-                    'validated': True
+                    'platform': deliverable.post_platform,
+                    'post_id': deliverable.post_id,
+                    'validated': deliverable.post_url_validated
                 }
             }), 200
         else:
