@@ -13,7 +13,8 @@ class PostMetrics(db.Model):
 
     # Links to BantuBuzz entities
     collaboration_id = db.Column(db.Integer, db.ForeignKey('collaborations.id'), nullable=False)
-    deliverable_id = db.Column(db.Integer, db.ForeignKey('milestone_deliverables.id'), unique=True, nullable=False)
+    deliverable_id = db.Column(db.Integer, nullable=False)  # ID of either milestone or package deliverable
+    deliverable_type = db.Column(db.String(20), nullable=False)  # 'milestone' or 'package'
     creator_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
 
     # ThunziAI IDs
@@ -64,8 +65,18 @@ class PostMetrics(db.Model):
 
     # Relationships
     collaboration = db.relationship('Collaboration', backref='post_metrics')
-    deliverable = db.relationship('MilestoneDeliverable', backref='metrics')
     creator = db.relationship('User', backref='post_metrics')
+    # Note: Deliverable relationship handled dynamically based on deliverable_type
+
+    def get_deliverable(self):
+        """Get the deliverable object based on deliverable_type"""
+        if self.deliverable_type == 'milestone':
+            from app.models import MilestoneDeliverable
+            return MilestoneDeliverable.query.get(self.deliverable_id)
+        elif self.deliverable_type == 'package':
+            from app.models import PackageDeliverable
+            return PackageDeliverable.query.get(self.deliverable_id)
+        return None
 
     def calculate_engagement(self):
         """Calculate total engagement and engagement rate"""
@@ -83,6 +94,7 @@ class PostMetrics(db.Model):
             'id': self.id,
             'collaboration_id': self.collaboration_id,
             'deliverable_id': self.deliverable_id,
+            'deliverable_type': self.deliverable_type,
             'creator_id': self.creator_id,
             'thunzi_platform_id': self.thunzi_platform_id,
             'thunzi_post_id': self.thunzi_post_id,

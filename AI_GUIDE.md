@@ -230,6 +230,29 @@ Key patterns from BrowseCreators.jsx:
 
 ## 🚀 Development & Deployment Process
 
+### ⚠️ Core Development Principles
+
+#### NO SHORTCUTS
+
+**We are building an actual product for real users.**
+All features MUST be implemented completely for ALL collaboration types and ALL user scenarios.
+
+**Rules:**
+- ✅ **Complete Implementation**: When building a feature, implement it for BOTH milestone-based collaborations AND package-based collaborations
+- ✅ **Test All Paths**: Verify functionality works for both brands and creators
+- ✅ **No Assumptions**: Don't assume users will only use features in one specific way
+- ✅ **Production Quality**: Every feature should be production-ready, fully tested, and handle edge cases
+- ❌ **NEVER** implement a feature partially or only for one collaboration type
+- ❌ **NEVER** skip implementing something because "users might not use it that way"
+- ❌ **NEVER** take shortcuts that compromise functionality
+
+**Example from Real Issue (March 13, 2026):**
+- ❌ WRONG: Implementing analytics ONLY for milestone collaborations, assuming package users won't need it
+- ✅ CORRECT: Implementing analytics for BOTH collaboration types from day one
+- **Result of Shortcut**: User submitted Facebook post URL, got validated checkmark, but analytics dashboard didn't appear because it wasn't built for package collaborations
+
+**If unsure about scope, always ask the user for clarification rather than making assumptions.**
+
 ### Local Development
 
 ```bash

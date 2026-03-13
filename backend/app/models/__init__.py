@@ -40,6 +40,7 @@ from .support_ticket_attachment import SupportTicketAttachment
 # Import milestone models BEFORE their parent models
 from .collaboration_milestone import CollaborationMilestone
 from .milestone_deliverable import MilestoneDeliverable
+from .package_deliverable import PackageDeliverable
 from .brief_milestone import BriefMilestone
 from .proposal_milestone import ProposalMilestone
 from .campaign_milestone import CampaignMilestone
@@ -79,6 +80,7 @@ __all__ = [
     'ProposalMilestone',
     'CollaborationMilestone',
     'MilestoneDeliverable',
+    'PackageDeliverable',
     'Brief',
     'BriefMilestone',
     'CampaignMilestone',

@@ -8,6 +8,7 @@ Part of: Brand Analytics Implementation - Phase 2
 from app import db
 from app.models import (
     MilestoneDeliverable,
+    PackageDeliverable,
     PostMetrics,
     ConnectedPlatform,
     User,
@@ -15,7 +16,7 @@ from app.models import (
 )
 from app.services.thunzi_service import thunzi_service
 from datetime import datetime, timedelta
-from typing import Optional, Dict
+from typing import Optional, Dict, Union
 import traceback
 
 
@@ -23,7 +24,7 @@ class PostMetricsService:
     """Service for syncing post metrics from ThunziAI"""
 
     @staticmethod
-    def sync_deliverable_metrics(deliverable_id: int) -> Dict:
+    def sync_deliverable_metrics(deliverable_id: int, deliverable_type: str = 'milestone') -> Dict:
         """
         Sync metrics for a specific deliverable from ThunziAI
 
@@ -36,7 +37,8 @@ class PostMetricsService:
         6. Stores/updates metrics in database
 
         Args:
-            deliverable_id: Milestone deliverable ID
+            deliverable_id: Deliverable ID (milestone or package)
+            deliverable_type: 'milestone' or 'package' (default: 'milestone')
 
         Returns:
             {
@@ -49,8 +51,18 @@ class PostMetricsService:
         from flask import current_app
 
         try:
-            # Get deliverable
-            deliverable = MilestoneDeliverable.query.get(deliverable_id)
+            # Get deliverable based on type
+            if deliverable_type == 'milestone':
+                deliverable = MilestoneDeliverable.query.get(deliverable_id)
+            elif deliverable_type == 'package':
+                deliverable = PackageDeliverable.query.get(deliverable_id)
+            else:
+                return {
+                    'success': False,
+                    'message': f'Invalid deliverable type: {deliverable_type}',
+                    'metrics': None,
+                    'error': 'Invalid deliverable type'
+                }
 
             if not deliverable:
                 return {
@@ -61,7 +73,7 @@ class PostMetricsService:
                 }
 
             # Check if post URL was submitted
-            if not deliverable.post_url or not deliverable.post_url_validated:
+            if not deliverable.url or not deliverable.post_url_validated:
                 return {
                     'success': False,
                     'message': 'No validated post URL for this deliverable',
@@ -69,8 +81,13 @@ class PostMetricsService:
                     'error': 'Post URL not submitted or not validated'
                 }
 
-            # Get creator
-            collaboration = deliverable.milestone.collaboration
+            # Get creator and collaboration based on deliverable type
+            if deliverable_type == 'milestone':
+                collaboration = deliverable.milestone.collaboration
+            else:  # package
+                from app.models import Collaboration
+                collaboration = Collaboration.query.get(deliverable.collaboration_id)
+
             creator_id = collaboration.creator_id
 
             # Get creator's connected platform for this platform type
@@ -144,15 +161,19 @@ class PostMetricsService:
                 insights = {'post': matching_post, 'commentSentiment': {}}
 
             # Get or create PostMetrics record
-            metrics = PostMetrics.query.filter_by(deliverable_id=deliverable_id).first()
+            metrics = PostMetrics.query.filter_by(
+                deliverable_id=deliverable_id,
+                deliverable_type=deliverable_type
+            ).first()
 
             if not metrics:
                 metrics = PostMetrics(
                     collaboration_id=collaboration.id,
                     deliverable_id=deliverable_id,
+                    deliverable_type=deliverable_type,
                     creator_id=creator_id,
                     thunzi_platform_id=connected_platform.thunzi_platform_id,
-                    post_url=deliverable.post_url,
+                    post_url=deliverable.url,  # Use .url for both types
                     post_platform=deliverable.post_platform,
                     post_id=deliverable.post_id
                 )
@@ -230,7 +251,10 @@ class PostMetricsService:
 
             # Try to update sync status in database
             try:
-                metrics = PostMetrics.query.filter_by(deliverable_id=deliverable_id).first()
+                metrics = PostMetrics.query.filter_by(
+                    deliverable_id=deliverable_id,
+                    deliverable_type=deliverable_type
+                ).first()
                 if metrics:
                     metrics.sync_status = 'failed'
                     metrics.sync_error = error_msg[:500]  # Truncate error message
@@ -281,11 +305,22 @@ class PostMetricsService:
 
             # Get all deliverables with submitted URLs
             deliverables = []
-            if collaboration.milestones:
+
+            # For milestone-based collaborations
+            if collaboration.collaboration_type == 'campaign' and collaboration.milestones:
                 for milestone in collaboration.milestones:
                     for deliverable in milestone.deliverables:
                         if deliverable.post_url_validated:
-                            deliverables.append(deliverable)
+                            deliverables.append(('milestone', deliverable))
+
+            # For package-based collaborations
+            elif collaboration.collaboration_type == 'package':
+                package_deliverables = PackageDeliverable.query.filter_by(
+                    collaboration_id=collaboration_id
+                ).all()
+                for deliverable in package_deliverables:
+                    if deliverable.post_url_validated:
+                        deliverables.append(('package', deliverable))
 
             if not deliverables:
                 return {
@@ -301,10 +336,14 @@ class PostMetricsService:
             synced = 0
             failed = 0
 
-            for deliverable in deliverables:
-                result = PostMetricsService.sync_deliverable_metrics(deliverable.id)
+            for deliverable_type, deliverable in deliverables:
+                result = PostMetricsService.sync_deliverable_metrics(
+                    deliverable.id,
+                    deliverable_type=deliverable_type
+                )
                 results.append({
                     'deliverable_id': deliverable.id,
+                    'deliverable_type': deliverable_type,
                     'deliverable_title': deliverable.title,
                     'success': result['success'],
                     'message': result['message']
@@ -339,17 +378,21 @@ class PostMetricsService:
             }
 
     @staticmethod
-    def get_deliverable_metrics(deliverable_id: int) -> Optional[Dict]:
+    def get_deliverable_metrics(deliverable_id: int, deliverable_type: str = 'milestone') -> Optional[Dict]:
         """
         Get cached metrics for a deliverable
 
         Args:
             deliverable_id: Deliverable ID
+            deliverable_type: 'milestone' or 'package' (default: 'milestone')
 
         Returns:
             Metrics dict or None if not found
         """
-        metrics = PostMetrics.query.filter_by(deliverable_id=deliverable_id).first()
+        metrics = PostMetrics.query.filter_by(
+            deliverable_id=deliverable_id,
+            deliverable_type=deliverable_type
+        ).first()
 
         if metrics:
             return metrics.to_dict()
