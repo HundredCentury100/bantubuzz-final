@@ -23,7 +23,7 @@ class PostURLParser:
             r'instagram\.com/tv/([A-Za-z0-9_-]+)',          # IGTV
         ],
         'facebook': [
-            r'facebook\.com/[^/]+/posts/([0-9]+)',                      # Page post
+            r'facebook\.com/[^/]+/posts/([A-Za-z0-9_-]+)',              # Page post (supports pfbid and numeric IDs)
             r'facebook\.com/photo\.php\?fbid=([0-9]+)',                 # Photo
             r'facebook\.com/permalink\.php\?story_fbid=([0-9]+)',      # Permalink
             r'fb\.watch/([A-Za-z0-9_-]+)',                             # FB Watch
