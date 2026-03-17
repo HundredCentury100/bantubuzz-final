@@ -20,6 +20,7 @@ const ConnectPlatforms = () => {
   const [selectedPlatform, setSelectedPlatform] = useState('');
   const [accountName, setAccountName] = useState('');
   const [accessToken, setAccessToken] = useState('');
+  const [youtubeAuthWindow, setYoutubeAuthWindow] = useState(null);
 
   // Available platforms
   const availablePlatforms = [
@@ -55,6 +56,9 @@ const ConnectPlatforms = () => {
       color: 'from-red-600 to-red-700',
       iconColor: 'text-red-600',
       requiresToken: false,
+      requiresOAuth: true,
+      useCustomOAuth: true,
+      oauthNote: 'YouTube requires OAuth authentication for analytics access.',
       icon: (
         <svg className="w-12 h-12" viewBox="0 0 24 24" fill="currentColor">
           <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
@@ -81,6 +85,7 @@ const ConnectPlatforms = () => {
       color: 'from-gray-900 to-black',
       iconColor: 'text-gray-900',
       requiresToken: false,
+      comingSoon: true,
       icon: (
         <svg className="w-12 h-12" viewBox="0 0 24 24" fill="currentColor">
           <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
@@ -109,6 +114,79 @@ const ConnectPlatforms = () => {
       toast.error('Failed to load connected platforms');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleConnectYouTube = async () => {
+    try {
+      setConnecting('youtube');
+
+      // Get the YouTube OAuth URL from backend
+      const response = await api.get('/creator/platforms/youtube/auth-url');
+
+      if (response.data.success) {
+        // Open YouTube OAuth in a popup
+        const width = 600;
+        const height = 700;
+        const left = window.screen.width / 2 - width / 2;
+        const top = window.screen.height / 2 - height / 2;
+
+        const authWindow = window.open(
+          response.data.authUrl,
+          'YouTube OAuth',
+          `width=${width},height=${height},left=${left},top=${top}`
+        );
+
+        setYoutubeAuthWindow(authWindow);
+
+        // Listen for OAuth callback
+        const handleMessage = async (event) => {
+          // Security check
+          if (event.origin !== window.location.origin) return;
+
+          if (event.data.type === 'youtube-oauth-success') {
+            window.removeEventListener('message', handleMessage);
+
+            // Connect the platform with the OAuth data
+            const connectResponse = await api.post('/creator/platforms/connect', {
+              platform: 'youtube',
+              accountName: event.data.channelTitle,
+              accountId: event.data.channelId,
+              accessToken: event.data.accessToken,
+              refreshToken: event.data.refreshToken,
+              tokenExpiry: new Date(Date.now() + event.data.expiresIn * 1000).toISOString()
+            });
+
+            if (connectResponse.data.success) {
+              toast.success('YouTube connected successfully!');
+              fetchPlatforms();
+            }
+            setConnecting(null);
+          } else if (event.data.type === 'youtube-oauth-error') {
+            window.removeEventListener('message', handleMessage);
+            toast.error(event.data.error || 'Failed to connect YouTube');
+            setConnecting(null);
+          }
+        };
+
+        window.addEventListener('message', handleMessage);
+
+        // Check if window was closed without completing auth
+        const checkClosed = setInterval(() => {
+          if (authWindow && authWindow.closed) {
+            clearInterval(checkClosed);
+            window.removeEventListener('message', handleMessage);
+            if (connecting === 'youtube') {
+              setConnecting(null);
+              toast.error('YouTube authentication was cancelled');
+            }
+          }
+        }, 1000);
+      }
+    } catch (error) {
+      console.error('YouTube OAuth error:', error);
+      toast.error(error.response?.data?.error || 'Failed to initiate YouTube OAuth');
+      setConnecting(null);
     }
   };
 
@@ -342,7 +420,14 @@ const ConnectPlatforms = () => {
                       </div>
                       <h3 className="text-lg md:text-xl font-bold text-dark">{platform.name}</h3>
                     </div>
-                    {platform.id === 'facebook' ? (
+                    {platform.comingSoon ? (
+                      <button
+                        disabled
+                        className="w-full py-2.5 md:py-3 rounded-full font-medium transition-colors text-sm md:text-base bg-gray-200 text-gray-500 cursor-not-allowed"
+                      >
+                        Coming Soon
+                      </button>
+                    ) : platform.id === 'facebook' ? (
                       <button
                         onClick={() => connectFacebookPage(fetchPlatforms)}
                         disabled={connected || isFacebookConnecting || !isSDKLoaded}
@@ -353,6 +438,18 @@ const ConnectPlatforms = () => {
                         }`}
                       >
                         {connected ? 'Already Connected' : isFacebookConnecting ? 'Connecting...' : !isSDKLoaded ? 'Loading Facebook...' : 'Connect with Facebook'}
+                      </button>
+                    ) : platform.id === 'youtube' ? (
+                      <button
+                        onClick={handleConnectYouTube}
+                        disabled={connected || connecting === 'youtube'}
+                        className={`w-full py-2.5 md:py-3 rounded-full font-medium transition-colors text-sm md:text-base ${
+                          connected
+                            ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                            : 'bg-dark text-white hover:bg-gray-800 disabled:opacity-50'
+                        }`}
+                      >
+                        {connected ? 'Already Connected' : connecting === 'youtube' ? 'Connecting...' : 'Connect with YouTube'}
                       </button>
                     ) : (
                       <button

@@ -237,6 +237,211 @@ def connect_platform():
         return jsonify({'error': str(e)}), 500
 
 
+@platforms_bp.route('/api/creator/platforms/youtube/auth-url', methods=['GET'])
+@jwt_required()
+def get_youtube_auth_url():
+    """
+    Get YouTube OAuth authorization URL
+
+    Returns the URL to redirect the user to for YouTube OAuth consent
+    """
+    try:
+        # YouTube OAuth credentials from ThunziAI docs
+        client_id = '1052058162489-6522oei5bjsalcgm0hmgku927lumqa06.apps.googleusercontent.com'
+        redirect_uri = f"{os.getenv('BACKEND_URL', 'https://bantubuzz.com')}/api/creator/platforms/youtube/callback"
+
+        # YouTube OAuth scopes for analytics and channel data
+        scopes = [
+            'https://www.googleapis.com/auth/youtube.readonly',
+            'https://www.googleapis.com/auth/yt-analytics.readonly'
+        ]
+
+        auth_url = (
+            'https://accounts.google.com/o/oauth2/v2/auth?'
+            f'client_id={client_id}&'
+            f'redirect_uri={redirect_uri}&'
+            'response_type=code&'
+            f'scope={" ".join(scopes)}&'
+            'access_type=offline&'
+            'prompt=consent'
+        )
+
+        return jsonify({
+            'success': True,
+            'authUrl': auth_url,
+            'redirectUri': redirect_uri
+        }), 200
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@platforms_bp.route('/api/creator/platforms/youtube/callback', methods=['GET'])
+def youtube_oauth_callback():
+    """
+    YouTube OAuth callback endpoint - NO JWT REQUIRED (called from OAuth redirect)
+
+    This receives the authorization code from YouTube in the callback URL
+    The frontend will then call /exchange-code with JWT to exchange it for tokens
+    """
+    # Just redirect to frontend callback page with the code
+    code = request.args.get('code')
+    error = request.args.get('error')
+
+    frontend_url = os.getenv('FRONTEND_URL', 'https://bantubuzz.com')
+
+    if error:
+        return f"""
+        <html>
+        <body>
+        <script>
+            window.opener.postMessage({{
+                type: 'youtube-oauth-error',
+                error: '{error}'
+            }}, '{frontend_url}');
+            window.close();
+        </script>
+        </body>
+        </html>
+        """
+
+    if code:
+        return f"""
+        <html>
+        <body>
+        <div style="display: flex; align-items: center; justify-center: center; height: 100vh; font-family: sans-serif;">
+            <div style="text-align: center;">
+                <div style="border: 4px solid #f3f3f3; border-top: 4px solid #FFDD00; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto 20px;"></div>
+                <p>Completing authentication...</p>
+            </div>
+        </div>
+        <style>
+            @keyframes spin {{
+                0% {{ transform: rotate(0deg); }}
+                100% {{ transform: rotate(360deg); }}
+            }}
+        </style>
+        <script>
+            fetch('{frontend_url}/api/creator/platforms/youtube/exchange-code', {{
+                method: 'POST',
+                headers: {{
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + localStorage.getItem('token')
+                }},
+                body: JSON.stringify({{ code: '{code}' }})
+            }})
+            .then(response => response.json())
+            .then(data => {{
+                if (data.success) {{
+                    window.opener.postMessage({{
+                        type: 'youtube-oauth-success',
+                        ...data
+                    }}, '{frontend_url}');
+                }} else {{
+                    window.opener.postMessage({{
+                        type: 'youtube-oauth-error',
+                        error: data.error || 'Authentication failed'
+                    }}, '{frontend_url}');
+                }}
+                window.close();
+            }})
+            .catch(error => {{
+                window.opener.postMessage({{
+                    type: 'youtube-oauth-error',
+                    error: error.message || 'Authentication failed'
+                }}, '{frontend_url}');
+                window.close();
+            }});
+        </script>
+        </body>
+        </html>
+        """
+
+    return jsonify({'error': 'No code or error received'}), 400
+
+
+@platforms_bp.route('/api/creator/platforms/youtube/exchange-code', methods=['POST'])
+@jwt_required()
+def exchange_youtube_code():
+    """
+    Exchange YouTube authorization code for access tokens
+
+    This endpoint is used after the OAuth callback to exchange the code for tokens
+    """
+    try:
+        current_user_id = get_jwt_identity()
+        user = User.query.get(current_user_id)
+
+        if not user or user.user_type != 'creator':
+            return jsonify({'error': 'Creator account required'}), 403
+
+        data = request.json
+        auth_code = data.get('code')
+
+        if not auth_code:
+            return jsonify({'error': 'Authorization code is required'}), 400
+
+        # YouTube OAuth credentials
+        client_id = '1052058162489-6522oei5bjsalcgm0hmgku927lumqa06.apps.googleusercontent.com'
+        client_secret = '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'
+        redirect_uri = f"{os.getenv('BACKEND_URL', 'https://bantubuzz.com')}/api/creator/platforms/youtube/callback"
+
+        # Exchange code for tokens
+        token_url = 'https://oauth2.googleapis.com/token'
+        token_data = {
+            'code': auth_code,
+            'client_id': client_id,
+            'client_secret': client_secret,
+            'redirect_uri': redirect_uri,
+            'grant_type': 'authorization_code'
+        }
+
+        response = requests.post(token_url, data=token_data)
+
+        if response.status_code != 200:
+            return jsonify({'error': f'Failed to exchange code: {response.text}'}), 400
+
+        tokens = response.json()
+        access_token = tokens.get('access_token')
+        refresh_token = tokens.get('refresh_token')
+        expires_in = tokens.get('expires_in', 3600)
+
+        if not access_token:
+            return jsonify({'error': 'No access token received'}), 400
+
+        # Get YouTube channel info
+        youtube_api_url = 'https://www.googleapis.com/youtube/v3/channels'
+        youtube_response = requests.get(
+            youtube_api_url,
+            params={'part': 'snippet,statistics', 'mine': 'true'},
+            headers={'Authorization': f'Bearer {access_token}'}
+        )
+
+        if youtube_response.status_code != 200:
+            return jsonify({'error': 'Failed to fetch YouTube channel info'}), 400
+
+        channel_data = youtube_response.json()
+        if not channel_data.get('items'):
+            return jsonify({'error': 'No YouTube channel found'}), 404
+
+        channel = channel_data['items'][0]
+        channel_id = channel['id']
+        channel_title = channel['snippet']['title']
+
+        # Return tokens and channel info to frontend
+        return jsonify({
+            'success': True,
+            'accessToken': access_token,
+            'refreshToken': refresh_token,
+            'expiresIn': expires_in,
+            'channelId': channel_id,
+            'channelTitle': channel_title
+        }), 200
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @platforms_bp.route('/api/creator/platforms/facebook/exchange-code', methods=['POST'])
 @jwt_required()
 def exchange_facebook_code():
