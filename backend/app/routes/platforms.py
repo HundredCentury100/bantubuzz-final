@@ -217,8 +217,14 @@ def connect_platform():
 
         db.session.commit()
 
+        # Login to ThunziAI with creator's credentials before sync (password = email)
+        login_success = thunzi_service.login(
+            email=thunzi_account.thunzi_email,
+            password=thunzi_account.thunzi_email
+        )
+
         # Trigger initial sync (pass all required fields)
-        if connected_platform.thunzi_platform_id:
+        if connected_platform.thunzi_platform_id and login_success:
             thunzi_service.sync_platform(
                 platform_id=connected_platform.thunzi_platform_id,
                 account_id=connected_platform.account_id,
@@ -540,12 +546,27 @@ def sync_platform(platform_id):
         platform.sync_status = 'in_progress'
         db.session.commit()
 
-        # Trigger sync in ThunziAI (pass all required fields per API docs)
+        # Get ThunziAI account
         thunzi_account = ThunziAccount.query.filter_by(user_id=current_user_id).first()
+        if not thunzi_account:
+            return jsonify({'error': 'ThunziAI account not found'}), 404
+
+        # Login to ThunziAI with creator's credentials (password = email)
+        login_success = thunzi_service.login(
+            email=thunzi_account.thunzi_email,
+            password=thunzi_account.thunzi_email
+        )
+
+        if not login_success:
+            platform.sync_status = 'failure'
+            db.session.commit()
+            return jsonify({'error': 'Failed to authenticate with ThunziAI'}), 401
+
+        # Trigger sync in ThunziAI (pass all required fields per API docs)
         success = thunzi_service.sync_platform(
             platform_id=platform.thunzi_platform_id,
             account_id=platform.account_id,
-            company_id=thunzi_account.thunzi_company_id if thunzi_account else None,
+            company_id=thunzi_account.thunzi_company_id,
             platform=platform.platform
         )
 
