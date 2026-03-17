@@ -31,7 +31,7 @@ class PostURLParser:
         ],
         'youtube': [
             r'youtube\.com/watch\?v=([A-Za-z0-9_-]+)',      # Regular video
-            r'youtu\.be/([A-Za-z0-9_-]+)',                  # Shortened URL
+            r'youtu\.be/([A-Za-z0-9_-]+)(?:\?|&|$)',        # Shortened URL (with query params)
             r'youtube\.com/shorts/([A-Za-z0-9_-]+)',        # Shorts
         ],
         'tiktok': [
