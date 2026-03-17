@@ -47,6 +47,7 @@ class PostMetrics(db.Model):
     positive_comments = db.Column(db.Integer, default=0)
     negative_comments = db.Column(db.Integer, default=0)
     neutral_comments = db.Column(db.Integer, default=0)
+    critical_comments = db.Column(db.Integer, default=0)  # From ThunziAI insights endpoint
 
     # Video-specific metrics (YouTube, TikTok, Instagram Reels)
     video_views = db.Column(db.BigInteger, default=0)
@@ -123,6 +124,7 @@ class PostMetrics(db.Model):
                 'positive': self.positive_comments,
                 'negative': self.negative_comments,
                 'neutral': self.neutral_comments,
+                'critical': self.critical_comments,
             },
             'sync': {
                 'last_synced_at': self.last_synced_at.isoformat() if self.last_synced_at else None,

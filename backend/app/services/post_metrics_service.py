@@ -90,14 +90,53 @@ class PostMetricsService:
 
             creator_id = collaboration.creator_id
 
-            # Get creator's connected platform for this platform type
-            connected_platform = ConnectedPlatform.query.filter_by(
-                user_id=creator_id,
+            # Get creator's ThunziAI account to login with their credentials
+            from app.models import ThunziAccount, CreatorProfile
+            creator_profile = CreatorProfile.query.get(creator_id)
+            if not creator_profile:
+                return {
+                    'success': False,
+                    'message': 'Creator profile not found',
+                    'metrics': None,
+                    'error': 'Creator profile not found'
+                }
+
+            thunzi_account = ThunziAccount.query.filter_by(user_id=creator_profile.user_id).first()
+            if not thunzi_account:
+                return {
+                    'success': False,
+                    'message': 'Creator has not connected to ThunziAI',
+                    'metrics': None,
+                    'error': 'ThunziAI account not found'
+                }
+
+            # Login to ThunziAI with creator's credentials (password = email)
+            login_success = thunzi_service.login(email=thunzi_account.thunzi_email, password=thunzi_account.thunzi_email)
+            if not login_success:
+                return {
+                    'success': False,
+                    'message': 'Failed to authenticate with ThunziAI',
+                    'metrics': None,
+                    'error': 'ThunziAI login failed'
+                }
+
+            # Check if creator has a ThunziAI creator entity (BantuBuzz ID)
+            if not thunzi_account.bantubuzz_id:
+                return {
+                    'success': False,
+                    'message': 'Creator has not been set up in ThunziAI. Please contact support.',
+                    'metrics': None,
+                    'error': 'ThunziAI BantuBuzz ID not found'
+                }
+
+            # Get connected platforms to verify creator has the platform connected
+            connected_platforms = ConnectedPlatform.query.filter_by(
+                user_id=creator_profile.user_id,
                 platform=deliverable.post_platform,
                 is_connected=True
-            ).first()
+            ).all()
 
-            if not connected_platform:
+            if not connected_platforms:
                 return {
                     'success': False,
                     'message': f'Creator has not connected their {deliverable.post_platform.title()} account',
@@ -105,48 +144,74 @@ class PostMetricsService:
                     'error': f'{deliverable.post_platform} not connected'
                 }
 
-            if not connected_platform.thunzi_platform_id:
-                return {
-                    'success': False,
-                    'message': f'Platform not synced with ThunziAI',
-                    'metrics': None,
-                    'error': 'ThunziAI platform ID missing'
-                }
+            # Use ThunziAI creator posts API with date range
+            # Get posts from past 90 days
+            end_date = datetime.utcnow()
+            start_date = end_date - timedelta(days=90)
 
-            # Fetch posts from ThunziAI
             current_app.logger.info(
-                f"Fetching posts from ThunziAI platform {connected_platform.thunzi_platform_id} "
-                f"for deliverable {deliverable_id}"
+                f"Fetching posts for ThunziAI creator {thunzi_account.bantubuzz_id} "
+                f"from {start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')}"
             )
 
-            thunzi_posts = thunzi_service.get_platform_posts(connected_platform.thunzi_platform_id)
+            thunzi_posts = thunzi_service.get_creator_posts_by_bantubuzz_id(
+                thunzi_account.bantubuzz_id,
+                start_date.strftime('%Y-%m-%d'),
+                end_date.strftime('%Y-%m-%d')
+            )
 
             if not thunzi_posts:
                 return {
                     'success': False,
-                    'message': 'No posts found in ThunziAI for this platform',
+                    'message': 'No posts found for this creator in ThunziAI. Make sure platforms are syncing.',
                     'metrics': None,
-                    'error': 'No posts synced in ThunziAI yet'
+                    'error': 'No posts found in date range'
                 }
 
-            # Match post by post_id (native platform ID)
+            # Find matching post by originalId and platform
             matching_post = None
+            connected_platform = None
+
+            current_app.logger.info(
+                f"Searching {len(thunzi_posts)} posts for post_id={deliverable.post_id} "
+                f"on platform={deliverable.post_platform}"
+            )
+
             for post in thunzi_posts:
-                # ThunziAI returns postId field with the native platform post ID
-                if str(post.get('postId', '')) == str(deliverable.post_id):
+                # Match by originalId (format: "accountId_postId") and platform type
+                # Extract post ID from the originalId field
+                original_id = post.get('originalId', '')
+                post_platform = post.get('platform', '').lower()
+
+                # originalId is formatted as "accountId_postId", we need to extract the postId part
+                if '_' in original_id:
+                    extracted_post_id = original_id.split('_', 1)[1]  # Get everything after first underscore
+                else:
+                    extracted_post_id = original_id
+
+                if (str(extracted_post_id) == str(deliverable.post_id) and
+                    post_platform == deliverable.post_platform.lower()):
                     matching_post = post
+                    # Find the connected platform for this post
+                    for platform in connected_platforms:
+                        connected_platform = platform
+                        break
+
+                    current_app.logger.info(
+                        f"Found matching post: originalId={original_id}, extracted_post_id={extracted_post_id}, platform={post_platform}"
+                    )
                     break
 
             if not matching_post:
                 current_app.logger.warning(
-                    f"Post {deliverable.post_id} not found in ThunziAI for deliverable {deliverable_id}. "
-                    f"Available posts: {[p.get('postId') for p in thunzi_posts[:5]]}"
+                    f"Post {deliverable.post_id} not found in ThunziAI creator posts. "
+                    f"Platform: {deliverable.post_platform}, Posts found: {len(thunzi_posts)}"
                 )
                 return {
                     'success': False,
-                    'message': 'Post not found in ThunziAI. It may not be synced yet.',
+                    'message': f'Post not found in ThunziAI. Make sure the post has been synced from {deliverable.post_platform.title()}.',
                     'metrics': None,
-                    'error': 'Post not found in ThunziAI'
+                    'error': 'Post not found in creator posts'
                 }
 
             # Get detailed insights for the post
@@ -186,9 +251,9 @@ class PostMetricsService:
             # Update ThunziAI post ID
             metrics.thunzi_post_id = str(thunzi_post_id)
 
-            # Post info
-            metrics.post_title = post_data.get('title')
-            metrics.post_description = post_data.get('description')
+            # Post info (creator API uses 'content', platform API uses 'description')
+            metrics.post_title = post_data.get('title') or post_data.get('username')
+            metrics.post_description = post_data.get('description') or post_data.get('content')
 
             # Parse published date
             if post_data.get('publishedAt'):
@@ -219,6 +284,7 @@ class PostMetricsService:
             metrics.positive_comments = sentiment_data.get('positive', 0)
             metrics.negative_comments = sentiment_data.get('negative', 0)
             metrics.neutral_comments = sentiment_data.get('neutral', 0)
+            metrics.critical_comments = sentiment_data.get('critical', 0)  # From ThunziAI insights
 
             # Sync metadata
             metrics.last_synced_at = datetime.utcnow()

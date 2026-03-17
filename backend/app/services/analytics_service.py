@@ -70,9 +70,9 @@ class AnalyticsService:
             # Get mentions (from post titles/descriptions)
             mentions = AnalyticsService._extract_mentions(metrics_records)
 
-            # Get creator info
-            creator = User.query.get(collaboration.creator_id)
-            creator_profile = CreatorProfile.query.filter_by(user_id=collaboration.creator_id).first()
+            # Get creator info (collaboration.creator_id is creator_profile.id, not user.id)
+            creator_profile = CreatorProfile.query.get(collaboration.creator_id)
+            creator = User.query.get(creator_profile.user_id) if creator_profile else None
 
             # Get deliverable details
             deliverable_details = []
@@ -97,7 +97,7 @@ class AnalyticsService:
                     'id': collaboration.id,
                     'status': collaboration.status,
                     'created_at': collaboration.created_at.isoformat(),
-                    'package_price': float(collaboration.package_price) if collaboration.package_price else 0,
+                    'package_price': float(collaboration.amount) if collaboration.amount else 0,
                 },
                 'creator': {
                     'id': creator.id,
@@ -180,7 +180,7 @@ class AnalyticsService:
         insights = {}
 
         # Cost per engagement
-        package_price = float(collaboration.package_price) if collaboration.package_price else 0
+        package_price = float(collaboration.amount) if collaboration.amount else 0
         total_engagement = raw_data['total_engagement']
 
         if total_engagement > 0:
@@ -344,7 +344,7 @@ class AnalyticsService:
 
             # Calculate totals
             total_spend = sum(
-                float(c.package_price) if c.package_price else 0
+                float(c.amount) if c.amount else 0
                 for c in collaborations
             )
             total_reach = sum(m.reach or 0 for m in all_metrics)
