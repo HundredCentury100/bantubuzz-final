@@ -100,8 +100,8 @@ class AnalyticsService:
                     'package_price': float(collaboration.amount) if collaboration.amount else 0,
                 },
                 'creator': {
-                    'id': creator.id,
-                    'display_name': creator_profile.display_name if creator_profile else creator.email,
+                    'id': creator.id if creator else None,
+                    'display_name': creator_profile.username if creator_profile else (creator.email if creator else 'Unknown'),
                     'username': creator_profile.username if creator_profile else None,
                     'profile_picture': creator_profile.profile_picture if creator_profile else None,
                 },
