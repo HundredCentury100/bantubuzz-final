@@ -26,8 +26,15 @@ def upgrade():
 
     This allows PostMetrics to track analytics for both collaboration types.
     """
-    # Drop existing unique constraint on deliverable_id
-    op.drop_constraint('post_metrics_deliverable_id_key', 'post_metrics', type_='unique')
+    # Drop existing unique constraint on deliverable_id (if it exists)
+    from sqlalchemy import inspect
+    conn = op.get_bind()
+    inspector = inspect(conn)
+    constraints = inspector.get_unique_constraints('post_metrics')
+    constraint_names = [c['name'] for c in constraints]
+
+    if 'post_metrics_deliverable_id_key' in constraint_names:
+        op.drop_constraint('post_metrics_deliverable_id_key', 'post_metrics', type_='unique')
 
     # Make deliverable_id nullable (so we can use it for both types)
     op.alter_column('post_metrics', 'deliverable_id',

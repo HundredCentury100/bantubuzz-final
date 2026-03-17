@@ -14,6 +14,7 @@ import PackageManagement from './pages/PackageManagement';
 import PackageForm from './pages/PackageForm';
 import BrandDashboard from './pages/BrandDashboard';
 import BrandProfileEdit from './pages/BrandProfileEdit';
+import BrandAnalytics from './pages/BrandAnalytics';
 import Creators from './pages/Creators';
 import CreatorProfile from './pages/CreatorProfile';
 import Packages from './pages/Packages';
@@ -509,6 +510,14 @@ function App() {
         element={
           <ProtectedRoute requiredType="brand">
             <BrandConnectPlatforms />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/brand/analytics/:collaborationId"
+        element={
+          <ProtectedRoute requiredType="brand">
+            <BrandAnalytics />
           </ProtectedRoute>
         }
       />

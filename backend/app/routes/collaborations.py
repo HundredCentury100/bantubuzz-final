@@ -1686,13 +1686,24 @@ def get_deliverable_metrics(collab_id, deliverable_id):
             if collaboration.brand_id != brand.id:
                 return jsonify({'error': 'Unauthorized'}), 403
 
-        # Get cached metrics
-        metrics = PostMetricsService.get_deliverable_metrics(deliverable_id)
+        # Get cached metrics for package deliverable
+        metrics_data = PostMetricsService.get_deliverable_metrics(deliverable_id, deliverable_type='package')
 
-        if metrics:
+        if metrics_data:
+            # Flatten the metrics structure for frontend compatibility
+            # The to_dict() method nests actual metrics under a 'metrics' key
+            # We need to flatten this so frontend can access metrics.likes, metrics.reach, etc.
+            if 'metrics' in metrics_data:
+                # Merge the nested metrics dict into the top level
+                flattened = {**metrics_data}
+                flattened.update(metrics_data['metrics'])
+                # Remove the nested metrics key
+                del flattened['metrics']
+                metrics_data = flattened
+
             return jsonify({
                 'success': True,
-                'metrics': metrics
+                'metrics': metrics_data
             }), 200
         else:
             return jsonify({
@@ -1703,5 +1714,173 @@ def get_deliverable_metrics(collab_id, deliverable_id):
     except Exception as e:
         current_app.logger.error(
             f"Error in get_deliverable_metrics: {str(e)}"
+        )
+        return jsonify({'error': str(e)}), 500
+
+
+@bp.route('/<int:collab_id>/deliverables/<int:deliverable_id>/sync-metrics', methods=['POST'])
+@jwt_required()
+def sync_package_deliverable_metrics(collab_id, deliverable_id):
+    """
+    Manually sync post metrics for a package deliverable from ThunziAI
+
+    This endpoint fetches the latest metrics from ThunziAI for a specific package deliverable.
+    Accessible by both brand and creator.
+
+    Part of: Brand Analytics Implementation - Phase 2 (Package Deliverables)
+    """
+    try:
+        from flask import current_app
+        from app.services.post_metrics_service import PostMetricsService
+        import traceback
+
+        user_id = int(get_jwt_identity())
+        user = User.query.get(user_id)
+
+        collaboration = Collaboration.query.get(collab_id)
+        if not collaboration:
+            return jsonify({'error': 'Collaboration not found'}), 404
+
+        # Check authorization (both brand and creator can sync)
+        if user.user_type == 'creator':
+            creator = CreatorProfile.query.filter_by(user_id=user_id).first()
+            if collaboration.creator_id != creator.id:
+                return jsonify({'error': 'Unauthorized'}), 403
+        else:
+            brand = BrandProfile.query.filter_by(user_id=user_id).first()
+            if collaboration.brand_id != brand.id:
+                return jsonify({'error': 'Unauthorized'}), 403
+
+        # Verify package deliverable exists and belongs to this collaboration
+        deliverable = PackageDeliverable.query.get(deliverable_id)
+        if not deliverable or deliverable.collaboration_id != collab_id:
+            return jsonify({'error': 'Deliverable not found'}), 404
+
+        # Sync metrics using the same service (it handles both deliverable types)
+        result = PostMetricsService.sync_deliverable_metrics(deliverable_id, deliverable_type='package')
+
+        if result['success']:
+            return jsonify({
+                'success': True,
+                'message': result['message'],
+                'metrics': result['metrics']
+            }), 200
+        else:
+            return jsonify({
+                'success': False,
+                'error': result['error'],
+                'message': result['message']
+            }), 400
+
+    except Exception as e:
+        current_app.logger.error(
+            f"Error in sync_package_deliverable_metrics: {str(e)}\n{traceback.format_exc()}"
+        )
+        return jsonify({'error': str(e)}), 500
+
+
+# ============================================================================
+# BRAND ANALYTICS ENDPOINTS
+# ============================================================================
+
+@bp.route('/<int:collab_id>/analytics', methods=['GET'])
+@jwt_required()
+def get_collaboration_analytics(collab_id):
+    """
+    Get comprehensive analytics for a single collaboration/campaign
+
+    Returns:
+    - Raw performance data (reach, impressions, likes, comments, etc.)
+    - Actionable insights (ROI, cost per engagement, performance rating)
+    - Sentiment analysis (positive/negative/neutral comments)
+    - Brand mentions tracking
+
+    Accessible by brand only.
+
+    Part of: Brand Analytics Dashboard
+    """
+    try:
+        from flask import current_app
+        from app.services.analytics_service import AnalyticsService
+        import traceback
+
+        user_id = int(get_jwt_identity())
+        user = User.query.get(user_id)
+
+        # Only brands can access analytics
+        if user.user_type != 'brand':
+            return jsonify({'error': 'Unauthorized - Brand access only'}), 403
+
+        collaboration = Collaboration.query.get(collab_id)
+        if not collaboration:
+            return jsonify({'error': 'Collaboration not found'}), 404
+
+        # Get comprehensive analytics
+        analytics = AnalyticsService.get_collaboration_analytics(collab_id, user_id)
+
+        if not analytics:
+            return jsonify({
+                'error': 'Unable to calculate analytics',
+                'message': 'Analytics data not available for this collaboration'
+            }), 404
+
+        return jsonify({
+            'success': True,
+            'analytics': analytics
+        }), 200
+
+    except Exception as e:
+        current_app.logger.error(
+            f"Error in get_collaboration_analytics: {str(e)}\n{traceback.format_exc()}"
+        )
+        return jsonify({'error': str(e)}), 500
+
+
+@bp.route('/analytics/summary', methods=['GET'])
+@jwt_required()
+def get_all_collaborations_summary():
+    """
+    Get summary analytics across all collaborations for the brand
+
+    Returns aggregated metrics including:
+    - Total spend
+    - Total reach and engagement
+    - Average engagement rate
+    - Top performing collaborations
+    - Overall sentiment
+
+    Accessible by brand only.
+
+    Part of: Brand Analytics Dashboard
+    """
+    try:
+        from flask import current_app
+        from app.services.analytics_service import AnalyticsService
+        import traceback
+
+        user_id = int(get_jwt_identity())
+        user = User.query.get(user_id)
+
+        # Only brands can access analytics
+        if user.user_type != 'brand':
+            return jsonify({'error': 'Unauthorized - Brand access only'}), 403
+
+        # Get summary analytics
+        summary = AnalyticsService.get_all_collaborations_summary(user_id)
+
+        if not summary:
+            return jsonify({
+                'error': 'Unable to calculate summary analytics',
+                'message': 'No analytics data available'
+            }), 404
+
+        return jsonify({
+            'success': True,
+            'summary': summary
+        }), 200
+
+    except Exception as e:
+        current_app.logger.error(
+            f"Error in get_all_collaborations_summary: {str(e)}\n{traceback.format_exc()}"
         )
         return jsonify({'error': str(e)}), 500
