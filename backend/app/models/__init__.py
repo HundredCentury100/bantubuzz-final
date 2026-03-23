@@ -48,7 +48,7 @@ from .campaign_milestone import CampaignMilestone
 # Now import parent models that reference milestone models
 from .brief import Brief
 from .proposal import Proposal
-from .campaign import Campaign, CampaignApplication
+from .campaign import Campaign, CampaignApplication, CampaignProposal
 
 __all__ = [
     'User',
@@ -57,6 +57,7 @@ __all__ = [
     'Package',
     'Campaign',
     'CampaignApplication',
+    'CampaignProposal',
     'Booking',
     'Message',
     'Notification',

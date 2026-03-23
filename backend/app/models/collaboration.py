@@ -13,7 +13,7 @@ class Collaboration(db.Model):
 
     # Source of collaboration
     collaboration_type = db.Column(db.String(20), nullable=False)  # 'campaign' or 'package'
-    campaign_application_id = db.Column(db.Integer, db.ForeignKey('campaign_applications.id'), nullable=True)
+    campaign_application_id = db.Column(db.Integer, db.ForeignKey('campaign_proposals.id'), nullable=True)
     booking_id = db.Column(db.Integer, db.ForeignKey('bookings.id'), nullable=True)
 
     # Parties involved
@@ -59,7 +59,7 @@ class Collaboration(db.Model):
     # Relationships
     brand = db.relationship('BrandProfile', backref=db.backref('collaborations', lazy='dynamic'))
     creator = db.relationship('CreatorProfile', backref=db.backref('collaborations', lazy='dynamic'))
-    campaign_application = db.relationship('CampaignApplication', backref=db.backref('collaboration', uselist=False))
+    campaign_application = db.relationship('CampaignProposal', backref=db.backref('collaboration', uselist=False))
     booking = db.relationship('Booking', backref=db.backref('collaboration', uselist=False))
 
     def calculate_progress(self):
