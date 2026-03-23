@@ -10,6 +10,7 @@ import {
   Cog6ToothIcon,
   QuestionMarkCircleIcon,
   LifebuoyIcon,
+  CurrencyDollarIcon,
 } from '@heroicons/react/24/outline';
 import NotificationBell from './NotificationBell';
 import { messagingService } from '../services/messagingAPI';
@@ -83,30 +84,13 @@ const Navbar = () => {
 
           {/* Desktop Navigation */}
           <div className="hidden md:flex items-center space-x-10">
-            {/* Show Search and How It Works only for non-creators or unauthenticated users */}
-            {(!isAuthenticated || user?.user_type !== 'creator') && (
-              <>
-                <Link
-                  to="/browse/creators"
-                  className="text-gray-700 hover:text-gray-900 transition-colors text-sm font-medium"
-                >
-                  Search
-                </Link>
-                <Link
-                  to="/how-it-works"
-                  className="text-gray-700 hover:text-gray-900 transition-colors text-sm font-medium"
-                >
-                  How It Works
-                </Link>
-              </>
-            )}
-            {/* Hide Pricing from creators */}
+            {/* Show Search only for non-creators or unauthenticated users */}
             {(!isAuthenticated || user?.user_type !== 'creator') && (
               <Link
-                to="/pricing"
+                to="/browse/creators"
                 className="text-gray-700 hover:text-gray-900 transition-colors text-sm font-medium"
               >
-                Pricing
+                Search
               </Link>
             )}
 
@@ -120,12 +104,20 @@ const Navbar = () => {
                   Dashboard
                 </Link>
                 {user?.user_type === 'brand' && (
-                  <Link
-                    to="/brand/campaigns"
-                    className="text-gray-700 hover:text-gray-900 transition-colors text-sm font-medium"
-                  >
-                    Campaigns
-                  </Link>
+                  <>
+                    <Link
+                      to="/brand/analytics"
+                      className="text-gray-700 hover:text-gray-900 transition-colors text-sm font-medium"
+                    >
+                      Analytics
+                    </Link>
+                    <Link
+                      to="/brand/campaigns"
+                      className="text-gray-700 hover:text-gray-900 transition-colors text-sm font-medium"
+                    >
+                      Campaigns
+                    </Link>
+                  </>
                 )}
                 {user?.user_type === 'creator' && (
                   <Link
@@ -224,6 +216,21 @@ const Navbar = () => {
                             </Link>
                           )}
                         </Menu.Item>
+                        {(!user || user?.user_type !== 'creator') && (
+                          <Menu.Item>
+                            {({ active }) => (
+                              <Link
+                                to="/pricing"
+                                className={`${
+                                  active ? 'bg-gray-50' : ''
+                                } flex items-center px-4 py-2 text-sm text-gray-700`}
+                              >
+                                <CurrencyDollarIcon className="h-5 w-5 mr-3 text-gray-400" />
+                                Pricing
+                              </Link>
+                            )}
+                          </Menu.Item>
+                        )}
                       </div>
 
                       {/* Logout Section */}
@@ -285,46 +292,17 @@ const Navbar = () => {
               >
                 <Menu.Items className="absolute right-0 mt-2 w-56 origin-top-right bg-white rounded-lg shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
                   <div className="p-2">
-                    {/* Show Search and How It Works only for non-creators or unauthenticated users */}
-                    {(!isAuthenticated || user?.user_type !== 'creator') && (
-                      <>
-                        <Menu.Item>
-                          {({ active }) => (
-                            <Link
-                              to="/browse/creators"
-                              className={`${
-                                active ? 'bg-light' : ''
-                              } block px-4 py-2 text-sm text-gray-700 rounded-lg`}
-                            >
-                              Search
-                            </Link>
-                          )}
-                        </Menu.Item>
-                        <Menu.Item>
-                          {({ active }) => (
-                            <Link
-                              to="/how-it-works"
-                              className={`${
-                                active ? 'bg-light' : ''
-                              } block px-4 py-2 text-sm text-gray-700 rounded-lg`}
-                            >
-                              How It Works
-                            </Link>
-                          )}
-                        </Menu.Item>
-                      </>
-                    )}
-                    {/* Hide Pricing from creators */}
+                    {/* Show Search only for non-creators or unauthenticated users */}
                     {(!isAuthenticated || user?.user_type !== 'creator') && (
                       <Menu.Item>
                         {({ active }) => (
                           <Link
-                            to="/pricing"
+                            to="/browse/creators"
                             className={`${
                               active ? 'bg-light' : ''
                             } block px-4 py-2 text-sm text-gray-700 rounded-lg`}
                           >
-                            Pricing
+                            Search
                           </Link>
                         )}
                       </Menu.Item>
@@ -345,18 +323,48 @@ const Navbar = () => {
                             </Link>
                           )}
                         </Menu.Item>
-                        <Menu.Item>
-                          {({ active }) => (
-                            <Link
-                              to={`/${user?.user_type}/campaigns`}
-                              className={`${
-                                active ? 'bg-light' : ''
-                              } block px-4 py-2 text-sm text-gray-700 rounded-lg`}
-                            >
-                              Campaigns
-                            </Link>
-                          )}
-                        </Menu.Item>
+                        {user?.user_type === 'brand' && (
+                          <Menu.Item>
+                            {({ active }) => (
+                              <Link
+                                to="/brand/analytics"
+                                className={`${
+                                  active ? 'bg-light' : ''
+                                } block px-4 py-2 text-sm text-gray-700 rounded-lg`}
+                              >
+                                Analytics
+                              </Link>
+                            )}
+                          </Menu.Item>
+                        )}
+                        {user?.user_type === 'brand' && (
+                          <Menu.Item>
+                            {({ active }) => (
+                              <Link
+                                to="/brand/campaigns"
+                                className={`${
+                                  active ? 'bg-light' : ''
+                                } block px-4 py-2 text-sm text-gray-700 rounded-lg`}
+                              >
+                                Campaigns
+                              </Link>
+                            )}
+                          </Menu.Item>
+                        )}
+                        {user?.user_type === 'creator' && (
+                          <Menu.Item>
+                            {({ active }) => (
+                              <Link
+                                to="/creator/campaigns"
+                                className={`${
+                                  active ? 'bg-light' : ''
+                                } block px-4 py-2 text-sm text-gray-700 rounded-lg`}
+                              >
+                                Opportunities
+                              </Link>
+                            )}
+                          </Menu.Item>
+                        )}
                         <Menu.Item>
                           {({ active }) => (
                             <Link
@@ -414,6 +422,20 @@ const Navbar = () => {
                             </Link>
                           )}
                         </Menu.Item>
+                        {(!user || user?.user_type !== 'creator') && (
+                          <Menu.Item>
+                            {({ active }) => (
+                              <Link
+                                to="/pricing"
+                                className={`${
+                                  active ? 'bg-light' : ''
+                                } block px-4 py-2 text-sm text-gray-700 rounded-lg`}
+                              >
+                                Pricing
+                              </Link>
+                            )}
+                          </Menu.Item>
+                        )}
                         <Menu.Item>
                           {({ active }) => (
                             <button
