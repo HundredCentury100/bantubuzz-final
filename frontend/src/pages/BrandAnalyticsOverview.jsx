@@ -4,6 +4,20 @@ import Navbar from '../components/Navbar';
 import api from '../services/api';
 import toast from 'react-hot-toast';
 import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  LineElement,
+  PointElement,
+  ArcElement,
+  Title,
+  Tooltip,
+  Legend,
+  Filler,
+} from 'chart.js';
+import { Bar, Line, Doughnut } from 'react-chartjs-2';
+import {
   ChartBarIcon,
   ArrowTrendingUpIcon,
   UserGroupIcon,
@@ -15,6 +29,20 @@ import {
   ChatBubbleLeftRightIcon,
 } from '@heroicons/react/24/outline';
 import Avatar from '../components/Avatar';
+
+// Register Chart.js components
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  BarElement,
+  LineElement,
+  PointElement,
+  ArcElement,
+  Title,
+  Tooltip,
+  Legend,
+  Filler
+);
 
 const BrandAnalyticsOverview = () => {
   const navigate = useNavigate();
@@ -37,7 +65,6 @@ const BrandAnalyticsOverview = () => {
     } catch (error) {
       console.error('Error fetching analytics:', error);
       if (error.response?.status === 404) {
-        // No analytics available yet - set empty state
         setAnalytics(null);
       } else {
         toast.error('Failed to load analytics');
@@ -56,6 +83,192 @@ const BrandAnalyticsOverview = () => {
 
   const formatCurrency = (amount) => {
     return `$${parseFloat(amount || 0).toFixed(2)}`;
+  };
+
+  // Chart configurations
+  const chartOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        display: false,
+      },
+      tooltip: {
+        backgroundColor: '#1F2937',
+        padding: 12,
+        titleFont: {
+          size: 14,
+        },
+        bodyFont: {
+          size: 13,
+        },
+        cornerRadius: 8,
+      },
+    },
+    scales: {
+      y: {
+        beginAtZero: true,
+        grid: {
+          color: '#E5E7EB',
+        },
+        ticks: {
+          callback: function(value) {
+            return formatNumber(value);
+          },
+        },
+      },
+      x: {
+        grid: {
+          display: false,
+        },
+      },
+    },
+  };
+
+  // Prepare chart data
+  const getEngagementBreakdownData = () => {
+    if (!analytics) return null;
+
+    return {
+      labels: ['Likes', 'Comments', 'Shares', 'Saves'],
+      datasets: [
+        {
+          label: 'Engagement',
+          data: [
+            analytics.total_likes,
+            analytics.total_comments,
+            analytics.total_shares,
+            analytics.total_saves,
+          ],
+          backgroundColor: [
+            'rgba(204, 219, 83, 0.8)',
+            'rgba(31, 41, 55, 0.8)',
+            'rgba(200, 255, 9, 0.8)',
+            'rgba(131, 138, 54, 0.8)',
+          ],
+          borderColor: [
+            '#ccdb53',
+            '#1F2937',
+            '#c8ff09',
+            '#838a36',
+          ],
+          borderWidth: 2,
+          borderRadius: 8,
+        },
+      ],
+    };
+  };
+
+  const getCampaignPerformanceData = () => {
+    if (!analytics || !analytics.campaigns) return null;
+
+    // Get top 10 campaigns
+    const topCampaigns = analytics.campaigns
+      .slice(0, 10)
+      .sort((a, b) => b.metrics.engagement - a.metrics.engagement);
+
+    return {
+      labels: topCampaigns.map(c => c.creator.display_name || c.creator.username),
+      datasets: [
+        {
+          label: 'Engagement',
+          data: topCampaigns.map(c => c.metrics.engagement),
+          backgroundColor: 'rgba(204, 219, 83, 0.8)',
+          borderColor: '#ccdb53',
+          borderWidth: 2,
+          borderRadius: 6,
+        },
+      ],
+    };
+  };
+
+  const getReachVsEngagementData = () => {
+    if (!analytics) return null;
+
+    return {
+      labels: ['Reach', 'Impressions', 'Engagement', 'Video Views'],
+      datasets: [
+        {
+          label: 'Performance Metrics',
+          data: [
+            analytics.total_reach,
+            analytics.total_impressions,
+            analytics.total_engagement,
+            analytics.total_video_views,
+          ],
+          backgroundColor: 'rgba(204, 219, 83, 0.2)',
+          borderColor: '#ccdb53',
+          borderWidth: 3,
+          fill: true,
+          tension: 0.4,
+          pointRadius: 6,
+          pointBackgroundColor: '#ccdb53',
+          pointBorderColor: '#fff',
+          pointBorderWidth: 2,
+          pointHoverRadius: 8,
+        },
+      ],
+    };
+  };
+
+  const getSentimentData = () => {
+    if (!analytics || !analytics.sentiment_overview) return null;
+
+    return {
+      labels: ['Positive', 'Neutral', 'Negative'],
+      datasets: [
+        {
+          data: [
+            analytics.sentiment_overview.positive,
+            analytics.sentiment_overview.neutral,
+            analytics.sentiment_overview.negative,
+          ],
+          backgroundColor: [
+            'rgba(34, 197, 94, 0.8)',
+            'rgba(156, 163, 175, 0.8)',
+            'rgba(239, 68, 68, 0.8)',
+          ],
+          borderColor: [
+            '#22c55e',
+            '#9ca3af',
+            '#ef4444',
+          ],
+          borderWidth: 2,
+        },
+      ],
+    };
+  };
+
+  const lineChartOptions = {
+    ...chartOptions,
+    plugins: {
+      ...chartOptions.plugins,
+      legend: {
+        display: false,
+      },
+    },
+  };
+
+  const doughnutOptions = {
+    responsive: true,
+    maintainAspectRatio: false,
+    plugins: {
+      legend: {
+        position: 'bottom',
+        labels: {
+          padding: 15,
+          font: {
+            size: 12,
+          },
+          usePointStyle: true,
+        },
+      },
+      tooltip: {
+        backgroundColor: '#1F2937',
+        padding: 12,
+        cornerRadius: 8,
+      },
+    },
   };
 
   if (loading) {
@@ -115,232 +328,179 @@ const BrandAnalyticsOverview = () => {
           </div>
         </div>
 
-        {/* Overall Performance Metrics */}
+        {/* Key Metrics Summary */}
         <div className="mb-8">
-          <h2 className="text-2xl font-bold text-dark mb-4">Overall Performance</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {/* Total Reach */}
-            <div className="card">
-              <div className="flex items-center justify-between">
+            <div className="bg-white rounded-3xl shadow-sm hover:shadow-md p-6 transition-shadow">
+              <div className="flex items-center justify-between mb-4">
                 <div>
                   <p className="text-sm text-gray-600 mb-1">Total Reach</p>
                   <p className="text-3xl font-bold text-dark">{formatNumber(analytics.total_reach)}</p>
                 </div>
-                <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
-                  <UserGroupIcon className="w-6 h-6 text-primary" />
+                <div className="w-14 h-14 bg-primary/10 rounded-2xl flex items-center justify-center">
+                  <UserGroupIcon className="w-7 h-7 text-primary" />
                 </div>
               </div>
-              <p className="text-xs text-gray-500 mt-2">Unique users reached</p>
+              <p className="text-xs text-gray-500">Unique users reached</p>
             </div>
 
             {/* Total Engagement */}
-            <div className="card">
-              <div className="flex items-center justify-between">
+            <div className="bg-white rounded-3xl shadow-sm hover:shadow-md p-6 transition-shadow">
+              <div className="flex items-center justify-between mb-4">
                 <div>
                   <p className="text-sm text-gray-600 mb-1">Total Engagement</p>
                   <p className="text-3xl font-bold text-dark">{formatNumber(analytics.total_engagement)}</p>
                 </div>
-                <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
-                  <HeartIcon className="w-6 h-6 text-primary" />
+                <div className="w-14 h-14 bg-primary/10 rounded-2xl flex items-center justify-center">
+                  <HeartIcon className="w-7 h-7 text-primary" />
                 </div>
               </div>
-              <p className="text-xs text-gray-500 mt-2">{analytics.avg_engagement_rate}% average rate</p>
+              <p className="text-xs text-green-600 font-medium">{analytics.avg_engagement_rate}% average rate</p>
             </div>
 
-            {/* Total Impressions */}
-            <div className="card">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600 mb-1">Total Impressions</p>
-                  <p className="text-3xl font-bold text-dark">{formatNumber(analytics.total_impressions)}</p>
-                </div>
-                <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
-                  <EyeIcon className="w-6 h-6 text-primary" />
-                </div>
-              </div>
-              <p className="text-xs text-gray-500 mt-2">Total views</p>
-            </div>
-
-            {/* Video Views */}
-            <div className="card">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600 mb-1">Video Views</p>
-                  <p className="text-3xl font-bold text-dark">{formatNumber(analytics.total_video_views)}</p>
-                </div>
-                <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
-                  <svg className="w-6 h-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-              </div>
-              <p className="text-xs text-gray-500 mt-2">Video content views</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Engagement Breakdown */}
-        <div className="mb-8">
-          <h2 className="text-2xl font-bold text-dark mb-4">Engagement Breakdown</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-            {/* Likes */}
-            <div className="card">
-              <p className="text-sm text-gray-600 mb-2">Likes</p>
-              <p className="text-2xl font-bold text-dark">{formatNumber(analytics.total_likes)}</p>
-            </div>
-
-            {/* Comments */}
-            <div className="card">
-              <p className="text-sm text-gray-600 mb-2">Comments</p>
-              <p className="text-2xl font-bold text-dark">{formatNumber(analytics.total_comments)}</p>
-            </div>
-
-            {/* Shares */}
-            <div className="card">
-              <p className="text-sm text-gray-600 mb-2">Shares</p>
-              <p className="text-2xl font-bold text-dark">{formatNumber(analytics.total_shares)}</p>
-            </div>
-
-            {/* Saves */}
-            <div className="card">
-              <p className="text-sm text-gray-600 mb-2">Saves</p>
-              <p className="text-2xl font-bold text-dark">{formatNumber(analytics.total_saves)}</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Financial Insights */}
-        <div className="mb-8">
-          <h2 className="text-2xl font-bold text-dark mb-4">Financial Insights</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {/* Total Investment */}
-            <div className="card">
-              <div className="flex items-center gap-3 mb-3">
-                <CurrencyDollarIcon className="w-5 h-5 text-primary" />
-                <p className="text-sm text-gray-600">Total Investment</p>
+            <div className="bg-white rounded-3xl shadow-sm hover:shadow-md p-6 transition-shadow">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <p className="text-sm text-gray-600 mb-1">Total Investment</p>
+                  <p className="text-3xl font-bold text-dark">{formatCurrency(analytics.total_spend)}</p>
+                </div>
+                <div className="w-14 h-14 bg-primary/10 rounded-2xl flex items-center justify-center">
+                  <CurrencyDollarIcon className="w-7 h-7 text-primary" />
+                </div>
               </div>
-              <p className="text-3xl font-bold text-dark">{formatCurrency(analytics.total_spend)}</p>
-              <p className="text-xs text-gray-500 mt-2">{analytics.total_posts} posts delivered</p>
-            </div>
-
-            {/* Avg Cost Per Engagement */}
-            <div className="card">
-              <div className="flex items-center gap-3 mb-3">
-                <HeartIcon className="w-5 h-5 text-primary" />
-                <p className="text-sm text-gray-600">Avg Cost Per Engagement</p>
-              </div>
-              <p className="text-2xl font-bold text-dark">{formatCurrency(analytics.avg_cost_per_engagement)}</p>
-              <p className="text-xs text-gray-500 mt-2">Lower is better</p>
-            </div>
-
-            {/* Avg Cost Per Reach */}
-            <div className="card">
-              <div className="flex items-center gap-3 mb-3">
-                <UserGroupIcon className="w-5 h-5 text-primary" />
-                <p className="text-sm text-gray-600">Avg Cost Per Reach</p>
-              </div>
-              <p className="text-2xl font-bold text-dark">{formatCurrency(analytics.avg_cost_per_reach)}</p>
-              <p className="text-xs text-gray-500 mt-2">Per unique user</p>
+              <p className="text-xs text-gray-500">{analytics.total_posts} posts delivered</p>
             </div>
 
             {/* Overall ROI */}
-            <div className="card">
-              <div className="flex items-center gap-3 mb-3">
-                <ArrowTrendingUpIcon className="w-5 h-5 text-primary" />
-                <p className="text-sm text-gray-600">Overall ROI</p>
+            <div className="bg-white rounded-3xl shadow-sm hover:shadow-md p-6 transition-shadow">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <p className="text-sm text-gray-600 mb-1">Overall ROI</p>
+                  <p className={`text-3xl font-bold ${analytics.overall_roi >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    {analytics.overall_roi >= 0 ? '+' : ''}{analytics.overall_roi}%
+                  </p>
+                </div>
+                <div className="w-14 h-14 bg-primary/10 rounded-2xl flex items-center justify-center">
+                  <ArrowTrendingUpIcon className="w-7 h-7 text-primary" />
+                </div>
               </div>
-              <p className={`text-2xl font-bold ${analytics.overall_roi >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                {analytics.overall_roi >= 0 ? '+' : ''}{analytics.overall_roi}%
-              </p>
-              <p className="text-xs text-gray-500 mt-2">Return on investment</p>
+              <p className="text-xs text-gray-500">Return on investment</p>
             </div>
           </div>
         </div>
 
-        {/* Campaign Statistics */}
+        {/* Charts Row 1 */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+          {/* Engagement Breakdown Chart */}
+          <div className="bg-white rounded-3xl shadow-sm hover:shadow-md p-6 transition-shadow">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center">
+                <ChartBarIcon className="w-5 h-5 text-primary" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-dark">Engagement Breakdown</h3>
+                <p className="text-sm text-gray-500">By interaction type</p>
+              </div>
+            </div>
+            <div className="h-80">
+              <Bar data={getEngagementBreakdownData()} options={chartOptions} />
+            </div>
+          </div>
+
+          {/* Performance Trends Chart */}
+          <div className="bg-white rounded-3xl shadow-sm hover:shadow-md p-6 transition-shadow">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center">
+                <ArrowTrendingUpIcon className="w-5 h-5 text-primary" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-dark">Performance Metrics</h3>
+                <p className="text-sm text-gray-500">Overall campaign performance</p>
+              </div>
+            </div>
+            <div className="h-80">
+              <Line data={getReachVsEngagementData()} options={lineChartOptions} />
+            </div>
+          </div>
+        </div>
+
+        {/* Charts Row 2 */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+          {/* Top Campaigns Chart */}
+          <div className="lg:col-span-2 bg-white rounded-3xl shadow-sm hover:shadow-md p-6 transition-shadow">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center">
+                <SparklesIcon className="w-5 h-5 text-primary" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-dark">Top Performing Campaigns</h3>
+                <p className="text-sm text-gray-500">By total engagement</p>
+              </div>
+            </div>
+            <div className="h-80">
+              <Bar data={getCampaignPerformanceData()} options={chartOptions} />
+            </div>
+          </div>
+
+          {/* Sentiment Doughnut Chart */}
+          {analytics.sentiment_overview.total_comments > 0 && (
+            <div className="bg-white rounded-3xl shadow-sm hover:shadow-md p-6 transition-shadow">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center">
+                  <ChatBubbleLeftRightIcon className="w-5 h-5 text-primary" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-dark">Sentiment Analysis</h3>
+                  <p className="text-sm text-gray-500">{analytics.sentiment_overview.total_comments} comments</p>
+                </div>
+              </div>
+              <div className="h-80 flex items-center justify-center">
+                <Doughnut data={getSentimentData()} options={doughnutOptions} />
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Campaign Statistics Cards */}
         <div className="mb-8">
           <h2 className="text-2xl font-bold text-dark mb-4">Campaign Statistics</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             {/* Total Campaigns */}
-            <div className="card">
+            <div className="bg-white rounded-3xl shadow-sm p-6">
               <p className="text-sm text-gray-600 mb-2">Total Campaigns</p>
-              <p className="text-4xl font-bold text-dark">{analytics.total_collaborations}</p>
+              <p className="text-4xl font-bold text-dark mb-2">{analytics.total_collaborations}</p>
+              <div className="flex items-center gap-2 text-xs">
+                <span className="text-primary font-medium">{analytics.active_collaborations} active</span>
+                <span className="text-gray-400">•</span>
+                <span className="text-green-600 font-medium">{analytics.completed_collaborations} completed</span>
+              </div>
             </div>
 
-            {/* Active Campaigns */}
-            <div className="card">
-              <p className="text-sm text-gray-600 mb-2">Active Campaigns</p>
-              <p className="text-4xl font-bold text-primary">{analytics.active_collaborations}</p>
+            {/* Cost Per Engagement */}
+            <div className="bg-white rounded-3xl shadow-sm p-6">
+              <p className="text-sm text-gray-600 mb-2">Avg Cost Per Engagement</p>
+              <p className="text-4xl font-bold text-dark mb-2">{formatCurrency(analytics.avg_cost_per_engagement)}</p>
+              <p className="text-xs text-gray-500">Lower is better</p>
             </div>
 
-            {/* Completed Campaigns */}
-            <div className="card">
-              <p className="text-sm text-gray-600 mb-2">Completed Campaigns</p>
-              <p className="text-4xl font-bold text-green-600">{analytics.completed_collaborations}</p>
+            {/* Cost Per Reach */}
+            <div className="bg-white rounded-3xl shadow-sm p-6">
+              <p className="text-sm text-gray-600 mb-2">Avg Cost Per Reach</p>
+              <p className="text-4xl font-bold text-dark mb-2">{formatCurrency(analytics.avg_cost_per_reach)}</p>
+              <p className="text-xs text-gray-500">Per unique user</p>
             </div>
           </div>
         </div>
 
-        {/* Sentiment Overview */}
-        {analytics.sentiment_overview.total_comments > 0 && (
-          <div className="mb-8">
-            <h2 className="text-2xl font-bold text-dark mb-4">Overall Sentiment</h2>
-            <div className="card">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                {/* Overall Sentiment */}
-                <div>
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className={`w-3 h-3 rounded-full ${
-                      analytics.sentiment_overview.overall === 'positive' ? 'bg-green-500' :
-                      analytics.sentiment_overview.overall === 'negative' ? 'bg-red-500' :
-                      'bg-gray-400'
-                    }`}></div>
-                    <p className="text-lg font-semibold text-dark capitalize">
-                      {analytics.sentiment_overview.overall} Sentiment
-                    </p>
-                  </div>
-                  <p className="text-sm text-gray-600">
-                    Across {analytics.sentiment_overview.total_comments} comments
-                  </p>
-                </div>
-
-                {/* Comment Breakdown */}
-                <div>
-                  <p className="text-sm text-gray-600 mb-4">Comment Distribution</p>
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-700">Positive</span>
-                      <span className="text-sm font-semibold text-green-600">
-                        {analytics.sentiment_overview.positive}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-700">Neutral</span>
-                      <span className="text-sm font-semibold text-gray-600">
-                        {analytics.sentiment_overview.neutral}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-gray-700">Negative</span>
-                      <span className="text-sm font-semibold text-red-600">
-                        {analytics.sentiment_overview.negative}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* Individual Campaigns */}
         <div className="mb-8">
-          <h2 className="text-2xl font-bold text-dark mb-4">Individual Campaigns</h2>
+          <h2 className="text-2xl font-bold text-dark mb-4">Campaign Details</h2>
           <div className="space-y-4">
             {analytics.campaigns.map((campaign) => (
-              <div key={campaign.id} className="card hover:shadow-md transition-shadow">
-                <div className="flex items-center justify-between">
+              <div key={campaign.id} className="bg-white rounded-3xl shadow-sm hover:shadow-md p-6 transition-shadow">
+                <div className="flex items-center justify-between flex-wrap gap-4">
                   {/* Creator Info */}
                   <div className="flex items-center gap-4">
                     <Avatar
@@ -353,33 +513,33 @@ const BrandAnalyticsOverview = () => {
                       <p className="font-semibold text-dark">{campaign.creator.display_name}</p>
                       <p className="text-sm text-gray-500">
                         {new Date(campaign.created_at).toLocaleDateString()} •{' '}
-                        <span className={`capitalize ${
+                        <span className={`capitalize font-medium ${
                           campaign.status === 'completed' ? 'text-green-600' :
                           campaign.status === 'in_progress' ? 'text-primary' :
                           'text-gray-600'
                         }`}>
-                          {campaign.status}
+                          {campaign.status.replace('_', ' ')}
                         </span>
                       </p>
                     </div>
                   </div>
 
                   {/* Campaign Stats */}
-                  <div className="grid grid-cols-4 gap-6 flex-1 max-w-2xl mx-6">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-6 flex-1 max-w-2xl">
                     <div className="text-center">
-                      <p className="text-xs text-gray-600">Investment</p>
+                      <p className="text-xs text-gray-600 mb-1">Investment</p>
                       <p className="text-lg font-bold text-dark">{formatCurrency(campaign.amount)}</p>
                     </div>
                     <div className="text-center">
-                      <p className="text-xs text-gray-600">Reach</p>
+                      <p className="text-xs text-gray-600 mb-1">Reach</p>
                       <p className="text-lg font-bold text-dark">{formatNumber(campaign.metrics.reach)}</p>
                     </div>
                     <div className="text-center">
-                      <p className="text-xs text-gray-600">Engagement</p>
+                      <p className="text-xs text-gray-600 mb-1">Engagement</p>
                       <p className="text-lg font-bold text-dark">{formatNumber(campaign.metrics.engagement)}</p>
                     </div>
                     <div className="text-center">
-                      <p className="text-xs text-gray-600">Eng. Rate</p>
+                      <p className="text-xs text-gray-600 mb-1">Eng. Rate</p>
                       <p className="text-lg font-bold text-primary">{campaign.metrics.avg_engagement_rate}%</p>
                     </div>
                   </div>
@@ -387,7 +547,7 @@ const BrandAnalyticsOverview = () => {
                   {/* View Analytics Button */}
                   <Link
                     to={`/brand/analytics/${campaign.id}`}
-                    className="px-4 py-2 bg-primary text-dark rounded-full hover:bg-primary/90 transition-colors text-sm font-medium"
+                    className="px-6 py-2.5 bg-primary text-dark rounded-full hover:bg-primary/90 transition-colors text-sm font-medium"
                   >
                     View Details
                   </Link>
@@ -401,7 +561,7 @@ const BrandAnalyticsOverview = () => {
         <div className="flex justify-center">
           <Link
             to="/brand/dashboard"
-            className="px-6 py-3 bg-white border-2 border-gray-200 text-dark rounded-full hover:border-primary hover:bg-primary/5 transition-colors"
+            className="px-6 py-3 bg-white border-2 border-gray-200 text-dark rounded-full hover:border-primary hover:bg-primary/5 transition-colors font-medium"
           >
             Back to Dashboard
           </Link>
