@@ -6,6 +6,7 @@ import os
 import requests
 from typing import Dict, List, Optional
 from datetime import datetime
+from app.utils.logger import log_external_api_call, log_external_api_response, log_error
 
 
 class ThunziAIService:
@@ -19,25 +20,55 @@ class ThunziAIService:
         self.session = requests.Session()
         self.is_authenticated = False
 
-    def login(self) -> bool:
-        """Login to ThunziAI and store session"""
+    def login(self, email: str = None, password: str = None) -> bool:
+        """
+        Login to ThunziAI and store session
+
+        Args:
+            email: ThunziAI account email (optional, uses instance email if not provided)
+            password: ThunziAI account password (optional, uses instance password if not provided)
+        """
         try:
+            login_email = email or self.email
+            login_password = password or self.password
+
+            url = f"{self.BASE_URL}/api/login"
+            payload = {"email": login_email, "password": "***MASKED***"}
+
+            # Log the API call
+            log_external_api_call(
+                service='ThunziAI',
+                method='POST',
+                url=url,
+                payload=payload
+            )
+
             response = self.session.post(
-                f"{self.BASE_URL}/api/login",
+                url,
                 json={
-                    "email": self.email,
-                    "password": self.password
+                    "email": login_email,
+                    "password": login_password
                 }
+            )
+
+            # Log the response
+            log_external_api_response(
+                service='ThunziAI',
+                method='POST',
+                url=url,
+                status_code=response.status_code,
+                response_body=response.text[:500] if response.status_code != 200 else 'Login successful'
             )
 
             if response.status_code == 200:
                 self.is_authenticated = True
+                self.email = login_email
                 return True
 
-            print(f"ThunziAI login failed: {response.status_code}")
+            log_error('ThunziAI.login', f"Login failed with status {response.status_code}: {response.text[:200]}")
             return False
         except Exception as e:
-            print(f"ThunziAI login error: {str(e)}")
+            log_error('ThunziAI.login', e)
             return False
 
     def _ensure_authenticated(self):
@@ -65,7 +96,7 @@ class ThunziAIService:
                 }
             )
 
-            if response.status_code == 200:
+            if response.status_code in [200, 201]:  # Accept both 200 OK and 201 Created
                 return response.json()
 
             print(f"ThunziAI registration failed: {response.status_code} - {response.text}")
@@ -73,6 +104,31 @@ class ThunziAIService:
         except Exception as e:
             print(f"ThunziAI registration error: {str(e)}")
             return None
+
+    def ensure_user_registered(self, email: str) -> Optional[Dict]:
+        """
+        Register user if not exists, then login
+        Password is set to email as per BantuBuzz convention
+
+        Returns: User data if successful, None otherwise
+        """
+        password = email  # Password = email per BantuBuzz convention
+
+        # Try to login first
+        if self.login(email=email, password=password):
+            return {"email": email}
+
+        # If login fails, register new user
+        user_data = self.register_user(email=email, password=password)
+        if not user_data:
+            return None
+
+        # Login after registration
+        if not self.login(email=email, password=password):
+            print(f"Failed to login after registration for {email}")
+            return None
+
+        return user_data
 
     def create_company(self, name: str, email: str = None, country: str = "Zimbabwe",
                       industry: str = None) -> Optional[int]:
@@ -103,20 +159,22 @@ class ThunziAIService:
 
     def add_platform(self, company_id: int, platform: str,
                     account_name: str, account_id: Optional[str] = None,
-                    access_token: Optional[str] = None) -> Optional[Dict]:
+                    access_token: Optional[str] = None,
+                    refresh_token: Optional[str] = None) -> Optional[Dict]:
         """
         Add and connect social media platform
 
         NOTE: As per ThunziAI API docs, POST /api/platforms now automatically
         attempts to connect the platform after adding it. Access tokens are
-        required for Meta platforms (Facebook/Instagram) to enable syncing.
+        required for Meta platforms (Facebook/Instagram) and YouTube to enable syncing.
 
         Args:
             company_id: ThunziAI company ID
             platform: One of: youtube, twitter, instagram, facebook, website
             account_name: Social media handle/username
-            account_id: Facebook Page ID or Instagram Business Account ID (required for Meta platforms)
-            access_token: User Access Token required for Meta platforms to enable data syncing
+            account_id: Platform-specific ID (YouTube Channel ID, Page ID, etc.)
+            access_token: OAuth access token for API access
+            refresh_token: OAuth refresh token for renewing access
 
         Returns:
             Platform data dict with id, followers, posts, etc.
@@ -156,22 +214,53 @@ class ThunziAIService:
             if account_id and platform.lower() not in ['facebook', 'instagram']:
                 payload["accountId"] = account_id
 
-            # Add access token for Meta platforms (REQUIRED for syncing)
+            # Add access token (REQUIRED for OAuth platforms)
             if access_token:
                 payload["accessToken"] = access_token
 
-            response = self.session.post(
-                f"{self.BASE_URL}/api/platforms",
-                json=payload
+            # Add refresh token (REQUIRED for YouTube and recommended for others)
+            if refresh_token:
+                payload["refreshToken"] = refresh_token
+
+            # Log the API call (mask tokens)
+            masked_payload = payload.copy()
+            if 'accessToken' in masked_payload:
+                masked_payload['accessToken'] = f"{masked_payload['accessToken'][:15]}..."
+            if 'refreshToken' in masked_payload:
+                masked_payload['refreshToken'] = f"{masked_payload['refreshToken'][:15]}..."
+
+            url = f"{self.BASE_URL}/api/platforms"
+            log_external_api_call(
+                service='ThunziAI',
+                method='POST',
+                url=url,
+                payload=masked_payload
             )
 
-            if response.status_code in [200, 201]:  # Accept both 200 OK and 201 Created
-                return response.json()
+            response = self.session.post(url, json=payload)
 
-            print(f"ThunziAI add platform failed: {response.status_code} - {response.text}")
+            # Log the response
+            try:
+                response_body = response.json() if response.status_code in [200, 201] else response.text
+            except:
+                response_body = response.text
+
+            log_external_api_response(
+                service='ThunziAI',
+                method='POST',
+                url=url,
+                status_code=response.status_code,
+                response_body=response_body
+            )
+
+            if response.status_code in [200, 201]:
+                result = response.json()
+                return result
+
+            log_error('ThunziAI.add_platform', f"Failed with status {response.status_code}: {response.text}")
             return None
         except Exception as e:
-            print(f"ThunziAI add platform error: {str(e)}")
+            log_error('ThunziAI.add_platform', e)
             return None
 
     def connect_platform(self, platform_id: int) -> Optional[Dict]:
@@ -240,17 +329,32 @@ class ThunziAIService:
             if platform:
                 payload["platform"] = platform
 
-            response = self.session.post(
-                f"{self.BASE_URL}/api/sync",
-                json=payload
+            url = f"{self.BASE_URL}/api/sync"
+
+            log_external_api_call(
+                service='ThunziAI',
+                method='POST',
+                url=url,
+                payload=payload
+            )
+
+            response = self.session.post(url, json=payload)
+
+            log_external_api_response(
+                service='ThunziAI',
+                method='POST',
+                url=url,
+                status_code=response.status_code,
+                response_body=response.text[:500] if response.status_code != 200 else 'Sync triggered successfully'
             )
 
             if response.status_code != 200:
-                print(f"ThunziAI sync failed: {response.status_code} - {response.text[:200]}")
+                log_error('ThunziAI.sync_platform',
+                         f"Sync failed with status {response.status_code}: {response.text[:200]}")
 
             return response.status_code == 200
         except Exception as e:
-            print(f"ThunziAI sync platform error: {str(e)}")
+            log_error('ThunziAI.sync_platform', e)
             return False
 
     def update_platform(self, platform_id: int, updates: Dict) -> Optional[Dict]:
@@ -337,53 +441,98 @@ class ThunziAIService:
         """
         Get all posts from a specific platform
 
-        This endpoint returns all posts that ThunziAI has synced from the platform.
-        Posts are automatically synced when platforms are connected with OAuth tokens.
+        NOTE: The /api/platforms/:id/posts endpoint is not publicly documented.
+        This method attempts to fetch posts, but may return empty list if endpoint
+        is not available. Alternative: use get_creator_posts if creator entity exists.
 
         Args:
             platform_id: ThunziAI platform ID
 
         Returns:
-            List of posts with metrics:
-            [
-                {
-                    "id": number,  # ThunziAI's internal post ID
-                    "platformId": number,
-                    "title": string,
-                    "description": string,
-                    "platform": string,
-                    "postId": string,  # Original platform post ID
-                    "url": string,
-                    "thumbnailUrl": string,
-                    "likes": number,
-                    "comments": number,
-                    "shares": number,
-                    "saves": number,
-                    "reach": number,
-                    "impressions": number,
-                    "engagement": number,
-                    "engagementRate": number,
-                    "videoViews": number,
-                    "publishedAt": string,
-                    "createdAt": string
-                },
-                ...
-            ]
+            List of posts with metrics (may be empty if endpoint not available)
+        """
+        self._ensure_authenticated()
+
+        try:
+            # Try the platforms endpoint (may not be publicly available)
+            response = self.session.get(
+                f"{self.BASE_URL}/api/platforms/{platform_id}/posts"
+            )
+
+            # Check if we got JSON response (not HTML)
+            content_type = response.headers.get('Content-Type', '')
+            if response.status_code == 200 and 'application/json' in content_type:
+                return response.json()
+
+            # If we got HTML or error, endpoint likely doesn't exist
+            print(f"ThunziAI get platform posts not available (got {content_type})")
+            return []
+        except Exception as e:
+            print(f"ThunziAI get platform posts error: {str(e)}")
+            return []
+
+    def get_creator_posts(self, creator_id: int, start_date: str, end_date: str) -> List[Dict]:
+        """
+        Get posts for a creator within a date range
+
+        Args:
+            creator_id: ThunziAI creator ID
+            start_date: Start date (YYYY-MM-DD)
+            end_date: End date (YYYY-MM-DD)
+
+        Returns:
+            List of posts with originalPostId field for matching
         """
         self._ensure_authenticated()
 
         try:
             response = self.session.get(
-                f"{self.BASE_URL}/api/platforms/{platform_id}/posts"
+                f"{self.BASE_URL}/api/creators/{creator_id}/posts",
+                params={
+                    "startDate": start_date,
+                    "endDate": end_date
+                }
             )
 
             if response.status_code == 200:
                 return response.json()
 
-            print(f"ThunziAI get platform posts failed: {response.status_code} - {response.text}")
+            print(f"ThunziAI get creator posts failed: {response.status_code} - {response.text[:200]}")
             return []
         except Exception as e:
-            print(f"ThunziAI get platform posts error: {str(e)}")
+            print(f"ThunziAI get creator posts error: {str(e)}")
+            return []
+
+    def get_creator_posts_by_bantubuzz_id(self, bantubuzz_id: str, start_date: str, end_date: str) -> List[Dict]:
+        """
+        Get posts for a creator within a date range using BantuBuzz ID
+
+        Args:
+            bantubuzz_id: BantuBuzz creator ID (used as identifier in ThunziAI)
+            start_date: Start date (YYYY-MM-DD)
+            end_date: End date (YYYY-MM-DD)
+
+        Returns:
+            List of posts with originalId field for matching
+        """
+        self._ensure_authenticated()
+
+        try:
+            response = self.session.get(
+                f"{self.BASE_URL}/api/creators/{bantubuzz_id}/posts",
+                params={
+                    "startDate": start_date,
+                    "endDate": end_date
+                }
+            )
+
+            if response.status_code == 200:
+                return response.json()
+
+            print(f"ThunziAI get creator posts by BantuBuzz ID failed: {response.status_code} - {response.text[:200]}")
+            return []
+        except Exception as e:
+            print(f"ThunziAI get creator posts by BantuBuzz ID error: {str(e)}")
             return []
 
     def get_post_by_id(self, post_id: int) -> Optional[Dict]:
@@ -507,6 +656,225 @@ class ThunziAIService:
             return None
         except Exception as e:
             print(f"ThunziAI get post comments error: {str(e)}")
+            return None
+
+    def get_creator_platforms(self, bantubuzz_id: str) -> List[Dict]:
+        """
+        Get all platforms with analytics for a creator (NEW ENDPOINT - Mar 2026)
+
+        This endpoint returns pre-calculated analytics averages from ThunziAI,
+        eliminating the need for manual calculation.
+
+        Args:
+            bantubuzz_id: BantuBuzz creator ID
+
+        Returns:
+            List of platform objects with analytics:
+            [
+                {
+                    "id": number,
+                    "companyId": number,
+                    "platform": string,
+                    "isConnected": boolean,
+                    "accountName": string,
+                    "profileUrl": string,
+                    "accessToken": string,
+                    "refreshToken": string,
+                    "tokenExpiry": string,
+                    "accountId": string,
+                    "accountIdSecondary": string,
+                    "followers": number,
+                    "posts": number,
+                    "averageEngagementRate": number,
+                    "averageSentimentScore": number,
+                    "averageViews": number,
+                    "averageReach": number,
+                    "averageComments": number,
+                    "averageLikes": number,
+                    "averageShares": number,
+                    "averageSaves": number,
+                    "syncStatus": string,
+                    "lastSyncedAt": string
+                },
+                ...
+            ]
+        """
+        self._ensure_authenticated()
+
+        try:
+            url = f"{self.BASE_URL}/api/creators/{bantubuzz_id}/platforms"
+
+            log_external_api_call(
+                service='ThunziAI',
+                method='GET',
+                url=url,
+                payload={'bantubuzz_id': bantubuzz_id}
+            )
+
+            response = self.session.get(url)
+
+            log_external_api_response(
+                service='ThunziAI',
+                method='GET',
+                url=url,
+                status_code=response.status_code,
+                response_body=response.json() if response.status_code == 200 else response.text[:500]
+            )
+
+            if response.status_code == 200:
+                return response.json()
+
+            log_error('ThunziAI.get_creator_platforms',
+                     f"Failed with status {response.status_code}: {response.text[:200]}")
+            return []
+        except Exception as e:
+            log_error('ThunziAI.get_creator_platforms', e)
+            return []
+
+    def get_post_by_original_id(self, original_post_id: str) -> Optional[Dict]:
+        """
+        Get a post by its original platform ID
+
+        Args:
+            original_post_id: The original post ID from the social media platform
+
+        Returns:
+            Post data with metrics
+        """
+        self._ensure_authenticated()
+
+        try:
+            url = f"{self.BASE_URL}/api/posts/{original_post_id}"
+
+            response = self.session.get(url)
+
+            if response.status_code == 200:
+                return response.json()
+
+            print(f"ThunziAI get post by original ID failed: {response.status_code}")
+            return None
+        except Exception as e:
+            print(f"ThunziAI get post by original ID error: {str(e)}")
+            return None
+
+    def get_post_insights_by_original_id(self, original_post_id: str) -> Optional[Dict]:
+        """
+        Get post insights including sentiment breakdown by original post ID
+
+        Args:
+            original_post_id: The original post ID from the social media platform
+
+        Returns:
+            {
+                "postId": string,
+                "sentiment": number,
+                "post": {...},
+                "commentSentiment": {
+                    "positive": number,
+                    "neutral": number,
+                    "negative": number,
+                    "critical": number
+                }
+            }
+        """
+        self._ensure_authenticated()
+
+        try:
+            url = f"{self.BASE_URL}/api/posts/{original_post_id}/insights"
+
+            log_external_api_call(
+                service='ThunziAI',
+                method='GET',
+                url=url,
+                payload={'original_post_id': original_post_id}
+            )
+
+            response = self.session.get(url)
+
+            log_external_api_response(
+                service='ThunziAI',
+                method='GET',
+                url=url,
+                status_code=response.status_code,
+                response_body=response.json() if response.status_code == 200 else response.text[:500]
+            )
+
+            if response.status_code == 200:
+                return response.json()
+
+            log_error('ThunziAI.get_post_insights_by_original_id',
+                     f"Failed with status {response.status_code}: {response.text[:200]}")
+            return None
+        except Exception as e:
+            log_error('ThunziAI.get_post_insights_by_original_id', e)
+            return None
+
+    def get_post_comments_by_original_id(self, original_post_id: str,
+                                        start_date: str = None,
+                                        end_date: str = None) -> Optional[Dict]:
+        """
+        Get comments with sentiment analysis by original post ID
+
+        Args:
+            original_post_id: The original post ID from the social media platform
+            start_date: Optional start date (YYYY-MM-DD)
+            end_date: Optional end date (YYYY-MM-DD)
+
+        Returns:
+            {
+                "postId": string,
+                "comments": [
+                    {
+                        "id": number,
+                        "companyId": number,
+                        "platform": string,
+                        "username": string,
+                        "content": string,
+                        "sentiment": "positive" | "neutral" | "negative" | "critical",
+                        "sentimentScore": number,
+                        "likes": number,
+                        "views": number,
+                        "publishedAt": string
+                    },
+                    ...
+                ]
+            }
+        """
+        self._ensure_authenticated()
+
+        try:
+            url = f"{self.BASE_URL}/api/posts/{original_post_id}/comments"
+            params = {}
+            if start_date:
+                params['startDate'] = start_date
+            if end_date:
+                params['endDate'] = end_date
+
+            log_external_api_call(
+                service='ThunziAI',
+                method='GET',
+                url=url,
+                payload={'original_post_id': original_post_id, **params}
+            )
+
+            response = self.session.get(url, params=params if params else None)
+
+            log_external_api_response(
+                service='ThunziAI',
+                method='GET',
+                url=url,
+                status_code=response.status_code,
+                response_body=response.json() if response.status_code == 200 else response.text[:500]
+            )
+
+            if response.status_code == 200:
+                return response.json()
+
+            log_error('ThunziAI.get_post_comments_by_original_id',
+                     f"Failed with status {response.status_code}: {response.text[:200]}")
+            return None
+        except Exception as e:
+            log_error('ThunziAI.get_post_comments_by_original_id', e)
             return None
 
 

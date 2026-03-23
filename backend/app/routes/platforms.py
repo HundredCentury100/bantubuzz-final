@@ -7,6 +7,7 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 from app import db
 from app.models import User, CreatorProfile, BrandProfile, ThunziAccount, ConnectedPlatform
 from app.services.thunzi_service import thunzi_service
+from app.utils.logger import log_incoming_request, log_response, log_error
 from datetime import datetime
 import requests
 import os
@@ -100,6 +101,15 @@ def connect_platform():
     """
     try:
         current_user_id = get_jwt_identity()
+
+        # Log incoming request
+        log_incoming_request(
+            method='POST',
+            path='/api/creator/platforms/connect',
+            body=request.json,
+            user_id=current_user_id
+        )
+
         user = User.query.get(current_user_id)
 
         if not user or user.user_type != 'creator':
@@ -164,13 +174,23 @@ def connect_platform():
             db.session.add(thunzi_account)
             db.session.commit()
 
+        # Login to ThunziAI with creator's credentials BEFORE adding platform (password = email)
+        login_success = thunzi_service.login(
+            email=thunzi_account.thunzi_email,
+            password=thunzi_account.thunzi_email
+        )
+
+        if not login_success:
+            return jsonify({'error': 'Failed to authenticate with ThunziAI'}), 500
+
         # Add platform to ThunziAI (use platform name as-is per API docs)
         thunzi_platform = thunzi_service.add_platform(
             company_id=thunzi_account.thunzi_company_id,
             platform=platform,
             account_name=account_name,
             account_id=account_id,  # Pass account_id to ThunziAI
-            access_token=access_token
+            access_token=access_token,
+            refresh_token=refresh_token  # Pass refresh_token for OAuth renewal
         )
 
         if not thunzi_platform:
@@ -232,15 +252,42 @@ def connect_platform():
                 platform=platform
             )
 
-        return jsonify({
+        response_data = {
             'success': True,
             'message': f'{platform.title()} connected successfully',
             'platform': connected_platform.to_dict()
-        }), 201
+        }
+
+        # Log successful response
+        log_response(
+            method='POST',
+            path='/api/creator/platforms/connect',
+            status_code=201,
+            response_body=response_data
+        )
+
+        return jsonify(response_data), 201
 
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': str(e)}), 500
+
+        # Log error with full traceback
+        log_error(
+            context='connect_platform',
+            error=e
+        )
+
+        error_response = {'error': str(e)}
+
+        # Log error response
+        log_response(
+            method='POST',
+            path='/api/creator/platforms/connect',
+            status_code=500,
+            error=str(e)
+        )
+
+        return jsonify(error_response), 500
 
 
 @platforms_bp.route('/api/creator/platforms/youtube/auth-url', methods=['GET'])
@@ -312,10 +359,12 @@ def youtube_oauth_callback():
         """
 
     if code:
+        # Send code back to parent window immediately via postMessage
+        # Parent window will exchange the code for tokens using its JWT token
         return f"""
         <html>
         <body>
-        <div style="display: flex; align-items: center; justify-center: center; height: 100vh; font-family: sans-serif;">
+        <div style="display: flex; align-items: center; justify-content: center; height: 100vh; font-family: sans-serif;">
             <div style="text-align: center;">
                 <div style="border: 4px solid #f3f3f3; border-top: 4px solid #FFDD00; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto 20px;"></div>
                 <p>Completing authentication...</p>
@@ -328,36 +377,19 @@ def youtube_oauth_callback():
             }}
         </style>
         <script>
-            fetch('{frontend_url}/api/creator/platforms/youtube/exchange-code', {{
-                method: 'POST',
-                headers: {{
-                    'Content-Type': 'application/json',
-                    'Authorization': 'Bearer ' + localStorage.getItem('token')
-                }},
-                body: JSON.stringify({{ code: '{code}' }})
-            }})
-            .then(response => response.json())
-            .then(data => {{
-                if (data.success) {{
-                    window.opener.postMessage({{
-                        type: 'youtube-oauth-success',
-                        ...data
-                    }}, '{frontend_url}');
-                }} else {{
-                    window.opener.postMessage({{
-                        type: 'youtube-oauth-error',
-                        error: data.error || 'Authentication failed'
-                    }}, '{frontend_url}');
-                }}
-                window.close();
-            }})
-            .catch(error => {{
+            console.log('[Backend Callback] Received code, sending to parent');
+            // Send code to parent window immediately
+            if (window.opener) {{
+                console.log('[Backend Callback] window.opener exists, sending postMessage');
                 window.opener.postMessage({{
-                    type: 'youtube-oauth-error',
-                    error: error.message || 'Authentication failed'
+                    type: 'youtube-oauth-code',
+                    code: '{code}'
                 }}, '{frontend_url}');
-                window.close();
-            }});
+                setTimeout(() => window.close(), 500);
+            }} else {{
+                console.error('[Backend Callback] No window.opener!');
+                document.body.innerHTML = '<div style="text-align: center; padding: 50px;"><h2>Error</h2><p>Please close this window and try again.</p></div>';
+            }}
         </script>
         </body>
         </html>

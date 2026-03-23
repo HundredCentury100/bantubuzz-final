@@ -148,14 +148,31 @@ def log_exception(app, exception, context=""):
 
 
 def log_request(app):
-    """Log incoming request details"""
+    """Log incoming request details including payload"""
     try:
         from flask import request
-        app.logger.info(
-            f"{request.method} {request.path} | "
-            f"IP: {request.remote_addr} | "
-            f"User-Agent: {request.headers.get('User-Agent', 'Unknown')[:50]}"
-        )
+        import json
+
+        log_msg = f"{request.method} {request.path} | IP: {request.remote_addr}"
+
+        # Log request body for POST/PUT/PATCH
+        if request.method in ['POST', 'PUT', 'PATCH']:
+            try:
+                if request.is_json:
+                    body = request.get_json()
+                    # Mask sensitive fields
+                    if body:
+                        masked_body = body.copy()
+                        for key in ['password', 'token', 'access_token', 'refresh_token']:
+                            if key in masked_body:
+                                masked_body[key] = '***MASKED***'
+                        log_msg += f"\nPayload: {json.dumps(masked_body, indent=2)}"
+                elif request.data:
+                    log_msg += f"\nPayload (raw): {request.data[:500]}"
+            except:
+                pass
+
+        app.logger.info(log_msg)
     except:
         pass
 

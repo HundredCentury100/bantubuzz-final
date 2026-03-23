@@ -322,16 +322,30 @@ class AnalyticsService:
             if not collaborations:
                 return {
                     'total_collaborations': 0,
+                    'active_collaborations': 0,
+                    'completed_collaborations': 0,
+                    'total_posts': 0,
                     'total_spend': 0,
                     'total_reach': 0,
+                    'total_impressions': 0,
                     'total_engagement': 0,
+                    'total_likes': 0,
+                    'total_comments': 0,
+                    'total_shares': 0,
+                    'total_saves': 0,
+                    'total_video_views': 0,
                     'avg_engagement_rate': 0,
+                    'avg_cost_per_engagement': 0,
+                    'avg_cost_per_reach': 0,
+                    'overall_roi': 0,
+                    'campaigns': [],
                     'top_performing_collaborations': [],
                     'sentiment_overview': {
                         'overall': 'neutral',
                         'positive': 0,
                         'negative': 0,
-                        'neutral': 0
+                        'neutral': 0,
+                        'total_comments': 0
                     }
                 }
 
@@ -342,13 +356,19 @@ class AnalyticsService:
                 PostMetrics.deliverable_type == 'package'
             ).all()
 
-            # Calculate totals
+            # Calculate totals and aggregate metrics
             total_spend = sum(
                 float(c.amount) if c.amount else 0
                 for c in collaborations
             )
             total_reach = sum(m.reach or 0 for m in all_metrics)
+            total_impressions = sum(m.impressions or 0 for m in all_metrics)
             total_engagement = sum(m.total_engagement or 0 for m in all_metrics)
+            total_likes = sum(m.likes or 0 for m in all_metrics)
+            total_comments = sum(m.comments or 0 for m in all_metrics)
+            total_shares = sum(m.shares or 0 for m in all_metrics)
+            total_saves = sum(m.saves or 0 for m in all_metrics)
+            total_video_views = sum(m.video_views or 0 for m in all_metrics)
 
             # Calculate average engagement rate
             engagement_rates = [m.engagement_rate for m in all_metrics if m.engagement_rate]
@@ -357,27 +377,91 @@ class AnalyticsService:
                 if engagement_rates else 0
             )
 
-            # Get top performing collaborations
-            top_performing = sorted(
-                [
-                    {
-                        'id': c.id,
-                        'engagement': sum(
-                            m.total_engagement or 0
-                            for m in all_metrics
-                            if m.collaboration_id == c.id
-                        )
+            # Calculate cost metrics
+            avg_cost_per_engagement = (
+                round(total_spend / total_engagement, 2)
+                if total_engagement > 0 else 0
+            )
+            avg_cost_per_reach = (
+                round(total_spend / total_reach, 4)
+                if total_reach > 0 else 0
+            )
+
+            # Calculate overall ROI
+            engagement_value = total_engagement * 0.10  # $0.10 per engagement
+            overall_roi = (
+                round(((engagement_value - total_spend) / total_spend) * 100, 2)
+                if total_spend > 0 else 0
+            )
+
+            # Count collaboration statuses
+            active_collaborations = sum(
+                1 for c in collaborations
+                if c.status in ['pending', 'in_progress', 'accepted']
+            )
+            completed_collaborations = sum(
+                1 for c in collaborations
+                if c.status == 'completed'
+            )
+
+            # Build detailed campaigns list
+            campaigns_list = []
+            for collab in collaborations:
+                collab_metrics = [
+                    m for m in all_metrics
+                    if m.collaboration_id == collab.id
+                ]
+
+                # Get creator info
+                creator_profile = CreatorProfile.query.get(collab.creator_id)
+                creator_user = User.query.get(creator_profile.user_id) if creator_profile else None
+
+                collab_reach = sum(m.reach or 0 for m in collab_metrics)
+                collab_engagement = sum(m.total_engagement or 0 for m in collab_metrics)
+                collab_engagement_rates = [
+                    m.engagement_rate for m in collab_metrics if m.engagement_rate
+                ]
+                collab_avg_engagement_rate = (
+                    sum(collab_engagement_rates) / len(collab_engagement_rates)
+                    if collab_engagement_rates else 0
+                )
+
+                campaigns_list.append({
+                    'id': collab.id,
+                    'status': collab.status,
+                    'created_at': collab.created_at.isoformat(),
+                    'amount': float(collab.amount) if collab.amount else 0,
+                    'creator': {
+                        'id': creator_user.id if creator_user else None,
+                        'username': creator_profile.username if creator_profile else None,
+                        'display_name': creator_profile.username if creator_profile else (creator_user.email if creator_user else 'Unknown'),
+                        'profile_picture': creator_profile.profile_picture if creator_profile else None,
+                    },
+                    'metrics': {
+                        'posts_count': len(collab_metrics),
+                        'reach': collab_reach,
+                        'engagement': collab_engagement,
+                        'avg_engagement_rate': round(collab_avg_engagement_rate, 2)
                     }
-                    for c in collaborations
-                ],
-                key=lambda x: x['engagement'],
-                reverse=True
-            )[:5]
+                })
+
+            # Sort campaigns by engagement
+            campaigns_list.sort(key=lambda x: x['metrics']['engagement'], reverse=True)
+
+            # Get top performing collaborations
+            top_performing = [
+                {
+                    'id': c['id'],
+                    'engagement': c['metrics']['engagement']
+                }
+                for c in campaigns_list[:5]
+            ]
 
             # Overall sentiment
             total_positive = sum(m.positive_comments or 0 for m in all_metrics)
             total_negative = sum(m.negative_comments or 0 for m in all_metrics)
             total_neutral = sum(m.neutral_comments or 0 for m in all_metrics)
+            total_comment_count = sum(m.comments or 0 for m in all_metrics)
 
             if total_positive > total_negative:
                 overall_sentiment = 'positive'
@@ -388,16 +472,30 @@ class AnalyticsService:
 
             return {
                 'total_collaborations': len(collaborations),
+                'active_collaborations': active_collaborations,
+                'completed_collaborations': completed_collaborations,
+                'total_posts': len(all_metrics),
                 'total_spend': round(total_spend, 2),
                 'total_reach': total_reach,
+                'total_impressions': total_impressions,
                 'total_engagement': total_engagement,
+                'total_likes': total_likes,
+                'total_comments': total_comments,
+                'total_shares': total_shares,
+                'total_saves': total_saves,
+                'total_video_views': total_video_views,
                 'avg_engagement_rate': round(avg_engagement_rate, 2),
+                'avg_cost_per_engagement': avg_cost_per_engagement,
+                'avg_cost_per_reach': avg_cost_per_reach,
+                'overall_roi': overall_roi,
+                'campaigns': campaigns_list,
                 'top_performing_collaborations': top_performing,
                 'sentiment_overview': {
                     'overall': overall_sentiment,
                     'positive': total_positive,
                     'negative': total_negative,
-                    'neutral': total_neutral
+                    'neutral': total_neutral,
+                    'total_comments': total_comment_count
                 }
             }
 

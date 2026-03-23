@@ -141,28 +141,55 @@ const ConnectPlatforms = () => {
 
         // Listen for OAuth callback
         const handleMessage = async (event) => {
+          console.log('[ConnectPlatforms] Received message:', event);
+          console.log('[ConnectPlatforms] Event origin:', event.origin);
+          console.log('[ConnectPlatforms] Window origin:', window.location.origin);
+          console.log('[ConnectPlatforms] Event data:', event.data);
+
           // Security check
-          if (event.origin !== window.location.origin) return;
+          if (event.origin !== window.location.origin) {
+            console.log('[ConnectPlatforms] Origin mismatch, ignoring message');
+            return;
+          }
 
-          if (event.data.type === 'youtube-oauth-success') {
-            window.removeEventListener('message', handleMessage);
+          // Handle receiving the authorization code from backend callback
+          if (event.data.type === 'youtube-oauth-code') {
+            console.log('[ConnectPlatforms] Received code, exchanging for tokens...');
+            try {
+              // Exchange code for tokens using our JWT token
+              const exchangeResponse = await api.post('/creator/platforms/youtube/exchange-code', {
+                code: event.data.code
+              });
 
-            // Connect the platform with the OAuth data
-            const connectResponse = await api.post('/creator/platforms/connect', {
-              platform: 'youtube',
-              accountName: event.data.channelTitle,
-              accountId: event.data.channelId,
-              accessToken: event.data.accessToken,
-              refreshToken: event.data.refreshToken,
-              tokenExpiry: new Date(Date.now() + event.data.expiresIn * 1000).toISOString()
-            });
+              console.log('[ConnectPlatforms] Exchange response:', exchangeResponse.data);
 
-            if (connectResponse.data.success) {
-              toast.success('YouTube connected successfully!');
-              fetchPlatforms();
+              if (exchangeResponse.data.success) {
+                // Now connect the platform with the tokens
+                // NOTE: Do NOT send accountId - ThunziAI will extract it from OAuth token or accountName
+                // This matches the Facebook implementation pattern
+                const connectResponse = await api.post('/creator/platforms/connect', {
+                  platform: 'youtube',
+                  accountName: exchangeResponse.data.channelTitle,
+                  accessToken: exchangeResponse.data.accessToken,
+                  refreshToken: exchangeResponse.data.refreshToken,
+                  tokenExpiry: new Date(Date.now() + exchangeResponse.data.expiresIn * 1000).toISOString()
+                });
+
+                console.log('[ConnectPlatforms] Connect response:', connectResponse.data);
+
+                if (connectResponse.data.success) {
+                  toast.success('YouTube connected successfully!');
+                  fetchPlatforms();
+                }
+              }
+            } catch (error) {
+              console.error('[ConnectPlatforms] Error during exchange:', error);
+              toast.error(error.response?.data?.error || 'Failed to connect YouTube');
             }
+            window.removeEventListener('message', handleMessage);
             setConnecting(null);
           } else if (event.data.type === 'youtube-oauth-error') {
+            console.log('[ConnectPlatforms] Error received:', event.data.error);
             window.removeEventListener('message', handleMessage);
             toast.error(event.data.error || 'Failed to connect YouTube');
             setConnecting(null);

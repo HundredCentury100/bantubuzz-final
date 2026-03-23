@@ -28,10 +28,10 @@ const Navbar = () => {
       if (isAuthenticated && user) {
         try {
           if (user.user_type === 'creator') {
-            const response = await creatorsAPI.getMyProfile();
+            const response = await creatorsAPI.getOwnProfile();
             setUserProfile(response.data);
           } else if (user.user_type === 'brand') {
-            const response = await brandsAPI.getMyProfile();
+            const response = await brandsAPI.getOwnProfile();
             setUserProfile(response.data);
           }
         } catch (error) {
@@ -168,13 +168,15 @@ const Navbar = () => {
                 <Menu as="div" className="relative ml-3">
                   <Menu.Button className="flex items-center p-1 rounded-full hover:ring-2 hover:ring-primary/20 transition-all">
                     <Avatar
-                      name={
+                      src={userProfile?.profile_picture || userProfile?.logo}
+                      alt={
                         userProfile?.display_name ||
                         userProfile?.username ||
                         userProfile?.company_name ||
                         user?.email
                       }
                       size="sm"
+                      type={user?.user_type === 'brand' ? 'brand' : 'user'}
                     />
                   </Menu.Button>
 

@@ -15,6 +15,7 @@ import PackageForm from './pages/PackageForm';
 import BrandDashboard from './pages/BrandDashboard';
 import BrandProfileEdit from './pages/BrandProfileEdit';
 import BrandAnalytics from './pages/BrandAnalytics';
+import BrandAnalyticsOverview from './pages/BrandAnalyticsOverview';
 import Creators from './pages/Creators';
 import CreatorProfile from './pages/CreatorProfile';
 import Packages from './pages/Packages';
@@ -49,6 +50,7 @@ import VerificationStatus from './pages/VerificationStatus';
 import VerificationPending from './pages/VerificationPending';
 import ConnectPlatforms from './pages/ConnectPlatforms';
 import BrandConnectPlatforms from './pages/BrandConnectPlatforms';
+import YouTubeCallback from './pages/YouTubeCallback';
 
 // Admin Pages
 import AdminLogin from './pages/AdminLogin';
@@ -203,6 +205,7 @@ function App() {
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password/:token" element={<ResetPassword />} />
       <Route path="/register/creator/complete-profile" element={<GoogleProfileComplete />} />
+      <Route path="/youtube/callback" element={<YouTubeCallback />} />
 
       {/* Creator Protected Routes */}
       <Route
@@ -510,6 +513,14 @@ function App() {
         element={
           <ProtectedRoute requiredType="brand">
             <BrandConnectPlatforms />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/brand/analytics"
+        element={
+          <ProtectedRoute requiredType="brand">
+            <BrandAnalyticsOverview />
           </ProtectedRoute>
         }
       />

@@ -8,6 +8,7 @@ import Footer from '../components/Footer';
 import ReviewCard from '../components/ReviewCard';
 import CreatorBadge from '../components/CreatorBadge';
 import CustomPackageRequestModal from '../components/CustomPackageRequestModal';
+import PlatformAnalytics from '../components/creator/PlatformAnalytics';
 import SEO from '../components/SEO';
 import toast from 'react-hot-toast';
 import { PLATFORM_CONFIGS, PACKAGE_TYPES } from '../constants/platformConfig';
@@ -337,11 +338,21 @@ const CreatorProfile = () => {
                   </span>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
 
-              {/* Bio */}
-              {creator.bio && (
-                <p className="text-gray-700 mb-4">{creator.bio}</p>
-              )}
+        {/* Platform Analytics */}
+        <PlatformAnalytics creatorId={creator.id} />
+
+        {/* Bio Section */}
+        <div className="card mb-8">
+          {creator.bio && (
+            <div className="mb-4">
+              <h3 className="text-lg font-semibold text-dark mb-2">About</h3>
+              <p className="text-gray-700">{creator.bio}</p>
+            </div>
+          )}
 
               {/* Categories */}
               {creator.categories && creator.categories.length > 0 && (
@@ -377,16 +388,16 @@ const CreatorProfile = () => {
                 </div>
               )}
 
-              {/* Social Links */}
-              {creator.social_links && Object.keys(creator.social_links).some(key => creator.social_links[key]) && (
-                <div>
-                  <h3 className="text-sm font-medium text-gray-700 mb-2">Social Media</h3>
-                  <div className="flex gap-3">
-                    {creator.social_links.instagram && (
-                      <a
-                        href={`https://www.instagram.com/${creator.social_links.instagram.replace('@', '')}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
+          {/* Social Links */}
+          {creator.social_links && Object.keys(creator.social_links).some(key => creator.social_links[key]) && (
+            <div>
+              <h3 className="text-sm font-medium text-gray-700 mb-2">Social Media</h3>
+              <div className="flex gap-3">
+                {creator.social_links.instagram && (
+                  <a
+                    href={`https://www.instagram.com/${creator.social_links.instagram.replace('@', '')}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
                         className="transition-colors hover:opacity-80"
                         title={`@${creator.social_links.instagram.replace('@', '')} on Instagram`}
                       >
@@ -446,8 +457,6 @@ const CreatorProfile = () => {
                   </div>
                 </div>
               )}
-            </div>
-          </div>
         </div>
 
         {/* Packages Section */}

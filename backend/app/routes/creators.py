@@ -6,6 +6,7 @@ from app.models import CreatorProfile, User, Review, Package
 from app.utils import save_profile_picture, delete_profile_picture
 from app.utils.file_upload import save_and_compress_image
 from app.utils.image_compression import delete_image_variants
+from app.services.creator_analytics_service import CreatorAnalyticsService
 from sqlalchemy import or_, and_, func
 
 bp = Blueprint('creators', __name__)
@@ -522,8 +523,17 @@ def update_profile():
         if 'categories' in data:
             creator.categories = data['categories']
 
-        if 'follower_count' in data:
-            creator.follower_count = data['follower_count']
+        # Auto-calculate follower_count from connected platforms
+        # Don't allow manual setting - always compute from ThunziAI data
+        from app.models import ConnectedPlatform
+        connected_platforms = ConnectedPlatform.query.filter_by(
+            user_id=user_id,
+            is_connected=True
+        ).all()
+
+        # Sum followers from all connected platforms
+        total_followers = sum(platform.followers or 0 for platform in connected_platforms)
+        creator.follower_count = total_followers
 
         if 'engagement_rate' in data:
             creator.engagement_rate = data['engagement_rate']
@@ -773,3 +783,28 @@ def delete_gallery_image(index):
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
+
+
+
+@bp.route("/<int:creator_id>/platform-analytics", methods=["GET"])
+def get_creator_platform_analytics(creator_id):
+    """
+    Get platform analytics for a creator (public endpoint)
+    Shows verified data from connected platforms via ThunziAI
+    """
+    try:
+        # Get creator to get their user_id
+        creator = CreatorProfile.query.get(creator_id)
+        if not creator:
+            return jsonify({"error": "Creator not found"}), 404
+
+        # Get platform analytics
+        analytics = CreatorAnalyticsService.get_creator_platform_analytics(
+            creator.user_id
+        )
+
+        return jsonify(analytics), 200
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+

@@ -214,13 +214,14 @@ class PostMetricsService:
                     'error': 'Post not found in creator posts'
                 }
 
-            # Get detailed insights for the post
-            thunzi_post_id = matching_post['id']
-            insights = thunzi_service.get_post_insights(thunzi_post_id)
+            # Get detailed insights using NEW endpoint (Mar 2026) - uses originalId instead of ThunziAI post ID
+            # This is more efficient as it directly queries by the original post ID
+            original_post_id = matching_post.get('originalId')
+            insights = thunzi_service.get_post_insights_by_original_id(original_post_id)
 
             if not insights:
                 current_app.logger.warning(
-                    f"Failed to fetch insights for ThunziAI post {thunzi_post_id}"
+                    f"Failed to fetch insights for original post ID {original_post_id}"
                 )
                 # Continue with basic metrics from post list
                 insights = {'post': matching_post, 'commentSentiment': {}}
@@ -248,8 +249,9 @@ class PostMetricsService:
             post_data = insights.get('post', matching_post)
             sentiment_data = insights.get('commentSentiment', {})
 
-            # Update ThunziAI post ID
-            metrics.thunzi_post_id = str(thunzi_post_id)
+            # Update ThunziAI post ID from insights or matching post
+            thunzi_post_id = insights.get('postId') or matching_post.get('id')
+            metrics.thunzi_post_id = str(thunzi_post_id) if thunzi_post_id else None
 
             # Post info (creator API uses 'content', platform API uses 'description')
             metrics.post_title = post_data.get('title') or post_data.get('username')
@@ -264,9 +266,8 @@ class PostMetricsService:
                 except:
                     pass
 
-            # Core metrics
+            # Core metrics (ThunziAI doesn't provide impressions, only reach)
             metrics.reach = post_data.get('reach') or 0
-            metrics.impressions = post_data.get('impressions') or 0
             metrics.likes = post_data.get('likes') or 0
             metrics.comments = post_data.get('comments') or 0
             metrics.shares = post_data.get('shares') or 0
@@ -281,7 +282,8 @@ class PostMetricsService:
             # Sentiment analysis
             metrics.sentiment = post_data.get('sentiment')
             metrics.sentiment_score = post_data.get('sentimentScore')
-            metrics.positive_comments = sentiment_data.get('positive', 0)
+            # Handle ThunziAI's typo: they return "postive" instead of "positive"
+            metrics.positive_comments = sentiment_data.get('positive', sentiment_data.get('postive', 0))
             metrics.negative_comments = sentiment_data.get('negative', 0)
             metrics.neutral_comments = sentiment_data.get('neutral', 0)
             metrics.critical_comments = sentiment_data.get('critical', 0)  # From ThunziAI insights

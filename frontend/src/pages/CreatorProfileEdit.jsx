@@ -82,7 +82,6 @@ const CreatorProfileEdit = () => {
       setValue('city', data.city || '');
       setValue('country', data.country || 'ZW');
       setValue('portfolio_url', data.portfolio_url || '');
-      setValue('follower_count', data.follower_count || 0);
       setValue('categories', data.categories || []);
       setValue('languages', data.languages || []);
       setValue('platforms', data.platforms || []);
@@ -295,7 +294,6 @@ const CreatorProfileEdit = () => {
         city: data.city,
         country: data.country,
         portfolio_url: data.portfolio_url,
-        follower_count: parseInt(data.follower_count) || 0,
         categories: data.categories || [],
         languages: data.languages || [],
         platforms: data.platforms || [],
@@ -658,30 +656,6 @@ const CreatorProfileEdit = () => {
               </div>
             </div>
 
-            {/* Social Stats */}
-            <div className="card">
-              <h2 className="text-xl font-bold text-dark mb-4">Social Media Stats</h2>
-
-              {/* Follower Count */}
-              <div>
-                <label className="block text-sm font-medium text-dark mb-2">
-                  Total Followers <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="number"
-                  className="input"
-                  placeholder="10000"
-                  {...register('follower_count', {
-                    required: 'Total followers is required',
-                    min: { value: 0, message: 'Cannot be negative' }
-                  })}
-                />
-                {errors.follower_count && (
-                  <p className="mt-1 text-sm text-error">{errors.follower_count.message}</p>
-                )}
-              </div>
-            </div>
-
             {/* Revision Settings */}
             <div className="card">
               <h2 className="text-xl font-bold text-dark mb-4">Revision Policy</h2>
@@ -947,7 +921,7 @@ const CreatorProfileEdit = () => {
             city: watch('city') || profile?.city,
             country: watch('country') || profile?.country,
             profile_picture: profilePicture,
-            follower_count: watch('follower_count') || profile?.follower_count || 0,
+            follower_count: profile?.follower_count || 0,
             categories: watch('categories') || profile?.categories || [],
             languages: watch('languages') || profile?.languages || [],
             platforms: watch('platforms') || profile?.platforms || [],

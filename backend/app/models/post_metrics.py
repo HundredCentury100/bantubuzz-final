@@ -83,10 +83,9 @@ class PostMetrics(db.Model):
         """Calculate total engagement and engagement rate"""
         self.total_engagement = (self.likes or 0) + (self.comments or 0) + (self.shares or 0) + (self.saves or 0)
 
+        # Calculate engagement rate based on reach (ThunziAI only provides reach, not impressions)
         if self.reach and self.reach > 0:
             self.engagement_rate = round((self.total_engagement / self.reach) * 100, 2)
-        elif self.impressions and self.impressions > 0:
-            self.engagement_rate = round((self.total_engagement / self.impressions) * 100, 2)
         else:
             self.engagement_rate = 0
 

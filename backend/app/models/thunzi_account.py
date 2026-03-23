@@ -13,6 +13,8 @@ class ThunziAccount(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), unique=True, nullable=False)
     thunzi_user_id = db.Column(db.Integer)  # ThunziAI user ID
     thunzi_company_id = db.Column(db.Integer)  # ThunziAI company ID
+    thunzi_creator_id = db.Column(db.Integer)  # ThunziAI creator numeric ID (deprecated - use bantubuzz_id)
+    bantubuzz_id = db.Column(db.String(255))  # BantuBuzz ID used as creator identifier in ThunziAI
     thunzi_email = db.Column(db.String(255))  # Email used for ThunziAI account
     is_active = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -27,6 +29,7 @@ class ThunziAccount(db.Model):
             'user_id': self.user_id,
             'thunzi_user_id': self.thunzi_user_id,
             'thunzi_company_id': self.thunzi_company_id,
+            'bantubuzz_id': self.bantubuzz_id,
             'thunzi_email': self.thunzi_email,
             'is_active': self.is_active,
             'created_at': self.created_at.isoformat() if self.created_at else None,
