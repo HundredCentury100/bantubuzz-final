@@ -299,8 +299,11 @@ def get_youtube_auth_url():
     Returns the URL to redirect the user to for YouTube OAuth consent
     """
     try:
-        # YouTube OAuth credentials from ThunziAI docs
-        client_id = '1052058162489-6522oei5bjsalcgm0hmgku927lumqa06.apps.googleusercontent.com'
+        # YouTube OAuth credentials from environment variables
+        client_id = os.getenv('YOUTUBE_CLIENT_ID')
+        if not client_id:
+            return jsonify({'error': 'YouTube OAuth not configured'}), 500
+
         redirect_uri = f"{os.getenv('BACKEND_URL', 'https://bantubuzz.com')}/api/creator/platforms/youtube/callback"
 
         # YouTube OAuth scopes for analytics and channel data
@@ -419,9 +422,13 @@ def exchange_youtube_code():
         if not auth_code:
             return jsonify({'error': 'Authorization code is required'}), 400
 
-        # YouTube OAuth credentials
-        client_id = '1052058162489-6522oei5bjsalcgm0hmgku927lumqa06.apps.googleusercontent.com'
-        client_secret = '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'
+        # YouTube OAuth credentials from environment variables
+        client_id = os.getenv('YOUTUBE_CLIENT_ID')
+        client_secret = os.getenv('YOUTUBE_CLIENT_SECRET')
+
+        if not client_id or not client_secret:
+            return jsonify({'error': 'YouTube OAuth not configured'}), 500
+
         redirect_uri = f"{os.getenv('BACKEND_URL', 'https://bantubuzz.com')}/api/creator/platforms/youtube/callback"
 
         # Exchange code for tokens

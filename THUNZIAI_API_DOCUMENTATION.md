@@ -227,10 +227,8 @@ Response Body:
 - This endpoint automatically attempts to connect platforms after adding them
 - For Meta platforms, `accessToken` contains the **User Access Token** (not Page Access Token)
 - User Access Token must be acquired from Facebook Login for Business
-- Facebook App ID: `1863571634283956`
-- Facebook Config ID: `1233734415390648`
-- YouTube OAuth Client ID: `1052058162489-6522oei5bjsalcgm0hmgku927lumqa06.apps.googleusercontent.com`
-- YouTube Client Secret: `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`
+- Facebook App ID and Config ID are configured in environment variables
+- YouTube OAuth credentials are configured in environment variables
 
 Example (YouTube):
 ```json
