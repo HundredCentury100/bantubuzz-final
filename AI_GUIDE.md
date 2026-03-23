@@ -1,6 +1,6 @@
 # 🤖 AI Assistant Guide for BantuBuzz Platform
 
-**Last Updated**: March 12, 2026
+**Last Updated**: March 23, 2026
 **Purpose**: Complete context and guidelines for AI assistants working on this project
 
 ---
@@ -24,7 +24,9 @@
 
 ### Core Features
 - **Creator Profiles**: Showcase portfolios, packages, and social media reach
-- **Brand Collaboration**: Book creators, launch campaigns, manage briefs
+- **Unified Campaign System**: Structured Campaign Brief with two participation modes (packages vs proposals)
+- **Campaign Opportunities**: Smart filtering showing creators campaigns matching their profile
+- **ThunziAI Integration**: Platform analytics with sentiment analysis and engagement metrics
 - **Messaging System**: Real-time chat with WebSocket support
 - **Payment System**: Paynow integration (EcoCash, cards) + manual payments
 - **Subscription Tiers**: For both brands (Free, Pro, Premium) and creators (Featured, Verification)
@@ -1250,6 +1252,89 @@ Understanding what's been implemented helps maintain consistency and avoid rewor
   - Removed `id_document_back` field (3 documents → 2 documents)
   - Now requires: Document Front + Selfie with Document
   - Matches industry standard verification flow
+
+### Phase 7: Unified Campaign System (Complete - March 23, 2026)
+**Design Philosophy**: Structured Campaign Brief with multiple specific fields (NOT a single text area!)
+
+#### Database & Models
+- **Enhanced Campaign table** with 14 new fields:
+  - Campaign Brief: `campaign_objective`, `target_audience` (JSON), `key_message`, `required_mentions` (JSON), `content_guidelines`
+  - Participation modes: `participation_mode` ('packages' or 'proposals'), `allows_applications`
+  - Budget handling: `budget` (packages mode) OR `budget_min`/`budget_max` (proposals mode)
+  - Timeline: `timeline_days`, `start_date`, `end_date`
+  - Targeting: `target_categories` (JSON), `target_min_followers`, `target_max_followers`, `target_locations` (JSON)
+- **CampaignMilestone table** updated:
+  - Renamed: `title` → `name`, `expected_deliverables` → `deliverables`
+  - Added: `due_date`, `updated_at`
+- **CampaignProposal** (renamed from CampaignApplication):
+  - Table renamed: `campaign_applications` → `campaign_proposals`
+  - Renamed: `application_message` → `proposal_message`
+  - New fields: `delivery_timeline_days`, `brand_notes`, `reviewed_at`
+- Migration: `backend/migrations/versions/202603201400_unified_campaign_system.py`
+
+#### Backend API (campaigns.py)
+- **Campaign Creation** (`POST /campaigns/`):
+  - Validates participation mode (packages vs proposals)
+  - Accepts all Campaign Brief fields
+  - Creates milestones if provided
+  - Smart budget validation based on mode
+- **Campaign Update** (`PUT /campaigns/<id>`):
+  - Updates all Campaign Brief fields
+  - Milestones management (delete old + create new)
+- **Browse Opportunities** (`GET /campaigns/browse`):
+  - Smart filtering based on creator profile (category, followers, location)
+  - Only shows campaigns with `allows_applications=true`
+  - Returns `has_applied` and `application_status` for each campaign
+- **Proposal Submission** (`POST /campaigns/<id>/apply`):
+  - Validates proposed price against budget range
+  - Accepts `delivery_timeline_days`
+  - Renamed from "application" to "proposal" terminology
+- **Proposal Review** (`PATCH /campaigns/<id>/applications/<id>`):
+  - Accepts `brand_notes` for feedback
+  - Sets `reviewed_at` timestamp
+  - Creates booking + collaboration on acceptance
+
+#### Frontend - Brand Side
+- **5-Step Campaign Creation Wizard** (`CampaignForm.jsx`):
+  1. **Basic Info**: Title, description, category, participation mode selection (packages vs proposals)
+  2. **Campaign Brief** (structured fields - NOT a text area!):
+     - Campaign Objective textarea
+     - Target Audience section: age range, interests (tags), customer type
+     - Key Message textarea
+     - Required Mentions: hashtags (blue tags), @mentions (purple tags), links (green)
+     - Content Guidelines textarea
+  3. **Budget & Timeline**: Single budget OR range (based on participation mode), dates, delivery timeline
+  4. **Creator Targeting**: Target categories (multi-select), follower range, locations (tags)
+  5. **Milestones**: Optional milestone creation with name, description, duration, due date
+- **Visual progress indicator**: Shows current step, completed steps (green checkmarks)
+- **Smart validation**: Per-step validation before allowing next
+- **Backward compatible**: Loads existing campaigns for editing
+
+#### Frontend - Creator Side
+- **Enhanced Opportunities Page** (`BrowseCampaigns.jsx`):
+  - Smart filtering banner explaining personalization
+  - Rich campaign cards showing Campaign Brief preview:
+    - Campaign objective (highlighted in primary color box)
+    - Budget range display (adapts to participation mode)
+    - Timeline indicator
+    - Required mentions preview (hashtags + @mentions with color-coded tags)
+    - Target audience age range
+    - Milestones count indicator
+  - Participation mode badge ("Accepting Proposals")
+  - Application status indicators (Applied/Accepted/Rejected with color coding)
+  - CTA: "View Full Brief & Apply" (not just "View Details")
+- **Navbar cleanup**:
+  - Removed "Briefs" link (unified with Campaigns)
+  - Renamed "Campaigns" → "Opportunities" for creators
+  - Profile avatar with user menu dropdown (How It Works, Support, Logout)
+  - Fetches user profile for avatar display
+
+#### Design Patterns Established
+1. **Structured Input over Free Text**: Campaign Brief uses 5 specific fields instead of one description box
+2. **Tag-based Multi-Input**: Hashtags, mentions, interests, locations use tag UI (add/remove individual items)
+3. **Conditional Forms**: Budget fields change based on participation mode
+4. **Smart Filtering**: Backend filters campaigns by creator profile automatically
+5. **Professional Navbar**: Avatar dropdown pattern for cleaner UI
   - Backend sets `id_document_back=None` explicitly
 - **Improved upload UX**:
   - Layout changed from 3 columns to 2 columns

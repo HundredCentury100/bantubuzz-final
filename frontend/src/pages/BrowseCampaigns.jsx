@@ -38,10 +38,17 @@ const BrowseCampaigns = () => {
       setCampaigns(response.data.campaigns || []);
     } catch (error) {
       console.error('Error fetching campaigns:', error);
-      toast.error('Failed to load campaigns');
+      toast.error('Failed to load opportunities');
     } finally {
       setLoading(false);
     }
+  };
+
+  const formatBudget = (campaign) => {
+    if (campaign.participation_mode === 'proposals' && campaign.budget_min && campaign.budget_max) {
+      return `$${campaign.budget_min} - $${campaign.budget_max}`;
+    }
+    return campaign.budget ? `$${campaign.budget}` : 'Negotiable';
   };
 
   if (loading) {
@@ -58,8 +65,8 @@ const BrowseCampaigns = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       <SEO
-        title="Browse Campaigns"
-        description="Find brand collaboration opportunities. Browse active campaigns and apply to work with top African brands."
+        title="Campaign Opportunities"
+        description="Browse brand collaboration opportunities. Find campaigns matching your niche and apply to work with top African brands."
         keywords="brand campaigns, collaboration opportunities, influencer jobs, creator opportunities"
       />
       <Navbar />
@@ -77,8 +84,23 @@ const BrowseCampaigns = () => {
             Back to Dashboard
           </Link>
 
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Browse Campaigns</h1>
-          <p className="text-gray-600">Find and apply to brand campaigns</p>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Campaign Opportunities</h1>
+          <p className="text-gray-600">Browse active campaigns and submit your proposal</p>
+        </div>
+
+        {/* Stats Banner */}
+        <div className="bg-primary/10 border border-primary/20 rounded-lg p-4 mb-6">
+          <div className="flex items-center gap-3">
+            <svg className="w-6 h-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <div>
+              <p className="font-medium text-gray-900">Smart Filtering Active</p>
+              <p className="text-sm text-gray-600">
+                We're showing you campaigns that match your category, follower count, and location
+              </p>
+            </div>
+          </div>
         </div>
 
         {/* Filters */}
@@ -100,67 +122,140 @@ const BrowseCampaigns = () => {
             <svg className="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
             </svg>
-            <h3 className="text-xl font-medium text-gray-900 mb-2">No campaigns found</h3>
-            <p className="text-gray-600">Check back later for new opportunities</p>
+            <h3 className="text-xl font-medium text-gray-900 mb-2">No opportunities found</h3>
+            <p className="text-gray-600">Check back later for campaigns matching your profile</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {campaigns.map((campaign) => (
-              <div key={campaign.id} className="bg-white rounded-lg shadow hover:shadow-lg transition-shadow">
+              <div key={campaign.id} className="bg-white rounded-lg shadow hover:shadow-lg transition-shadow border border-gray-200">
                 <div className="p-6">
-                  {/* Category and Status */}
+                  {/* Header: Category, Mode, Status */}
                   <div className="flex items-center justify-between mb-4">
-                    <span className="text-sm text-gray-600">{campaign.category}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-xs font-medium">
+                        {campaign.category}
+                      </span>
+                      {campaign.participation_mode === 'proposals' && (
+                        <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-xs font-medium">
+                          Accepting Proposals
+                        </span>
+                      )}
+                    </div>
                     {campaign.has_applied && (
-                      <span className="px-3 py-1 rounded-full text-xs font-medium bg-primary text-primary-dark">
-                        Applied
+                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                        campaign.application_status === 'accepted' ? 'bg-green-100 text-green-700' :
+                        campaign.application_status === 'rejected' ? 'bg-red-100 text-red-700' :
+                        'bg-yellow-100 text-yellow-700'
+                      }`}>
+                        {campaign.application_status === 'accepted' ? 'Accepted' :
+                         campaign.application_status === 'rejected' ? 'Rejected' :
+                         'Applied'}
                       </span>
                     )}
                   </div>
 
                   {/* Title */}
-                  <h3 className="text-xl font-semibold text-gray-900 mb-2">
+                  <h3 className="text-xl font-semibold text-gray-900 mb-3">
                     {campaign.title}
                   </h3>
 
-                  {/* Description */}
-                  <p className="text-gray-600 text-sm mb-4 line-clamp-3">
-                    {campaign.description}
-                  </p>
-
                   {/* Brand */}
                   {campaign.brand && (
-                    <div className="flex items-center gap-2 mb-4">
+                    <div className="flex items-center gap-2 mb-4 pb-4 border-b">
                       <Avatar
                         src={campaign.brand.logo}
                         alt={campaign.brand.company_name}
                         size="sm"
                         type="brand"
                       />
-                      <p className="text-sm text-gray-600">
-                        By: {campaign.brand.company_name}
-                      </p>
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">
+                          {campaign.brand.company_name}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {campaign.brand.industry}
+                        </p>
+                      </div>
                     </div>
                   )}
 
-                  {/* Stats */}
-                  <div className="flex items-center justify-between mb-4 pb-4 border-b border-gray-200">
-                    <div>
-                      <p className="text-xs text-gray-600">Budget</p>
-                      <p className="text-lg font-semibold text-gray-900">${campaign.budget}</p>
+                  {/* Campaign Brief Preview */}
+                  {campaign.campaign_objective && (
+                    <div className="mb-4 p-3 bg-primary/5 rounded-lg border border-primary/20">
+                      <p className="text-xs font-medium text-primary mb-1">Campaign Objective</p>
+                      <p className="text-sm text-gray-700 line-clamp-2">{campaign.campaign_objective}</p>
                     </div>
-                    <div>
-                      <p className="text-xs text-gray-600">Packages</p>
-                      <p className="text-lg font-semibold text-gray-900">{campaign.packages_count || 0}</p>
+                  )}
+
+                  {/* Key Info Grid */}
+                  <div className="grid grid-cols-2 gap-3 mb-4">
+                    <div className="bg-gray-50 p-3 rounded-lg">
+                      <p className="text-xs text-gray-600 mb-1">Budget Range</p>
+                      <p className="text-lg font-semibold text-gray-900">{formatBudget(campaign)}</p>
                     </div>
+                    {campaign.timeline_days && (
+                      <div className="bg-gray-50 p-3 rounded-lg">
+                        <p className="text-xs text-gray-600 mb-1">Timeline</p>
+                        <p className="text-lg font-semibold text-gray-900">{campaign.timeline_days} days</p>
+                      </div>
+                    )}
                   </div>
 
-                  {/* Action */}
+                  {/* Required Mentions */}
+                  {(campaign.required_mentions?.hashtags?.length > 0 ||
+                    campaign.required_mentions?.mentions?.length > 0) && (
+                    <div className="mb-4">
+                      <p className="text-xs font-medium text-gray-700 mb-2">Required Mentions</p>
+                      <div className="flex flex-wrap gap-2">
+                        {campaign.required_mentions.hashtags?.slice(0, 3).map((tag, i) => (
+                          <span key={i} className="px-2 py-1 bg-blue-50 text-blue-600 rounded text-xs">
+                            {tag}
+                          </span>
+                        ))}
+                        {campaign.required_mentions.mentions?.slice(0, 2).map((mention, i) => (
+                          <span key={i} className="px-2 py-1 bg-purple-50 text-purple-600 rounded text-xs">
+                            {mention}
+                          </span>
+                        ))}
+                        {(campaign.required_mentions.hashtags?.length + campaign.required_mentions.mentions?.length) > 5 && (
+                          <span className="px-2 py-1 bg-gray-100 text-gray-600 rounded text-xs">
+                            +{(campaign.required_mentions.hashtags?.length + campaign.required_mentions.mentions?.length) - 5} more
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Target Audience */}
+                  {campaign.target_audience?.age_range && (
+                    <div className="mb-4 text-sm">
+                      <p className="text-xs font-medium text-gray-700 mb-1">Target Audience</p>
+                      <p className="text-gray-600">Age: {campaign.target_audience.age_range}</p>
+                    </div>
+                  )}
+
+                  {/* Milestones Indicator */}
+                  {campaign.milestones && campaign.milestones.length > 0 && (
+                    <div className="mb-4 flex items-center gap-2 text-sm text-gray-600">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                      </svg>
+                      <span>{campaign.milestones.length} milestone{campaign.milestones.length > 1 ? 's' : ''}</span>
+                    </div>
+                  )}
+
+                  {/* Description */}
+                  <p className="text-gray-600 text-sm mb-4 line-clamp-2">
+                    {campaign.description}
+                  </p>
+
+                  {/* Action Button */}
                   <Link
                     to={`/creator/campaigns/${campaign.id}`}
-                    className="block w-full px-4 py-2 bg-primary hover:bg-primary-dark text-white text-center font-medium rounded-lg transition-colors"
+                    className="block w-full px-4 py-3 bg-primary hover:bg-primary-dark text-white text-center font-medium rounded-lg transition-colors"
                   >
-                    View Details
+                    {campaign.has_applied ? 'View Application' : 'View Full Brief & Apply'}
                   </Link>
                 </div>
               </div>

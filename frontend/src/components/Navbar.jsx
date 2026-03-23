@@ -8,14 +8,40 @@ import {
   UserCircleIcon,
   ArrowRightOnRectangleIcon,
   Cog6ToothIcon,
+  QuestionMarkCircleIcon,
+  LifebuoyIcon,
 } from '@heroicons/react/24/outline';
 import NotificationBell from './NotificationBell';
 import { messagingService } from '../services/messagingAPI';
+import { creatorsAPI, brandsAPI } from '../services/api';
+import Avatar from './Avatar';
 
 const Navbar = () => {
   const { isAuthenticated, user, logout } = useAuth();
   const navigate = useNavigate();
   const [unreadMessageCount, setUnreadMessageCount] = useState(0);
+  const [userProfile, setUserProfile] = useState(null);
+
+  // Fetch user profile for avatar
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      if (isAuthenticated && user) {
+        try {
+          if (user.user_type === 'creator') {
+            const response = await creatorsAPI.getMyProfile();
+            setUserProfile(response.data);
+          } else if (user.user_type === 'brand') {
+            const response = await brandsAPI.getMyProfile();
+            setUserProfile(response.data);
+          }
+        } catch (error) {
+          console.error('Error fetching user profile:', error);
+        }
+      }
+    };
+
+    fetchUserProfile();
+  }, [isAuthenticated, user]);
 
   // Fetch unread message count
   useEffect(() => {
@@ -106,32 +132,8 @@ const Navbar = () => {
                     to="/creator/campaigns"
                     className="text-gray-700 hover:text-gray-900 transition-colors text-sm font-medium"
                   >
-                    Campaigns
+                    Opportunities
                   </Link>
-                )}
-                {user?.user_type === 'brand' && (
-                  <Link
-                    to="/brand/briefs"
-                    className="text-gray-700 hover:text-gray-900 transition-colors text-sm font-medium"
-                  >
-                    Briefs
-                  </Link>
-                )}
-                {user?.user_type === 'creator' && (
-                  <>
-                    <Link
-                      to="/creator/briefs"
-                      className="text-gray-700 hover:text-gray-900 transition-colors text-sm font-medium"
-                    >
-                      Briefs
-                    </Link>
-                    <Link
-                      to="/creator/proposals"
-                      className="text-gray-700 hover:text-gray-900 transition-colors text-sm font-medium"
-                    >
-                      Proposals
-                    </Link>
-                  </>
                 )}
                 <Link
                   to={`/${user?.user_type}/collaborations`}
@@ -158,21 +160,22 @@ const Navbar = () => {
                     Wallet
                   </Link>
                 )}
-                <Link
-                  to="/my-tickets"
-                  className="text-gray-700 hover:text-gray-900 transition-colors text-sm font-medium"
-                >
-                  Support
-                </Link>
 
                 {/* Notification Bell */}
                 <NotificationBell />
 
-                {/* User Menu */}
-                <Menu as="div" className="relative">
-                  <Menu.Button className="flex items-center space-x-2 p-2 rounded-lg hover:bg-light transition-colors">
-                    <UserCircleIcon className="h-6 w-6 text-gray-700" />
-                    <span className="text-gray-700 text-sm font-medium">{user?.email}</span>
+                {/* User Menu - Cleaner with avatar */}
+                <Menu as="div" className="relative ml-3">
+                  <Menu.Button className="flex items-center p-1 rounded-full hover:ring-2 hover:ring-primary/20 transition-all">
+                    <Avatar
+                      name={
+                        userProfile?.display_name ||
+                        userProfile?.username ||
+                        userProfile?.company_name ||
+                        user?.email
+                      }
+                      size="sm"
+                    />
                   </Menu.Button>
 
                   <Transition
@@ -184,18 +187,55 @@ const Navbar = () => {
                     leaveFrom="transform opacity-100 scale-100"
                     leaveTo="transform opacity-0 scale-95"
                   >
-                    <Menu.Items className="absolute right-0 mt-2 w-48 origin-top-right bg-white rounded-lg shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
-                      <div className="p-1">
+                    <Menu.Items className="absolute right-0 mt-2 w-56 origin-top-right bg-white rounded-lg shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none divide-y divide-gray-100">
+                      {/* User Info Section */}
+                      <div className="px-4 py-3">
+                        <p className="text-sm font-medium text-gray-900 truncate">{user?.email}</p>
+                        <p className="text-xs text-gray-500 mt-0.5 capitalize">{user?.user_type} Account</p>
+                      </div>
+
+                      {/* Menu Items */}
+                      <div className="py-1">
+                        <Menu.Item>
+                          {({ active }) => (
+                            <Link
+                              to="/how-it-works"
+                              className={`${
+                                active ? 'bg-gray-50' : ''
+                              } flex items-center px-4 py-2 text-sm text-gray-700`}
+                            >
+                              <QuestionMarkCircleIcon className="h-5 w-5 mr-3 text-gray-400" />
+                              How It Works
+                            </Link>
+                          )}
+                        </Menu.Item>
+                        <Menu.Item>
+                          {({ active }) => (
+                            <Link
+                              to="/my-tickets"
+                              className={`${
+                                active ? 'bg-gray-50' : ''
+                              } flex items-center px-4 py-2 text-sm text-gray-700`}
+                            >
+                              <LifebuoyIcon className="h-5 w-5 mr-3 text-gray-400" />
+                              Support
+                            </Link>
+                          )}
+                        </Menu.Item>
+                      </div>
+
+                      {/* Logout Section */}
+                      <div className="py-1">
                         <Menu.Item>
                           {({ active }) => (
                             <button
                               onClick={handleLogout}
                               className={`${
-                                active ? 'bg-light' : ''
-                              } flex items-center space-x-2 w-full px-4 py-2 text-sm text-gray-700 rounded-lg`}
+                                active ? 'bg-gray-50' : ''
+                              } flex items-center w-full px-4 py-2 text-sm text-red-600`}
                             >
-                              <ArrowRightOnRectangleIcon className="h-5 w-5" />
-                              <span>Logout</span>
+                              <ArrowRightOnRectangleIcon className="h-5 w-5 mr-3" />
+                              Logout
                             </button>
                           )}
                         </Menu.Item>
