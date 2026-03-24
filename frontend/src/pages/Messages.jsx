@@ -304,7 +304,7 @@ const Messages = () => {
         <div className={`flex items-center justify-between mb-8 ${showMobileChat ? 'hidden lg:flex' : 'flex'}`}>
           <h1 className="text-4xl font-bold">Messages</h1>
           <Link
-            to={user?.user_type === 'brand' ? '/browse/creators' : '/browse/campaigns'}
+            to="/browse/creators"
             className="px-6 py-3 bg-primary hover:bg-primary-dark text-white font-medium rounded-lg transition-colors flex items-center gap-2"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -353,10 +353,10 @@ const Messages = () => {
                   </svg>
                   <p className="text-gray-500 mb-4">No conversations yet</p>
                   <Link
-                    to={user?.user_type === 'brand' ? '/browse/creators' : '/browse/campaigns'}
+                    to="/browse/creators"
                     className="inline-block text-primary hover:text-primary-dark font-medium text-sm"
                   >
-                    Start a conversation →
+                    Browse Creators →
                   </Link>
                 </div>
               ) : (
