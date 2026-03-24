@@ -19,8 +19,30 @@ export const checkHarmfulLanguage = (message) => {
   const harmfulPatterns = {
     violence: ['kill', 'murder', 'hurt', 'attack', 'beat up', 'bomb', 'shoot', 'stab', 'die'],
     threats: ['i will kill', 'i will hurt', 'watch out', "you'll regret", 'find you', 'come for you'],
-    harassment: ['rape', 'assault', 'molest', 'harass'],
-    hate: ['hate you', 'wish you were dead']
+    harassment: ['rape', 'assault', 'molest', 'harass', 'abuse'],
+    hate: ['hate you', 'wish you were dead'],
+    hateSpeech: [
+      // Racial slurs
+      'nigger', 'nigga', 'negro', 'coon', 'chink', 'gook', 'kike', 'spic', 'wetback', 'beaner',
+      // Religious hate
+      'infidel', 'kafir', 'heathen',
+      // Homophobic slurs
+      'faggot', 'fag', 'dyke', 'tranny', 'homo',
+      // Sexist slurs
+      'bitch', 'whore', 'slut', 'hoe', 'thot',
+      // General hate phrases
+      'kill yourself', 'kys', 'go die', 'you should die', 'end yourself',
+      'worthless', 'piece of shit', 'scum', 'trash', 'filth'
+    ],
+    vulgar: [
+      'fuck', 'fucking', 'fucked', 'fucker', 'motherfucker', 'motherfucking',
+      'shit', 'shit', 'bullshit', 'horseshit',
+      'ass', 'asshole', 'dumbass', 'jackass', 'smartass',
+      'damn', 'damned', 'goddamn',
+      'cock', 'dick', 'pussy', 'cunt',
+      'piss', 'pissed', 'pissing',
+      'bastard', 'bitch'
+    ]
   };
 
   const detectedPatterns = [];

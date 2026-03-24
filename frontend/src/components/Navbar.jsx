@@ -11,6 +11,7 @@ import {
   QuestionMarkCircleIcon,
   LifebuoyIcon,
   CurrencyDollarIcon,
+  ChatBubbleLeftRightIcon,
 } from '@heroicons/react/24/outline';
 import NotificationBell from './NotificationBell';
 import { messagingService } from '../services/messagingAPI';
@@ -135,11 +136,12 @@ const Navbar = () => {
                 </Link>
                 <Link
                   to="/messages"
-                  className="text-gray-700 hover:text-gray-900 transition-colors text-sm font-medium relative"
+                  className="text-gray-700 hover:text-gray-900 transition-colors relative p-2"
+                  title="Messages"
                 >
-                  Messages
+                  <ChatBubbleLeftRightIcon className="w-6 h-6" />
                   {unreadMessageCount > 0 && (
-                    <span className="absolute -top-2 -right-3 inline-flex items-center justify-center w-5 h-5 text-xs font-bold text-white bg-primary rounded-full">
+                    <span className="absolute -top-1 -right-1 inline-flex items-center justify-center w-5 h-5 text-xs font-bold text-white bg-primary rounded-full">
                       {unreadMessageCount > 9 ? '9+' : unreadMessageCount}
                     </span>
                   )}
@@ -149,7 +151,7 @@ const Navbar = () => {
                     to="/wallet"
                     className="text-gray-700 hover:text-gray-900 transition-colors text-sm font-medium"
                   >
-                    Wallet
+                    Earnings
                   </Link>
                 )}
 
@@ -405,7 +407,7 @@ const Navbar = () => {
                                   active ? 'bg-light' : ''
                                 } block px-4 py-2 text-sm text-gray-700 rounded-lg`}
                               >
-                                Wallet
+                                Earnings
                               </Link>
                             )}
                           </Menu.Item>

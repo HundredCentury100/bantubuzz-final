@@ -2859,6 +2859,96 @@ Enabled direct messaging between creators for collaboration, networking, and cro
 - Facilitates multi-creator partnerships
 - No additional development cost (infrastructure already supports it)
 
+### Recent: UI/UX Improvements - Navbar & Safety (Mar 24, 2026)
+
+Three focused improvements to enhance user experience and safety:
+
+**1. Enhanced Messaging Safety Detection** (High Priority)
+- **Problem**: Safety system only detected basic harmful language and threats
+- **Solution**: Expanded detection to include hate speech and vulgar language
+
+**New Detection Categories** (`frontend/src/utils/messageSafety.js:24-46`):
+```javascript
+hateSpeech: [
+  // Racial slurs
+  'nigger', 'nigga', 'negro', 'coon', 'chink', 'gook', 'kike', 'spic', 'wetback', 'beaner',
+  // Religious hate
+  'infidel', 'kafir', 'heathen',
+  // Homophobic slurs
+  'faggot', 'fag', 'dyke', 'tranny', 'homo',
+  // Sexist slurs
+  'bitch', 'whore', 'slut', 'hoe', 'thot',
+  // General hate phrases
+  'kill yourself', 'kys', 'go die', 'you should die', 'end yourself',
+  'worthless', 'piece of shit', 'scum', 'trash', 'filth'
+],
+vulgar: [
+  'fuck', 'fucking', 'fucked', 'fucker', 'motherfucker', 'motherfucking',
+  'shit', 'bullshit', 'horseshit',
+  'ass', 'asshole', 'dumbass', 'jackass', 'smartass',
+  'damn', 'damned', 'goddamn',
+  'cock', 'dick', 'pussy', 'cunt',
+  'piss', 'pissed', 'pissing',
+  'bastard', 'bitch'
+]
+```
+
+**Detection Behavior**:
+- Real-time scanning before message send
+- Warning modal appears if harmful content detected
+- User can: Edit message, Cancel, or Send anyway (logged)
+- Pattern matching is case-insensitive
+- Works for all conversation types (brand-creator, creator-creator)
+
+**2. Messages Icon in Navbar** (Medium Priority)
+- **Problem**: Text "Messages" took up navbar space
+- **Solution**: Replaced with ChatBubbleLeftRightIcon
+
+**Desktop Navbar** (`frontend/src/components/Navbar.jsx:137-148`):
+```javascript
+// Before: Text label
+<Link to="/messages">Messages</Link>
+
+// After: Icon with tooltip
+<Link to="/messages" className="relative p-2" title="Messages">
+  <ChatBubbleLeftRightIcon className="w-6 h-6" />
+  {unreadMessageCount > 0 && (
+    <span className="absolute -top-1 -right-1 ... bg-primary rounded-full">
+      {unreadMessageCount > 9 ? '9+' : unreadMessageCount}
+    </span>
+  )}
+</Link>
+```
+
+**Benefits**:
+- Cleaner navbar with more space
+- Icon is universally recognizable
+- Unread badge repositioned to top-right of icon
+- Tooltip on hover shows "Messages"
+- Mobile menu still shows text label (better for touch)
+
+**3. Wallet Renamed to Earnings** (Low Priority)
+- **Problem**: "Wallet" doesn't clearly communicate it's about earnings/income
+- **Solution**: Changed label to "Earnings" for clarity
+
+**Changes** (`frontend/src/components/Navbar.jsx:149-156, 401-414`):
+- Desktop navbar: "Wallet" → "Earnings"
+- Mobile menu: "Wallet" → "Earnings"
+- Still links to `/wallet` route (route unchanged for backward compatibility)
+- Only visible to creators (brands don't have wallet/earnings)
+
+**Files Modified**:
+1. `frontend/src/utils/messageSafety.js` - Added hate speech & vulgar detection (lines 24-46)
+2. `frontend/src/components/Navbar.jsx` - Icon + Earnings changes (lines 14, 137-156, 401-414)
+
+**No Backend Changes**: All changes are frontend-only
+
+**Impact**:
+- Stronger content moderation catches more harmful messages
+- Cleaner navigation design with icon-based messaging link
+- Clearer terminology for creator earnings section
+- Better user safety and experience
+
 ---
 
 ### Phase 7: Trust & Safety System (Complete - March 10, 2026)
