@@ -2786,6 +2786,79 @@ Comprehensive update to brand analytics navigation and security improvements for
 - Improved security posture (no credentials in repository)
 - Better UX for brands navigating between overview and detailed analytics
 
+### Recent: Creator-to-Creator Messaging Enabled (Mar 24, 2026)
+
+Enabled direct messaging between creators for collaboration, networking, and cross-promotion opportunities.
+
+**Problem**: Creators could only message brands (via campaigns), not other creators
+**Solution**: Updated CreatorProfile to show "Send Message" button for creators viewing other creators
+
+**Implementation** (`frontend/src/pages/CreatorProfile.jsx:280`):
+```javascript
+// OLD: Only brands could message
+{user?.user_type === 'brand' && (
+  <Link to="/messages" state={{ startConversationWith: {...} }}>
+    Send Message
+  </Link>
+)}
+
+// NEW: Brands OR creators (not viewing themselves)
+{(user?.user_type === 'brand' ||
+  (user?.user_type === 'creator' && user?.id !== creator.user_id)) && (
+  <div className="flex flex-col gap-3 ...">
+    <Link to="/messages" state={{ startConversationWith: {...} }}>
+      Send Message
+    </Link>
+    {/* Save button only for brands */}
+    {user?.user_type === 'brand' && (
+      <button onClick={handleSaveCreator}>
+        {isSaved ? 'Saved' : 'Save Creator'}
+      </button>
+    )}
+  </div>
+)}
+```
+
+**Key Changes**:
+- Line 280: Added creator condition `(user?.user_type === 'creator' && user?.id !== creator.user_id)`
+- Line 293: Wrapped "Save Creator" button in brand-only check
+- Button hidden when creator views their own profile (prevents self-messaging)
+- "Save Creator" remains a brand-exclusive feature
+
+**No Backend Changes Required**:
+- ✅ Messages table uses `sender_id`/`receiver_id` with no user type restrictions
+- ✅ Messaging service (Node.js) has no user type validation
+- ✅ Block/report system works for any user pair
+- ✅ Trust & Safety applies to all conversations
+
+**Use Cases Enabled**:
+1. **Collaboration Requests**: Creators can propose joint content projects
+2. **Cross-Promotion**: Discuss shoutout exchanges and audience sharing
+3. **Networking**: Connect with creators in same niche or location
+4. **Mentorship**: Established creators can guide newcomers
+5. **Partnership Opportunities**: Discuss multi-creator campaign participation
+
+**User Experience**:
+- Creators browsing creator profiles see prominent "Send Message" button
+- Clicking redirects to `/messages` with pre-filled conversation
+- All existing messaging features work: typing indicators, online status, real-time delivery
+- Safety features apply: block, report, content analysis
+
+**Files Modified**:
+- `frontend/src/pages/CreatorProfile.jsx` - Message button logic (line 280-309)
+
+**Deployment** (Mar 24, 2026):
+- Frontend built and deployed
+- No database migrations needed
+- No backend changes required
+- Tested with existing messaging infrastructure
+
+**Impact**:
+- Opens creator networking and collaboration opportunities
+- Enables organic creator community building
+- Facilitates multi-creator partnerships
+- No additional development cost (infrastructure already supports it)
+
 ---
 
 ### Phase 7: Trust & Safety System (Complete - March 10, 2026)
