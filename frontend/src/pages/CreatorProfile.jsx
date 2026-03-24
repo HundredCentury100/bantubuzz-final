@@ -276,7 +276,8 @@ const CreatorProfile = () => {
                 </div>
 
                 {/* Actions - Desktop: Side by side on right, Mobile: Stacked below badges */}
-                {user?.user_type === 'brand' && (
+                {/* Show message button for brands OR creators viewing other creators (not themselves) */}
+                {(user?.user_type === 'brand' || (user?.user_type === 'creator' && user?.id !== creator.user_id)) && (
                   <div className="flex flex-col gap-3 w-full md:w-auto md:flex-row md:gap-2 md:flex-shrink-0">
                     <Link
                       to="/messages"
@@ -288,19 +289,22 @@ const CreatorProfile = () => {
                       </svg>
                       Send Message
                     </Link>
-                    <button
-                      onClick={handleSaveCreator}
-                      className={`px-6 py-3 rounded-full border transition-colors flex items-center justify-center gap-2 whitespace-nowrap font-medium w-full md:w-auto ${
-                        isSaved
-                          ? 'bg-primary text-white border-primary'
-                          : 'bg-white text-gray-600 border-gray-300 hover:border-primary hover:text-primary'
-                      }`}
-                    >
-                      <svg className="w-5 h-5" fill={isSaved ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
-                      </svg>
-                      {isSaved ? 'Saved' : 'Save Creator'}
-                    </button>
+                    {/* Save button only for brands */}
+                    {user?.user_type === 'brand' && (
+                      <button
+                        onClick={handleSaveCreator}
+                        className={`px-6 py-3 rounded-full border transition-colors flex items-center justify-center gap-2 whitespace-nowrap font-medium w-full md:w-auto ${
+                          isSaved
+                            ? 'bg-primary text-white border-primary'
+                            : 'bg-white text-gray-600 border-gray-300 hover:border-primary hover:text-primary'
+                        }`}
+                      >
+                        <svg className="w-5 h-5" fill={isSaved ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                        </svg>
+                        {isSaved ? 'Saved' : 'Save Creator'}
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
