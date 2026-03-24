@@ -32,6 +32,7 @@ import RevisionPayment from './pages/RevisionPayment';
 import CampaignPayment from './pages/CampaignPayment';
 import Messages from './pages/Messages';
 import BlockedUsers from './pages/BlockedUsers';
+import Notifications from './pages/Notifications';
 import Campaigns from './pages/Campaigns';
 import CampaignForm from './pages/CampaignForm';
 import CampaignDetails from './pages/CampaignDetails';
@@ -593,6 +594,14 @@ function App() {
         element={
           <ProtectedRoute>
             <BlockedUsers />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/notifications"
+        element={
+          <ProtectedRoute>
+            <Notifications />
           </ProtectedRoute>
         }
       />
