@@ -826,6 +826,62 @@ const CampaignFormNew = () => {
                 </label>
               </div>
 
+              {/* Publish Status */}
+              <div className="space-y-4 pt-6 border-t">
+                <div>
+                  <h3 className="font-semibold text-gray-900 mb-2">Campaign Status</h3>
+                  <p className="text-sm text-gray-600 mb-4">
+                    Choose whether to publish your campaign immediately or save as draft
+                  </p>
+                </div>
+
+                <div className="space-y-3">
+                  <label className="flex items-start p-4 border-2 border-gray-200 rounded-xl cursor-pointer hover:border-primary transition-all">
+                    <input
+                      type="radio"
+                      name="status"
+                      value="active"
+                      checked={formData.status === 'active'}
+                      onChange={handleChange}
+                      className="mt-1 mr-3"
+                    />
+                    <div>
+                      <div className="font-semibold text-gray-900 flex items-center gap-2">
+                        <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        Publish Now (Active)
+                      </div>
+                      <div className="text-sm text-gray-600 ml-7">
+                        Campaign goes live immediately. Creators can view and apply/browse packages
+                      </div>
+                    </div>
+                  </label>
+
+                  <label className="flex items-start p-4 border-2 border-gray-200 rounded-xl cursor-pointer hover:border-primary transition-all">
+                    <input
+                      type="radio"
+                      name="status"
+                      value="draft"
+                      checked={formData.status === 'draft'}
+                      onChange={handleChange}
+                      className="mt-1 mr-3"
+                    />
+                    <div>
+                      <div className="font-semibold text-gray-900 flex items-center gap-2">
+                        <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                        </svg>
+                        Save as Draft
+                      </div>
+                      <div className="text-sm text-gray-600 ml-7">
+                        Campaign is not visible to creators. You can publish it later from campaigns list
+                      </div>
+                    </div>
+                  </label>
+                </div>
+              </div>
+
               {/* Conditional: Targeting for Proposals/Both */}
               {(formData.participation_type === 'proposals' || formData.participation_type === 'both') && (
                 <div className="space-y-6 pt-6 border-t">
