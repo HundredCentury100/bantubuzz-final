@@ -81,13 +81,31 @@ const CampaignPackageBrowser = () => {
     try {
       setLoading(true);
 
-      // Add each selected package to campaign
-      for (const pkg of selectedPackages) {
-        await campaignsAPI.addPackageToCampaign(campaignId, pkg.id);
-      }
+      // Add first package to campaign (this creates booking on backend)
+      const firstPackage = selectedPackages[0];
+      const response = await campaignsAPI.addPackageToCampaign(campaignId, firstPackage.id);
 
-      toast.success(`Added ${selectedPackages.length} package(s) to campaign!`);
-      navigate('/brand/campaigns');
+      if (response.data.booking_id) {
+        // Store payment context with booking_id and redirect to payment page
+        localStorage.setItem('payment_context', JSON.stringify({
+          package_id: firstPackage.id,
+          campaign_id: campaignId,
+          booking_id: response.data.booking_id,
+          creator_id: firstPackage.creator_id || firstPackage.creator?.id,
+          type: 'campaign_package',
+          amount: firstPackage.price,
+          payment_category: 'package',
+          booking_type: 'campaign_package',
+          // Store remaining packages to add after payment
+          remaining_packages: selectedPackages.slice(1).map(pkg => pkg.id)
+        }));
+
+        // Navigate to payment page
+        toast.success('Proceeding to payment...');
+        navigate(`/brand/campaigns/payment/${campaignId}`);
+      } else {
+        toast.error('Failed to create payment booking');
+      }
     } catch (error) {
       console.error('Error adding packages to campaign:', error);
       toast.error(error.response?.data?.error || 'Failed to add packages to campaign');
@@ -208,9 +226,18 @@ const CampaignPackageBrowser = () => {
             <button
               onClick={handleAddToCampaign}
               disabled={loading || (campaign && totalCost > parseFloat(campaign.budget))}
-              className="w-full bg-primary hover:bg-primary-dark text-white font-medium py-3 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full bg-primary hover:bg-primary-dark text-white font-medium py-3 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
-              {loading ? 'Adding to Campaign...' : `Add ${selectedPackages.length} Package(s) to Campaign`}
+              {loading ? (
+                'Processing...'
+              ) : (
+                <>
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                  </svg>
+                  {`Proceed to Payment ($${totalCost.toFixed(2)})`}
+                </>
+              )}
             </button>
           </div>
         )}
@@ -340,7 +367,7 @@ const CampaignPackageBrowser = () => {
               disabled={loading || (campaign && totalCost > parseFloat(campaign.budget))}
               className="w-full bg-primary hover:bg-primary-dark text-white font-medium py-3 rounded-xl transition-colors disabled:opacity-50"
             >
-              Add to Campaign
+              Proceed to Payment
             </button>
           </div>
         )}

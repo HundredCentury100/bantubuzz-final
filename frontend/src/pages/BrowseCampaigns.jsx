@@ -235,13 +235,31 @@ const BrowseCampaigns = () => {
                     </div>
                   )}
 
-                  {/* Milestones Indicator */}
+                  {/* Deliverables Preview */}
                   {campaign.milestones && campaign.milestones.length > 0 && (
-                    <div className="mb-4 flex items-center gap-2 text-sm text-gray-600">
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-                      </svg>
-                      <span>{campaign.milestones.length} milestone{campaign.milestones.length > 1 ? 's' : ''}</span>
+                    <div className="mb-4 bg-gray-50 rounded-lg p-3">
+                      <p className="text-xs font-medium text-gray-700 mb-2">What You'll Deliver:</p>
+                      <div className="space-y-1">
+                        {campaign.milestones.slice(0, 2).map((milestone, idx) => (
+                          milestone.deliverables && milestone.deliverables.length > 0 && (
+                            <div key={idx} className="flex items-start gap-2">
+                              <svg className="w-4 h-4 text-primary flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                              </svg>
+                              <span className="text-sm text-gray-700">
+                                {milestone.deliverables.map(d =>
+                                  `${d.quantity}× ${d.platform} ${d.content_type}`
+                                ).join(', ')}
+                              </span>
+                            </div>
+                          )
+                        ))}
+                        {campaign.milestones.length > 2 && (
+                          <p className="text-xs text-gray-500 ml-6">
+                            +{campaign.milestones.length - 2} more milestone{campaign.milestones.length - 2 > 1 ? 's' : ''}
+                          </p>
+                        )}
+                      </div>
                     </div>
                   )}
 
