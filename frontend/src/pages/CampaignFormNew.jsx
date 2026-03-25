@@ -80,7 +80,7 @@ const CampaignFormNew = () => {
   }, [id]);
 
   const fetchCategories = async () => {
-    try:
+    try {
       setCategoriesLoading(true);
       const response = await categoriesAPI.getCategories();
       setCategories(response.data.categories.map(cat => cat.name));
