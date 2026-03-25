@@ -285,16 +285,81 @@ const CampaignDetails = () => {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2 space-y-6">
               {/* Description */}
-              <div className="bg-white rounded-lg shadow p-6">
-                <h2 className="text-xl font-bold text-gray-900 mb-4">Description</h2>
+              <div className="bg-white rounded-3xl shadow-sm hover:shadow-md p-6 transition-shadow">
+                <h2 className="text-xl font-bold text-gray-900 mb-4">Campaign Overview</h2>
                 <p className="text-gray-700 whitespace-pre-wrap">{campaign.description}</p>
               </div>
 
-              {/* Objectives */}
-              {campaign.objectives && (
-                <div className="bg-white rounded-lg shadow p-6">
-                  <h2 className="text-xl font-bold text-gray-900 mb-4">Objectives</h2>
-                  <p className="text-gray-700 whitespace-pre-wrap">{campaign.objectives}</p>
+              {/* Campaign Objective */}
+              {campaign.objective && (
+                <div className="bg-white rounded-3xl shadow-sm hover:shadow-md p-6 transition-shadow">
+                  <h2 className="text-xl font-bold text-gray-900 mb-2">Campaign Objective</h2>
+                  <p className="text-lg text-primary font-semibold">{campaign.objective}</p>
+                  {campaign.additional_notes && (
+                    <div className="mt-4 pt-4 border-t border-gray-200">
+                      <p className="text-sm font-medium text-gray-700 mb-2">Additional Notes:</p>
+                      <p className="text-gray-600">{campaign.additional_notes}</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Milestones & Deliverables */}
+              {campaign.milestones && campaign.milestones.length > 0 && (
+                <div className="bg-white rounded-3xl shadow-sm hover:shadow-md p-6 transition-shadow">
+                  <h2 className="text-xl font-bold text-gray-900 mb-4">Milestones & Deliverables</h2>
+                  <div className="space-y-4">
+                    {campaign.milestones.map((milestone, idx) => (
+                      <div key={idx} className="bg-primary/10 rounded-2xl p-4 border-2 border-primary/20">
+                        <div className="flex items-start justify-between mb-3">
+                          <div className="flex-1">
+                            <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+                              <span className="bg-primary text-white w-6 h-6 rounded-full flex items-center justify-center text-sm">
+                                {idx + 1}
+                              </span>
+                              {milestone.name}
+                            </h3>
+                            {milestone.due_date && (
+                              <p className="text-sm text-gray-600 ml-8 mt-1">
+                                Due: {new Date(milestone.due_date).toLocaleDateString()}
+                              </p>
+                            )}
+                          </div>
+                          {milestone.budget_allocation && (
+                            <div className="text-right">
+                              <p className="text-xs text-gray-600">Payment</p>
+                              <p className="text-lg font-bold text-primary">${milestone.budget_allocation}</p>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Structured Deliverables */}
+                        {milestone.deliverables && milestone.deliverables.length > 0 && (
+                          <div className="ml-8 space-y-2">
+                            <p className="text-xs font-medium text-gray-700 uppercase">Deliverables:</p>
+                            {milestone.deliverables.map((deliverable, delIdx) => (
+                              <div key={delIdx} className="flex items-center gap-2 text-sm text-gray-700">
+                                <svg className="w-4 h-4 text-primary flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                </svg>
+                                <span>
+                                  <strong>{deliverable.quantity}×</strong> {deliverable.platform} {deliverable.content_type}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Target Audience */}
+              {campaign.target_audience && (
+                <div className="bg-white rounded-3xl shadow-sm hover:shadow-md p-6 transition-shadow">
+                  <h2 className="text-xl font-bold text-gray-900 mb-4">Target Audience</h2>
+                  <p className="text-gray-700">{campaign.target_audience}</p>
                 </div>
               )}
             </div>
@@ -302,38 +367,85 @@ const CampaignDetails = () => {
             {/* Sidebar */}
             <div className="space-y-6">
               {/* Stats Card */}
-              <div className="bg-white rounded-lg shadow p-6">
-                <h3 className="text-lg font-bold text-gray-900 mb-4">Campaign Stats</h3>
+              <div className="bg-white rounded-3xl shadow-sm hover:shadow-md p-6 transition-shadow">
+                <h3 className="text-lg font-bold text-gray-900 mb-4">Campaign Details</h3>
                 <div className="space-y-4">
-                  <div>
-                    <p className="text-sm text-gray-600">Budget</p>
-                    <p className="text-2xl font-bold text-gray-900">${campaign.budget}</p>
+                  <div className="bg-primary/10 rounded-xl p-3">
+                    <p className="text-xs text-gray-600 mb-1">Total Budget</p>
+                    <p className="text-2xl font-bold text-primary">${campaign.budget}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-600">Duration</p>
-                    <p className="text-gray-900">
-                      {new Date(campaign.start_date).toLocaleDateString()} - {new Date(campaign.end_date).toLocaleDateString()}
+                    <p className="text-xs text-gray-600 mb-1">Campaign Period</p>
+                    <p className="text-sm text-gray-900 font-medium">
+                      {new Date(campaign.start_date).toLocaleDateString()}
+                    </p>
+                    <p className="text-xs text-gray-500">to</p>
+                    <p className="text-sm text-gray-900 font-medium">
+                      {new Date(campaign.end_date).toLocaleDateString()}
                     </p>
                   </div>
-                  <div>
-                    <p className="text-sm text-gray-600">Packages</p>
-                    <p className="text-xl font-bold text-gray-900">{packages.length}</p>
+                  {campaign.application_deadline && (
+                    <div>
+                      <p className="text-xs text-gray-600 mb-1">Application Deadline</p>
+                      <p className="text-sm text-gray-900 font-medium">
+                        {new Date(campaign.application_deadline).toLocaleDateString()}
+                      </p>
+                    </div>
+                  )}
+                  <div className="pt-3 border-t border-gray-200">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="text-center p-2 bg-gray-50 rounded-lg">
+                        <p className="text-xs text-gray-600">Milestones</p>
+                        <p className="text-xl font-bold text-gray-900">{campaign.milestones?.length || 0}</p>
+                      </div>
+                      {isBrand && (
+                        <>
+                          <div className="text-center p-2 bg-gray-50 rounded-lg">
+                            <p className="text-xs text-gray-600">Packages</p>
+                            <p className="text-xl font-bold text-gray-900">{packages.length}</p>
+                          </div>
+                          <div className="text-center p-2 bg-gray-50 rounded-lg col-span-2">
+                            <p className="text-xs text-gray-600">Applications</p>
+                            <p className="text-xl font-bold text-gray-900">{applications.length}</p>
+                          </div>
+                        </>
+                      )}
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-sm text-gray-600">Applications</p>
-                    <p className="text-xl font-bold text-gray-900">{applications.length}</p>
-                  </div>
+                  {campaign.participation_type && (
+                    <div className="pt-3 border-t border-gray-200">
+                      <p className="text-xs text-gray-600 mb-2">Participation Mode</p>
+                      <span className="inline-block px-3 py-1 bg-primary/20 text-primary-dark text-xs font-medium rounded-full">
+                        {campaign.participation_type === 'packages' && 'Fixed Packages'}
+                        {campaign.participation_type === 'proposals' && 'Custom Proposals'}
+                        {campaign.participation_type === 'both' && 'Packages & Proposals'}
+                      </span>
+                    </div>
+                  )}
                 </div>
               </div>
 
               {/* Brand Info */}
               {campaign.brand && (
-                <div className="bg-white rounded-lg shadow p-6">
+                <div className="bg-white rounded-3xl shadow-sm hover:shadow-md p-6 transition-shadow">
                   <h3 className="text-lg font-bold text-gray-900 mb-4">Brand</h3>
-                  <p className="text-gray-900 font-medium">{campaign.brand.company_name}</p>
-                  {campaign.brand.location && (
-                    <p className="text-sm text-gray-600 mt-1">{campaign.brand.location}</p>
-                  )}
+                  <div className="flex items-center gap-3">
+                    <Avatar
+                      src={campaign.brand.logo}
+                      alt={campaign.brand.company_name}
+                      size="md"
+                      type="brand"
+                    />
+                    <div>
+                      <p className="text-gray-900 font-semibold">{campaign.brand.company_name}</p>
+                      {campaign.brand.industry && (
+                        <p className="text-xs text-gray-600">{campaign.brand.industry}</p>
+                      )}
+                      {campaign.brand.location && (
+                        <p className="text-xs text-gray-500 mt-0.5">{campaign.brand.location}</p>
+                      )}
+                    </div>
+                  </div>
                 </div>
               )}
             </div>

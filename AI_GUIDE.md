@@ -1465,9 +1465,9 @@ if (incompleteMilestone) {
 ```
 
 **Navigation Flow After Creation**:
-- If participation type = "packages": Navigate to `/campaigns/:id/browse-packages` (TODO: not yet implemented)
+- If participation type = "packages": Navigate to `/brand/campaigns/:id/browse-packages` (Package Browser)
 - If participation type = "proposals": Navigate to `/brand/campaigns`
-- If participation type = "both": Navigate to `/brand/campaigns` (TODO: could show modal with options)
+- If participation type = "both": Show success modal with options (browse packages now OR view dashboard)
 
 **Progress Indicators**:
 - Step indicator with checkmarks for completed steps
@@ -5013,3 +5013,63 @@ npm install chart.js react-chartjs-2
 **Remember**: This platform serves real users. Every change should maintain consistency, functionality, and the professional design we've established. When in doubt, refer to Home.jsx and this guide.
 
 🤖 **Generated for AI Assistants** | **Maintained by**: Development Team | **Last Review**: Mar 13, 2026
+
+
+### Recent: Campaign Status Management & Payment Flow Fixes (March 25, 2026)
+
+**Goal**: Allow brands to publish campaigns and ensure proper payment flow when adding packages.
+
+#### Campaign Status Selection (`CampaignFormNew.jsx` Step 4)
+**New "Campaign Status" Section**:
+- Added after participation type selection
+- Two radio options with clear descriptions:
+  - **Publish Now (Active)**: Campaign goes live immediately, creators can view and apply
+  - **Save as Draft**: Campaign not visible to creators, can publish later
+- Visual icons (green checkmark for active, gray pencil for draft)
+- Default: draft (for safety)
+
+#### Quick Status Toggle Buttons (`Campaigns.jsx`)
+**Campaign List Page Enhancements**:
+- Added `handleStatusChange` function using `campaignsAPI.updateCampaign`
+- Contextual quick action buttons next to status badge:
+  - **Draft campaigns**: Green "Publish" button → Changes to active
+  - **Active campaigns**: Yellow "Pause" button → Changes to paused
+  - **Paused campaigns**: Green "Resume" button → Changes to active
+- One-click status changes (no confirmation dialog)
+- Toast notifications for feedback
+- Auto-refreshes list after status change
+
+**Status Meanings**:
+- **draft**: Not visible to creators, can be edited freely
+- **active**: Live and accepting creator applications/package selections
+- **paused**: Temporarily stopped, not accepting new applications
+- **completed**: Campaign ended, no longer accepting applications
+
+#### Fixed Package Browser Payment Flow (`CampaignPackageBrowser.jsx`)
+**CRITICAL FIX**: Package browser was skipping payment, now properly integrated with payment page.
+
+**Payment Flow Summary**:
+- **Campaign Creation**: FREE (no payment required)
+- **Payment Required When**: Adding packages OR accepting applications
+- Creates booking → Redirects to `/brand/campaigns/payment/:id`
+- Payment held in escrow until deliverable completion
+
+#### Milestone Budget Allocation
+**New Field**: `campaign_milestones.budget_allocation`
+- Shows creators payment breakdown per milestone
+- Frontend displays budget summary with progress bar
+- Validates budget_allocation doesn't exceed campaign budget
+
+#### Structured Deliverables Display (`BrowseCampaigns.jsx`)
+- Shows "What You'll Deliver" section in opportunities
+- Format: "2× Instagram Reel, 1× TikTok Video"
+- Helps creators understand requirements before applying
+
+#### "Both Mode" Success Modal (`CampaignSuccessModal.jsx`)
+- Shows after creating campaigns with participation_type="both"
+- Two action buttons: Browse Packages OR View Dashboard
+- Professional success icon with clear next steps
+
+---
+
+🤖 **Updated**: Mar 25, 2026
