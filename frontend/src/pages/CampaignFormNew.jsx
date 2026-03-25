@@ -3,6 +3,7 @@ import { useNavigate, useParams, Link } from 'react-router-dom';
 import { campaignsAPI, categoriesAPI } from '../services/api';
 import Navbar from '../components/Navbar';
 import DeliverableBuilder from '../components/DeliverableBuilder';
+import CampaignSuccessModal from '../components/CampaignSuccessModal';
 import toast from 'react-hot-toast';
 
 const CampaignFormNew = () => {
@@ -14,6 +15,8 @@ const CampaignFormNew = () => {
   const [loading, setLoading] = useState(false);
   const [categories, setCategories] = useState([]);
   const [categoriesLoading, setCategoriesLoading] = useState(true);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [createdCampaignId, setCreatedCampaignId] = useState(null);
 
   const [formData, setFormData] = useState({
     // Step 1: Basic Details
@@ -325,25 +328,29 @@ const CampaignFormNew = () => {
       if (isEditMode) {
         await campaignsAPI.updateCampaign(id, payload);
         toast.success('Campaign updated successfully!');
+        navigate('/brand/campaigns');
       } else {
         const response = await campaignsAPI.createCampaign(payload);
+        const campaignId = response.data.campaign.id;
+
         toast.success('Campaign created successfully!');
 
         // If participation type is "packages", navigate to package browser
         if (formData.participation_type === 'packages') {
-          navigate(`/campaigns/${response.data.campaign.id}/browse-packages`);
+          navigate(`/brand/campaigns/${campaignId}/browse-packages`);
           return;
         }
 
-        // If "both", show option
+        // If "both", show modal with options
         if (formData.participation_type === 'both') {
-          // TODO: Show modal with options
-          navigate('/brand/campaigns');
+          setCreatedCampaignId(campaignId);
+          setShowSuccessModal(true);
           return;
         }
-      }
 
-      navigate('/brand/campaigns');
+        // If "proposals", just go to campaigns list
+        navigate('/brand/campaigns');
+      }
     } catch (error) {
       console.error('Error saving campaign:', error);
       toast.error(error.response?.data?.error || 'Failed to save campaign');
@@ -963,6 +970,14 @@ const CampaignFormNew = () => {
           </div>
         </form>
       </div>
+
+      {/* Success Modal for "Both" mode */}
+      <CampaignSuccessModal
+        isOpen={showSuccessModal}
+        onClose={() => setShowSuccessModal(false)}
+        campaignId={createdCampaignId}
+        campaignTitle={formData.title}
+      />
     </div>
   );
 };
