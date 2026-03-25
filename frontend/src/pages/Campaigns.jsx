@@ -26,6 +26,17 @@ const Campaigns = () => {
     }
   };
 
+  const handleStatusChange = async (campaignId, newStatus) => {
+    try {
+      await campaignsAPI.updateCampaign(campaignId, { status: newStatus });
+      toast.success(`Campaign status updated to ${newStatus}`);
+      fetchCampaigns();
+    } catch (error) {
+      console.error('Error updating campaign status:', error);
+      toast.error('Failed to update campaign status');
+    }
+  };
+
   const handleDelete = async (campaignId) => {
     if (!window.confirm('Are you sure you want to delete this campaign?')) {
       return;
@@ -173,11 +184,51 @@ const Campaigns = () => {
             {filteredCampaigns.map((campaign) => (
               <div key={campaign.id} className="bg-white rounded-lg shadow hover:shadow-lg transition-shadow">
                 <div className="p-6">
-                  {/* Status Badge */}
+                  {/* Status Badge & Controls */}
                   <div className="flex items-center justify-between mb-4">
-                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(campaign.status)}`}>
-                      {campaign.status}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(campaign.status)}`}>
+                        {campaign.status}
+                      </span>
+                      {/* Status Quick Actions */}
+                      {campaign.status === 'draft' && (
+                        <button
+                          onClick={() => handleStatusChange(campaign.id, 'active')}
+                          className="px-3 py-1 bg-green-100 hover:bg-green-200 text-green-700 text-xs font-medium rounded-full transition-colors flex items-center gap-1"
+                          title="Publish campaign"
+                        >
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          Publish
+                        </button>
+                      )}
+                      {campaign.status === 'active' && (
+                        <button
+                          onClick={() => handleStatusChange(campaign.id, 'paused')}
+                          className="px-3 py-1 bg-yellow-100 hover:bg-yellow-200 text-yellow-700 text-xs font-medium rounded-full transition-colors flex items-center gap-1"
+                          title="Pause campaign"
+                        >
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          Pause
+                        </button>
+                      )}
+                      {campaign.status === 'paused' && (
+                        <button
+                          onClick={() => handleStatusChange(campaign.id, 'active')}
+                          className="px-3 py-1 bg-green-100 hover:bg-green-200 text-green-700 text-xs font-medium rounded-full transition-colors flex items-center gap-1"
+                          title="Resume campaign"
+                        >
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          Resume
+                        </button>
+                      )}
+                    </div>
                     <span className="text-sm text-gray-600">{campaign.category}</span>
                   </div>
 
