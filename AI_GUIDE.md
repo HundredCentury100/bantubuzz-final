@@ -1343,6 +1343,237 @@ Understanding what's been implemented helps maintain consistency and avoid rewor
   - Better mobile experience
 - **Files**: `frontend/src/pages/VerificationApplication.jsx`, `backend/app/routes/verification.py`
 
+### Recent: Campaign System Major Restructuring (March 25, 2026)
+
+**Goal**: Implement unified campaign flow with mandatory milestones, structured deliverables, and improved UX based on new platform requirements.
+
+#### Database Changes (`202603251430_campaign_improvements.py`)
+**New Campaign Model Fields**:
+- `application_deadline` (DateTime): Required for proposals mode - deadline for creators to apply
+- `allows_packages` (Boolean): Support "Both" participation mode (packages + proposals simultaneously)
+- `requires_milestones` (Boolean, default=True): Enforce milestone requirements for all campaigns
+
+#### Backend API Updates (`campaigns.py`)
+**Enhanced Campaign Creation/Update**:
+- Application deadline handling: Auto-filter expired campaigns from browse endpoint
+- "Both" mode support: Can have `participation_mode='proposals'` AND `allows_packages=True`
+- Visibility filtering: `GET /campaigns/browse` now excludes campaigns where `application_deadline` has passed
+
+**Browse Endpoint Logic**:
+```python
+# Only show campaigns where:
+# 1. status='active'
+# 2. allows_applications=True OR participation_mode='proposals'
+# 3. application_deadline is NULL OR application_deadline > now()
+query = Campaign.query.filter_by(status='active').filter(
+    db.or_(Campaign.participation_mode == 'proposals', Campaign.allows_applications == True)
+).filter(
+    db.or_(Campaign.application_deadline == None, Campaign.application_deadline > datetime.utcnow())
+)
+```
+
+#### Frontend - Complete Wizard Restructure
+**CampaignFormNew.jsx** - 4-Step Wizard (down from 5 steps):
+
+**Step 1 - Basic Details** (Simplified):
+- Campaign Title (required)
+- Campaign Description (required, max 150 chars recommended)
+- Removed: category, participation_mode, status (moved to other steps)
+
+**Step 2 - Campaign Brief** (Enhanced with Structured Deliverables):
+- **Objective** (Dropdown, required):
+  - Options: Brand Awareness | Engagement | Product Promotion | App Installs/Signups | Sales/Conversions | Content Creation | Other
+- **Target Audience** (Optional textarea): Free-text description
+- **Deliverables Builder** (Required, structured):
+  - Platform dropdown (Instagram, TikTok, YouTube, Facebook, Twitter, LinkedIn)
+  - Content Type dropdown (dynamic based on platform):
+    - Instagram: Post, Reel, Story, IGTV
+    - TikTok: Video, Livestream
+    - YouTube: Video, Short, Livestream
+    - Facebook: Post, Video, Story, Livestream
+    - Twitter: Tweet, Thread
+    - LinkedIn: Post, Article, Video
+  - Quantity input (min: 1)
+  - Add/Remove buttons for multiple deliverables
+  - Summary display showing total deliverables and pieces
+- **Additional Notes** (Optional textarea): Content guidelines, hashtags, tone/style
+
+**Step 3 - Campaign Setup** (Focused on Budget, Timeline, Milestones):
+- **Budget** (required): Single total budget amount (not range anymore)
+- **Timeline** (required):
+  - Start Date
+  - End Date
+  - Validation: End date must be after start date
+- **Milestones** (required, minimum 1):
+  - Name (required)
+  - Linked Deliverable (dropdown, required): Select from deliverables added in Step 2
+  - Due Date (required)
+  - Add/Remove buttons
+  - Validation: All milestones must be complete before proceeding
+  - **Milestone-to-Deliverable Linking**: Each milestone references a specific deliverable by index
+
+**Step 4 - Participation** (New Structure):
+- **Participation Type Radio Buttons** (required):
+  - ( ) Add Creator Packages: Browse and select fixed-price packages
+  - ( ) Allow Creators to Apply: Creators submit custom proposals
+  - ( ) Both: Combine both approaches
+- **Conditional Targeting Section** (shows if "Allow Creators to Apply" or "Both"):
+  - Application Deadline (required date picker)
+  - Target Location (dropdown): Zimbabwe, South Africa, Nigeria, Kenya, Ghana, Global
+  - Target Categories (multi-select): All available categories with toggle buttons
+  - Follower Range (optional):
+    - Minimum Followers
+    - Maximum Followers
+
+**DeliverableBuilder Component** (`DeliverableBuilder.jsx`):
+- Standalone reusable component for structured deliverable input
+- Visual design: Rounded-2xl cards with border, gray-50 background
+- Platform-aware content type filtering
+- Real-time summary display:
+  - Individual deliverable preview: "2 × Instagram Reels"
+  - Overall summary box showing total deliverables and pieces
+- Empty state with "Add First Deliverable" button
+- Validation: Ensures platform, content_type, and quantity are all filled
+
+**Validation Logic**:
+```javascript
+// Step 2 validation
+if (formData.deliverables.length === 0) {
+  toast.error('Please add at least one deliverable');
+  return false;
+}
+const incompleteDeliverable = formData.deliverables.find(
+  d => !d.platform || !d.content_type || !d.quantity
+);
+if (incompleteDeliverable) {
+  toast.error('Please complete all deliverable fields');
+  return false;
+}
+
+// Step 3 validation
+if (formData.milestones.length === 0) {
+  toast.error('Please add at least one milestone');
+  return false;
+}
+const incompleteMilestone = formData.milestones.find(
+  m => !m.name || m.deliverable_index === null || !m.due_date
+);
+if (incompleteMilestone) {
+  toast.error('Please complete all milestone fields');
+  return false;
+}
+```
+
+**Navigation Flow After Creation**:
+- If participation type = "packages": Navigate to `/campaigns/:id/browse-packages` (TODO: not yet implemented)
+- If participation type = "proposals": Navigate to `/brand/campaigns`
+- If participation type = "both": Navigate to `/brand/campaigns` (TODO: could show modal with options)
+
+**Progress Indicators**:
+- Step indicator with checkmarks for completed steps
+- Deliverable counter: "X Deliverables"
+- Milestone counter: "X Milestones" (shows from Step 3 onwards)
+- Character counter for description (X/150 characters)
+
+#### Data Structure Changes
+
+**Deliverable Structure** (Campaign Brief):
+```javascript
+// OLD: Simple text array
+deliverables: ["Post on Instagram", "Video on TikTok"]
+
+// NEW: Structured objects
+deliverables: [
+  { platform: "Instagram", content_type: "Reel", quantity: 2 },
+  { platform: "TikTok", content_type: "Video", quantity: 3 }
+]
+```
+
+**Milestone Structure** (linking to deliverables):
+```javascript
+milestones: [
+  {
+    name: "TikTok Video Delivery",
+    deliverable_index: 1,  // References deliverables[1]
+    due_date: "2026-07-10"
+  }
+]
+```
+
+**Backend Payload Mapping**:
+```javascript
+// Frontend sends:
+milestones: [
+  { name: "TikTok Videos", deliverable_index: 1, due_date: "2026-07-10" }
+]
+
+// Backend receives (transformed):
+milestones: [
+  {
+    name: "TikTok Videos",
+    description: "TikTok Video (3×)",  // Auto-generated from deliverable
+    deliverables: [{ platform: "TikTok", content_type: "Video", quantity: 3 }],
+    due_date: "2026-07-10T00:00:00.000Z"
+  }
+]
+```
+
+#### Design Patterns Followed
+
+**Rounded Corners**:
+- Outer cards: `rounded-3xl`
+- Inner containers/nested cards: `rounded-2xl`
+- Form inputs: `rounded-xl`
+- Buttons: `rounded-lg` (secondary) or `rounded-full` (primary CTA)
+
+**Color Usage**:
+- Primary color (#ccdb53): Step indicators (current step), selected categories, summary boxes
+- Success green: Completed steps checkmarks
+- Red: Required field asterisks, remove/delete buttons
+- Gray-50: Background for deliverable/milestone cards
+- Gray-200: Borders, disabled states
+
+**Spacing**:
+- Outer card padding: `p-6`
+- Inner card padding: `p-4`
+- Form field spacing: `space-y-6` between major sections, `space-y-3` within sections
+- Grid gaps: `gap-3` for form grids, `gap-4` for card lists
+
+#### Files Modified/Created
+- **Backend**:
+  - `backend/app/models/campaign.py`: Added 3 new fields
+  - `backend/app/routes/campaigns.py`: Updated create/update/browse endpoints
+  - `backend/migrations/versions/202603251430_campaign_improvements.py`: Migration for new fields
+- **Frontend**:
+  - `frontend/src/components/DeliverableBuilder.jsx`: NEW - Structured deliverable input component
+  - `frontend/src/pages/CampaignFormNew.jsx`: NEW - Complete wizard rewrite (4 steps)
+  - `frontend/src/App.jsx`: Updated routes to use CampaignFormNew
+
+#### Key Improvements Summary
+1. **Mandatory Milestones**: Every campaign must have at least 1 milestone (enforced via validation)
+2. **Structured Deliverables**: Platform + Content Type + Quantity structure replaces free-text deliverables
+3. **Milestone-Deliverable Linking**: Milestones now explicitly reference deliverables, improving tracking
+4. **Simplified Step 1**: Removed clutter, focused on title and description only
+5. **Application Deadlines**: Proposals mode requires deadline, prevents late applications automatically
+6. **"Both" Mode Support**: Brands can now combine package browsing with proposal acceptance
+7. **Better Validation**: Step-by-step validation prevents incomplete submissions
+8. **Improved UX**: Progress counters, character limits, dynamic content type options based on platform
+
+#### Backward Compatibility Notes
+- Old campaigns with text-based deliverables will still load but may not display perfectly in new UI
+- `participation_mode` field unchanged for existing campaigns
+- `allows_packages=False` by default for existing campaigns (won't break proposals-only campaigns)
+- Migration adds new columns with sensible defaults (no data loss)
+
+#### TODO/Future Enhancements
+- [ ] Implement `/campaigns/:id/browse-packages` page for "packages" mode post-creation flow
+- [ ] Add modal for "Both" mode after creation offering to browse packages or view campaign
+- [ ] Consider adding deliverable templates (e.g., "Instagram Influencer Package" preset)
+- [ ] Budget allocation per milestone (optional enhancement)
+- [ ] Auto-suggest milestone names based on deliverable type
+
+---
+
 ### Recent: Badge Priority & Verification Flow Fixes (Feb 23-24, 2026)
 - **Badge display priority standardized**:
   - Top Creator badge now displays first (highest priority)
