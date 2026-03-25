@@ -108,6 +108,7 @@ class Campaign(db.Model):
     # Timeline
     # ========================================
     timeline_days = db.Column(db.Integer)  # How long creators have to deliver
+    application_deadline = db.Column(db.DateTime)  # Deadline for creators to apply (for proposals mode)
 
     # ========================================
     # Targeting Fields
@@ -117,8 +118,15 @@ class Campaign(db.Model):
     target_max_followers = db.Column(db.Integer)
     target_locations = db.Column(db.JSON)  # ["Zimbabwe", "South Africa"]
 
+    # ========================================
+    # Advanced Features
+    # ========================================
+    allows_packages = db.Column(db.Boolean, default=False)  # Support "Both" mode (packages + proposals)
+    requires_milestones = db.Column(db.Boolean, default=True)  # Enforce milestone requirement
+
     # Relationships
     bookings = db.relationship('Booking', backref='campaign', lazy='dynamic')
+    milestones = db.relationship('CampaignMilestone', backref='campaign', lazy='dynamic', cascade='all, delete-orphan')
 
     # Many-to-many relationship with packages
     packages = db.relationship('Package', secondary=campaign_packages,
@@ -161,12 +169,17 @@ class Campaign(db.Model):
 
             # Timeline
             'timeline_days': self.timeline_days,
+            'application_deadline': self.application_deadline.isoformat() if self.application_deadline else None,
 
             # Targeting
             'target_categories': self.target_categories or [],
             'target_min_followers': self.target_min_followers,
             'target_max_followers': self.target_max_followers,
-            'target_locations': self.target_locations or []
+            'target_locations': self.target_locations or [],
+
+            # Advanced Features
+            'allows_packages': self.allows_packages,
+            'requires_milestones': self.requires_milestones
         }
 
         if include_brand and self.brand:
@@ -178,7 +191,7 @@ class Campaign(db.Model):
         if include_applicants:
             data['applications'] = [app.to_dict(include_relations=True) for app in self.applications.all()]
 
-        if include_milestones and hasattr(self, 'milestones'):
+        if include_milestones:
             data['milestones'] = [m.to_dict() for m in self.milestones.all()]
 
         return data

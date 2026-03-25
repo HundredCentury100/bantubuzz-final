@@ -117,7 +117,11 @@ def create_campaign():
             target_categories=data.get('target_categories', []),
             target_min_followers=data.get('target_min_followers'),
             target_max_followers=data.get('target_max_followers'),
-            target_locations=data.get('target_locations', [])
+            target_locations=data.get('target_locations', []),
+
+            # Advanced features
+            allows_packages=data.get('allows_packages', False),
+            requires_milestones=data.get('requires_milestones', True)
         )
 
         # Set budget based on participation mode
@@ -132,6 +136,8 @@ def create_campaign():
             campaign.start_date = datetime.fromisoformat(data['start_date'].replace('Z', '+00:00'))
         if 'end_date' in data:
             campaign.end_date = datetime.fromisoformat(data['end_date'].replace('Z', '+00:00'))
+        if 'application_deadline' in data:
+            campaign.application_deadline = datetime.fromisoformat(data['application_deadline'].replace('Z', '+00:00'))
 
         db.session.add(campaign)
         db.session.flush()  # Get campaign.id
@@ -189,17 +195,20 @@ def update_campaign(campaign_id):
 
         # Participation and budget fields
         participation_fields = ['participation_mode', 'allows_applications',
-                              'budget_min', 'budget_max', 'timeline_days']
+                              'budget_min', 'budget_max', 'timeline_days', 'application_deadline']
 
         # Targeting fields
         targeting_fields = ['target_categories', 'target_min_followers',
                            'target_max_followers', 'target_locations']
 
-        all_fields = updatable_fields + campaign_brief_fields + participation_fields + targeting_fields
+        # Advanced fields
+        advanced_fields = ['allows_packages', 'requires_milestones']
+
+        all_fields = updatable_fields + campaign_brief_fields + participation_fields + targeting_fields + advanced_fields
 
         for field in all_fields:
             if field in data:
-                if field in ['start_date', 'end_date']:
+                if field in ['start_date', 'end_date', 'application_deadline']:
                     setattr(campaign, field, datetime.fromisoformat(data[field].replace('Z', '+00:00')))
                 else:
                     setattr(campaign, field, data[field])
@@ -409,10 +418,16 @@ def browse_campaigns():
         category = request.args.get('category')
 
         # Get active campaigns that allow applications (proposals mode or allows_applications=true)
+        # Also filter out campaigns where application deadline has passed
         query = Campaign.query.filter_by(status='active').filter(
             db.or_(
                 Campaign.participation_mode == 'proposals',
                 Campaign.allows_applications == True
+            )
+        ).filter(
+            db.or_(
+                Campaign.application_deadline == None,
+                Campaign.application_deadline > datetime.utcnow()
             )
         )
 

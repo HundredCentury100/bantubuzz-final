@@ -34,7 +34,7 @@ import Messages from './pages/Messages';
 import BlockedUsers from './pages/BlockedUsers';
 import Notifications from './pages/Notifications';
 import Campaigns from './pages/Campaigns';
-import CampaignForm from './pages/CampaignForm';
+import CampaignFormNew from './pages/CampaignFormNew';
 import CampaignDetails from './pages/CampaignDetails';
 import BrowseCampaigns from './pages/BrowseCampaigns';
 import CreatorCampaignDetails from './pages/CreatorCampaignDetails';
@@ -399,7 +399,7 @@ function App() {
         path="/brand/campaigns/create"
         element={
           <ProtectedRoute requiredType="brand">
-            <CampaignForm />
+            <CampaignFormNew />
           </ProtectedRoute>
         }
       />
@@ -407,7 +407,7 @@ function App() {
         path="/brand/campaigns/:id/edit"
         element={
           <ProtectedRoute requiredType="brand">
-            <CampaignForm />
+            <CampaignFormNew />
           </ProtectedRoute>
         }
       />
