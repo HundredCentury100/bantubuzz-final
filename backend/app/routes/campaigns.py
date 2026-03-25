@@ -89,6 +89,50 @@ def create_campaign():
         elif participation_mode == 'proposals' and ('budget_min' not in data or 'budget_max' not in data):
             return jsonify({'error': 'Budget range (budget_min and budget_max) required for proposals mode'}), 400
 
+        # Enhanced validation for new requirements
+        # 1. Validate milestones are provided and structured correctly
+        if data.get('requires_milestones', True):
+            if 'milestones' not in data or not data['milestones']:
+                return jsonify({'error': 'At least one milestone is required for this campaign'}), 400
+
+            # Validate each milestone has required fields
+            for idx, milestone in enumerate(data['milestones']):
+                if not milestone.get('name'):
+                    return jsonify({'error': f'Milestone {idx + 1}: name is required'}), 400
+                if 'deliverables' not in milestone or not milestone['deliverables']:
+                    return jsonify({'error': f'Milestone {idx + 1}: at least one deliverable is required'}), 400
+
+                # Validate deliverables structure
+                for del_idx, deliverable in enumerate(milestone['deliverables']):
+                    if not isinstance(deliverable, dict):
+                        return jsonify({'error': f'Milestone {idx + 1}, Deliverable {del_idx + 1}: invalid format'}), 400
+                    if not deliverable.get('platform'):
+                        return jsonify({'error': f'Milestone {idx + 1}, Deliverable {del_idx + 1}: platform is required'}), 400
+                    if not deliverable.get('content_type'):
+                        return jsonify({'error': f'Milestone {idx + 1}, Deliverable {del_idx + 1}: content_type is required'}), 400
+                    if not deliverable.get('quantity') or deliverable['quantity'] < 1:
+                        return jsonify({'error': f'Milestone {idx + 1}, Deliverable {del_idx + 1}: quantity must be at least 1'}), 400
+
+        # 2. Validate application deadline for proposals mode
+        if (participation_mode == 'proposals' or data.get('allows_packages')) and data.get('allows_applications', True):
+            if 'application_deadline' not in data or not data['application_deadline']:
+                return jsonify({'error': 'Application deadline is required for proposals mode'}), 400
+
+            # Validate application deadline is in the future
+            try:
+                deadline = datetime.fromisoformat(data['application_deadline'].replace('Z', '+00:00'))
+                if deadline <= datetime.utcnow():
+                    return jsonify({'error': 'Application deadline must be in the future'}), 400
+            except (ValueError, AttributeError):
+                return jsonify({'error': 'Invalid application deadline format'}), 400
+
+        # 3. Validate budget allocation if milestone_budgets provided
+        if 'milestone_budgets' in data and data['milestone_budgets']:
+            total_allocated = sum(float(b) for b in data['milestone_budgets'].values())
+            campaign_budget = float(data.get('budget', 0))
+            if total_allocated > campaign_budget:
+                return jsonify({'error': f'Total milestone budgets (${total_allocated}) exceeds campaign budget (${campaign_budget})'}), 400
+
         # Create campaign with basic fields
         campaign = Campaign(
             brand_id=brand.id,
@@ -152,7 +196,8 @@ def create_campaign():
                     description=milestone_data.get('description'),
                     deliverables=milestone_data.get('deliverables', []),
                     duration_days=milestone_data.get('duration_days'),
-                    due_date=datetime.fromisoformat(milestone_data['due_date'].replace('Z', '+00:00')) if 'due_date' in milestone_data else None
+                    due_date=datetime.fromisoformat(milestone_data['due_date'].replace('Z', '+00:00')) if 'due_date' in milestone_data else None,
+                    budget_allocation=milestone_data.get('budget_allocation')  # NEW: Budget for this milestone
                 )
                 db.session.add(milestone)
 
@@ -227,7 +272,8 @@ def update_campaign(campaign_id):
                     description=milestone_data.get('description'),
                     deliverables=milestone_data.get('deliverables', []),
                     duration_days=milestone_data.get('duration_days'),
-                    due_date=datetime.fromisoformat(milestone_data['due_date'].replace('Z', '+00:00')) if 'due_date' in milestone_data else None
+                    due_date=datetime.fromisoformat(milestone_data['due_date'].replace('Z', '+00:00')) if 'due_date' in milestone_data else None,
+                    budget_allocation=milestone_data.get('budget_allocation')  # NEW: Budget for this milestone
                 )
                 db.session.add(milestone)
 

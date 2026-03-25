@@ -14,6 +14,7 @@ class CampaignMilestone(db.Model):
     deliverables = db.Column(JSON, nullable=True)  # Renamed from 'expected_deliverables' in migration
     duration_days = db.Column(db.Integer)  # How many days from campaign start
     due_date = db.Column(db.DateTime)  # When this milestone should be completed (added in migration)
+    budget_allocation = db.Column(db.Numeric(10, 2), nullable=True)  # Budget allocated to this milestone
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)  # Added in migration
 
@@ -33,6 +34,7 @@ class CampaignMilestone(db.Model):
             'deliverables': self.deliverables or [],
             'duration_days': self.duration_days,
             'due_date': self.due_date.isoformat() if self.due_date else None,
+            'budget_allocation': float(self.budget_allocation) if self.budget_allocation else None,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }

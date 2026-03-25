@@ -30,7 +30,7 @@ const CampaignFormNew = () => {
     budget: '', // Single total budget
     start_date: '',
     end_date: '',
-    milestones: [], // [{name, deliverable_index, due_date}]
+    milestones: [], // [{name, deliverable_index, due_date, budget_allocation}]
 
     // Step 4: Participation
     participation_type: 'proposals', // 'packages', 'proposals', or 'both'
@@ -161,7 +161,8 @@ const CampaignFormNew = () => {
         {
           name: '',
           deliverable_index: null,
-          due_date: ''
+          due_date: '',
+          budget_allocation: ''
         }
       ]
     }));
@@ -315,7 +316,8 @@ const CampaignFormNew = () => {
             name: m.name,
             description: `${deliverable.platform} ${deliverable.content_type} (${deliverable.quantity}×)`,
             deliverables: [deliverable], // Store structured deliverable
-            due_date: new Date(m.due_date).toISOString()
+            due_date: new Date(m.due_date).toISOString(),
+            budget_allocation: m.budget_allocation ? parseFloat(m.budget_allocation) : null
           };
         })
       };
@@ -646,7 +648,7 @@ const CampaignFormNew = () => {
                             required
                           />
 
-                          <div className="grid grid-cols-2 gap-3">
+                          <div className="grid grid-cols-3 gap-3">
                             <select
                               value={milestone.deliverable_index !== null ? milestone.deliverable_index : ''}
                               onChange={(e) => updateMilestone(index, 'deliverable_index', parseInt(e.target.value))}
@@ -671,7 +673,25 @@ const CampaignFormNew = () => {
                               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                               required
                             />
+
+                            <input
+                              type="number"
+                              placeholder="Budget ($)"
+                              value={milestone.budget_allocation}
+                              onChange={(e) => updateMilestone(index, 'budget_allocation', e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                              min="0"
+                              step="0.01"
+                            />
                           </div>
+
+                          {/* Budget summary */}
+                          {milestone.budget_allocation && (
+                            <div className="flex items-center justify-between p-2 bg-primary/10 rounded-lg text-sm">
+                              <span className="text-gray-700">Milestone Budget:</span>
+                              <span className="font-semibold text-gray-900">${milestone.budget_allocation}</span>
+                            </div>
+                          )}
                         </div>
                       </div>
                     ))}
@@ -683,6 +703,58 @@ const CampaignFormNew = () => {
                     >
                       + Add Another Milestone
                     </button>
+
+                    {/* Overall budget summary */}
+                    {formData.budget && formData.milestones.some(m => m.budget_allocation) && (
+                      <div className="bg-primary/10 p-4 rounded-2xl mt-4">
+                        <h4 className="font-medium text-gray-900 mb-2">Budget Allocation Summary</h4>
+                        {(() => {
+                          const totalAllocated = formData.milestones.reduce((sum, m) => sum + (parseFloat(m.budget_allocation) || 0), 0);
+                          const remaining = parseFloat(formData.budget) - totalAllocated;
+                          const percentAllocated = (totalAllocated / parseFloat(formData.budget)) * 100;
+
+                          return (
+                            <>
+                              <div className="space-y-1 text-sm">
+                                <div className="flex justify-between">
+                                  <span className="text-gray-700">Total Budget:</span>
+                                  <span className="font-semibold">${parseFloat(formData.budget).toFixed(2)}</span>
+                                </div>
+                                <div className="flex justify-between">
+                                  <span className="text-gray-700">Allocated to Milestones:</span>
+                                  <span className="font-semibold">${totalAllocated.toFixed(2)}</span>
+                                </div>
+                                <div className="flex justify-between pt-1 border-t border-primary/20">
+                                  <span className={`font-semibold ${remaining < 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                    {remaining < 0 ? 'Over Budget:' : 'Remaining:'}
+                                  </span>
+                                  <span className={`font-bold ${remaining < 0 ? 'text-red-600' : 'text-green-600'}`}>
+                                    ${Math.abs(remaining).toFixed(2)}
+                                  </span>
+                                </div>
+                              </div>
+                              {/* Progress bar */}
+                              <div className="mt-3">
+                                <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+                                  <div
+                                    className={`h-full transition-all ${percentAllocated > 100 ? 'bg-red-500' : 'bg-green-500'}`}
+                                    style={{ width: `${Math.min(percentAllocated, 100)}%` }}
+                                  />
+                                </div>
+                                <p className="text-xs text-gray-600 mt-1">
+                                  {percentAllocated.toFixed(1)}% allocated
+                                </p>
+                              </div>
+                              {remaining < 0 && (
+                                <p className="text-xs text-red-600 mt-2">
+                                  ⚠️ Total milestone budgets exceed campaign budget
+                                </p>
+                              )}
+                            </>
+                          );
+                        })()}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

@@ -15,7 +15,10 @@
       "Bash(python:*)",
       "Bash(git commit:*)",
       "Bash(git push:*)",
-      "Bash(npm install:*)"
+      "Bash(npm install:*)",
+      "Bash(dir:*)",
+      "Bash(findstr:*)",
+      "Bash(if exist nul del /f nul)"
     ],
     "deny": [],
     "ask": []
