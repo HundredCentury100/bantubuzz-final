@@ -1,203 +1,162 @@
+"""Campaign routes - Rebuilt with proper money handling and payment flow
+
+CRITICAL RULES:
+1. Parse money as Decimal(str(value)) - NO float()
+2. Use datetime.now(timezone.utc) for ALL datetime operations
+3. Handle budget fields correctly based on participation_mode
+4. Payment-gated flow: Accept proposal → Create booking → Payment → Create collaboration
+"""
+
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from datetime import datetime
+from datetime import datetime, timezone
+from decimal import Decimal
+from sqlalchemy import text, or_, and_
 from app import db
-from app.models import Campaign, BrandProfile, CreatorProfile, Package, CampaignProposal, CampaignMilestone, Collaboration, User, Booking
-from app.models.campaign import campaign_packages
-from app.utils.notifications import notify_campaign_application, notify_campaign_status
+from app.models.campaign import Campaign, CampaignMilestone, CampaignProposal, campaign_packages
+from app.models.user import User
+from app.models.brand_profile import BrandProfile
+from app.models.creator_profile import CreatorProfile
+from app.models.package import Package
+from app.models.booking import Booking
+from app.models.collaboration import Collaboration
 
-# Backward compatibility alias
-CampaignApplication = CampaignProposal
-
-bp = Blueprint('campaigns', __name__)
-
-
-@bp.route('/', methods=['GET'])
-@jwt_required()
-def get_campaigns():
-    """Get campaigns (filtered by user type)"""
-    try:
-        user_id = int(get_jwt_identity())
-        brand = BrandProfile.query.filter_by(user_id=user_id).first()
-
-        if not brand:
-            return jsonify({'error': 'Brand profile not found'}), 404
-
-        page = request.args.get('page', 1, type=int)
-        per_page = request.args.get('per_page', 10, type=int)
-        status = request.args.get('status')
-
-        query = Campaign.query.filter_by(brand_id=brand.id)
-
-        if status:
-            query = query.filter_by(status=status)
-
-        pagination = query.order_by(Campaign.created_at.desc()).paginate(
-            page=page, per_page=per_page, error_out=False
-        )
-        campaigns = [campaign.to_dict() for campaign in pagination.items]
-
-        return jsonify({
-            'campaigns': campaigns,
-            'total': pagination.total,
-            'pages': pagination.pages,
-            'current_page': page
-        }), 200
-
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+bp = Blueprint('campaigns', __name__, url_prefix='/api/campaigns')
 
 
-@bp.route('/<int:campaign_id>', methods=['GET'])
-def get_campaign(campaign_id):
-    """Get a specific campaign"""
-    try:
-        campaign = Campaign.query.get(campaign_id)
-        if not campaign:
-            return jsonify({'error': 'Campaign not found'}), 404
-
-        return jsonify(campaign.to_dict(include_brand=True, include_packages=True)), 200
-
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
+# ========================================
+# BRAND ENDPOINTS - Campaign Management
+# ========================================
 
 @bp.route('/', methods=['POST'])
 @jwt_required()
 def create_campaign():
-    """Create a new campaign with Campaign Brief (brands only)"""
+    """
+    Brand creates new campaign
+    CRITICAL: Handle budget fields based on participation_mode
+    """
     try:
-        user_id = int(get_jwt_identity())
+        user_id = get_jwt_identity()
         brand = BrandProfile.query.filter_by(user_id=user_id).first()
 
         if not brand:
             return jsonify({'error': 'Brand profile not found'}), 404
 
         data = request.get_json()
-        required_fields = ['title', 'description', 'category', 'participation_mode']
-        if not all(field in data for field in required_fields):
-            return jsonify({'error': 'Missing required fields'}), 400
 
         # Validate participation mode
-        participation_mode = data['participation_mode']
-        if participation_mode not in ['packages', 'proposals']:
-            return jsonify({'error': 'Invalid participation_mode. Must be "packages" or "proposals"'}), 400
+        participation_mode = data.get('participation_mode', 'proposals')
+        if participation_mode not in ['packages', 'proposals', 'both']:
+            return jsonify({'error': 'Invalid participation mode'}), 400
 
-        # For packages mode, budget is required; for proposals mode, budget range is required
-        if participation_mode == 'packages' and 'budget' not in data:
-            return jsonify({'error': 'Budget is required for packages mode'}), 400
-        elif participation_mode == 'proposals' and ('budget_min' not in data or 'budget_max' not in data):
-            return jsonify({'error': 'Budget range (budget_min and budget_max) required for proposals mode'}), 400
+        # Parse dates as timezone-aware
+        try:
+            start_date = datetime.fromisoformat(data['start_date'].replace('Z', '+00:00'))
+            end_date = datetime.fromisoformat(data['end_date'].replace('Z', '+00:00'))
+        except (ValueError, KeyError) as e:
+            return jsonify({'error': f'Invalid date format: {str(e)}'}), 400
 
-        # Enhanced validation for new requirements
-        # 1. Validate milestones are provided and structured correctly
-        if data.get('requires_milestones', True):
-            if 'milestones' not in data or not data['milestones']:
-                return jsonify({'error': 'At least one milestone is required for this campaign'}), 400
-
-            # Validate each milestone has required fields
-            for idx, milestone in enumerate(data['milestones']):
-                if not milestone.get('name'):
-                    return jsonify({'error': f'Milestone {idx + 1}: name is required'}), 400
-                if 'deliverables' not in milestone or not milestone['deliverables']:
-                    return jsonify({'error': f'Milestone {idx + 1}: at least one deliverable is required'}), 400
-
-                # Validate deliverables structure
-                for del_idx, deliverable in enumerate(milestone['deliverables']):
-                    if not isinstance(deliverable, dict):
-                        return jsonify({'error': f'Milestone {idx + 1}, Deliverable {del_idx + 1}: invalid format'}), 400
-                    if not deliverable.get('platform'):
-                        return jsonify({'error': f'Milestone {idx + 1}, Deliverable {del_idx + 1}: platform is required'}), 400
-                    if not deliverable.get('content_type'):
-                        return jsonify({'error': f'Milestone {idx + 1}, Deliverable {del_idx + 1}: content_type is required'}), 400
-                    if not deliverable.get('quantity') or deliverable['quantity'] < 1:
-                        return jsonify({'error': f'Milestone {idx + 1}, Deliverable {del_idx + 1}: quantity must be at least 1'}), 400
-
-        # 2. Validate application deadline for proposals mode
-        if (participation_mode == 'proposals' or data.get('allows_packages')) and data.get('allows_applications', True):
-            if 'application_deadline' not in data or not data['application_deadline']:
-                return jsonify({'error': 'Application deadline is required for proposals mode'}), 400
-
-            # Validate application deadline is in the future
+        application_deadline = None
+        if data.get('application_deadline'):
             try:
-                deadline = datetime.fromisoformat(data['application_deadline'].replace('Z', '+00:00'))
-                if deadline <= datetime.utcnow():
-                    return jsonify({'error': 'Application deadline must be in the future'}), 400
-            except (ValueError, AttributeError):
-                return jsonify({'error': 'Invalid application deadline format'}), 400
+                application_deadline = datetime.fromisoformat(data['application_deadline'].replace('Z', '+00:00'))
+            except ValueError:
+                return jsonify({'error': 'Invalid application_deadline format'}), 400
 
-        # 3. Validate budget allocation if milestone_budgets provided
-        if 'milestone_budgets' in data and data['milestone_budgets']:
-            total_allocated = sum(float(b) for b in data['milestone_budgets'].values())
-            campaign_budget = float(data.get('budget', 0))
-            if total_allocated > campaign_budget:
-                return jsonify({'error': f'Total milestone budgets (${total_allocated}) exceeds campaign budget (${campaign_budget})'}), 400
+        # CRITICAL: Handle budget fields based on participation_mode
+        budget = None
+        budget_min = None
+        budget_max = None
 
-        # Create campaign with basic fields
+        if participation_mode == 'packages':
+            # Packages mode: budget only (no min/max)
+            if not data.get('budget'):
+                return jsonify({'error': 'Budget required for packages mode'}), 400
+            budget = Decimal(str(data['budget']))
+
+        elif participation_mode == 'proposals':
+            # Proposals mode: budget_min and budget_max only (no budget)
+            if not data.get('budget_min') or not data.get('budget_max'):
+                return jsonify({'error': 'Budget range required for proposals mode'}), 400
+            budget_min = Decimal(str(data['budget_min']))
+            budget_max = Decimal(str(data['budget_max']))
+
+            if budget_min > budget_max:
+                return jsonify({'error': 'Budget min cannot be greater than budget max'}), 400
+
+        elif participation_mode == 'both':
+            # Both mode: all three fields required
+            if not data.get('budget') or not data.get('budget_min') or not data.get('budget_max'):
+                return jsonify({'error': 'Budget and budget range required for both mode'}), 400
+            budget = Decimal(str(data['budget']))
+            budget_min = Decimal(str(data['budget_min']))
+            budget_max = Decimal(str(data['budget_max']))
+
+        # CRITICAL: Convert empty strings to None for integer fields
+        target_min_followers = data.get('target_min_followers')
+        if target_min_followers == '' or target_min_followers is None:
+            target_min_followers = None
+        else:
+            target_min_followers = int(target_min_followers)
+
+        target_max_followers = data.get('target_max_followers')
+        if target_max_followers == '' or target_max_followers is None:
+            target_max_followers = None
+        else:
+            target_max_followers = int(target_max_followers)
+
+        timeline_days = data.get('timeline_days')
+        if timeline_days == '' or timeline_days is None:
+            timeline_days = None
+        else:
+            timeline_days = int(timeline_days)
+
+        # Create campaign
         campaign = Campaign(
             brand_id=brand.id,
+            brief_id=data.get('brief_id'),
             title=data['title'],
             description=data['description'],
-            objectives=data.get('objectives'),
-            category=data['category'],
-            requirements=data.get('requirements', {}),
-            status=data.get('status', 'draft'),
-
-            # Campaign Brief fields
+            category=data.get('category'),
             campaign_objective=data.get('campaign_objective'),
-            target_audience=data.get('target_audience', {}),
-            key_message=data.get('key_message'),
-            required_mentions=data.get('required_mentions', {}),
+            target_audience=data.get('target_audience'),
             content_guidelines=data.get('content_guidelines'),
-
-            # Participation mode
             participation_mode=participation_mode,
-            allows_applications=data.get('allows_applications', True),
-
-            # Timeline
-            timeline_days=data.get('timeline_days'),
-
-            # Targeting
+            allows_applications=(participation_mode in ['proposals', 'both']),
+            allows_packages=(participation_mode in ['packages', 'both']),
+            requires_milestones=data.get('requires_milestones', True),
+            budget=budget,
+            budget_min=budget_min,
+            budget_max=budget_max,
+            start_date=start_date,
+            end_date=end_date,
+            application_deadline=application_deadline,
+            timeline_days=timeline_days,
             target_categories=data.get('target_categories', []),
-            target_min_followers=data.get('target_min_followers'),
-            target_max_followers=data.get('target_max_followers'),
             target_locations=data.get('target_locations', []),
-
-            # Advanced features
-            allows_packages=data.get('allows_packages', False),
-            requires_milestones=data.get('requires_milestones', True)
+            target_min_followers=target_min_followers,
+            target_max_followers=target_max_followers,
+            status=data.get('status', 'draft')
         )
-
-        # Set budget based on participation mode
-        if participation_mode == 'packages':
-            campaign.budget = data['budget']
-        else:  # proposals mode
-            campaign.budget_min = data['budget_min']
-            campaign.budget_max = data['budget_max']
-
-        # Set dates if provided
-        if 'start_date' in data:
-            campaign.start_date = datetime.fromisoformat(data['start_date'].replace('Z', '+00:00'))
-        if 'end_date' in data:
-            campaign.end_date = datetime.fromisoformat(data['end_date'].replace('Z', '+00:00'))
-        if 'application_deadline' in data:
-            campaign.application_deadline = datetime.fromisoformat(data['application_deadline'].replace('Z', '+00:00'))
 
         db.session.add(campaign)
         db.session.flush()  # Get campaign.id
 
         # Create milestones if provided
-        if 'milestones' in data and data['milestones']:
-            for idx, milestone_data in enumerate(data['milestones'], start=1):
+        if data.get('milestones'):
+            for milestone_data in data['milestones']:
+                budget_allocation = None
+                if milestone_data.get('budget_allocation'):
+                    budget_allocation = Decimal(str(milestone_data['budget_allocation']))
+
                 milestone = CampaignMilestone(
                     campaign_id=campaign.id,
-                    milestone_number=idx,
+                    milestone_number=milestone_data['milestone_number'],
                     name=milestone_data['name'],
                     description=milestone_data.get('description'),
                     deliverables=milestone_data.get('deliverables', []),
-                    duration_days=milestone_data.get('duration_days'),
-                    due_date=datetime.fromisoformat(milestone_data['due_date'].replace('Z', '+00:00')) if 'due_date' in milestone_data else None,
-                    budget_allocation=milestone_data.get('budget_allocation')  # NEW: Budget for this milestone
+                    budget_allocation=budget_allocation,
+                    duration_days=milestone_data.get('duration_days')
                 )
                 db.session.add(milestone)
 
@@ -205,104 +164,158 @@ def create_campaign():
 
         return jsonify({
             'message': 'Campaign created successfully',
-            'campaign': campaign.to_dict(include_milestones=True)
+            'campaign': campaign.to_dict()
         }), 201
 
     except Exception as e:
         db.session.rollback()
+        print(f"Error creating campaign: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@bp.route('/', methods=['GET'])
+@jwt_required()
+def get_campaigns():
+    """Get brand's campaigns"""
+    try:
+        user_id = get_jwt_identity()
+        brand = BrandProfile.query.filter_by(user_id=user_id).first()
+
+        if not brand:
+            return jsonify({'error': 'Brand profile not found'}), 404
+
+        # Get filter parameters
+        status = request.args.get('status')
+
+        query = Campaign.query.filter_by(brand_id=brand.id)
+
+        if status:
+            query = query.filter_by(status=status)
+
+        campaigns = query.order_by(Campaign.created_at.desc()).all()
+
+        return jsonify({
+            'campaigns': [c.to_dict() for c in campaigns]
+        }), 200
+
+    except Exception as e:
+        print(f"Error fetching campaigns: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+
+@bp.route('/<int:campaign_id>', methods=['GET'])
+@jwt_required()
+def get_campaign(campaign_id):
+    """Get campaign details"""
+    try:
+        campaign = Campaign.query.get(campaign_id)
+        if not campaign:
+            return jsonify({'error': 'Campaign not found'}), 404
+
+        return jsonify(campaign.to_dict(include_brand=True)), 200
+
+    except Exception as e:
+        print(f"Error fetching campaign: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 
 @bp.route('/<int:campaign_id>', methods=['PUT'])
 @jwt_required()
 def update_campaign(campaign_id):
-    """Update a campaign with Campaign Brief fields (owner only)"""
+    """Update campaign"""
     try:
-        user_id = int(get_jwt_identity())
+        user_id = get_jwt_identity()
         brand = BrandProfile.query.filter_by(user_id=user_id).first()
 
-        campaign = Campaign.query.get(campaign_id)
-        if not campaign:
-            return jsonify({'error': 'Campaign not found'}), 404
+        if not brand:
+            return jsonify({'error': 'Brand profile not found'}), 404
 
-        if campaign.brand_id != brand.id:
-            return jsonify({'error': 'Unauthorized'}), 403
+        campaign = Campaign.query.get(campaign_id)
+        if not campaign or campaign.brand_id != brand.id:
+            return jsonify({'error': 'Campaign not found'}), 404
 
         data = request.get_json()
 
-        # Basic fields
-        updatable_fields = ['title', 'description', 'objectives', 'budget',
-                          'start_date', 'end_date', 'status', 'requirements', 'category']
+        # Update basic fields
+        if 'title' in data:
+            campaign.title = data['title']
+        if 'description' in data:
+            campaign.description = data['description']
+        if 'category' in data:
+            campaign.category = data['category']
+        if 'campaign_objective' in data:
+            campaign.campaign_objective = data['campaign_objective']
+        if 'target_audience' in data:
+            campaign.target_audience = data['target_audience']
+        if 'content_guidelines' in data:
+            campaign.content_guidelines = data['content_guidelines']
+        if 'status' in data:
+            campaign.status = data['status']
+        if 'target_categories' in data:
+            campaign.target_categories = data['target_categories']
+        if 'target_locations' in data:
+            campaign.target_locations = data['target_locations']
 
-        # Campaign Brief fields
-        campaign_brief_fields = ['campaign_objective', 'target_audience', 'key_message',
-                                'required_mentions', 'content_guidelines']
+        # CRITICAL: Convert empty strings to None for integer fields
+        if 'target_min_followers' in data:
+            val = data['target_min_followers']
+            campaign.target_min_followers = None if (val == '' or val is None) else int(val)
+        if 'target_max_followers' in data:
+            val = data['target_max_followers']
+            campaign.target_max_followers = None if (val == '' or val is None) else int(val)
+        if 'timeline_days' in data:
+            val = data.get('timeline_days')
+            campaign.timeline_days = None if (val == '' or val is None) else int(val)
 
-        # Participation and budget fields
-        participation_fields = ['participation_mode', 'allows_applications',
-                              'budget_min', 'budget_max', 'timeline_days', 'application_deadline']
+        # Update dates
+        if 'start_date' in data:
+            campaign.start_date = datetime.fromisoformat(data['start_date'].replace('Z', '+00:00'))
+        if 'end_date' in data:
+            campaign.end_date = datetime.fromisoformat(data['end_date'].replace('Z', '+00:00'))
+        if 'application_deadline' in data:
+            if data['application_deadline']:
+                campaign.application_deadline = datetime.fromisoformat(data['application_deadline'].replace('Z', '+00:00'))
+            else:
+                campaign.application_deadline = None
 
-        # Targeting fields
-        targeting_fields = ['target_categories', 'target_min_followers',
-                           'target_max_followers', 'target_locations']
+        # Update budget fields (based on participation mode)
+        if 'budget' in data and data['budget']:
+            campaign.budget = Decimal(str(data['budget']))
+        if 'budget_min' in data and data['budget_min']:
+            campaign.budget_min = Decimal(str(data['budget_min']))
+        if 'budget_max' in data and data['budget_max']:
+            campaign.budget_max = Decimal(str(data['budget_max']))
 
-        # Advanced fields
-        advanced_fields = ['allows_packages', 'requires_milestones']
-
-        all_fields = updatable_fields + campaign_brief_fields + participation_fields + targeting_fields + advanced_fields
-
-        for field in all_fields:
-            if field in data:
-                if field in ['start_date', 'end_date', 'application_deadline']:
-                    setattr(campaign, field, datetime.fromisoformat(data[field].replace('Z', '+00:00')))
-                else:
-                    setattr(campaign, field, data[field])
-
-        # Handle milestones updates if provided
-        if 'milestones' in data:
-            # Delete existing milestones
-            CampaignMilestone.query.filter_by(campaign_id=campaign_id).delete()
-
-            # Create new milestones
-            for idx, milestone_data in enumerate(data['milestones'], start=1):
-                milestone = CampaignMilestone(
-                    campaign_id=campaign.id,
-                    milestone_number=idx,
-                    name=milestone_data['name'],
-                    description=milestone_data.get('description'),
-                    deliverables=milestone_data.get('deliverables', []),
-                    duration_days=milestone_data.get('duration_days'),
-                    due_date=datetime.fromisoformat(milestone_data['due_date'].replace('Z', '+00:00')) if 'due_date' in milestone_data else None,
-                    budget_allocation=milestone_data.get('budget_allocation')  # NEW: Budget for this milestone
-                )
-                db.session.add(milestone)
-
+        campaign.updated_at = datetime.now(timezone.utc)
         db.session.commit()
 
         return jsonify({
             'message': 'Campaign updated successfully',
-            'campaign': campaign.to_dict(include_milestones=True)
+            'campaign': campaign.to_dict()
         }), 200
 
     except Exception as e:
         db.session.rollback()
+        print(f"Error updating campaign: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 
 @bp.route('/<int:campaign_id>', methods=['DELETE'])
 @jwt_required()
 def delete_campaign(campaign_id):
-    """Delete a campaign (owner only)"""
+    """Delete campaign"""
     try:
-        user_id = int(get_jwt_identity())
+        user_id = get_jwt_identity()
         brand = BrandProfile.query.filter_by(user_id=user_id).first()
 
-        campaign = Campaign.query.get(campaign_id)
-        if not campaign:
-            return jsonify({'error': 'Campaign not found'}), 404
+        if not brand:
+            return jsonify({'error': 'Brand profile not found'}), 404
 
-        if campaign.brand_id != brand.id:
-            return jsonify({'error': 'Unauthorized'}), 403
+        campaign = Campaign.query.get(campaign_id)
+        if not campaign or campaign.brand_id != brand.id:
+            return jsonify({'error': 'Campaign not found'}), 404
 
         db.session.delete(campaign)
         db.session.commit()
@@ -311,237 +324,72 @@ def delete_campaign(campaign_id):
 
     except Exception as e:
         db.session.rollback()
+        print(f"Error deleting campaign: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 
-# ============= CAMPAIGN PACKAGES MANAGEMENT =============
-
-@bp.route('/<int:campaign_id>/packages', methods=['POST'])
-@jwt_required()
-def add_package_to_campaign(campaign_id):
-    """Add a package to a campaign (brand owner only) - creates a collaboration"""
-    try:
-        user_id = int(get_jwt_identity())
-        brand = BrandProfile.query.filter_by(user_id=user_id).first()
-
-        campaign = Campaign.query.get(campaign_id)
-        if not campaign:
-            return jsonify({'error': 'Campaign not found'}), 404
-
-        if campaign.brand_id != brand.id:
-            return jsonify({'error': 'Unauthorized'}), 403
-
-        data = request.get_json()
-        package_id = data.get('package_id')
-
-        if not package_id:
-            return jsonify({'error': 'Package ID is required'}), 400
-
-        package = Package.query.get(package_id)
-        if not package:
-            return jsonify({'error': 'Package not found'}), 404
-
-        # Check if package is already in campaign
-        if package in campaign.packages.all():
-            return jsonify({'error': 'Package already added to campaign'}), 400
-
-        campaign.packages.append(package)
-
-        # Create booking first (required for payment processing)
-        booking = Booking(
-            package_id=package.id,
-            campaign_id=campaign.id,
-            creator_id=package.creator_id,
-            brand_id=brand.id,
-            amount=package.price,
-            total_price=package.price,
-            status='pending',  # Will be 'accepted' after payment
-            payment_status='pending',  # User needs to pay
-            payment_reference=f"PKG_{package.id}_C{campaign.id}_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
-        )
-        db.session.add(booking)
-        db.session.flush()  # Get booking.id
-
-        # Create collaboration linked to booking
-        collaboration = Collaboration(
-            collaboration_type='package',
-            booking_id=booking.id,
-            brand_id=brand.id,
-            creator_id=package.creator_id,
-            title=f"{campaign.title} - {package.title}",
-            description=package.description,
-            amount=package.price,
-            deliverables=package.deliverables or [],
-            start_date=campaign.start_date,
-            expected_completion_date=campaign.end_date,
-            status='pending_payment',  # Changed from 'in_progress' until payment
-            progress_percentage=0,
-            notes=f"Package added to campaign: {campaign.title}"
-        )
-        db.session.add(collaboration)
-
-        db.session.commit()
-
-        return jsonify({
-            'message': 'Package added to campaign successfully',
-            'package': package.to_dict(),
-            'collaboration': collaboration.to_dict(),
-            'booking_id': booking.id,
-            'requires_payment': True
-        }), 200
-
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'error': str(e)}), 500
-
-
-@bp.route('/<int:campaign_id>/packages/<int:package_id>', methods=['DELETE'])
-@jwt_required()
-def remove_package_from_campaign(campaign_id, package_id):
-    """Remove a package from a campaign (brand owner only)"""
-    try:
-        user_id = int(get_jwt_identity())
-        brand = BrandProfile.query.filter_by(user_id=user_id).first()
-
-        campaign = Campaign.query.get(campaign_id)
-        if not campaign:
-            return jsonify({'error': 'Campaign not found'}), 404
-
-        if campaign.brand_id != brand.id:
-            return jsonify({'error': 'Unauthorized'}), 403
-
-        package = Package.query.get(package_id)
-        if not package:
-            return jsonify({'error': 'Package not found'}), 404
-
-        if package not in campaign.packages.all():
-            return jsonify({'error': 'Package not in campaign'}), 400
-
-        campaign.packages.remove(package)
-        db.session.commit()
-
-        return jsonify({'message': 'Package removed from campaign successfully'}), 200
-
-    except Exception as e:
-        db.session.rollback()
-        return jsonify({'error': str(e)}), 500
-
-
-@bp.route('/<int:campaign_id>/packages', methods=['GET'])
-def get_campaign_packages(campaign_id):
-    """Get all packages in a campaign"""
-    try:
-        campaign = Campaign.query.get(campaign_id)
-        if not campaign:
-            return jsonify({'error': 'Campaign not found'}), 404
-
-        packages = [pkg.to_dict() for pkg in campaign.packages.all()]
-
-        return jsonify({
-            'packages': packages,
-            'count': len(packages)
-        }), 200
-
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-
-# ============= CAMPAIGN APPLICATIONS (CREATORS) =============
+# ========================================
+# CREATOR ENDPOINTS - Browse Opportunities
+# ========================================
 
 @bp.route('/browse', methods=['GET'])
 @jwt_required()
 def browse_campaigns():
-    """Get all active campaigns for creators to browse (Opportunities)"""
+    """
+    Creator browsing active campaigns (opportunities)
+    CRITICAL: Use timezone-aware datetime for comparisons
+    """
     try:
-        user_id = int(get_jwt_identity())
-        creator = CreatorProfile.query.filter_by(user_id=user_id).first()
+        # Get current time (timezone-aware)
+        now = datetime.now(timezone.utc)
 
-        if not creator:
-            return jsonify({'error': 'Creator profile not found'}), 404
+        # Base query: active campaigns only
+        query = Campaign.query.filter_by(status='active')
 
-        page = request.args.get('page', 1, type=int)
-        per_page = request.args.get('per_page', 12, type=int)
+        # Filter by participation mode
+        participation_mode = request.args.get('mode')
+        if participation_mode == 'packages':
+            query = query.filter_by(allows_packages=True)
+        elif participation_mode == 'proposals':
+            query = query.filter_by(allows_applications=True)
+            # Only show campaigns with deadline in future or no deadline
+            query = query.filter(
+                or_(
+                    Campaign.application_deadline == None,
+                    Campaign.application_deadline > now  # CRITICAL: timezone-aware comparison
+                )
+            )
+
+        # Filter by category
         category = request.args.get('category')
-
-        # Get active campaigns that allow applications (proposals mode or allows_applications=true)
-        # Also filter out campaigns where application deadline has passed
-        query = Campaign.query.filter_by(status='active').filter(
-            db.or_(
-                Campaign.participation_mode == 'proposals',
-                Campaign.allows_applications == True
-            )
-        ).filter(
-            db.or_(
-                Campaign.application_deadline == None,
-                Campaign.application_deadline > datetime.utcnow()
-            )
-        )
-
         if category:
-            query = query.filter_by(category=category)
+            query = query.filter(Campaign.target_categories.contains([category]))
 
-        # Apply intelligent filtering based on creator profile
-        # Filter by target categories if campaign has them
-        if creator.category:
-            # Show campaigns that either have no target categories or include creator's category
-            query = query.filter(
-                db.or_(
-                    Campaign.target_categories == None,
-                    Campaign.target_categories == [],
-                    Campaign.target_categories.contains([creator.category])
-                )
-            )
+        # Filter by location
+        location = request.args.get('location')
+        if location:
+            query = query.filter(Campaign.target_locations.contains([location]))
 
-        # Filter by follower count if campaign has follower requirements
-        creator_total_followers = getattr(creator, 'total_followers', 0)
-        if creator_total_followers > 0:
-            query = query.filter(
-                db.or_(
-                    db.and_(
-                        Campaign.target_min_followers == None,
-                        Campaign.target_max_followers == None
-                    ),
-                    db.and_(
-                        db.or_(Campaign.target_min_followers == None, Campaign.target_min_followers <= creator_total_followers),
-                        db.or_(Campaign.target_max_followers == None, Campaign.target_max_followers >= creator_total_followers)
-                    )
-                )
-            )
-
-        pagination = query.order_by(Campaign.created_at.desc()).paginate(
-            page=page, per_page=per_page, error_out=False
-        )
-
-        campaigns = []
-        for campaign in pagination.items:
-            campaign_dict = campaign.to_dict(include_brand=True, include_milestones=True)
-            # Check if creator has already applied
-            existing_app = CampaignProposal.query.filter_by(
-                campaign_id=campaign.id,
-                creator_id=creator.id
-            ).first()
-            campaign_dict['has_applied'] = existing_app is not None
-            if existing_app:
-                campaign_dict['application_status'] = existing_app.status
-            campaigns.append(campaign_dict)
+        campaigns = query.order_by(Campaign.created_at.desc()).all()
 
         return jsonify({
-            'campaigns': campaigns,
-            'total': pagination.total,
-            'pages': pagination.pages,
-            'current_page': page
+            'campaigns': [c.to_dict(include_brand=True) for c in campaigns]
         }), 200
 
     except Exception as e:
+        print(f"Error browsing campaigns: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 
 @bp.route('/<int:campaign_id>/apply', methods=['POST'])
 @jwt_required()
 def apply_to_campaign(campaign_id):
-    """Submit a proposal to a campaign (creators only) with pricing, deliverables, and timeline"""
+    """
+    Creator applies to campaign (creates proposal)
+    CRITICAL: Use timezone-aware datetime for deadline check
+    """
     try:
-        user_id = int(get_jwt_identity())
+        user_id = get_jwt_identity()
         creator = CreatorProfile.query.filter_by(user_id=user_id).first()
 
         if not creator:
@@ -552,264 +400,465 @@ def apply_to_campaign(campaign_id):
             return jsonify({'error': 'Campaign not found'}), 404
 
         if campaign.status != 'active':
-            return jsonify({'error': 'Campaign is not accepting applications'}), 400
+            return jsonify({'error': 'Campaign is not active'}), 400
 
-        # Check if campaign allows applications
         if not campaign.allows_applications:
-            return jsonify({'error': 'This campaign is not accepting proposals'}), 400
+            return jsonify({'error': 'Campaign does not accept applications'}), 400
+
+        # Check application deadline (timezone-aware comparison)
+        if campaign.application_deadline:
+            now = datetime.now(timezone.utc)
+            if now > campaign.application_deadline:
+                return jsonify({'error': 'Application deadline has passed'}), 400
 
         # Check if already applied
-        existing_proposal = CampaignProposal.query.filter_by(
+        existing = CampaignProposal.query.filter_by(
             campaign_id=campaign_id,
             creator_id=creator.id
         ).first()
 
-        if existing_proposal:
-            return jsonify({'error': 'Already applied to this campaign'}), 400
+        if existing:
+            return jsonify({'error': 'You have already applied to this campaign'}), 400
 
         data = request.get_json()
 
-        # Validate required fields
-        if 'proposed_price' not in data:
+        # Parse proposed price (no rounding!)
+        if not data.get('proposed_price'):
             return jsonify({'error': 'Proposed price is required'}), 400
 
-        if 'deliverables' not in data or not data['deliverables']:
-            return jsonify({'error': 'At least one deliverable is required'}), 400
+        proposed_price = Decimal(str(data['proposed_price']))
 
-        # Validate proposed price is within budget range (if campaign has budget range)
-        proposed_price = float(data['proposed_price'])
-        if campaign.budget_min and proposed_price < float(campaign.budget_min):
+        # Validate price is within budget range
+        if campaign.budget_min and proposed_price < campaign.budget_min:
             return jsonify({'error': f'Proposed price must be at least ${campaign.budget_min}'}), 400
-        if campaign.budget_max and proposed_price > float(campaign.budget_max):
-            return jsonify({'error': f'Proposed price must not exceed ${campaign.budget_max}'}), 400
+        if campaign.budget_max and proposed_price > campaign.budget_max:
+            return jsonify({'error': f'Proposed price cannot exceed ${campaign.budget_max}'}), 400
 
-        # Create proposal with new fields
+        # Create proposal
         proposal = CampaignProposal(
             campaign_id=campaign_id,
             creator_id=creator.id,
-            proposal_message=data.get('message', ''),  # Renamed from application_message
+            status='pending',
             proposed_price=proposed_price,
-            deliverables=data['deliverables'],  # List of deliverables
-            delivery_timeline_days=data.get('delivery_timeline_days'),  # New field
-            status='pending'
+            proposal_message=data.get('proposal_message'),
+            deliverables=data.get('deliverables'),
+            delivery_timeline_days=data.get('delivery_timeline_days')
         )
 
         db.session.add(proposal)
         db.session.commit()
 
-        # Notify brand of new proposal
-        brand_user = User.query.get(campaign.brand.user_id)
-        if brand_user:
-            notify_campaign_application(
-                brand_id=brand_user.id,
-                creator_name=creator.user.email if hasattr(creator.user, 'email') else 'A creator',
-                campaign_id=campaign.id
-            )
-
         return jsonify({
-            'message': 'Proposal submitted successfully',
-            'proposal': proposal.to_dict(include_relations=True)
+            'message': 'Application submitted successfully',
+            'proposal': proposal.to_dict()
         }), 201
 
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': str(e)}), 500
-
-
-@bp.route('/<int:campaign_id>/applications', methods=['GET'])
-@jwt_required()
-def get_campaign_applications(campaign_id):
-    """Get all applications for a campaign (brand owner only)"""
-    try:
-        user_id = int(get_jwt_identity())
-        brand = BrandProfile.query.filter_by(user_id=user_id).first()
-
-        campaign = Campaign.query.get(campaign_id)
-        if not campaign:
-            return jsonify({'error': 'Campaign not found'}), 404
-
-        if campaign.brand_id != brand.id:
-            return jsonify({'error': 'Unauthorized'}), 403
-
-        # Get applications with details
-        applications = CampaignApplication.query.filter_by(
-            campaign_id=campaign_id
-        ).order_by(CampaignApplication.applied_at.desc()).all()
-
-        result = [app.to_dict(include_relations=True) for app in applications]
-
-        return jsonify({
-            'applications': result,
-            'count': len(result)
-        }), 200
-
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-
-@bp.route('/<int:campaign_id>/applications/<int:application_id>', methods=['GET'])
-@jwt_required()
-def get_application_details(campaign_id, application_id):
-    """Get details of a specific campaign application"""
-    try:
-        user_id = int(get_jwt_identity())
-        brand = BrandProfile.query.filter_by(user_id=user_id).first()
-
-        campaign = Campaign.query.get(campaign_id)
-        if not campaign:
-            return jsonify({'error': 'Campaign not found'}), 404
-
-        if campaign.brand_id != brand.id:
-            return jsonify({'error': 'Unauthorized'}), 403
-
-        application = CampaignApplication.query.get(application_id)
-        if not application or application.campaign_id != campaign_id:
-            return jsonify({'error': 'Application not found'}), 404
-
-        return jsonify(application.to_dict(include_relations=True)), 200
-
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-
-@bp.route('/<int:campaign_id>/applications/<int:application_id>', methods=['PATCH'])
-@jwt_required()
-def update_application_status(campaign_id, application_id):
-    """Accept or reject a campaign proposal with brand notes (brand owner only)"""
-    try:
-        user_id = int(get_jwt_identity())
-        brand = BrandProfile.query.filter_by(user_id=user_id).first()
-
-        campaign = Campaign.query.get(campaign_id)
-        if not campaign:
-            return jsonify({'error': 'Campaign not found'}), 404
-
-        if campaign.brand_id != brand.id:
-            return jsonify({'error': 'Unauthorized'}), 403
-
-        proposal = CampaignProposal.query.get(application_id)
-        if not proposal or proposal.campaign_id != campaign_id:
-            return jsonify({'error': 'Proposal not found'}), 404
-
-        data = request.get_json()
-        status = data.get('status')
-
-        if status not in ['accepted', 'rejected']:
-            return jsonify({'error': 'Invalid status'}), 400
-
-        # Update proposal status with new fields
-        proposal.status = status
-        proposal.brand_notes = data.get('brand_notes', '')  # New field for brand feedback
-        proposal.reviewed_at = datetime.utcnow()  # New field to track when reviewed
-        proposal.updated_at = datetime.utcnow()
-
-        # If accepted, create a booking and collaboration
-        if status == 'accepted':
-            # Check if collaboration already exists
-            existing_collab = Collaboration.query.filter_by(
-                campaign_application_id=application_id
-            ).first()
-
-            if not existing_collab:
-                # Create booking first (required for payment processing)
-                booking = Booking(
-                    campaign_id=campaign.id,
-                    creator_id=proposal.creator_id,
-                    brand_id=brand.id,
-                    amount=proposal.proposed_price,
-                    total_price=proposal.proposed_price,
-                    status='pending',  # Will be 'accepted' after payment
-                    payment_status='pending',  # User needs to pay
-                    payment_reference=f"PROP_{application_id}_{datetime.utcnow().strftime('%Y%m%d%H%M%S')}"
-                )
-                db.session.add(booking)
-                db.session.flush()  # Get booking.id
-
-                # Create collaboration linked to booking
-                collaboration = Collaboration(
-                    collaboration_type='campaign',
-                    campaign_application_id=application_id,
-                    booking_id=booking.id,
-                    brand_id=brand.id,
-                    creator_id=proposal.creator_id,
-                    title=campaign.title,
-                    description=campaign.description,
-                    amount=proposal.proposed_price,
-                    deliverables=proposal.deliverables,
-                    start_date=campaign.start_date,
-                    expected_completion_date=campaign.end_date,
-                    status='pending_payment',  # Changed from 'in_progress' until payment
-                    progress_percentage=0
-                )
-                db.session.add(collaboration)
-
-                # Return booking_id in response for payment processing
-                booking_id = booking.id
-
-        db.session.commit()
-
-        # Notify creator of proposal status change
-        creator_user = User.query.get(proposal.creator.user_id)
-        if creator_user:
-            notify_campaign_status(
-                user_id=creator_user.id,
-                status=status,
-                campaign_name=campaign.title,
-                campaign_id=campaign.id
-            )
-
-        response_data = {
-            'message': f'Proposal {status} successfully',
-            'proposal': proposal.to_dict(include_relations=True)
-        }
-
-        # Include booking_id if proposal was accepted (for payment flow)
-        if status == 'accepted' and 'booking_id' in locals():
-            response_data['booking_id'] = booking_id
-            response_data['requires_payment'] = True
-
-        return jsonify(response_data), 200
-
-    except Exception as e:
-        db.session.rollback()
+        print(f"Error applying to campaign: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 
 @bp.route('/my-applications', methods=['GET'])
 @jwt_required()
 def get_my_applications():
-    """Get all campaign applications for the logged-in creator"""
+    """Get creator's campaign applications"""
     try:
-        user_id = int(get_jwt_identity())
+        user_id = get_jwt_identity()
         creator = CreatorProfile.query.filter_by(user_id=user_id).first()
 
         if not creator:
             return jsonify({'error': 'Creator profile not found'}), 404
 
-        # Get limit parameter for dashboard (default all applications)
-        limit = request.args.get('limit', type=int)
-        status_filter = request.args.get('status')
+        # Get filter parameters
+        status = request.args.get('status')
 
-        # Query applications with campaign details
-        query = CampaignApplication.query.filter_by(creator_id=creator.id)
+        query = CampaignProposal.query.filter_by(creator_id=creator.id)
 
-        if status_filter:
-            query = query.filter_by(status=status_filter)
+        if status:
+            query = query.filter_by(status=status)
 
-        query = query.order_by(CampaignApplication.applied_at.desc())
-
-        if limit:
-            query = query.limit(limit)
-
-        applications = query.all()
-
-        # Return applications with full campaign details
-        result = [app.to_dict(include_relations=True) for app in applications]
+        proposals = query.order_by(CampaignProposal.applied_at.desc()).all()
 
         return jsonify({
-            'applications': result,
-            'count': len(result)
+            'applications': [p.to_dict(include_campaign=True) for p in proposals]
         }), 200
 
     except Exception as e:
+        print(f"Error fetching applications: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+
+# ========================================
+# BRAND ENDPOINTS - Manage Proposals
+# ========================================
+
+@bp.route('/<int:campaign_id>/proposals', methods=['GET'])
+@jwt_required()
+def get_campaign_proposals(campaign_id):
+    """Brand views proposals for their campaign"""
+    try:
+        user_id = get_jwt_identity()
+        brand = BrandProfile.query.filter_by(user_id=user_id).first()
+
+        if not brand:
+            return jsonify({'error': 'Brand profile not found'}), 404
+
+        campaign = Campaign.query.get(campaign_id)
+        if not campaign or campaign.brand_id != brand.id:
+            return jsonify({'error': 'Campaign not found'}), 404
+
+        proposals = CampaignProposal.query.filter_by(campaign_id=campaign_id).order_by(
+            CampaignProposal.applied_at.desc()
+        ).all()
+
+        return jsonify({
+            'proposals': [p.to_dict(include_creator=True) for p in proposals]
+        }), 200
+
+    except Exception as e:
+        print(f"Error fetching proposals: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+
+@bp.route('/proposals/<int:proposal_id>/accept', methods=['POST'])
+@jwt_required()
+def accept_proposal(proposal_id):
+    """
+    Brand accepts proposal - CREATES BOOKING (not collaboration yet)
+    Collaboration only created after payment confirmed
+    """
+    try:
+        user_id = get_jwt_identity()
+        brand = BrandProfile.query.filter_by(user_id=user_id).first()
+
+        if not brand:
+            return jsonify({'error': 'Brand profile not found'}), 404
+
+        proposal = CampaignProposal.query.get(proposal_id)
+        if not proposal:
+            return jsonify({'error': 'Proposal not found'}), 404
+
+        if proposal.campaign.brand_id != brand.id:
+            return jsonify({'error': 'Unauthorized'}), 403
+
+        if proposal.status != 'pending':
+            return jsonify({'error': 'Proposal already processed'}), 400
+
+        # Create booking (payment required before collaboration)
+        booking = Booking(
+            booking_type='campaign_proposal',
+            brand_id=brand.id,
+            creator_id=proposal.creator_id,
+            campaign_id=proposal.campaign_id,
+            amount=proposal.proposed_price,
+            total_price=proposal.proposed_price,
+            status='pending',
+            payment_status='pending',
+            payment_method='paynow',
+            notes=f"Campaign proposal for: {proposal.campaign.title}"
+        )
+
+        db.session.add(booking)
+        db.session.flush()  # Get booking.id
+
+        # Link booking to proposal
+        proposal.booking_id = booking.id
+        proposal.status = 'awaiting_payment'
+
+        db.session.commit()
+
+        return jsonify({
+            'message': 'Booking created. Please proceed to payment.',
+            'booking_id': booking.id,
+            'redirect_to': f'/bookings/{booking.id}/payment'
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error accepting proposal: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@bp.route('/proposals/<int:proposal_id>/complete-payment', methods=['POST'])
+@jwt_required()
+def complete_proposal_payment(proposal_id):
+    """
+    Called AFTER payment confirmed - Creates collaboration
+    """
+    try:
+        proposal = CampaignProposal.query.get(proposal_id)
+        if not proposal:
+            return jsonify({'error': 'Proposal not found'}), 404
+
+        if not proposal.booking_id:
+            return jsonify({'error': 'No booking found'}), 400
+
+        booking = Booking.query.get(proposal.booking_id)
+        if booking.payment_status not in ['paid', 'verified']:
+            return jsonify({'error': 'Payment not confirmed'}), 400
+
+        # Update proposal status
+        proposal.status = 'accepted'
+        proposal.reviewed_at = datetime.now(timezone.utc)
+
+        # Create collaboration NOW (after payment)
+        collaboration = Collaboration(
+            collaboration_type='campaign',
+            campaign_id=proposal.campaign_id,
+            booking_id=booking.id,
+            brand_id=proposal.campaign.brand_id,
+            creator_id=proposal.creator_id,
+            title=proposal.campaign.title,
+            description=proposal.campaign.description,
+            amount=proposal.proposed_price,
+            deliverables=proposal.deliverables,
+            start_date=proposal.campaign.start_date,
+            expected_completion_date=proposal.campaign.end_date,
+            status='in_progress',
+            progress_percentage=0
+        )
+
+        db.session.add(collaboration)
+        db.session.commit()
+
+        return jsonify({
+            'message': 'Payment confirmed, collaboration started',
+            'collaboration_id': collaboration.id
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error completing proposal payment: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@bp.route('/proposals/<int:proposal_id>/reject', methods=['POST'])
+@jwt_required()
+def reject_proposal(proposal_id):
+    """Brand rejects proposal"""
+    try:
+        user_id = get_jwt_identity()
+        brand = BrandProfile.query.filter_by(user_id=user_id).first()
+
+        if not brand:
+            return jsonify({'error': 'Brand profile not found'}), 404
+
+        proposal = CampaignProposal.query.get(proposal_id)
+        if not proposal:
+            return jsonify({'error': 'Proposal not found'}), 404
+
+        if proposal.campaign.brand_id != brand.id:
+            return jsonify({'error': 'Unauthorized'}), 403
+
+        if proposal.status != 'pending':
+            return jsonify({'error': 'Proposal already processed'}), 400
+
+        data = request.get_json()
+
+        proposal.status = 'rejected'
+        proposal.brand_notes = data.get('brand_notes')
+        proposal.reviewed_at = datetime.now(timezone.utc)
+
+        db.session.commit()
+
+        return jsonify({
+            'message': 'Proposal rejected'
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error rejecting proposal: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+
+# ========================================
+# BRAND ENDPOINTS - Package Management
+# ========================================
+
+@bp.route('/<int:campaign_id>/packages', methods=['POST'])
+@jwt_required()
+def add_package_to_campaign(campaign_id):
+    """
+    Brand adds package to campaign - CREATES BOOKING (not collaboration yet)
+    """
+    try:
+        user_id = get_jwt_identity()
+        brand = BrandProfile.query.filter_by(user_id=user_id).first()
+
+        if not brand:
+            return jsonify({'error': 'Brand profile not found'}), 404
+
+        campaign = Campaign.query.get(campaign_id)
+        if not campaign or campaign.brand_id != brand.id:
+            return jsonify({'error': 'Campaign not found'}), 404
+
+        if not campaign.allows_packages:
+            return jsonify({'error': 'Campaign does not allow packages'}), 400
+
+        data = request.get_json()
+        package_id = data.get('package_id')
+
+        package = Package.query.get(package_id)
+        if not package:
+            return jsonify({'error': 'Package not found'}), 404
+
+        # Check if already added
+        if package in campaign.packages:
+            return jsonify({'error': 'Package already added to campaign'}), 400
+
+        # Create booking (payment required before adding package)
+        booking = Booking(
+            booking_type='campaign_package',
+            package_id=package.id,
+            campaign_id=campaign.id,
+            brand_id=brand.id,
+            creator_id=package.creator_id,
+            amount=package.price,
+            total_price=package.price,
+            status='pending',
+            payment_status='pending',
+            payment_method='paynow',
+            notes=f"Package '{package.title}' for campaign: {campaign.title}"
+        )
+
+        db.session.add(booking)
+        db.session.commit()
+
+        return jsonify({
+            'message': 'Booking created. Please proceed to payment.',
+            'booking_id': booking.id,
+            'redirect_to': f'/bookings/{booking.id}/payment'
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error adding package to campaign: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@bp.route('/<int:campaign_id>/packages/<int:package_id>/complete-payment', methods=['POST'])
+@jwt_required()
+def complete_package_payment(campaign_id, package_id):
+    """
+    Called AFTER payment confirmed - Adds package and creates collaboration
+    """
+    try:
+        data = request.get_json()
+        booking_id = data.get('booking_id')
+
+        booking = Booking.query.get(booking_id)
+        if not booking or booking.payment_status not in ['paid', 'verified']:
+            return jsonify({'error': 'Payment not confirmed'}), 400
+
+        campaign = Campaign.query.get(campaign_id)
+        package = Package.query.get(package_id)
+
+        if not campaign or not package:
+            return jsonify({'error': 'Campaign or package not found'}), 404
+
+        # Add package to campaign NOW (after payment)
+        campaign.packages.append(package)
+
+        # Update association table with booking_id
+        db.session.execute(text("""
+            UPDATE campaign_packages
+            SET booking_id = :booking_id
+            WHERE campaign_id = :campaign_id AND package_id = :package_id
+        """), {'booking_id': booking_id, 'campaign_id': campaign_id, 'package_id': package_id})
+
+        # Create collaboration
+        collaboration = Collaboration(
+            collaboration_type='package',
+            campaign_id=campaign_id,
+            package_id=package_id,
+            booking_id=booking.id,
+            brand_id=campaign.brand_id,
+            creator_id=package.creator_id,
+            title=f"{campaign.title} - {package.title}",
+            description=package.description,
+            amount=package.price,
+            deliverables=package.deliverables or [],
+            start_date=campaign.start_date,
+            expected_completion_date=campaign.end_date,
+            status='in_progress',
+            progress_percentage=0
+        )
+
+        db.session.add(collaboration)
+        db.session.commit()
+
+        return jsonify({
+            'message': 'Payment confirmed, package added to campaign',
+            'collaboration_id': collaboration.id
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error completing package payment: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@bp.route('/<int:campaign_id>/packages', methods=['GET'])
+@jwt_required()
+def get_campaign_packages(campaign_id):
+    """Get packages added to campaign"""
+    try:
+        campaign = Campaign.query.get(campaign_id)
+        if not campaign:
+            return jsonify({'error': 'Campaign not found'}), 404
+
+        packages = [p.to_dict() for p in campaign.packages]
+
+        return jsonify({
+            'packages': packages
+        }), 200
+
+    except Exception as e:
+        print(f"Error fetching campaign packages: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+
+@bp.route('/<int:campaign_id>/packages/<int:package_id>', methods=['DELETE'])
+@jwt_required()
+def remove_package_from_campaign(campaign_id, package_id):
+    """Remove package from campaign"""
+    try:
+        user_id = get_jwt_identity()
+        brand = BrandProfile.query.filter_by(user_id=user_id).first()
+
+        if not brand:
+            return jsonify({'error': 'Brand profile not found'}), 404
+
+        campaign = Campaign.query.get(campaign_id)
+        if not campaign or campaign.brand_id != brand.id:
+            return jsonify({'error': 'Campaign not found'}), 404
+
+        package = Package.query.get(package_id)
+        if not package:
+            return jsonify({'error': 'Package not found'}), 404
+
+        if package not in campaign.packages:
+            return jsonify({'error': 'Package not in campaign'}), 400
+
+        campaign.packages.remove(package)
+        db.session.commit()
+
+        return jsonify({
+            'message': 'Package removed from campaign'
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error removing package: {str(e)}")
         return jsonify({'error': str(e)}), 500

@@ -1,23 +1,26 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { campaignsAPI } from '../services/api';
 import Navbar from '../components/Navbar';
 import toast from 'react-hot-toast';
 
 const Campaigns = () => {
+  const navigate = useNavigate();
   const [campaigns, setCampaigns] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all'); // all, draft, active, paused, completed
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
 
   useEffect(() => {
     fetchCampaigns();
-  }, []);
+  }, [filter]);
 
   const fetchCampaigns = async () => {
     try {
       setLoading(true);
-      const response = await campaignsAPI.getCampaigns();
-      setCampaigns(response.data.campaigns || []);
+      const params = filter !== 'all' ? { status: filter } : {};
+      const response = await campaignsAPI.getCampaigns(params);
+      setCampaigns(response.data.campaigns);
     } catch (error) {
       console.error('Error fetching campaigns:', error);
       toast.error('Failed to load campaigns');
@@ -29,22 +32,19 @@ const Campaigns = () => {
   const handleStatusChange = async (campaignId, newStatus) => {
     try {
       await campaignsAPI.updateCampaign(campaignId, { status: newStatus });
-      toast.success(`Campaign status updated to ${newStatus}`);
+      toast.success(`Campaign ${newStatus === 'active' ? 'published' : newStatus}`);
       fetchCampaigns();
     } catch (error) {
-      console.error('Error updating campaign status:', error);
+      console.error('Error updating campaign:', error);
       toast.error('Failed to update campaign status');
     }
   };
 
   const handleDelete = async (campaignId) => {
-    if (!window.confirm('Are you sure you want to delete this campaign?')) {
-      return;
-    }
-
     try {
       await campaignsAPI.deleteCampaign(campaignId);
       toast.success('Campaign deleted successfully');
+      setDeleteConfirm(null);
       fetchCampaigns();
     } catch (error) {
       console.error('Error deleting campaign:', error);
@@ -52,27 +52,28 @@ const Campaigns = () => {
     }
   };
 
-  const getStatusColor = (status) => {
-    const colors = {
-      draft: 'bg-gray-100 text-gray-800',
-      active: 'bg-primary/20 text-primary-dark',
-      paused: 'bg-primary/20 text-primary-dark',
-      completed: 'bg-primary/20 text-primary-dark',
-      cancelled: 'bg-red-100 text-red-800'
-    };
-    return colors[status] || 'bg-gray-100 text-gray-800';
+  const getStatusBadgeClass = (status) => {
+    switch (status) {
+      case 'draft':
+        return 'bg-gray-100 text-gray-700';
+      case 'active':
+        return 'bg-green-100 text-green-700';
+      case 'paused':
+        return 'bg-yellow-100 text-yellow-700';
+      case 'completed':
+        return 'bg-blue-100 text-blue-700';
+      default:
+        return 'bg-gray-100 text-gray-700';
+    }
   };
 
-  const filteredCampaigns = campaigns.filter(campaign => {
-    if (filter === 'all') return true;
-    return campaign.status === filter;
-  });
+  const filteredCampaigns = campaigns;
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-light">
+      <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-blue-50">
         <Navbar />
-        <div className="flex items-center justify-center h-screen">
+        <div className="flex items-center justify-center h-96">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
         </div>
       </div>
@@ -80,203 +81,165 @@ const Campaigns = () => {
   }
 
   return (
-    <div className="min-h-screen bg-light">
+    <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-blue-50">
       <Navbar />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 py-8">
         {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">My Campaigns</h1>
-              <p className="text-gray-600 mt-1">Create and manage your marketing campaigns</p>
-            </div>
-            <Link
-              to="/brand/campaigns/create"
-              className="px-6 py-3 bg-primary hover:bg-primary-dark text-white font-medium rounded-lg transition-colors flex items-center gap-2"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              Create Campaign
-            </Link>
+        <div className="flex justify-between items-center mb-8">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900">My Campaigns</h1>
+            <p className="text-gray-600 mt-2">Manage your brand campaigns</p>
           </div>
+          <Link
+            to="/brand/campaigns/create"
+            className="px-6 py-3 bg-primary text-white rounded-xl hover:bg-primary-dark transition-colors font-medium"
+          >
+            + Create Campaign
+          </Link>
+        </div>
 
-          {/* Navigation */}
-          <div className="mb-4">
-            <Link
-              to="/brand/dashboard"
-              className="text-gray-600 hover:text-gray-900 flex items-center gap-2 w-fit"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-              </svg>
-              Back to Dashboard
-            </Link>
-          </div>
-
-          {/* Filter Tabs */}
-          <div className="flex gap-2 border-b border-gray-200">
+        {/* Filters */}
+        <div className="flex gap-2 mb-6 overflow-x-auto">
+          {[
+            { value: 'all', label: 'All Campaigns' },
+            { value: 'draft', label: 'Draft' },
+            { value: 'active', label: 'Active' },
+            { value: 'paused', label: 'Paused' },
+            { value: 'completed', label: 'Completed' }
+          ].map((tab) => (
             <button
-              onClick={() => setFilter('all')}
-              className={`px-4 py-2 font-medium transition-colors ${
-                filter === 'all'
-                  ? 'text-primary border-b-2 border-primary'
-                  : 'text-gray-600 hover:text-gray-900'
+              key={tab.value}
+              onClick={() => setFilter(tab.value)}
+              className={`px-4 py-2 rounded-xl font-medium whitespace-nowrap transition-colors ${
+                filter === tab.value
+                  ? 'bg-primary text-white'
+                  : 'bg-white text-gray-700 hover:bg-gray-50'
               }`}
             >
-              All ({campaigns.length})
+              {tab.label}
             </button>
-            <button
-              onClick={() => setFilter('draft')}
-              className={`px-4 py-2 font-medium transition-colors ${
-                filter === 'draft'
-                  ? 'text-primary border-b-2 border-primary'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              Draft ({campaigns.filter(c => c.status === 'draft').length})
-            </button>
-            <button
-              onClick={() => setFilter('active')}
-              className={`px-4 py-2 font-medium transition-colors ${
-                filter === 'active'
-                  ? 'text-primary border-b-2 border-primary'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              Active ({campaigns.filter(c => c.status === 'active').length})
-            </button>
-            <button
-              onClick={() => setFilter('completed')}
-              className={`px-4 py-2 font-medium transition-colors ${
-                filter === 'completed'
-                  ? 'text-primary border-b-2 border-primary'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              Completed ({campaigns.filter(c => c.status === 'completed').length})
-            </button>
-          </div>
+          ))}
         </div>
 
         {/* Campaigns List */}
         {filteredCampaigns.length === 0 ? (
-          <div className="bg-white rounded-lg shadow p-12 text-center">
-            <svg className="w-16 h-16 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-            </svg>
-            <h3 className="text-xl font-medium text-gray-900 mb-2">No campaigns found</h3>
+          <div className="bg-white rounded-3xl shadow-lg p-12 text-center">
+            <div className="text-gray-400 text-6xl mb-4">📋</div>
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">
+              {filter === 'all' ? 'No campaigns yet' : `No ${filter} campaigns`}
+            </h3>
             <p className="text-gray-600 mb-6">
               {filter === 'all'
-                ? "You haven't created any campaigns yet."
-                : `No ${filter} campaigns at the moment.`}
+                ? 'Create your first campaign to start working with creators'
+                : `You don't have any ${filter} campaigns`}
             </p>
-            <Link
-              to="/brand/campaigns/create"
-              className="inline-block px-6 py-3 bg-primary hover:bg-primary-dark text-white font-medium rounded-lg transition-colors"
-            >
-              Create Your First Campaign
-            </Link>
+            {filter === 'all' && (
+              <Link
+                to="/brand/campaigns/create"
+                className="inline-block px-6 py-3 bg-primary text-white rounded-xl hover:bg-primary-dark transition-colors font-medium"
+              >
+                Create Campaign
+              </Link>
+            )}
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
             {filteredCampaigns.map((campaign) => (
-              <div key={campaign.id} className="bg-white rounded-lg shadow hover:shadow-lg transition-shadow">
-                <div className="p-6">
-                  {/* Status Badge & Controls */}
-                  <div className="flex items-center justify-between mb-4">
-                    <div className="flex items-center gap-2">
-                      <span className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(campaign.status)}`}>
-                        {campaign.status}
-                      </span>
-                      {/* Status Quick Actions */}
-                      {campaign.status === 'draft' && (
-                        <button
-                          onClick={() => handleStatusChange(campaign.id, 'active')}
-                          className="px-3 py-1 bg-green-100 hover:bg-green-200 text-green-700 text-xs font-medium rounded-full transition-colors flex items-center gap-1"
-                          title="Publish campaign"
-                        >
-                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                          </svg>
-                          Publish
-                        </button>
-                      )}
-                      {campaign.status === 'active' && (
-                        <button
-                          onClick={() => handleStatusChange(campaign.id, 'paused')}
-                          className="px-3 py-1 bg-yellow-100 hover:bg-yellow-200 text-yellow-700 text-xs font-medium rounded-full transition-colors flex items-center gap-1"
-                          title="Pause campaign"
-                        >
-                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                          </svg>
-                          Pause
-                        </button>
-                      )}
-                      {campaign.status === 'paused' && (
-                        <button
-                          onClick={() => handleStatusChange(campaign.id, 'active')}
-                          className="px-3 py-1 bg-green-100 hover:bg-green-200 text-green-700 text-xs font-medium rounded-full transition-colors flex items-center gap-1"
-                          title="Resume campaign"
-                        >
-                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                          </svg>
-                          Resume
-                        </button>
-                      )}
-                    </div>
-                    <span className="text-sm text-gray-600">{campaign.category}</span>
+              <div
+                key={campaign.id}
+                className="bg-white rounded-3xl shadow-lg hover:shadow-xl transition-shadow overflow-hidden"
+              >
+                {/* Campaign Header */}
+                <div className="p-6 border-b border-gray-100">
+                  <div className="flex justify-between items-start mb-3">
+                    <h3 className="text-lg font-bold text-gray-900 line-clamp-2">
+                      {campaign.title}
+                    </h3>
+                    <span
+                      className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusBadgeClass(
+                        campaign.status
+                      )}`}
+                    >
+                      {campaign.status}
+                    </span>
                   </div>
 
-                  {/* Title */}
-                  <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                    {campaign.title}
-                  </h3>
-
-                  {/* Description */}
-                  <p className="text-gray-600 text-sm mb-4 line-clamp-2">
+                  <p className="text-gray-600 text-sm line-clamp-2 mb-4">
                     {campaign.description}
                   </p>
 
-                  {/* Stats */}
-                  <div className="grid grid-cols-2 gap-4 mb-4 pb-4 border-b border-gray-200">
+                  {/* Campaign Stats */}
+                  <div className="grid grid-cols-2 gap-4 mb-4">
                     <div>
-                      <p className="text-xs text-gray-600">Budget</p>
-                      <p className="text-lg font-semibold text-gray-900">${campaign.budget}</p>
+                      <p className="text-xs text-gray-500 mb-1">Budget</p>
+                      <p className="font-semibold text-gray-900">
+                        {campaign.participation_mode === 'proposals' || campaign.participation_mode === 'both'
+                          ? `$${campaign.budget_min} - $${campaign.budget_max}`
+                          : `$${campaign.budget}`}
+                      </p>
                     </div>
                     <div>
-                      <p className="text-xs text-gray-600">Applications</p>
-                      <p className="text-lg font-semibold text-gray-900">{campaign.applicants_count || 0}</p>
+                      <p className="text-xs text-gray-500 mb-1">Applications</p>
+                      <p className="font-semibold text-gray-900">
+                        {campaign.proposals_count || 0}
+                      </p>
                     </div>
                   </div>
 
-                  {/* Dates */}
-                  <div className="text-xs text-gray-600 mb-4">
-                    <p>Start: {new Date(campaign.start_date).toLocaleDateString()}</p>
-                    <p>End: {new Date(campaign.end_date).toLocaleDateString()}</p>
+                  <div className="flex items-center text-xs text-gray-500">
+                    <span>
+                      {new Date(campaign.start_date).toLocaleDateString()} -{' '}
+                      {new Date(campaign.end_date).toLocaleDateString()}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Campaign Actions */}
+                <div className="p-4 bg-gray-50 flex items-center justify-between">
+                  <div className="flex gap-2">
+                    {campaign.status === 'draft' && (
+                      <button
+                        onClick={() => handleStatusChange(campaign.id, 'active')}
+                        className="px-3 py-1.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors"
+                      >
+                        Publish
+                      </button>
+                    )}
+                    {campaign.status === 'active' && (
+                      <button
+                        onClick={() => handleStatusChange(campaign.id, 'paused')}
+                        className="px-3 py-1.5 bg-yellow-600 text-white text-sm rounded-lg hover:bg-yellow-700 transition-colors"
+                      >
+                        Pause
+                      </button>
+                    )}
+                    {campaign.status === 'paused' && (
+                      <button
+                        onClick={() => handleStatusChange(campaign.id, 'active')}
+                        className="px-3 py-1.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition-colors"
+                      >
+                        Resume
+                      </button>
+                    )}
                   </div>
 
-                  {/* Actions */}
                   <div className="flex gap-2">
                     <Link
                       to={`/brand/campaigns/${campaign.id}`}
-                      className="flex-1 px-4 py-2 bg-primary hover:bg-primary-dark text-white text-sm font-medium rounded-lg transition-colors text-center"
+                      className="px-3 py-1.5 bg-primary text-white text-sm rounded-lg hover:bg-primary-dark transition-colors"
                     >
-                      View Details
+                      View
                     </Link>
                     <Link
                       to={`/brand/campaigns/${campaign.id}/edit`}
-                      className="px-4 py-2 border-2 border-gray-300 hover:border-gray-400 text-gray-700 text-sm font-medium rounded-lg transition-colors"
+                      className="px-3 py-1.5 bg-gray-600 text-white text-sm rounded-lg hover:bg-gray-700 transition-colors"
                     >
                       Edit
                     </Link>
                     <button
-                      onClick={() => handleDelete(campaign.id)}
-                      className="px-4 py-2 border-2 border-red-300 hover:border-red-400 text-red-600 text-sm font-medium rounded-lg transition-colors"
+                      onClick={() => setDeleteConfirm(campaign.id)}
+                      className="px-3 py-1.5 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 transition-colors"
                     >
                       Delete
                     </button>
@@ -284,6 +247,34 @@ const Campaigns = () => {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* Delete Confirmation Modal */}
+        {deleteConfirm && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-3xl p-8 max-w-md w-full">
+              <h3 className="text-xl font-bold text-gray-900 mb-4">
+                Delete Campaign?
+              </h3>
+              <p className="text-gray-600 mb-6">
+                Are you sure you want to delete this campaign? This action cannot be undone.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setDeleteConfirm(null)}
+                  className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors font-medium"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => handleDelete(deleteConfirm)}
+                  className="flex-1 px-4 py-3 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors font-medium"
+                >
+                  Delete
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>

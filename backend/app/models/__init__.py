@@ -43,12 +43,11 @@ from .milestone_deliverable import MilestoneDeliverable
 from .package_deliverable import PackageDeliverable
 from .brief_milestone import BriefMilestone
 from .proposal_milestone import ProposalMilestone
-from .campaign_milestone import CampaignMilestone
 
-# Now import parent models that reference milestone models
+# Now import parent models that reference milestone models (including CampaignMilestone)
 from .brief import Brief
 from .proposal import Proposal
-from .campaign import Campaign, CampaignApplication, CampaignProposal
+from .campaign import Campaign, CampaignApplication, CampaignProposal, CampaignMilestone
 
 __all__ = [
     'User',

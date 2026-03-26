@@ -1,200 +1,249 @@
-from datetime import datetime
+"""Campaign models - Rebuilt with proper money handling and NULL constraints
+
+CRITICAL RULES:
+1. ALL money fields returned as str() in to_dict() - NO float() conversion
+2. Use datetime.now(timezone.utc) for ALL datetime operations
+3. Budget fields nullable based on participation_mode
+"""
+
+from datetime import datetime, timezone
+from decimal import Decimal
 from app import db
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB
 
 
-class CampaignProposal(db.Model):
-    """Campaign proposals from creators (formerly CampaignApplication)"""
-    __tablename__ = 'campaign_proposals'
-
-    id = db.Column(db.Integer, primary_key=True)
-    campaign_id = db.Column(db.Integer, db.ForeignKey('campaigns.id'), nullable=False)
-    creator_id = db.Column(db.Integer, db.ForeignKey('creator_profiles.id'), nullable=False)
-    status = db.Column(db.String(20), default='pending')  # pending, accepted, rejected
-    proposal_message = db.Column(db.Text)  # Creator's pitch/proposal
-    proposed_price = db.Column(db.Numeric(10, 2), nullable=False)  # How much creator is charging
-    deliverables = db.Column(db.JSON, default=list)  # List of deliverables creator proposes
-    delivery_timeline_days = db.Column(db.Integer)  # How many days creator needs to deliver
-    brand_notes = db.Column(db.Text)  # Brand's notes/feedback on the proposal
-    applied_at = db.Column(db.DateTime, default=datetime.utcnow)
-    reviewed_at = db.Column(db.DateTime)  # When brand reviewed the proposal
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
-
-    # Relationships
-    campaign = db.relationship('Campaign', backref=db.backref('applications', lazy='dynamic'))
-    creator = db.relationship('CreatorProfile', backref=db.backref('campaign_proposals', lazy='dynamic'))
-
-    def to_dict(self, include_relations=False):
-        """Convert proposal to dictionary"""
-        data = {
-            'id': self.id,
-            'campaign_id': self.campaign_id,
-            'creator_id': self.creator_id,
-            'status': self.status,
-            'proposal_message': self.proposal_message,
-            'proposed_price': float(self.proposed_price) if self.proposed_price else None,
-            'deliverables': self.deliverables or [],
-            'delivery_timeline_days': self.delivery_timeline_days,
-            'brand_notes': self.brand_notes,
-            'applied_at': self.applied_at.isoformat() if self.applied_at else None,
-            'reviewed_at': self.reviewed_at.isoformat() if self.reviewed_at else None,
-            'updated_at': self.updated_at.isoformat() if self.updated_at else None
-        }
-
-        if include_relations:
-            if self.campaign:
-                data['campaign'] = self.campaign.to_dict(include_brand=True)
-            if self.creator:
-                data['creator'] = self.creator.to_dict(include_user=True)
-
-        return data
-
-    def __repr__(self):
-        return f'<CampaignProposal {self.id} - {self.status}>'
-
-
-# Keep CampaignApplication as an alias for backward compatibility
-CampaignApplication = CampaignProposal
-
-# Association table for campaign packages (brands adding packages to campaigns)
+# Association table for campaign-package many-to-many relationship
 campaign_packages = db.Table('campaign_packages',
-    db.Column('id', db.Integer, primary_key=True),
-    db.Column('campaign_id', db.Integer, db.ForeignKey('campaigns.id'), nullable=False),
-    db.Column('package_id', db.Integer, db.ForeignKey('packages.id'), nullable=False),
-    db.Column('added_at', db.DateTime, default=datetime.utcnow)
+    db.Column('campaign_id', db.Integer, db.ForeignKey('campaigns.id', ondelete='CASCADE'), primary_key=True),
+    db.Column('package_id', db.Integer, db.ForeignKey('packages.id', ondelete='CASCADE'), primary_key=True),
+    db.Column('booking_id', db.Integer, db.ForeignKey('bookings.id', ondelete='SET NULL')),
+    db.Column('added_at', db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 )
 
 
 class Campaign(db.Model):
+    """
+    Campaign model - Brand initiatives for creator collaborations
+
+    Participation Modes:
+    - 'packages': Brands select creator packages (budget required, budget_min/max NULL)
+    - 'proposals': Creators submit custom proposals (budget NULL, budget_min/max required)
+    - 'both': Both packages and proposals allowed (all budget fields required)
+    """
     __tablename__ = 'campaigns'
 
     id = db.Column(db.Integer, primary_key=True)
-    brand_id = db.Column(db.Integer, db.ForeignKey('brand_profiles.id'), nullable=False)
-    brief_id = db.Column(db.Integer, db.ForeignKey('briefs.id'), nullable=True)  # Link to source brief if converted
+    brand_id = db.Column(db.Integer, db.ForeignKey('brand_profiles.id', ondelete='CASCADE'), nullable=False)
+    brief_id = db.Column(db.Integer, db.ForeignKey('briefs.id', ondelete='SET NULL'))
+
+    # Basic Info
     title = db.Column(db.String(200), nullable=False)
     description = db.Column(db.Text, nullable=False)
-    objectives = db.Column(db.Text)
-    budget = db.Column(db.Numeric(10, 2), nullable=False)
-    start_date = db.Column(db.DateTime, nullable=False)
-    end_date = db.Column(db.DateTime, nullable=False)
-    status = db.Column(db.String(20), default='draft')  # draft, active, paused, completed, cancelled
-    requirements = db.Column(db.JSON, default=dict)  # Campaign requirements
-    category = db.Column(db.String(100), nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    category = db.Column(db.String(100))
 
-    # ========================================
-    # Campaign Brief Fields
-    # ========================================
-    campaign_objective = db.Column(db.Text)  # What brand wants to achieve
-    target_audience = db.Column(db.JSON)  # {age_range, locations, interests, customer_type}
-    key_message = db.Column(db.Text)  # Main message to communicate
-    required_mentions = db.Column(db.JSON)  # {hashtags: [], mentions: [], links: []}
-    content_guidelines = db.Column(db.Text)  # Tone, style, format guidelines
+    # Campaign Brief
+    campaign_objective = db.Column(db.String(100))  # 'Brand Awareness', 'Engagement', etc.
+    target_audience = db.Column(db.Text)
+    content_guidelines = db.Column(db.Text)
 
-    # ========================================
     # Participation Mode
-    # ========================================
-    participation_mode = db.Column(db.String(20))  # 'packages' or 'proposals'
-    allows_applications = db.Column(db.Boolean, default=True)  # Allow creators to apply
+    participation_mode = db.Column(db.String(20), nullable=False, default='proposals')  # 'packages', 'proposals', 'both'
+    allows_applications = db.Column(db.Boolean, nullable=False, default=True)
+    allows_packages = db.Column(db.Boolean, nullable=False, default=False)
+    requires_milestones = db.Column(db.Boolean, nullable=False, default=True)
 
-    # ========================================
-    # Budget Fields
-    # ========================================
-    budget_min = db.Column(db.Numeric(10, 2))  # For proposal mode
-    budget_max = db.Column(db.Numeric(10, 2))  # For proposal mode
-    # Note: 'budget' field is kept for packages mode
+    # Budget - CRITICAL: NULL handling
+    # For 'packages' mode: budget NOT NULL, budget_min/max NULL
+    # For 'proposals' mode: budget NULL, budget_min/max NOT NULL
+    # For 'both' mode: all three NOT NULL
+    budget = db.Column(db.Numeric(12, 2), nullable=True)  # Single budget for packages mode
+    budget_min = db.Column(db.Numeric(12, 2), nullable=True)  # Min budget for proposals mode
+    budget_max = db.Column(db.Numeric(12, 2), nullable=True)  # Max budget for proposals mode
 
-    # ========================================
     # Timeline
-    # ========================================
-    timeline_days = db.Column(db.Integer)  # How long creators have to deliver
-    application_deadline = db.Column(db.DateTime)  # Deadline for creators to apply (for proposals mode)
+    start_date = db.Column(db.DateTime(timezone=True), nullable=False)
+    end_date = db.Column(db.DateTime(timezone=True), nullable=False)
+    application_deadline = db.Column(db.DateTime(timezone=True))  # Deadline for proposals
+    timeline_days = db.Column(db.Integer)
 
-    # ========================================
-    # Targeting Fields
-    # ========================================
-    target_categories = db.Column(db.JSON)  # ["Fashion", "Lifestyle"]
+    # Targeting
+    target_categories = db.Column(ARRAY(db.Text), default=[])
+    target_locations = db.Column(ARRAY(db.Text), default=[])
     target_min_followers = db.Column(db.Integer)
     target_max_followers = db.Column(db.Integer)
-    target_locations = db.Column(db.JSON)  # ["Zimbabwe", "South Africa"]
 
-    # ========================================
-    # Advanced Features
-    # ========================================
-    allows_packages = db.Column(db.Boolean, default=False)  # Support "Both" mode (packages + proposals)
-    requires_milestones = db.Column(db.Boolean, default=True)  # Enforce milestone requirement
+    # Status
+    status = db.Column(db.String(20), nullable=False, default='draft')  # 'draft', 'active', 'paused', 'completed'
+
+    # Timestamps
+    created_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     # Relationships
-    bookings = db.relationship('Booking', backref='campaign', lazy='dynamic')
-    milestones = db.relationship('CampaignMilestone', backref='campaign', lazy='dynamic', cascade='all, delete-orphan')
+    # Note: 'brand' backref is defined in BrandProfile.campaigns relationship
+    brand = db.relationship('BrandProfile', back_populates='campaigns')
+    milestones = db.relationship('CampaignMilestone', backref='campaign', lazy='dynamic', cascade='all, delete-orphan', order_by='CampaignMilestone.milestone_number')
+    proposals = db.relationship('CampaignProposal', backref='campaign', lazy='dynamic', cascade='all, delete-orphan')
+    packages = db.relationship('Package', secondary=campaign_packages, backref='campaigns')
 
-    # Many-to-many relationship with packages
-    packages = db.relationship('Package', secondary=campaign_packages,
-                              backref=db.backref('campaigns', lazy='dynamic'), lazy='dynamic')
-
-    def to_dict(self, include_brand=False, include_packages=False, include_applicants=False, include_milestones=False):
-        """Convert campaign to dictionary"""
-        data = {
+    def to_dict(self, include_milestones=True, include_brand=False):
+        """
+        CRITICAL: Return money as strings to avoid rounding
+        Never use float() or .toFixed() anywhere
+        """
+        result = {
             'id': self.id,
             'brand_id': self.brand_id,
             'brief_id': self.brief_id,
             'title': self.title,
             'description': self.description,
-            'objectives': self.objectives,
-            'budget': float(self.budget) if self.budget else None,
-            'start_date': self.start_date.isoformat(),
-            'end_date': self.end_date.isoformat(),
-            'status': self.status,
-            'requirements': self.requirements or {},
             'category': self.category,
-            'packages_count': self.packages.count(),
-            'applicants_count': self.applications.count(),
-            'created_at': self.created_at.isoformat(),
-            'updated_at': self.updated_at.isoformat(),
-
-            # Campaign Brief
             'campaign_objective': self.campaign_objective,
-            'target_audience': self.target_audience or {},
-            'key_message': self.key_message,
-            'required_mentions': self.required_mentions or {},
+            'target_audience': self.target_audience,
             'content_guidelines': self.content_guidelines,
-
-            # Participation Mode
-            'participation_mode': self.participation_mode or 'packages',
+            'participation_mode': self.participation_mode,
             'allows_applications': self.allows_applications,
+            'allows_packages': self.allows_packages,
+            'requires_milestones': self.requires_milestones,
 
-            # Budget
-            'budget_min': float(self.budget_min) if self.budget_min else None,
-            'budget_max': float(self.budget_max) if self.budget_max else None,
+            # CRITICAL: Return as strings to prevent rounding
+            'budget': str(self.budget) if self.budget is not None else None,
+            'budget_min': str(self.budget_min) if self.budget_min is not None else None,
+            'budget_max': str(self.budget_max) if self.budget_max is not None else None,
 
-            # Timeline
-            'timeline_days': self.timeline_days,
+            'start_date': self.start_date.isoformat() if self.start_date else None,
+            'end_date': self.end_date.isoformat() if self.end_date else None,
             'application_deadline': self.application_deadline.isoformat() if self.application_deadline else None,
-
-            # Targeting
+            'timeline_days': self.timeline_days,
             'target_categories': self.target_categories or [],
+            'target_locations': self.target_locations or [],
             'target_min_followers': self.target_min_followers,
             'target_max_followers': self.target_max_followers,
-            'target_locations': self.target_locations or [],
-
-            # Advanced Features
-            'allows_packages': self.allows_packages,
-            'requires_milestones': self.requires_milestones
+            'status': self.status,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None,
         }
 
-        if include_brand and self.brand:
-            data['brand'] = self.brand.to_dict(include_user=True)
-
-        if include_packages:
-            data['packages'] = [pkg.to_dict() for pkg in self.packages.all()]
-
-        if include_applicants:
-            data['applications'] = [app.to_dict(include_relations=True) for app in self.applications.all()]
-
         if include_milestones:
-            data['milestones'] = [m.to_dict() for m in self.milestones.all()]
+            result['milestones'] = [m.to_dict() for m in self.milestones.all()]
+            result['proposals_count'] = self.proposals.count()
+            result['packages_count'] = len(self.packages)
 
-        return data
+        if include_brand and self.brand:
+            result['brand'] = self.brand.to_dict()
+
+        return result
 
     def __repr__(self):
-        return f'<Campaign {self.title}>'
+        return f'<Campaign {self.id}: {self.title}>'
+
+
+class CampaignMilestone(db.Model):
+    """
+    Campaign Milestone - Structured deliverables within a campaign
+    """
+    __tablename__ = 'campaign_milestones'
+
+    id = db.Column(db.Integer, primary_key=True)
+    campaign_id = db.Column(db.Integer, db.ForeignKey('campaigns.id', ondelete='CASCADE'), nullable=False)
+    milestone_number = db.Column(db.Integer, nullable=False)
+    name = db.Column(db.String(200), nullable=False)
+    description = db.Column(db.Text)
+
+    # Structured deliverables: [{"platform": "Instagram", "content_type": "Post", "quantity": 2}, ...]
+    deliverables = db.Column(JSONB, default=[], nullable=False)
+
+    # Budget allocation for this milestone (proposals mode)
+    budget_allocation = db.Column(db.Numeric(12, 2))  # NULL for packages mode
+
+    duration_days = db.Column(db.Integer)
+    due_date = db.Column(db.DateTime(timezone=True))
+
+    created_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    updated_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
+
+    __table_args__ = (
+        db.UniqueConstraint('campaign_id', 'milestone_number', name='uq_campaign_milestone_number'),
+    )
+
+    def to_dict(self):
+        """CRITICAL: Return money as string"""
+        return {
+            'id': self.id,
+            'campaign_id': self.campaign_id,
+            'milestone_number': self.milestone_number,
+            'name': self.name,
+            'description': self.description,
+            'deliverables': self.deliverables,
+            'budget_allocation': str(self.budget_allocation) if self.budget_allocation is not None else None,
+            'duration_days': self.duration_days,
+            'due_date': self.due_date.isoformat() if self.due_date else None,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+        }
+
+    def __repr__(self):
+        return f'<CampaignMilestone {self.id}: {self.name}>'
+
+
+class CampaignProposal(db.Model):
+    """
+    Campaign Proposal - Creator applications to campaigns (opportunities)
+    """
+    __tablename__ = 'campaign_proposals'
+
+    id = db.Column(db.Integer, primary_key=True)
+    campaign_id = db.Column(db.Integer, db.ForeignKey('campaigns.id', ondelete='CASCADE'), nullable=False)
+    creator_id = db.Column(db.Integer, db.ForeignKey('creator_profiles.id', ondelete='CASCADE'), nullable=False)
+
+    status = db.Column(db.String(20), nullable=False, default='pending')  # 'pending', 'awaiting_payment', 'accepted', 'rejected'
+    proposed_price = db.Column(db.Numeric(12, 2), nullable=False)
+    proposal_message = db.Column(db.Text)  # Why they're perfect for this opportunity
+    deliverables = db.Column(db.Text)  # Custom deliverables description
+    delivery_timeline_days = db.Column(db.Integer)
+
+    brand_notes = db.Column(db.Text)  # Brand's internal notes
+    booking_id = db.Column(db.Integer, db.ForeignKey('bookings.id', ondelete='SET NULL'))  # Payment link
+
+    applied_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+    reviewed_at = db.Column(db.DateTime(timezone=True))
+
+    __table_args__ = (
+        db.UniqueConstraint('campaign_id', 'creator_id', name='uq_campaign_creator_proposal'),
+    )
+
+    # Relationships
+    creator = db.relationship('CreatorProfile', backref='campaign_proposals')
+    booking = db.relationship('Booking', backref='campaign_proposal', uselist=False)
+
+    def to_dict(self, include_creator=False, include_campaign=False):
+        """CRITICAL: Return money as string"""
+        result = {
+            'id': self.id,
+            'campaign_id': self.campaign_id,
+            'creator_id': self.creator_id,
+            'status': self.status,
+            'proposed_price': str(self.proposed_price) if self.proposed_price is not None else None,
+            'proposal_message': self.proposal_message,
+            'deliverables': self.deliverables,
+            'delivery_timeline_days': self.delivery_timeline_days,
+            'brand_notes': self.brand_notes,
+            'booking_id': self.booking_id,
+            'applied_at': self.applied_at.isoformat() if self.applied_at else None,
+            'reviewed_at': self.reviewed_at.isoformat() if self.reviewed_at else None
+        }
+
+        if include_creator and self.creator:
+            result['creator'] = self.creator.to_dict()
+
+        if include_campaign and self.campaign:
+            result['campaign'] = self.campaign.to_dict(include_milestones=True, include_brand=False)
+
+        return result
+
+    def __repr__(self):
+        return f'<CampaignProposal {self.id}: Campaign {self.campaign_id} - Creator {self.creator_id}>'
+
+
+# Backward compatibility alias
+CampaignApplication = CampaignProposal

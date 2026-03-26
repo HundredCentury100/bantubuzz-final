@@ -22,7 +22,7 @@ class BrandProfile(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # Relationships
-    campaigns = db.relationship('Campaign', backref='brand', lazy='dynamic', cascade='all, delete-orphan')
+    campaigns = db.relationship('Campaign', back_populates='brand', lazy='dynamic', cascade='all, delete-orphan')
     bookings_as_brand = db.relationship('Booking', foreign_keys='Booking.brand_id', backref='brand', lazy='dynamic')
     saved_creators = db.relationship('SavedCreator', backref='brand', lazy='dynamic', cascade='all, delete-orphan')
 
