@@ -239,3 +239,82 @@ def unsave_creator(creator_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
+
+
+# ========================================
+# ANALYTICS ENDPOINTS - Audience Demographics
+# ========================================
+
+@bp.route('/audience', methods=['GET'])
+@jwt_required()
+def get_brand_audience():
+    """
+    Get aggregated audience demographics across ALL brand campaigns/collaborations
+
+    Shows combined reach across all campaigns and collaborations
+    """
+    try:
+        user_id = int(get_jwt_identity())
+        brand = BrandProfile.query.filter_by(user_id=user_id).first()
+
+        if not brand:
+            return jsonify({'error': 'Brand profile not found'}), 404
+
+        # Get all collaborations for this brand
+        from app.models.collaboration import Collaboration
+        from app.models.thunzi_account import ThunziAccount
+        from app.services.thunzi_service import thunzi_service
+
+        collaborations = Collaboration.query.filter_by(brand_id=brand.id).all()
+
+        if not collaborations:
+            return jsonify({'error': 'No collaborations found'}), 404
+
+        # Get Instagram platform IDs only (only Instagram has audience data currently)
+        instagram_platform_ids = []
+
+        for collab in collaborations:
+            thunzi_account = ThunziAccount.query.filter_by(
+                user_id=collab.creator.user_id
+            ).first()
+
+            if thunzi_account and thunzi_account.bantubuzz_id and thunzi_account.thunzi_email:
+                # ThunziAI: email is the password
+                thunzi_service.login(email=thunzi_account.thunzi_email, password=thunzi_account.thunzi_email)
+                # get_creator_platforms accepts bantubuzz_id directly
+                platforms = thunzi_service.get_creator_platforms(thunzi_account.bantubuzz_id)
+                if platforms:
+                    # Filter for Instagram platforms only
+                    ig_platforms = [p['id'] for p in platforms if p.get('isConnected') and p.get('platform') == 'instagram']
+                    instagram_platform_ids.extend(ig_platforms)
+
+        if not instagram_platform_ids:
+            return jsonify({
+                'error': 'No audience data available',
+                'message': 'Audience demographics are currently only available for Instagram platforms. Please ensure creators have connected Instagram accounts with synced data.'
+            }), 404
+
+        # Get aggregated audience data from Instagram platforms only
+        audience_data = thunzi_service.get_aggregated_audience(instagram_platform_ids)
+
+        if not audience_data:
+            return jsonify({
+                'error': 'No audience data available',
+                'message': 'Instagram platforms found but no audience data available yet. Data may need to be synced in ThunziAI.'
+            }), 404
+
+        # Add additional context
+        from app.models.campaign import Campaign
+        campaigns = Campaign.query.filter_by(brand_id=brand.id).all()
+
+        return jsonify({
+            **audience_data,
+            'totalCollaborations': len(collaborations),
+            'totalCampaigns': len(campaigns)
+        }), 200
+
+    except Exception as e:
+        print(f"Error getting brand audience: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500

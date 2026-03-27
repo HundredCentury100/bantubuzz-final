@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from datetime import datetime
+from datetime import datetime, timezone
 from app import db
 from app.models import CreatorProfile, User, Review, Package
 from app.utils import save_profile_picture, delete_profile_picture
@@ -68,7 +68,7 @@ def get_featured_creators():
                 # Check for top creators (5+ completed collaborations in last 30 days)
                 from datetime import timedelta
                 from app.models import Collaboration
-                thirty_days_ago = datetime.utcnow() - timedelta(days=30)
+                thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
 
                 fallback_creators = fallback_query.order_by(
                     CreatorProfile.follower_count.desc()
@@ -357,7 +357,7 @@ def get_creators():
             ).filter(
                 CreatorSubscription.status == 'active',
                 CreatorSubscription.payment_verified == True,
-                CreatorSubscription.end_date > datetime.utcnow(),
+                CreatorSubscription.end_date > datetime.now(timezone.utc),
                 CreatorSubscriptionPlan.subscription_type == 'featured'
             ).all()
 
@@ -578,7 +578,7 @@ def update_profile():
             else:
                 return jsonify({'error': 'Revision fee cannot be negative'}), 400
 
-        creator.updated_at = datetime.utcnow()
+        creator.updated_at = datetime.now(timezone.utc)
         db.session.commit()
 
         return jsonify({
@@ -634,7 +634,7 @@ def upload_profile_picture():
 
             # Backward compatibility: store medium size as main profile picture
             creator.profile_picture = image_data['medium']
-            creator.updated_at = datetime.utcnow()
+            creator.updated_at = datetime.now(timezone.utc)
             db.session.commit()
 
             return jsonify({
@@ -689,7 +689,7 @@ def upload_gallery_image():
                 'thumbnail': image_data['thumbnail'],
                 'medium': image_data['medium'],
                 'large': image_data['large'],
-                'uploaded_at': datetime.utcnow().isoformat(),
+                'uploaded_at': datetime.now(timezone.utc).isoformat(),
                 'original_size_kb': image_data.get('original_size_kb', 0),
                 'compressed_size_kb': image_data.get('compressed_size_kb', 0)
             }
@@ -706,7 +706,7 @@ def upload_gallery_image():
             gallery.append(image_data['medium'])
             creator.gallery = gallery
 
-            creator.updated_at = datetime.utcnow()
+            creator.updated_at = datetime.now(timezone.utc)
             db.session.commit()
 
             return jsonify({
@@ -771,7 +771,7 @@ def delete_gallery_image(index):
         else:
             return jsonify({'error': 'Invalid gallery index'}), 400
 
-        creator.updated_at = datetime.utcnow()
+        creator.updated_at = datetime.now(timezone.utc)
         db.session.commit()
 
         return jsonify({
@@ -807,4 +807,61 @@ def get_creator_platform_analytics(creator_id):
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
+
+
+@bp.route('/<int:creator_id>/audience', methods=['GET'])
+def get_creator_audience(creator_id):
+    """
+    Get aggregated audience demographics for a creator (public endpoint)
+
+    Combines audience data from all connected ThunziAI platforms
+    """
+    try:
+        creator = CreatorProfile.query.get(creator_id)
+        if not creator:
+            return jsonify({'error': 'Creator not found'}), 404
+
+        # Get ThunziAI account
+        from app.models.thunzi_account import ThunziAccount
+        from app.services.thunzi_service import thunzi_service
+
+        thunzi_account = ThunziAccount.query.filter_by(
+            user_id=creator.user_id
+        ).first()
+
+        if not thunzi_account or not thunzi_account.bantubuzz_id or not thunzi_account.thunzi_email:
+            return jsonify({'error': 'Creator not connected to ThunziAI'}), 404
+
+        # Get all platforms for this creator
+        # get_creator_platforms accepts bantubuzz_id directly
+        # ThunziAI: email is the password
+        thunzi_service.login(email=thunzi_account.thunzi_email, password=thunzi_account.thunzi_email)
+        platforms = thunzi_service.get_creator_platforms(thunzi_account.bantubuzz_id)
+
+        if not platforms:
+            return jsonify({'error': 'No platforms found'}), 404
+
+        # Filter for Instagram platforms only (only Instagram has audience data currently)
+        instagram_platform_ids = [p['id'] for p in platforms if p.get('isConnected') and p.get('platform') == 'instagram']
+
+        if not instagram_platform_ids:
+            return jsonify({
+                'error': 'No audience data available',
+                'message': 'Audience demographics are currently only available for Instagram platforms. Please ensure the creator has a connected Instagram account with synced data.'
+            }), 404
+
+        # Get aggregated audience data from Instagram platforms only
+        audience_data = thunzi_service.get_aggregated_audience(instagram_platform_ids)
+
+        if not audience_data:
+            return jsonify({
+                'error': 'No audience data available',
+                'message': 'Instagram platform found but no audience data available yet. Data may need to be synced in ThunziAI.'
+            }), 404
+
+        return jsonify(audience_data), 200
+
+    except Exception as e:
+        print(f"Error getting creator audience: {str(e)}")
+        return jsonify({'error': str(e)}), 500
 
