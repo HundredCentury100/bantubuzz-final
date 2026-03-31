@@ -27,6 +27,8 @@ const PackageForm = () => {
   const [loading, setLoading] = useState(false);
   const [deliverables, setDeliverables] = useState(['']);
   const [packageData, setPackageData] = useState(null);
+  const [isMultiPlatform, setIsMultiPlatform] = useState(false);
+  const [selectedPlatforms, setSelectedPlatforms] = useState([]);
 
   const {
     register,
@@ -65,6 +67,12 @@ const PackageForm = () => {
       if (pkg.deliverables && pkg.deliverables.length > 0) {
         setDeliverables(pkg.deliverables);
       }
+
+      // Set multi-platform data
+      if (pkg.is_multi_platform) {
+        setIsMultiPlatform(true);
+        setSelectedPlatforms(pkg.platforms || []);
+      }
     } catch (error) {
       console.error('Error fetching package:', error);
       alert('Failed to load package');
@@ -87,8 +95,10 @@ const PackageForm = () => {
         price: parseFloat(data.price),
         duration_days: parseInt(data.duration_days),
         collaboration_type: data.collaboration_type,
-        platform_type: data.platform_type || null,
+        platform_type: isMultiPlatform ? null : (data.platform_type || null),
         content_type: data.content_type || null,
+        is_multi_platform: isMultiPlatform,
+        platforms: isMultiPlatform ? selectedPlatforms : [],
         deliverables: validDeliverables,
         is_active: data.is_active
       };
@@ -135,6 +145,28 @@ const PackageForm = () => {
     const updated = [...deliverables];
     updated[index] = value;
     setDeliverables(updated);
+  };
+
+  const togglePlatform = (platformValue) => {
+    setSelectedPlatforms(prev => {
+      if (prev.includes(platformValue)) {
+        return prev.filter(p => p !== platformValue);
+      } else {
+        return [...prev, platformValue];
+      }
+    });
+  };
+
+  const handleMultiPlatformToggle = (checked) => {
+    setIsMultiPlatform(checked);
+    if (checked) {
+      // Clear single platform selection
+      setValue('platform_type', '');
+      setSelectedPlatforms([]);
+    } else {
+      // Clear multi-platform selections
+      setSelectedPlatforms([]);
+    }
   };
 
   if (loading && isEditMode) {
@@ -352,84 +384,160 @@ const PackageForm = () => {
           </p>
         </div>
 
-        {/* Platform Type & Content Type */}
+        {/* Platform Type & Multi-Platform Option */}
         <div className="bg-white rounded-lg shadow-sm p-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Platform Type */}
+          {/* Multi-Platform Toggle */}
+          <div className="mb-6">
+            <label className="flex items-center gap-3 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={isMultiPlatform}
+                onChange={(e) => handleMultiPlatformToggle(e.target.checked)}
+                className="w-5 h-5 text-primary border-gray-300 rounded focus:ring-primary"
+              />
+              <div>
+                <span className="text-sm font-semibold text-gray-700">
+                  Multi-Platform Package
+                </span>
+                <p className="text-sm text-gray-600">
+                  Offer the same content across multiple platforms for one price
+                </p>
+              </div>
+            </label>
+          </div>
+
+          {isMultiPlatform ? (
+            /* Multi-Platform Selector */
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
-                Platform Type
+              <label className="block text-sm font-semibold text-gray-700 mb-3">
+                Select Platforms * (Select at least 2)
               </label>
-              <select
-                {...register('platform_type')}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                onChange={(e) => {
-                  setValue('platform_type', e.target.value);
-                  setValue('content_type', ''); // Reset content type when platform changes
-                }}
-              >
-                <option value="">Select platform (optional)</option>
-                {PACKAGE_TYPES.map((platform) => {
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                {PACKAGE_TYPES.filter(p => p.value !== 'UGC').map((platform) => {
                   const config = PLATFORM_CONFIGS[platform.value];
+                  const isSelected = selectedPlatforms.includes(platform.value);
                   return (
-                    <option key={platform.value} value={platform.value}>
-                      {platform.label}
-                    </option>
+                    <button
+                      key={platform.value}
+                      type="button"
+                      onClick={() => togglePlatform(platform.value)}
+                      className={`p-4 rounded-lg border-2 transition-all ${
+                        isSelected
+                          ? 'border-primary bg-primary/5'
+                          : 'border-gray-200 hover:border-gray-300'
+                      }`}
+                    >
+                      <div className="flex flex-col items-center gap-2">
+                        <div className={`p-2 rounded-lg ${config.bgColor}`}>
+                          <svg
+                            className={`w-6 h-6 ${config.color}`}
+                            viewBox="0 0 24 24"
+                            fill="currentColor"
+                          >
+                            {config.icon}
+                          </svg>
+                        </div>
+                        <span className="text-sm font-medium text-gray-900">{platform.label}</span>
+                        {isSelected && (
+                          <svg className="w-5 h-5 text-primary" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                          </svg>
+                        )}
+                      </div>
+                    </button>
                   );
                 })}
-              </select>
-              <p className="mt-2 text-sm text-gray-500">
-                Choose the platform where content will be posted (or UGC for non-posted content)
-              </p>
+              </div>
+              {selectedPlatforms.length > 0 && (
+                <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                  <p className="text-sm text-blue-800 font-medium mb-2">
+                    Selected Platforms ({selectedPlatforms.length}):
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {selectedPlatforms.map(platform => (
+                      <div key={platform} className={`flex items-center gap-2 px-3 py-1.5 rounded-lg ${PLATFORM_CONFIGS[platform].bgColor}`}>
+                        <svg className={`w-4 h-4 ${PLATFORM_CONFIGS[platform].color}`} viewBox="0 0 24 24" fill="currentColor">
+                          {PLATFORM_CONFIGS[platform].icon}
+                        </svg>
+                        <span className={`text-sm font-medium ${PLATFORM_CONFIGS[platform].color}`}>
+                          {platform}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {selectedPlatforms.length < 2 && selectedPlatforms.length > 0 && (
+                <p className="mt-2 text-sm text-red-600">Please select at least 2 platforms for a multi-platform package</p>
+              )}
             </div>
-
-            {/* Content Type */}
-            {selectedPlatformType && PLATFORM_CONFIGS[selectedPlatformType] && (
+          ) : (
+            /* Single Platform Selector */
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  Content Type
+                  Platform Type
                 </label>
                 <select
-                  {...register('content_type')}
+                  {...register('platform_type')}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                  onChange={(e) => {
+                    setValue('platform_type', e.target.value);
+                    setValue('content_type', '');
+                  }}
                 >
-                  <option value="">Select content type (optional)</option>
-                  {PLATFORM_CONFIGS[selectedPlatformType].contentTypes.map((type) => (
-                    <option key={type} value={type}>
-                      {type}
+                  <option value="">Select platform (optional)</option>
+                  {PACKAGE_TYPES.map((platform) => (
+                    <option key={platform.value} value={platform.value}>
+                      {platform.label}
                     </option>
                   ))}
                 </select>
                 <p className="mt-2 text-sm text-gray-500">
-                  Specify the type of content for this package
+                  Choose the platform where content will be posted
                 </p>
               </div>
-            )}
-          </div>
 
-          {/* Platform Preview Badge */}
-          {selectedPlatformType && PLATFORM_CONFIGS[selectedPlatformType] && (
-            <div className="mt-4 pt-4 border-t">
-              <p className="text-xs text-gray-600 mb-2">Preview:</p>
-              <div className="flex items-center gap-2">
-                <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg ${PLATFORM_CONFIGS[selectedPlatformType].bgColor}`}>
-                  <svg
-                    className={`w-4 h-4 ${PLATFORM_CONFIGS[selectedPlatformType].color}`}
-                    viewBox="0 0 24 24"
-                    fill="currentColor"
+              {selectedPlatformType && PLATFORM_CONFIGS[selectedPlatformType] && (
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-2">
+                    Content Type
+                  </label>
+                  <select
+                    {...register('content_type')}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
                   >
-                    {PLATFORM_CONFIGS[selectedPlatformType].icon}
-                  </svg>
-                  <span className={`text-sm font-medium ${PLATFORM_CONFIGS[selectedPlatformType].color}`}>
-                    {selectedPlatformType}
-                  </span>
+                    <option value="">Select content type (optional)</option>
+                    {PLATFORM_CONFIGS[selectedPlatformType].contentTypes.map((type) => (
+                      <option key={type} value={type}>
+                        {type}
+                      </option>
+                    ))}
+                  </select>
+                  <p className="mt-2 text-sm text-gray-500">
+                    Specify the type of content for this package
+                  </p>
                 </div>
-                {watch('content_type') && (
-                  <span className="text-sm text-gray-600">
-                    • {watch('content_type')}
-                  </span>
-                )}
-              </div>
+              )}
+
+              {selectedPlatformType && PLATFORM_CONFIGS[selectedPlatformType] && (
+                <div className="md:col-span-2">
+                  <p className="text-xs text-gray-600 mb-2">Preview:</p>
+                  <div className="flex items-center gap-2">
+                    <div className={`flex items-center gap-2 px-3 py-1.5 rounded-lg ${PLATFORM_CONFIGS[selectedPlatformType].bgColor}`}>
+                      <svg className={`w-4 h-4 ${PLATFORM_CONFIGS[selectedPlatformType].color}`} viewBox="0 0 24 24" fill="currentColor">
+                        {PLATFORM_CONFIGS[selectedPlatformType].icon}
+                      </svg>
+                      <span className={`text-sm font-medium ${PLATFORM_CONFIGS[selectedPlatformType].color}`}>
+                        {selectedPlatformType}
+                      </span>
+                    </div>
+                    {watch('content_type') && (
+                      <span className="text-sm text-gray-600">• {watch('content_type')}</span>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>

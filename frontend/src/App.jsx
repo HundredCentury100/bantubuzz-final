@@ -38,6 +38,9 @@ import CampaignForm from './pages/CampaignForm';
 import CampaignPackageBrowser from './pages/CampaignPackageBrowser';
 import CampaignDetails from './pages/CampaignDetails';
 import BrowseCampaigns from './pages/BrowseCampaigns';
+import Opportunities from './pages/Opportunities';
+import OpportunityDetails from './pages/OpportunityDetails';
+import MyApplications from './pages/MyApplications';
 import CreatorCampaignDetails from './pages/CreatorCampaignDetails';
 import Collaborations from './pages/Collaborations';
 import CollaborationDetails from './pages/CollaborationDetails';
@@ -252,9 +255,29 @@ function App() {
       />
       <Route
         path="/creator/campaigns"
+        element={<Navigate to="/creator/opportunities" replace />}
+      />
+      <Route
+        path="/creator/opportunities"
         element={
           <ProtectedRoute requiredType="creator">
-            <BrowseCampaigns />
+            <Opportunities />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/creator/opportunities/:id"
+        element={
+          <ProtectedRoute requiredType="creator">
+            <OpportunityDetails />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/creator/applications"
+        element={
+          <ProtectedRoute requiredType="creator">
+            <MyApplications />
           </ProtectedRoute>
         }
       />

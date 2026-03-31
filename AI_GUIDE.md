@@ -5073,3 +5073,277 @@ npm install chart.js react-chartjs-2
 ---
 
 🤖 **Updated**: Mar 25, 2026
+
+
+### Campaign System Complete Rebuild (March 26, 2026)
+
+**Goal**: Rebuild campaign system from scratch to fix critical issues with money rounding, datetime comparisons, and NULL constraint violations.
+
+#### Critical Problems Fixed
+1. **Money Rounding**: Values like 100 were becoming 99.99 or 97 due to `.toFixed()` and `step` attributes
+2. **DateTime Errors**: "can't compare offset-naive and offset-aware datetimes" errors
+3. **NULL Violations**: `null value in column "budget" violates not-null constraint`
+4. **Payment Bypass**: Collaborations created before payment, allowing free work
+
+#### Architecture Changes
+
+**Database Schema** ([backend/migrations/versions/202603261000_rebuild_campaign_system.py](backend/migrations/versions/202603261000_rebuild_campaign_system.py)):
+- Dropped old tables completely (CASCADE)
+- New campaigns table with:
+  - `budget` (nullable) - for packages mode
+  - `budget_min`, `budget_max` (nullable) - for proposals mode
+  - `participation_mode`: 'packages', 'proposals', or 'both'
+  - `allows_applications`, `allows_packages` (boolean flags)
+  - All DateTime fields use `timezone=True`
+- `campaign_milestones` table with JSONB deliverables
+- `campaign_proposals` table (creator applications)
+- `campaign_packages` association table with booking_id
+
+**Backend Models** ([backend/app/models/campaign.py](backend/app/models/campaign.py)):
+```python
+# CRITICAL: All money returned as strings to avoid rounding
+def to_dict(self):
+    return {
+        'budget': str(self.budget) if self.budget is not None else None,
+        'budget_min': str(self.budget_min) if self.budget_min is not None else None,
+        'budget_max': str(self.budget_max) if self.budget_max is not None else None,
+        # ... other fields
+    }
+```
+
+**Backend Routes** ([backend/app/routes/campaigns.py](backend/app/routes/campaigns.py)) - 16 endpoints:
+```python
+# CRITICAL: Parse money as Decimal(str(value))
+budget = Decimal(str(data['budget']))  # NO float()
+
+# CRITICAL: Use timezone.utc for all datetime operations
+from datetime import datetime, timezone
+now = datetime.now(timezone.utc)  # NOT datetime.utcnow()
+```
+
+#### Money Handling Rules (CRITICAL)
+
+**Backend**:
+1. NEVER use `float()` for money - always `Decimal(str(value))`
+2. Return money as strings: `str(self.budget)`
+3. Parse incoming money: `Decimal(str(data['budget']))`
+
+**Frontend**:
+1. NEVER use `.toFixed()` on money values
+2. NEVER use `step` attribute on number inputs
+3. Send money as strings: `String(formData.budget)`
+4. Display raw values: `${campaign.budget}` not `${campaign.budget.toFixed(2)}`
+
+**Example**:
+```javascript
+// BAD
+<input type="number" step="0.01" value={budget} />
+<span>${budget.toFixed(2)}</span>
+
+// GOOD
+<input type="number" value={budget} />
+<span>${budget}</span>
+```
+
+#### DateTime Handling Rules (CRITICAL)
+
+**Always use timezone-aware datetime**:
+```python
+# BAD
+from datetime import datetime
+now = datetime.utcnow()  # Returns offset-naive
+
+# GOOD
+from datetime import datetime, timezone
+now = datetime.now(timezone.utc)  # Returns offset-aware
+```
+
+**Database**:
+```python
+sa.Column('created_at', sa.DateTime(timezone=True))  # Always timezone=True
+```
+
+#### Payment-Gated Collaboration Flow
+
+**OLD BROKEN FLOW**:
+1. Brand accepts application → Collaboration created immediately
+2. Creator starts work (no payment verified)
+
+**NEW CORRECT FLOW**:
+1. Brand accepts application → **Creates Booking** (no collaboration yet)
+2. Brand redirected to payment page
+3. Brand pays (Paynow or Bank Transfer)
+4. Payment confirmed → **Creates Collaboration**
+5. Creator notified
+
+**Implementation**:
+```python
+# campaigns.py - Accept proposal
+@bp.route('/proposals/<int:id>/accept', methods=['POST'])
+def accept_proposal(id):
+    # Create booking (NOT collaboration)
+    booking = Booking(
+        booking_type='campaign_proposal',
+        amount=proposal.proposed_price,
+        status='pending',
+        payment_status='pending'
+    )
+    proposal.status = 'awaiting_payment'
+    return jsonify({
+        'booking_id': booking.id,
+        'redirect_to': f'/bookings/{booking.id}/payment'
+    })
+
+# campaigns.py - Complete payment (called after payment confirmed)
+@bp.route('/proposals/<int:id>/complete-payment', methods=['POST'])
+def complete_proposal_payment(id):
+    # Verify payment confirmed
+    if booking.payment_status not in ['paid', 'verified']:
+        return error
+
+    # NOW create collaboration (after payment)
+    collaboration = Collaboration(...)
+    proposal.status = 'accepted'
+```
+
+#### Frontend Pages Rebuilt
+
+**1. [frontend/src/pages/CampaignForm.jsx](frontend/src/pages/CampaignForm.jsx)** (924 lines)
+- 4-step wizard: Basic → Milestones → Budget → Settings
+- NO `.toFixed()` anywhere
+- NO `step` attributes on inputs
+- Sends budget as strings: `String(formData.budget)`
+- Multi-milestone support with structured deliverables
+- Budget allocation summary for proposals mode
+
+**2. [frontend/src/pages/Campaigns.jsx](frontend/src/pages/Campaigns.jsx)** (286 lines)
+- Brand campaign dashboard
+- Status filters (all, draft, active, paused, completed)
+- Quick actions: Publish, Pause, Resume, Edit, Delete
+- Displays budget without rounding
+- Card-based grid layout
+
+**3. [frontend/src/pages/CampaignDetails.jsx](frontend/src/pages/CampaignDetails.jsx)** (648 lines)
+- 3 tabs: Overview, Applications, Packages
+- Applications tab with Accept & Pay button
+- Packages tab with Browse Packages link
+- Status management buttons
+- Milestone and deliverable display
+- Reject modal for applications
+- NO budget rounding anywhere
+
+#### Terminology: Campaigns vs Opportunities
+
+**Brand Side** (sees "Campaigns"):
+- "My Campaigns"
+- "Create Campaign"
+- "Campaign Details"
+- "Review Applications"
+- "Accept Application"
+
+**Creator Side** (sees "Opportunities"):
+- "Browse Opportunities"
+- "Opportunity Details"
+- "Apply to Opportunity"
+- "My Applications"
+
+**Implementation**:
+```javascript
+// frontend/src/services/api.js
+
+// Brand-facing API
+export const campaignsAPI = {
+  getCampaigns: (params) => api.get('/campaigns', { params }),
+  createCampaign: (data) => api.post('/campaigns', data),
+  acceptProposal: (id) => api.post(`/campaigns/proposals/${id}/accept`),
+  // ...
+};
+
+// Creator-facing API (same backend, different naming)
+export const opportunitiesAPI = {
+  browseOpportunities: (params) => api.get('/campaigns/browse', { params }),
+  getOpportunity: (id) => api.get(`/campaigns/${id}`),
+  applyToOpportunity: (id, data) => api.post(`/campaigns/${id}/apply`, data),
+  // ...
+};
+```
+
+#### Budget NULL Handling
+
+**Packages Mode** (brand selects pre-made packages):
+- `budget` NOT NULL (total campaign budget)
+- `budget_min` NULL
+- `budget_max` NULL
+
+**Proposals Mode** (creators submit custom proposals):
+- `budget` NULL
+- `budget_min` NOT NULL (minimum willing to pay)
+- `budget_max` NOT NULL (maximum willing to pay)
+
+**Both Mode** (accept both):
+- All three NOT NULL
+
+**Validation**:
+```python
+if participation_mode == 'packages':
+    if not data.get('budget'):
+        return error('Budget required for packages mode')
+    budget = Decimal(str(data['budget']))
+    budget_min = None
+    budget_max = None
+
+elif participation_mode == 'proposals':
+    if not data.get('budget_min') or not data.get('budget_max'):
+        return error('Budget range required for proposals mode')
+    budget = None
+    budget_min = Decimal(str(data['budget_min']))
+    budget_max = Decimal(str(data['budget_max']))
+```
+
+#### Files Created/Modified
+
+**Backend**:
+1. `backend/migrations/versions/202603261000_rebuild_campaign_system.py` - Migration
+2. `backend/app/models/campaign.py` - Models with string money handling
+3. `backend/app/routes/campaigns.py` - 16 endpoints with payment-gated flow
+
+**Frontend**:
+1. `frontend/src/services/api.js` - campaignsAPI + opportunitiesAPI
+2. `frontend/src/pages/CampaignForm.jsx` - Campaign creation form
+3. `frontend/src/pages/Campaigns.jsx` - Campaign dashboard
+4. `frontend/src/pages/CampaignDetails.jsx` - Campaign details with applications
+
+**Still TODO**:
+- `frontend/src/pages/Opportunities.jsx` - Creator browse page
+- `frontend/src/pages/OpportunityDetails.jsx` - Creator view & apply
+- `frontend/src/pages/MyApplications.jsx` - Creator applications tracking
+- `frontend/src/pages/CampaignPayment.jsx` - Payment page
+
+#### Testing Checklist
+
+**Backend**:
+- [ ] Create campaign with packages mode → budget set, min/max NULL
+- [ ] Create campaign with proposals mode → budget NULL, min/max set
+- [ ] Accept proposal → Creates booking, NOT collaboration
+- [ ] Complete payment → Creates collaboration AFTER payment verified
+- [ ] Money values stay exact (100 stays 100, not 99.99)
+- [ ] Timezone-aware datetime comparisons work
+
+**Frontend**:
+- [ ] Enter budget 100 → Stays 100 (not 99.99)
+- [ ] Accept application → Redirects to payment page
+- [ ] Budget display shows exact values
+- [ ] Milestone budget allocation works
+- [ ] Status toggles work (draft → active → paused)
+
+#### Key Principles
+
+1. **Money is Sacred**: Never round, never use `.toFixed()`, never use `step` attributes
+2. **Time is Complex**: Always use `timezone.utc`, never `utcnow()`
+3. **Payment is Required**: No collaboration before payment confirmed
+4. **NULL is Strategic**: Budget fields nullable based on participation_mode
+5. **Terminology Matters**: Brands see "campaigns", creators see "opportunities"
+
+---
+
+**Updated**: Mar 26, 2026

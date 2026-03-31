@@ -183,7 +183,7 @@ const CreatorCampaignDetails = () => {
             )}
 
             {/* Milestones & Deliverables - What You'll Create */}
-            {campaign.milestones && campaign.milestones.length > 0 && (
+            {campaign.milestones && Array.isArray(campaign.milestones) && campaign.milestones.length > 0 && (
               <div className="bg-white rounded-3xl shadow-sm hover:shadow-md p-6 transition-shadow">
                 <h2 className="text-xl font-bold text-gray-900 mb-2">What You'll Create</h2>
                 <p className="text-sm text-gray-600 mb-4">Here's the breakdown of deliverables and payment schedule</p>
@@ -238,7 +238,7 @@ const CreatorCampaignDetails = () => {
                     <div className="flex items-center justify-between text-white">
                       <span className="font-medium">Total Potential Earnings:</span>
                       <span className="text-2xl font-bold">
-                        ${campaign.milestones.reduce((sum, m) => sum + (parseFloat(m.budget_allocation) || 0), 0).toFixed(2)}
+                        ${campaign.milestones.reduce((sum, m) => sum + (parseFloat(m.budget_allocation) || 0), 0)}
                       </span>
                     </div>
                   </div>
@@ -247,7 +247,7 @@ const CreatorCampaignDetails = () => {
             )}
 
             {/* Target Audience */}
-            {campaign.target_audience && (
+            {campaign.target_audience && typeof campaign.target_audience === 'string' && campaign.target_audience.trim() !== '' && (
               <div className="bg-white rounded-3xl shadow-sm hover:shadow-md p-6 transition-shadow">
                 <h2 className="text-xl font-bold text-gray-900 mb-4">Target Audience</h2>
                 <p className="text-gray-700">{campaign.target_audience}</p>

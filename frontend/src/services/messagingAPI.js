@@ -52,6 +52,55 @@ messagingAPI.interceptors.response.use(
   }
 );
 
+// Create axios instance for main API (Flask backend)
+const mainAPI = axios.create({
+  baseURL: API_BASE_URL,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+// Add auth token to main API requests
+mainAPI.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('access_token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
+
+// Handle token refresh on 401 for main API
+mainAPI.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    if (error.response?.status === 401) {
+      // Token expired, try to refresh
+      try {
+        const refreshToken = localStorage.getItem('refresh_token');
+        const response = await axios.post(`${API_BASE_URL}/auth/refresh`, {}, {
+          headers: { Authorization: `Bearer ${refreshToken}` }
+        });
+
+        const { access_token } = response.data;
+        localStorage.setItem('access_token', access_token);
+
+        // Retry original request
+        error.config.headers.Authorization = `Bearer ${access_token}`;
+        return axios(error.config);
+      } catch (refreshError) {
+        // Refresh failed, logout user
+        localStorage.clear();
+        window.location.href = '/login';
+        return Promise.reject(refreshError);
+      }
+    }
+    return Promise.reject(error);
+  }
+);
+
 export const messagingService = {
   // Get all conversations
   getConversations: () => messagingAPI.get('/conversations'),
@@ -63,6 +112,12 @@ export const messagingService = {
   // Mark messages as read
   markAsRead: (messageIds) =>
     messagingAPI.post('/messages/read', { messageIds }),
+
+  // Report a user/message (uses main API)
+  reportMessage: (data) => mainAPI.post('/messaging/report', data),
+
+  // Block a user (uses main API)
+  blockUser: (userId) => mainAPI.post(`/messaging/block/${userId}`),
 };
 
 export default messagingService;

@@ -1,7 +1,7 @@
 """
 Wallet Service - Handles all wallet-related operations
 """
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from sqlalchemy import func
 from app import db
 from app.models import (
@@ -27,12 +27,13 @@ def calculate_wallet_balances(user_id):
     wallet = get_or_create_wallet(user_id)
 
     # Calculate pending clearance
+    now = datetime.now(timezone.utc)
     pending_clearance = db.session.query(
         func.coalesce(func.sum(WalletTransaction.amount), 0)
     ).filter(
         WalletTransaction.user_id == user_id,
         WalletTransaction.status == 'pending_clearance',
-        WalletTransaction.available_at > datetime.utcnow()
+        WalletTransaction.available_at > now
     ).scalar()
 
     # Calculate available balance
@@ -64,7 +65,7 @@ def calculate_wallet_balances(user_id):
     wallet.available_balance = float(available_balance)
     wallet.withdrawn_total = float(withdrawn_total)
     wallet.total_earned = float(total_earned)
-    wallet.updated_at = datetime.utcnow()
+    wallet.updated_at = datetime.now(timezone.utc)
 
     db.session.commit()
 
@@ -73,17 +74,18 @@ def calculate_wallet_balances(user_id):
 
 def get_pending_clearance_transactions(user_id):
     """Get all transactions in pending clearance with progress"""
+    now = datetime.now(timezone.utc)
     transactions = WalletTransaction.query.filter(
         WalletTransaction.user_id == user_id,
         WalletTransaction.status == 'pending_clearance',
-        WalletTransaction.available_at > datetime.utcnow()
+        WalletTransaction.available_at > now
     ).order_by(WalletTransaction.available_at.asc()).all()
 
     result = []
     for txn in transactions:
         # Calculate days remaining
         days_total = txn.clearance_days or 30
-        days_elapsed = (datetime.utcnow() - txn.completed_at).days if txn.completed_at else 0
+        days_elapsed = (now - txn.completed_at).days if txn.completed_at else 0
         days_remaining = max(0, days_total - days_elapsed)
         progress_percentage = min(100, (days_elapsed / days_total) * 100)
 
@@ -147,7 +149,7 @@ def clear_pending_transactions():
     Scheduled job: Clear transactions that have passed 30-day period
     Should be run daily
     """
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
 
     # Find all transactions ready to clear
     ready_transactions = WalletTransaction.query.filter(
@@ -214,7 +216,7 @@ def credit_brand_wallet(user_id, amount, transaction_type, description, metadata
 
     # Update wallet balance
     wallet.available_balance = float(wallet.available_balance or 0) + float(amount)
-    wallet.updated_at = datetime.utcnow()
+    wallet.updated_at = datetime.now(timezone.utc)
 
     db.session.commit()
     return transaction

@@ -10,7 +10,7 @@ from app.models import (
     User
 )
 from app.services.payment_service import PaymentService
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import os
 from werkzeug.utils import secure_filename
 
@@ -94,7 +94,7 @@ def get_my_subscription_status():
             CreatorSubscription.status == 'active',
             CreatorSubscriptionPlan.subscription_type == 'verification',
             CreatorSubscription.payment_verified == True,
-            CreatorSubscription.end_date > datetime.utcnow()
+            CreatorSubscription.end_date > datetime.now(timezone.utc)
         ).first()
 
         if verification_subscription:
@@ -156,7 +156,7 @@ def subscribe_to_plan():
                 CreatorSubscription.status == 'active',
                 CreatorSubscriptionPlan.subscription_type == 'featured',
                 CreatorSubscriptionPlan.featured_category == plan.featured_category,
-                CreatorSubscription.end_date > datetime.utcnow()
+                CreatorSubscription.end_date > datetime.now(timezone.utc)
             ).first()
 
             if existing:
@@ -381,7 +381,7 @@ def upload_payment_proof():
             os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
             # Generate unique filename
-            filename = secure_filename(f"creator_sub_{subscription_id}_{creator.id}_{datetime.utcnow().timestamp()}.{file.filename.rsplit('.', 1)[1].lower()}")
+            filename = secure_filename(f"creator_sub_{subscription_id}_{creator.id}_{datetime.now(timezone.utc).timestamp()}.{file.filename.rsplit('.', 1)[1].lower()}")
             filepath = os.path.join(UPLOAD_FOLDER, filename)
 
             file.save(filepath)
@@ -390,7 +390,7 @@ def upload_payment_proof():
             subscription.payment_proof_path = f"/uploads/payment_proofs/{filename}"
             subscription.payment_method = 'manual'
             subscription.payment_status = 'pending_verification'  # Awaiting admin verification
-            subscription.updated_at = datetime.utcnow()
+            subscription.updated_at = datetime.now(timezone.utc)
 
             db.session.commit()
 
@@ -471,11 +471,11 @@ def pay_with_wallet():
         subscription.payment_verified = True
         subscription.payment_method = 'wallet'
         subscription.status = 'active'
-        subscription.start_date = datetime.utcnow()
+        subscription.start_date = datetime.now(timezone.utc)
 
         # Set end date based on plan duration
         if plan.duration_days:
-            subscription.end_date = datetime.utcnow() + timedelta(days=plan.duration_days)
+            subscription.end_date = datetime.now(timezone.utc) + timedelta(days=plan.duration_days)
         else:
             # One-time verification
             subscription.end_date = None

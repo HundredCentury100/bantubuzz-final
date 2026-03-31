@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { customPackagesAPI } from '../services/api';
 import toast from 'react-hot-toast';
 
-const CustomOfferModal = ({ requestId, requestData, onClose, onSuccess }) => {
+const CustomOfferModal = ({ requestId, requestData, brandId, onClose, onSuccess }) => {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [deliverables, setDeliverables] = useState(requestData?.expected_deliverables || ['']);
@@ -60,15 +60,23 @@ const CustomOfferModal = ({ requestId, requestData, onClose, onSuccess }) => {
     try {
       setSubmitting(true);
 
-      const response = await customPackagesAPI.createOffer({
-        request_id: requestId,
+      const offerData = {
         title: title.trim(),
         description: description.trim(),
         deliverables: validDeliverables,
         price: parseFloat(price),
         delivery_time_days: parseInt(deliveryTime),
         revisions_allowed: parseInt(revisions)
-      });
+      };
+
+      // Add either request_id or brand_id
+      if (requestId) {
+        offerData.request_id = requestId;
+      } else if (brandId) {
+        offerData.brand_id = brandId;
+      }
+
+      const response = await customPackagesAPI.createOffer(offerData);
 
       if (response.data.success) {
         toast.success('Custom package offer sent successfully!');

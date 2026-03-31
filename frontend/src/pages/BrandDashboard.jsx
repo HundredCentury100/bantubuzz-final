@@ -15,6 +15,9 @@ const BrandDashboard = () => {
   const [bookings, setBookings] = useState([]);
   const [subscription, setSubscription] = useState(null);
   const [connectedPlatforms, setConnectedPlatforms] = useState([]);
+  const [subscriptionBannerDismissed, setSubscriptionBannerDismissed] = useState(
+    localStorage.getItem('subscriptionBannerDismissed') === 'true'
+  );
   const [stats, setStats] = useState({
     totalBookings: 0,
     activeBookings: 0,
@@ -34,6 +37,11 @@ const BrandDashboard = () => {
       window.history.replaceState({}, document.title);
     }
   }, [location]);
+
+  const handleDismissSubscriptionBanner = () => {
+    setSubscriptionBannerDismissed(true);
+    localStorage.setItem('subscriptionBannerDismissed', 'true');
+  };
 
   const fetchDashboardData = async () => {
     try {
@@ -112,9 +120,18 @@ const BrandDashboard = () => {
 
       <div className="container-custom section-padding">
         {/* Upgrade Banner - Show Next Tier Features */}
-        {subscription && subscription.plan && subscription.plan.slug !== 'agency' && (
-          <div className="mb-8 p-6 bg-primary border border-primary rounded-3xl">
-            <div className="flex items-start gap-3">
+        {subscription && subscription.plan && subscription.plan.slug !== 'agency' && !subscriptionBannerDismissed && (
+          <div className="mb-8 p-6 bg-primary border border-primary rounded-3xl relative">
+            <button
+              onClick={handleDismissSubscriptionBanner}
+              className="absolute top-4 right-4 text-primary-dark hover:text-dark transition-colors"
+              title="Dismiss"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+            <div className="flex items-start gap-3 pr-8">
               <svg className="w-6 h-6 text-primary-dark mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M11.3 1.046A1 1 0 0112 2v5h4a1 1 0 01.82 1.573l-7 10A1 1 0 018 18v-5H4a1 1 0 01-.82-1.573l7-10a1 1 0 011.12-.38z" clipRule="evenodd" />
               </svg>

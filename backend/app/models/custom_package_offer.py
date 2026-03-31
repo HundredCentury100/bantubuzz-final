@@ -1,5 +1,5 @@
 from app import db
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 class CustomPackageOffer(db.Model):
     __tablename__ = 'custom_package_offers'
@@ -23,10 +23,10 @@ class CustomPackageOffer(db.Model):
     declined_at = db.Column(db.DateTime)
     declined_reason = db.Column(db.Text)
 
-    expires_at = db.Column(db.DateTime, default=lambda: datetime.utcnow() + timedelta(days=7))
+    expires_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc) + timedelta(days=7))
 
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
+    updated_at = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
 
     # Relationships
     creator = db.relationship('CreatorProfile', backref='custom_offers_sent')
@@ -64,5 +64,5 @@ class CustomPackageOffer(db.Model):
             'expires_at': self.expires_at.isoformat() if self.expires_at else None,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,
-            'is_expired': datetime.utcnow() > self.expires_at if self.expires_at else False
+            'is_expired': datetime.now(timezone.utc) > self.expires_at if self.expires_at else False
         }

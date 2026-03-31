@@ -102,7 +102,7 @@ const CampaignPackageBrowser = () => {
 
         // Navigate to payment page
         toast.success('Proceeding to payment...');
-        navigate(`/brand/campaigns/payment/${campaignId}`);
+        navigate(`/brand/campaigns/payment/${response.data.booking_id}`);
       } else {
         toast.error('Failed to create payment booking');
       }

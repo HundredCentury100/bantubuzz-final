@@ -236,13 +236,13 @@ const CustomPackageMessage = ({ message, isOwnMessage, currentUserId }) => {
         />
       )}
 
-      {/* Decline Modal */}
+      {/* Decline Modal with Counter-Offer Option */}
       {showDeclineModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-lg max-w-md w-full p-6">
             <h3 className="text-xl font-bold text-dark mb-4">Decline Offer</h3>
             <p className="text-gray-600 mb-4">
-              Please provide a reason for declining this offer.
+              Not quite what you're looking for? You can decline or send a counter-offer instead.
             </p>
             <textarea
               value={declineReason}
@@ -251,21 +251,36 @@ const CustomPackageMessage = ({ message, isOwnMessage, currentUserId }) => {
               rows="4"
               className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent mb-4"
             />
-            <div className="flex gap-3">
+            <div className="flex flex-col gap-3">
+              {/* Counter-Offer Button - Primary Action */}
               <button
-                onClick={() => setShowDeclineModal(false)}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                onClick={() => {
+                  setShowDeclineModal(false);
+                  setShowOfferModal(true);
+                }}
+                className="w-full bg-primary hover:bg-primary-dark text-white font-bold py-3 rounded-lg transition-colors"
                 disabled={actionLoading}
               >
-                Cancel
+                💼 Send Counter-Offer
               </button>
-              <button
-                onClick={handleDeclineOffer}
-                disabled={actionLoading || !declineReason.trim()}
-                className="flex-1 bg-error hover:bg-error/90 text-white font-bold py-2 rounded-lg disabled:opacity-50"
-              >
-                {actionLoading ? 'Declining...' : 'Decline'}
-              </button>
+
+              {/* Decline and Just Decline Buttons */}
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowDeclineModal(false)}
+                  className="flex-1 px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50"
+                  disabled={actionLoading}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDeclineOffer}
+                  disabled={actionLoading || !declineReason.trim()}
+                  className="flex-1 bg-error hover:bg-error/90 text-white font-bold py-2 rounded-lg disabled:opacity-50"
+                >
+                  {actionLoading ? 'Declining...' : 'Just Decline'}
+                </button>
+              </div>
             </div>
           </div>
         </div>

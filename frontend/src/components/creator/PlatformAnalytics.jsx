@@ -38,11 +38,19 @@ const PlatformAnalytics = ({ creatorId }) => {
   // Calculate overall stats from all platforms
   const getOverallStats = () => {
     if (!analytics || !analytics.platforms || analytics.platforms.length === 0) {
-      return { totalFollowers: 0, totalPosts: 0, avgEngagementRate: 0, totalReach: 0, totalLikes: 0, platformCount: 0 };
+      return { totalFollowers: 0, totalViews: 0, avgEngagementRate: 0, totalReach: 0, totalLikes: 0, platformCount: 0 };
     }
 
     const totalFollowers = analytics.platforms.reduce((sum, p) => sum + (p.followers || 0), 0);
-    const totalPosts = analytics.platforms.reduce((sum, p) => sum + (p.total_posts || 0), 0);
+
+    // Calculate total views/engagement across all platforms
+    // In BantuBuzz, views/engagement = reach (impressions)
+    // Calculate as avg_reach * total_posts for each platform
+    const totalViews = analytics.platforms.reduce((sum, p) => {
+      const avgReach = p.metrics?.avg_reach || 0;
+      const totalPosts = p.total_posts || 0;
+      return sum + (avgReach * totalPosts);
+    }, 0);
 
     // Calculate weighted average engagement rate
     // Weight each platform's engagement by its follower count for accurate overall metric
@@ -78,7 +86,7 @@ const PlatformAnalytics = ({ creatorId }) => {
 
     return {
       totalFollowers,
-      totalPosts,
+      totalViews,
       avgEngagementRate: avgEngagementRate.toFixed(2),
       totalReach,
       totalLikes,
@@ -133,8 +141,8 @@ const PlatformAnalytics = ({ creatorId }) => {
             <p className="text-sm text-gray-600 mt-1">Total Followers</p>
           </div>
           <div className="text-center">
-            <p className="text-3xl font-bold text-primary">{formatNumber(overallStats.totalPosts)}</p>
-            <p className="text-sm text-gray-600 mt-1">Total Posts</p>
+            <p className="text-3xl font-bold text-primary">{formatNumber(overallStats.totalViews)}</p>
+            <p className="text-sm text-gray-600 mt-1">Total Views</p>
           </div>
           <div className="text-center">
             <p className="text-3xl font-bold text-primary">{formatNumber(overallStats.totalReach)}</p>

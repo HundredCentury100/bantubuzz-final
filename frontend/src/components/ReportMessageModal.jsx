@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import toast from 'react-hot-toast';
+import messagingService from '../services/messagingAPI';
 
 const ReportMessageModal = ({ isOpen, onClose, message, conversationId, reportedUser }) => {
   const [loading, setLoading] = useState(false);
@@ -28,43 +29,32 @@ const ReportMessageModal = ({ isOpen, onClose, message, conversationId, reported
     try {
       setLoading(true);
 
-      const token = localStorage.getItem('access_token');
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/messaging/report`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          reported_user_id: reportedUser.id,
-          conversation_id: conversationId,
-          message_id: message.id || `temp_${Date.now()}`,
-          message_content: message.content,
-          report_category: selectedCategory,
-          description: description.trim() || undefined
-        })
+      const response = await messagingService.reportMessage({
+        reported_user_id: reportedUser.id,
+        conversation_id: conversationId,
+        message_id: message.id || `temp_${Date.now()}`,
+        message_content: message.content,
+        report_category: selectedCategory,
+        description: description.trim() || undefined
       });
 
-      const data = await response.json();
+      const data = response.data;
 
-      if (response.ok) {
-        if (data.is_emergency) {
-          toast.success('Emergency report submitted. Our team has been notified immediately.', {
-            duration: 5000,
-            icon: '🚨'
-          });
-        } else {
-          toast.success('Report submitted successfully. Our team will review it within 24 hours.');
-        }
-        onClose();
-        setSelectedCategory('');
-        setDescription('');
+      if (data.is_emergency) {
+        toast.success('Emergency report submitted. Our team has been notified immediately.', {
+          duration: 5000,
+          icon: '🚨'
+        });
       } else {
-        toast.error(data.error || 'Failed to submit report');
+        toast.success('Report submitted successfully. Our team will review it within 24 hours.');
       }
+      onClose();
+      setSelectedCategory('');
+      setDescription('');
     } catch (error) {
       console.error('Error reporting message:', error);
-      toast.error('Failed to submit report. Please try again.');
+      const errorMessage = error.response?.data?.error || error.message || 'Failed to submit report. Please try again.';
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }

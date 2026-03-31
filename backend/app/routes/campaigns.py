@@ -441,8 +441,10 @@ def apply_to_campaign(campaign_id):
             status='pending',
             proposed_price=proposed_price,
             proposal_message=data.get('proposal_message'),
-            deliverables=data.get('deliverables'),
-            delivery_timeline_days=data.get('delivery_timeline_days')
+            deliverables=data.get('deliverables'),  # Legacy field
+            delivery_timeline_days=data.get('delivery_timeline_days'),
+            pricing_mode=data.get('pricing_mode', 'total'),
+            milestones=data.get('milestones', [])
         )
 
         db.session.add(proposal)
@@ -607,6 +609,8 @@ def complete_proposal_payment(proposal_id):
         proposal.reviewed_at = datetime.now(timezone.utc)
 
         # Create collaboration NOW (after payment)
+        from app.models.collaboration_milestone import CollaborationMilestone
+
         collaboration = Collaboration(
             collaboration_type='campaign',
             campaign_id=proposal.campaign_id,
@@ -616,7 +620,7 @@ def complete_proposal_payment(proposal_id):
             title=proposal.campaign.title,
             description=proposal.campaign.description,
             amount=proposal.proposed_price,
-            deliverables=proposal.deliverables,
+            deliverables=proposal.deliverables,  # Legacy field for backward compatibility
             start_date=proposal.campaign.start_date,
             expected_completion_date=proposal.campaign.end_date,
             status='in_progress',
@@ -624,6 +628,43 @@ def complete_proposal_payment(proposal_id):
         )
 
         db.session.add(collaboration)
+        db.session.flush()  # Get collaboration.id
+
+        # Create collaboration milestones from proposal milestones
+        if proposal.milestones and len(proposal.milestones) > 0:
+            for milestone_data in proposal.milestones:
+                # Parse due date if present
+                due_date = None
+                if milestone_data.get('due_date'):
+                    try:
+                        due_date_str = milestone_data['due_date']
+                        if isinstance(due_date_str, str):
+                            # Parse ISO date string
+                            due_date = datetime.fromisoformat(due_date_str.split('T')[0]).date()
+                    except (ValueError, AttributeError):
+                        pass
+
+                # Parse milestone price (handle per_milestone pricing)
+                milestone_price = Decimal('0')
+                if proposal.pricing_mode == 'per_milestone' and milestone_data.get('price'):
+                    milestone_price = Decimal(str(milestone_data['price']))
+                else:
+                    # For total pricing, divide evenly among milestones
+                    milestone_price = proposal.proposed_price / len(proposal.milestones)
+
+                # Create collaboration milestone
+                collab_milestone = CollaborationMilestone(
+                    collaboration_id=collaboration.id,
+                    milestone_number=milestone_data.get('milestone_number', 1),
+                    title=milestone_data.get('name', f"Milestone {milestone_data.get('milestone_number', 1)}"),
+                    description='',
+                    expected_deliverables=milestone_data.get('deliverables', []),
+                    status='pending',
+                    price=milestone_price,
+                    due_date=due_date
+                )
+                db.session.add(collab_milestone)
+
         db.session.commit()
 
         return jsonify({
@@ -861,4 +902,68 @@ def remove_package_from_campaign(campaign_id, package_id):
     except Exception as e:
         db.session.rollback()
         print(f"Error removing package: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+
+# ========================================
+# ANALYTICS ENDPOINTS - Audience Demographics
+# ========================================
+
+@bp.route('/<int:campaign_id>/audience', methods=['GET'])
+@jwt_required()
+def get_campaign_audience(campaign_id):
+    """
+    Get aggregated audience demographics for creators in a campaign
+
+    Combines audience data from all creators who have collaborations in this campaign
+    """
+    try:
+        user_id = int(get_jwt_identity())
+        brand = BrandProfile.query.filter_by(user_id=user_id).first()
+
+        if not brand:
+            return jsonify({'error': 'Brand profile not found'}), 404
+
+        campaign = Campaign.query.get(campaign_id)
+        if not campaign or campaign.brand_id != brand.id:
+            return jsonify({'error': 'Campaign not found or unauthorized'}), 404
+
+        # Get all collaborations for this campaign
+        collaborations = Collaboration.query.filter_by(campaign_id=campaign_id).all()
+
+        if not collaborations:
+            return jsonify({'error': 'No collaborations found for this campaign'}), 404
+
+        # Get ThunziAI platform IDs for all creators in collaborations
+        from app.models.thunzi_account import ThunziAccount
+        from app.services.thunzi_service import thunzi_service
+
+        platform_ids = []
+
+        for collab in collaborations:
+            thunzi_account = ThunziAccount.query.filter_by(
+                bantubuzz_user_id=collab.creator.user_id,
+                bantubuzz_user_type='creator'
+            ).first()
+
+            if thunzi_account and thunzi_account.thunzi_creator_id:
+                thunzi_service.login()
+                platforms = thunzi_service.get_creator_platforms(thunzi_account.thunzi_creator_id)
+                platform_ids.extend([p['id'] for p in platforms if p.get('isConnected')])
+
+        if not platform_ids:
+            return jsonify({'error': 'No platform data available'}), 404
+
+        # Get aggregated audience data
+        audience_data = thunzi_service.get_aggregated_audience(platform_ids)
+
+        if not audience_data:
+            return jsonify({'error': 'No audience data available'}), 404
+
+        return jsonify(audience_data), 200
+
+    except Exception as e:
+        print(f"Error getting campaign audience: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500

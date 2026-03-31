@@ -1,24 +1,14 @@
 {
   "permissions": {
     "allow": [
-      "Bash(curl -I http://173.212.245.22)",
-      "Bash(ssh root@173.212.245.22 \"ls -lah /var/www/bantubuzz/frontend/dist/ | head -20\")",
-      "Bash(curl:*)",
-      "Bash(ping:*)",
-      "Bash(ssh root@173.212.245.22 \"du -sh /var/www/bantubuzz/frontend/dist/assets/* 2>/dev/null | sort -h\")",
+      "Bash(git push:*)",
+      "Bash(ssh root@173.212.245.22 \"cd /var/www/bantubuzz/backend && systemctl restart bantubuzz-backend && echo ''Backend restarted successfully''\")",
+      "Bash(ssh root@173.212.245.22 \"pm2 restart bantubuzz-backend && echo ''Backend restarted successfully''\")",
       "Bash(ssh:*)",
       "Bash(npm run build:*)",
       "Bash(tar:*)",
       "Bash(scp:*)",
-      "Bash(git add:*)",
-      "Bash(md5sum:*)",
-      "Bash(python:*)",
-      "Bash(git commit:*)",
-      "Bash(git push:*)",
-      "Bash(npm install:*)",
-      "Bash(dir:*)",
-      "Bash(findstr:*)",
-      "Bash(if exist nul del /f nul)"
+      "Bash(git add:*)"
     ],
     "deny": [],
     "ask": []

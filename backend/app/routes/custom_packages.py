@@ -3,7 +3,7 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 from app import db
 from app.models import CustomPackageRequest, CustomPackageOffer, BrandProfile, CreatorProfile, User, Booking, Notification, Message
 from app.utils.websocket_helper import emit_message_to_websocket
-from datetime import datetime
+from datetime import datetime, timezone
 
 bp = Blueprint('custom_packages', __name__, url_prefix='/api/custom-packages')
 
@@ -146,14 +146,14 @@ def accept_offer(offer_id):
             return jsonify({'error': f'Offer is already {offer.status}'}), 400
 
         # Check if expired
-        if datetime.utcnow() > offer.expires_at:
+        if datetime.now(timezone.utc) > offer.expires_at:
             offer.status = 'expired'
             db.session.commit()
             return jsonify({'error': 'Offer has expired'}), 400
 
         # Update offer status
         offer.status = 'accepted'
-        offer.accepted_at = datetime.utcnow()
+        offer.accepted_at = datetime.now(timezone.utc)
 
         # Update request status
         offer.request.status = 'accepted'
@@ -232,7 +232,7 @@ def decline_offer(offer_id):
 
         # Update offer status
         offer.status = 'declined'
-        offer.declined_at = datetime.utcnow()
+        offer.declined_at = datetime.now(timezone.utc)
         offer.declined_reason = reason
 
         # Update request back to pending so creator can send another offer
@@ -294,7 +294,7 @@ def get_received_requests():
 @bp.route('/offers', methods=['POST'])
 @jwt_required()
 def create_custom_offer():
-    """Creator creates a custom package offer in response to a request"""
+    """Creator creates a custom package offer in response to a request OR directly to a brand"""
     try:
         user_id = int(get_jwt_identity())
         creator = CreatorProfile.query.filter_by(user_id=user_id).first()
@@ -304,6 +304,7 @@ def create_custom_offer():
 
         data = request.get_json()
         request_id = data.get('request_id')
+        brand_id = data.get('brand_id')  # Allow direct brand targeting
         title = data.get('title')
         description = data.get('description')
         deliverables = data.get('deliverables')
@@ -312,7 +313,7 @@ def create_custom_offer():
         revisions_allowed = data.get('revisions_allowed', 2)
 
         # Validation
-        if not all([request_id, title, description, deliverables, price, delivery_time_days]):
+        if not all([title, description, deliverables, price, delivery_time_days]):
             return jsonify({'error': 'Missing required fields'}), 400
 
         if not isinstance(deliverables, list) or len(deliverables) == 0:
@@ -332,22 +333,46 @@ def create_custom_offer():
         except ValueError:
             return jsonify({'error': 'Invalid delivery time'}), 400
 
-        # Check request exists
-        custom_request = CustomPackageRequest.query.get(request_id)
-        if not custom_request:
-            return jsonify({'error': 'Request not found'}), 404
+        # Handle two cases: response to request OR direct offer
+        if request_id:
+            # Response to existing request
+            custom_request = CustomPackageRequest.query.get(request_id)
+            if not custom_request:
+                return jsonify({'error': 'Request not found'}), 404
 
-        if custom_request.creator_id != creator.id:
-            return jsonify({'error': 'Unauthorized'}), 403
+            if custom_request.creator_id != creator.id:
+                return jsonify({'error': 'Unauthorized'}), 403
 
-        if custom_request.status == 'accepted':
-            return jsonify({'error': 'Request has already been accepted'}), 400
+            if custom_request.status == 'accepted':
+                return jsonify({'error': 'Request has already been accepted'}), 400
+
+            brand_id = custom_request.brand_id
+        elif brand_id:
+            # Direct offer - create a placeholder request first
+            brand = BrandProfile.query.get(brand_id)
+            if not brand:
+                return jsonify({'error': 'Brand not found'}), 404
+
+            # Create placeholder request
+            custom_request = CustomPackageRequest(
+                brand_id=brand_id,
+                creator_id=creator.id,
+                expected_deliverables=deliverables,
+                budget=price,
+                additional_notes='Direct offer from creator',
+                status='offer_sent'
+            )
+            db.session.add(custom_request)
+            db.session.flush()
+            request_id = custom_request.id
+        else:
+            return jsonify({'error': 'Either request_id or brand_id is required'}), 400
 
         # Create offer
         offer = CustomPackageOffer(
             request_id=request_id,
             creator_id=creator.id,
-            brand_id=custom_request.brand_id,
+            brand_id=brand_id,
             title=title,
             description=description,
             deliverables=deliverables,
@@ -361,11 +386,15 @@ def create_custom_offer():
         db.session.flush()  # Get offer ID
 
         # Update request status
-        custom_request.status = 'offer_sent'
+        if custom_request:
+            custom_request.status = 'offer_sent'
+
+        # Get brand for notification
+        brand = BrandProfile.query.get(brand_id)
 
         # Create notification for brand
         notification = Notification(
-            user_id=custom_request.brand.user_id,
+            user_id=brand.user_id,
             type='custom_package_offer',
             title='New Custom Package Offer',
             message=f'{creator.username} has sent you a custom package offer: {title}. Price: ${price}',
@@ -378,7 +407,7 @@ def create_custom_offer():
 
         message = Message(
             sender_id=creator.user_id,
-            receiver_id=custom_request.brand.user_id,
+            receiver_id=brand.user_id,
             custom_offer_id=offer.id,
             message_type='custom_offer',
             content=message_content,

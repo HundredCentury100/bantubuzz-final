@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { creatorsAPI, packagesAPI, bookingsAPI, campaignsAPI } from '../services/api';
+import { creatorsAPI, packagesAPI, bookingsAPI, opportunitiesAPI } from '../services/api';
 import api from '../services/api';
 import Navbar from '../components/Navbar';
 import toast from 'react-hot-toast';
@@ -69,7 +69,7 @@ const CreatorDashboard = () => {
         creatorsAPI.getOwnProfile(),
         packagesAPI.getMyPackages(),
         bookingsAPI.getMyBookings(),
-        campaignsAPI.getMyApplications({ limit: 5 }),
+        opportunitiesAPI.getMyApplications({ limit: 5 }),
         api.get('/subscriptions/my-subscription'),
         api.get('/creator/verification/status'),
         api.get('/creator/subscriptions/my-subscription'),
@@ -81,13 +81,13 @@ const CreatorDashboard = () => {
         setProfile(profileRes.value.data);
       }
 
-      // Handle packages
+      // Handle packages - Keep FULL array for stats, slice for display
       const pkgs = packagesRes.status === 'fulfilled' ? (packagesRes.value.data.packages || []) : [];
-      setPackages(pkgs.slice(0, 3)); // Show only 3 recent
+      setPackages(pkgs.slice(0, 3)); // Show only 3 recent in UI
 
-      // Handle bookings
+      // Handle bookings - Keep FULL array for stats, slice for display
       const bks = bookingsRes.status === 'fulfilled' ? (bookingsRes.value.data.bookings || []) : [];
-      setBookings(bks.slice(0, 5)); // Show only 5 recent
+      setBookings(bks.slice(0, 5)); // Show only 5 recent in UI
 
       // Handle applications
       const apps = applicationsRes.status === 'fulfilled' ? (applicationsRes.value.data.applications || []) : [];
@@ -113,7 +113,7 @@ const CreatorDashboard = () => {
         setConnectedPlatforms(platformsRes.value.data.platforms || []);
       }
 
-      // Calculate stats
+      // Calculate stats from FULL arrays (before slicing)
       const activePackages = pkgs.filter(p => p.is_active).length;
       const pendingBookings = bks.filter(b => b.status === 'pending').length;
       const totalEarnings = bks
@@ -121,9 +121,9 @@ const CreatorDashboard = () => {
         .reduce((sum, b) => sum + (b.amount || 0), 0);
 
       setStats({
-        totalPackages: pkgs.length,
+        totalPackages: pkgs.length,  // Use full array length
         activePackages,
-        totalBookings: bks.length,
+        totalBookings: bks.length,  // Use full array length
         pendingBookings,
         totalEarnings
       });
@@ -146,7 +146,8 @@ const CreatorDashboard = () => {
     );
   }
 
-  const profileComplete = profile?.bio && profile?.categories?.length > 0 && profile?.follower_count > 0;
+  // Profile is complete if bio and at least one category is set
+  const profileComplete = profile?.bio && profile?.categories?.length > 0;
 
   return (
     <div className="min-h-screen bg-light">
@@ -309,7 +310,7 @@ const CreatorDashboard = () => {
                   <p className={`text-sm mb-2 ${profileComplete ? 'text-green-700' : 'text-blue-700'}`}>
                     {profileComplete
                       ? 'Great! Your profile is complete and ready to attract brands.'
-                      : 'Add your bio, categories, and follower count to make your profile stand out.'}
+                      : 'Add your bio and select your categories to make your profile stand out.'}
                   </p>
                   {!profileComplete && (
                     <Link
@@ -413,16 +414,10 @@ const CreatorDashboard = () => {
                     </p>
                     <div className="flex flex-wrap gap-2">
                       <Link
-                        to="/creator/briefs"
+                        to="/creator/campaigns"
                         className="inline-flex items-center px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors text-sm font-medium"
                       >
-                        Browse Briefs
-                      </Link>
-                      <Link
-                        to="/creator/campaigns"
-                        className="inline-flex items-center px-4 py-2 bg-white text-primary border border-primary rounded-lg hover:bg-primary/5 transition-colors text-sm font-medium"
-                      >
-                        Browse Campaigns
+                        Browse Opportunities
                       </Link>
                     </div>
                   </div>
@@ -450,74 +445,7 @@ const CreatorDashboard = () => {
           </div>
         )}
 
-        {/* Profile Completion Alert */}
-        {!profileComplete && (
-          <div className="mb-6 p-4 bg-primary border border-primary rounded-lg">
-            <div className="flex items-start">
-              <svg className="w-5 h-5 text-primary-dark mt-0.5 mr-3" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-              </svg>
-              <div className="flex-1">
-                <h3 className="font-medium text-primary-dark leading-snug">Complete Your Profile</h3>
-                <p className="text-sm text-primary-dark leading-relaxed mt-1">
-                  Fill out your profile to attract more brands and start earning!
-                </p>
-                <Link
-                  to="/creator/profile/edit"
-                  className="inline-block mt-3 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary transition-colors text-sm font-medium"
-                >
-                  Complete Profile
-                </Link>
-              </div>
-            </div>
-          </div>
-        )}
 
-        {/* Social Media Connection Banner */}
-        {profileComplete && connectedPlatforms.length === 0 && (
-          <div className="mb-6 p-4 bg-primary border border-primary rounded-lg">
-            <div className="flex items-start">
-              <svg className="w-5 h-5 text-primary-dark mt-0.5 mr-3" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM4.332 8.027a6.012 6.012 0 011.912-2.706C6.512 5.73 6.974 6 7.5 6A1.5 1.5 0 019 7.5V8a2 2 0 004 0 2 2 0 011.523-1.943A5.977 5.977 0 0116 10c0 .34-.028.675-.083 1H15a2 2 0 00-2 2v2.197A5.973 5.973 0 0110 16v-2a2 2 0 00-2-2 2 2 0 01-2-2 2 2 0 00-1.668-1.973z" clipRule="evenodd" />
-              </svg>
-              <div className="flex-1">
-                <h3 className="font-medium text-primary-dark leading-snug">Connect Your Social Media Platforms</h3>
-                <p className="text-sm text-primary-dark leading-relaxed mt-1">
-                  Link your Instagram, TikTok, YouTube, Facebook, and X accounts to showcase your reach to brands and increase bookings.
-                </p>
-                <Link
-                  to="/creator/platforms"
-                  className="inline-block mt-3 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary transition-colors text-sm font-medium"
-                >
-                  Connect Platforms
-                </Link>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* No Packages Alert */}
-        {stats.totalPackages === 0 && profileComplete && (
-          <div className="mb-6 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-            <div className="flex items-start">
-              <svg className="w-5 h-5 text-yellow-600 mt-0.5 mr-3" fill="currentColor" viewBox="0 0 20 20">
-                <path d="M10 2a8 8 0 100 16 8 8 0 000-16zm0 14a6 6 0 110-12 6 6 0 010 12zm-1-9h2v5H9V7zm0 6h2v2H9v-2z"/>
-              </svg>
-              <div className="flex-1">
-                <h3 className="font-medium text-yellow-900 leading-snug">Create Your First Package</h3>
-                <p className="text-sm text-yellow-800 leading-relaxed mt-1">
-                  You need at least one active package to appear in the browse creators page. Create a package to start receiving bookings from brands!
-                </p>
-                <Link
-                  to="/creator/packages"
-                  className="inline-block mt-3 px-4 py-2 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors text-sm font-medium"
-                >
-                  Create Package
-                </Link>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
@@ -670,44 +598,6 @@ const CreatorDashboard = () => {
               )}
             </div>
 
-            {/* Recent Bookings */}
-            <div className="card">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-xl font-bold text-dark">Recent Bookings</h2>
-                <Link to="/creator/bookings" className="text-primary hover:text-primary-dark text-sm font-medium">
-                  View All
-                </Link>
-              </div>
-
-              {bookings.length === 0 ? (
-                <div className="text-center py-8">
-                  <p className="text-gray-500">No bookings yet</p>
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {bookings.map((booking) => (
-                    <div key={booking.id} className="p-4 border border-gray-200 rounded-lg">
-                      <div className="flex items-center justify-between mb-2">
-                        <span className={`px-2 py-1 rounded text-xs font-medium ${
-                          booking.status === 'pending' ? 'bg-primary text-primary-dark' :
-                          booking.status === 'accepted' ? 'bg-primary/10 text-primary' :
-                          booking.status === 'completed' ? 'bg-primary/10 text-primary-dark' :
-                          'bg-red-100 text-red-800'
-                        }`}>
-                          {booking.status}
-                        </span>
-                        <span className="text-sm font-bold text-dark">${booking.amount}</span>
-                      </div>
-                      <p className="text-sm text-gray-600">{booking.package?.title || 'Package'}</p>
-                      <p className="text-xs text-gray-500 mt-1">
-                        {new Date(booking.created_at).toLocaleDateString()}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
             {/* Recent Campaign Applications */}
             <div className="card">
               <div className="flex items-center justify-between mb-6">
@@ -834,18 +724,6 @@ const CreatorDashboard = () => {
                 </Link>
 
                 <Link
-                  to="/creator/briefs"
-                  className="block p-3 border border-gray-200 rounded-lg hover:border-primary hover:bg-primary/5 transition-colors"
-                >
-                  <div className="flex items-center">
-                    <svg className="w-5 h-5 text-primary mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                    </svg>
-                    <span className="font-medium text-dark">Browse Briefs</span>
-                  </div>
-                </Link>
-
-                <Link
                   to="/creator/proposals"
                   className="block p-3 border border-gray-200 rounded-lg hover:border-primary hover:bg-primary/5 transition-colors"
                 >
@@ -866,7 +744,7 @@ const CreatorDashboard = () => {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 3.055A9.001 9.001 0 1020.945 13H11V3.055z" />
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.488 9H15V3.512A9.025 9.025 0 0120.488 9z" />
                     </svg>
-                    <span className="font-medium text-dark">Browse Campaigns</span>
+                    <span className="font-medium text-dark">Browse Opportunities</span>
                   </div>
                 </Link>
 

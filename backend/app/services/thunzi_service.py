@@ -877,6 +877,156 @@ class ThunziAIService:
             log_error('ThunziAI.get_post_comments_by_original_id', e)
             return None
 
+    def get_platform_audience(self, platform_id: int) -> Optional[Dict]:
+        """
+        Get audience demographics for a platform
+
+        Args:
+            platform_id: ThunziAI platform connection ID
+
+        Returns:
+            {
+                "id": number,
+                "platformId": number,
+                "age": [{"breakdown": string, "value": number}],
+                "countries": [{"breakdown": string, "value": number}],
+                "cities": [{"breakdown": string, "value": number}],
+                "gender": [{"breakdown": string, "value": number}],
+                "createdAt": string,
+                "updatedAt": string
+            }
+        """
+        self._ensure_authenticated()
+
+        try:
+            url = f"{self.BASE_URL}/api/platforms/{platform_id}/audience"
+
+            log_external_api_call(
+                service='ThunziAI',
+                method='GET',
+                url=url,
+                payload={'platform_id': platform_id}
+            )
+
+            response = self.session.get(url)
+
+            # Log response safely
+            try:
+                response_body = response.json() if response.status_code == 200 else response.text[:500]
+            except:
+                response_body = response.text[:500] if response.text else f"Empty response (status {response.status_code})"
+
+            log_external_api_response(
+                service='ThunziAI',
+                method='GET',
+                url=url,
+                status_code=response.status_code,
+                response_body=response_body
+            )
+
+            if response.status_code == 200:
+                data = response.json()
+                # Flatten nested arrays for easier consumption
+                return {
+                    'id': data.get('id'),
+                    'platformId': data.get('platormConnectionId'),  # Typo in Thunzi API
+                    'age': self._flatten_audience_data(data.get('age', [])),  # Use 'age' field
+                    'countries': self._flatten_audience_data(data.get('countries', [])),
+                    'cities': self._flatten_audience_data(data.get('cities', [])),
+                    'gender': self._flatten_audience_data(data.get('gender', [])),
+                    'createdAt': data.get('createdAt'),
+                    'updatedAt': data.get('updatedAt')
+                }
+
+            log_error('ThunziAI.get_platform_audience',
+                     f"Failed with status {response.status_code}: {response.text[:200]}")
+            return None
+        except Exception as e:
+            log_error('ThunziAI.get_platform_audience', e)
+            return None
+
+    def _flatten_audience_data(self, nested_data: List) -> List[Dict]:
+        """
+        Flatten nested audience data arrays
+
+        Input: [[{"breakdown": "18-24", "value": 28}], [{"breakdown": "25-34", "value": 48}]]
+        Output: [{"breakdown": "18-24", "value": 28}, {"breakdown": "25-34", "value": 48}]
+        """
+        flattened = []
+        for item_array in nested_data:
+            if item_array and len(item_array) > 0:
+                flattened.append(item_array[0])
+        return flattened
+
+    def get_aggregated_audience(self, platform_ids: List[int]) -> Optional[Dict]:
+        """
+        Get aggregated audience data across multiple platforms
+
+        Useful for brand analytics to see combined audience from all campaigns
+
+        Args:
+            platform_ids: List of ThunziAI platform IDs
+
+        Returns:
+            Aggregated audience data with totals and percentages
+        """
+        all_audiences = []
+
+        for platform_id in platform_ids:
+            audience = self.get_platform_audience(platform_id)
+            if audience:
+                all_audiences.append(audience)
+
+        if not all_audiences:
+            return None
+
+        # Aggregate data
+        aggregated = {
+            'age': self._aggregate_demographic(all_audiences, 'age'),
+            'countries': self._aggregate_demographic(all_audiences, 'countries'),
+            'cities': self._aggregate_demographic(all_audiences, 'cities'),
+            'gender': self._aggregate_demographic(all_audiences, 'gender'),
+            'totalPlatforms': len(all_audiences)
+        }
+
+        return aggregated
+
+    def _aggregate_demographic(self, audiences: List[Dict], field: str) -> List[Dict]:
+        """
+        Aggregate a demographic field across multiple audiences
+
+        Sums up values for same breakdowns and calculates percentages
+        """
+        breakdown_totals = {}
+
+        for audience in audiences:
+            demographics = audience.get(field, [])
+            for demo in demographics:
+                breakdown = demo.get('breakdown')
+                value = demo.get('value', 0)
+
+                if breakdown:
+                    if breakdown not in breakdown_totals:
+                        breakdown_totals[breakdown] = 0
+                    breakdown_totals[breakdown] += value
+
+        # Convert to list and calculate percentages
+        total = sum(breakdown_totals.values())
+        result = []
+
+        for breakdown, value in breakdown_totals.items():
+            percentage = (value / total * 100) if total > 0 else 0
+            result.append({
+                'breakdown': breakdown,
+                'value': value,
+                'percentage': round(percentage, 2)
+            })
+
+        # Sort by value descending
+        result.sort(key=lambda x: x['value'], reverse=True)
+
+        return result
+
 
 # Singleton instance
 thunzi_service = ThunziAIService()

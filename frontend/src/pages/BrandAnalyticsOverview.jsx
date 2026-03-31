@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
-import api from '../services/api';
+import api, { analyticsAPI } from '../services/api';
 import toast from 'react-hot-toast';
+import AudienceCharts from '../components/AudienceCharts';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -48,9 +49,12 @@ const BrandAnalyticsOverview = () => {
   const navigate = useNavigate();
   const [analytics, setAnalytics] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [audienceData, setAudienceData] = useState(null);
+  const [audienceLoading, setAudienceLoading] = useState(true);
 
   useEffect(() => {
     fetchOverallAnalytics();
+    fetchBrandAudience();
   }, []);
 
   const fetchOverallAnalytics = async () => {
@@ -71,6 +75,20 @@ const BrandAnalyticsOverview = () => {
       }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchBrandAudience = async () => {
+    try {
+      setAudienceLoading(true);
+      const response = await analyticsAPI.getBrandAudience();
+      setAudienceData(response.data);
+    } catch (error) {
+      console.error('Error fetching audience data:', error);
+      // Don't show error toast as audience data is optional
+      setAudienceData(null);
+    } finally {
+      setAudienceLoading(false);
     }
   };
 
@@ -373,23 +391,36 @@ const BrandAnalyticsOverview = () => {
               <p className="text-xs text-gray-500">{analytics.total_posts} posts delivered</p>
             </div>
 
-            {/* Overall ROI */}
+            {/* Total Views/Impressions */}
             <div className="bg-white rounded-3xl shadow-sm hover:shadow-md p-6 transition-shadow">
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <p className="text-sm text-gray-600 mb-1">Overall ROI</p>
-                  <p className={`text-3xl font-bold ${analytics.overall_roi >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    {analytics.overall_roi >= 0 ? '+' : ''}{analytics.overall_roi}%
-                  </p>
+                  <p className="text-sm text-gray-600 mb-1">Total Views</p>
+                  <p className="text-3xl font-bold text-dark">{formatNumber(analytics.total_impressions)}</p>
                 </div>
                 <div className="w-14 h-14 bg-primary/10 rounded-2xl flex items-center justify-center">
-                  <ArrowTrendingUpIcon className="w-7 h-7 text-primary" />
+                  <EyeIcon className="w-7 h-7 text-primary" />
                 </div>
               </div>
-              <p className="text-xs text-gray-500">Return on investment</p>
+              <p className="text-xs text-gray-500">Total impressions across campaigns</p>
             </div>
           </div>
         </div>
+
+        {/* Audience Demographics */}
+        {audienceData && audienceData.totalPlatforms > 0 && (
+          <div className="mb-8">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-2xl font-bold text-dark">Audience Demographics</h2>
+                <p className="text-sm text-gray-500 mt-1">
+                  Combined audience across {audienceData.totalCollaborations} collaborations • {audienceData.totalPlatforms} platforms
+                </p>
+              </div>
+            </div>
+            <AudienceCharts audienceData={audienceData} loading={audienceLoading} />
+          </div>
+        )}
 
         {/* Charts Row 1 */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">

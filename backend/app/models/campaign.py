@@ -199,8 +199,12 @@ class CampaignProposal(db.Model):
     status = db.Column(db.String(20), nullable=False, default='pending')  # 'pending', 'awaiting_payment', 'accepted', 'rejected'
     proposed_price = db.Column(db.Numeric(12, 2), nullable=False)
     proposal_message = db.Column(db.Text)  # Why they're perfect for this opportunity
-    deliverables = db.Column(db.Text)  # Custom deliverables description
+    deliverables = db.Column(db.Text)  # Legacy text field for backward compatibility
     delivery_timeline_days = db.Column(db.Integer)
+
+    # New structured fields for milestone-based applications
+    pricing_mode = db.Column(db.String(20), default='total')  # 'total' or 'per_milestone'
+    milestones = db.Column(JSONB, default=[])  # Structured milestones with deliverables and pricing
 
     brand_notes = db.Column(db.Text)  # Brand's internal notes
     booking_id = db.Column(db.Integer, db.ForeignKey('bookings.id', ondelete='SET NULL'))  # Payment link
@@ -227,6 +231,8 @@ class CampaignProposal(db.Model):
             'proposal_message': self.proposal_message,
             'deliverables': self.deliverables,
             'delivery_timeline_days': self.delivery_timeline_days,
+            'pricing_mode': self.pricing_mode,
+            'milestones': self.milestones or [],
             'brand_notes': self.brand_notes,
             'booking_id': self.booking_id,
             'applied_at': self.applied_at.isoformat() if self.applied_at else None,

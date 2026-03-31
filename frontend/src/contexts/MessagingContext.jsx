@@ -117,6 +117,12 @@ export const MessagingProvider = ({ children }) => {
         }
       });
 
+      // Receive initial list of online users
+      socketInstance.on('online_users_list', ({ userIds }) => {
+        console.log('📋 Received online users list:', userIds);
+        setOnlineUsers(new Set(userIds.map(id => id.toString())));
+      });
+
       // Receive new messages
       socketInstance.on('new_message', (message) => {
         console.log('New message received:', message);
@@ -128,11 +134,14 @@ export const MessagingProvider = ({ children }) => {
           [conversationId]: [...(prev[conversationId] || []), message]
         }));
 
+        // Dispatch custom event to trigger conversation list refresh
+        window.dispatchEvent(new CustomEvent('new_message_received', { detail: message }));
+
         // Play notification sound
         playNotificationSound();
 
         // Show toast notification
-        toast(`New message from ${message.sender.name || message.sender.email}`, {
+        toast(`New message from ${message.sender?.name || message.sender?.email || 'Someone'}`, {
           duration: 3000,
         });
       });
@@ -147,6 +156,9 @@ export const MessagingProvider = ({ children }) => {
           ...prev,
           [conversationId]: [...(prev[conversationId] || []), message]
         }));
+
+        // Dispatch custom event to trigger conversation list refresh
+        window.dispatchEvent(new CustomEvent('message_sent', { detail: message }));
       });
 
       // User status updates

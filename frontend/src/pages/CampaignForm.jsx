@@ -308,6 +308,13 @@ const CampaignForm = () => {
 
   const nextStep = () => {
     if (validateStep(currentStep)) {
+      // If moving from step 3 to step 4, show warning about budget fields for proposals/both
+      if (currentStep === 3 && (formData.participation_mode === 'proposals' || formData.participation_mode === 'both')) {
+        toast('Please set budget range in the next step', {
+          icon: 'ℹ️',
+          duration: 4000,
+        });
+      }
       setCurrentStep(prev => Math.min(prev + 1, 4));
     }
   };
@@ -493,10 +500,10 @@ const CampaignForm = () => {
                   onChange={handleChange}
                   rows={4}
                   className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent"
-                  placeholder="Promote our new mobile payment feature to young professionals in Zimbabwe"
-                  maxLength={150}
+                  placeholder="Provide a detailed description of your campaign, including objectives, target audience, key messages, and any specific requirements for creators"
+                  maxLength={1000}
                 />
-                <p className="text-xs text-gray-500 mt-1">{formData.description.length}/150 characters</p>
+                <p className="text-xs text-gray-500 mt-1">{formData.description.length}/1000 characters</p>
               </div>
             </div>
           )}

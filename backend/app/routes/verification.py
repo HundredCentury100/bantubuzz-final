@@ -9,7 +9,7 @@ from app.models import (
     CreatorProfile, VerificationApplication, User,
     CreatorSubscription, CreatorSubscriptionPlan
 )
-from datetime import datetime
+from datetime import datetime, timezone
 import os
 from werkzeug.utils import secure_filename
 
@@ -56,7 +56,7 @@ def apply_for_verification():
             status='active',
             payment_verified=True
         ).filter(
-            CreatorSubscription.end_date > datetime.utcnow()
+            CreatorSubscription.end_date > datetime.now(timezone.utc)
         ).first()
 
         if not active_subscription:
@@ -162,7 +162,7 @@ def upload_verification_document():
             os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
             # Generate unique filename
-            filename = secure_filename(f"{creator.id}_{document_type}_{datetime.utcnow().timestamp()}.{file.filename.rsplit('.', 1)[1].lower()}")
+            filename = secure_filename(f"{creator.id}_{document_type}_{datetime.now(timezone.utc).timestamp()}.{file.filename.rsplit('.', 1)[1].lower()}")
             filepath = os.path.join(UPLOAD_FOLDER, filename)
 
             file.save(filepath)

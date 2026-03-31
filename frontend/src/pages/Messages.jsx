@@ -5,6 +5,8 @@ import messagingService from '../services/messagingAPI';
 import Navbar from '../components/Navbar';
 import Avatar from '../components/Avatar';
 import CustomPackageMessage from '../components/CustomPackageMessage';
+import CustomRequestModal from '../components/CustomRequestModal';
+import CustomOfferModal from '../components/CustomOfferModal';
 import { BASE_URL } from '../services/api';
 import { useAuth } from '../hooks/useAuth';
 import toast from 'react-hot-toast';
@@ -45,6 +47,10 @@ const Messages = () => {
   const [safetyWarningData, setSafetyWarningData] = useState(null);
   const [reportMessageData, setReportMessageData] = useState(null);
   const [showActionsMenu, setShowActionsMenu] = useState(false);
+
+  // Custom Package modals state
+  const [showCustomRequestModal, setShowCustomRequestModal] = useState(false);
+  const [showCustomOfferModal, setShowCustomOfferModal] = useState(false);
 
   // Load all conversations on mount
   useEffect(() => {
@@ -675,6 +681,38 @@ const Messages = () => {
                 {/* Message Input */}
                 <form onSubmit={handleSendMessage} className="p-3 sm:p-4 border-t border-gray-200 bg-white">
                   <div className="flex items-center gap-2 w-full max-w-full">
+                    {/* Custom Package Button */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        // Validate: Check if creator trying to send to another creator
+                        if (user?.user_type === 'creator' && selectedConversation?.user_type === 'creator') {
+                          toast.error('Custom packages can only be created between brands and creators');
+                          return;
+                        }
+
+                        // Validate: Check if brand trying to send to another brand
+                        if (user?.user_type === 'brand' && selectedConversation?.user_type === 'brand') {
+                          toast.error('Custom packages can only be created between brands and creators');
+                          return;
+                        }
+
+                        // Show appropriate modal based on user type
+                        if (user?.user_type === 'brand') {
+                          setShowCustomRequestModal(true);
+                        } else if (user?.user_type === 'creator') {
+                          setShowCustomOfferModal(true);
+                        }
+                      }}
+                      className="flex-shrink-0 p-2.5 text-primary hover:bg-primary/10 rounded-full transition-all"
+                      title={user?.user_type === 'brand' ? 'Request Custom Package' : 'Send Custom Offer'}
+                      disabled={!isConnected}
+                    >
+                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                    </button>
+
                     <div className="flex-1 min-w-0">
                       <input
                         type="text"
@@ -740,6 +778,33 @@ const Messages = () => {
         onEdit={handleEditMessageAfterWarning}
         onSendAnyway={handleSendAnywayAfterWarning}
       />
+
+      {/* Custom Package Modals */}
+      {showCustomRequestModal && selectedConversation && (
+        <CustomRequestModal
+          onClose={() => setShowCustomRequestModal(false)}
+          onSuccess={() => {
+            setShowCustomRequestModal(false);
+            loadConversation(selectedConversation);
+            toast.success('Custom package request sent!');
+          }}
+          creatorId={selectedConversation.id}
+        />
+      )}
+
+      {showCustomOfferModal && selectedConversation && (
+        <CustomOfferModal
+          onClose={() => setShowCustomOfferModal(false)}
+          onSuccess={() => {
+            setShowCustomOfferModal(false);
+            loadConversation(selectedConversation);
+            toast.success('Custom offer sent!');
+          }}
+          requestId={null}
+          requestData={null}
+          brandId={selectedConversation.id}
+        />
+      )}
     </div>
   );
 };

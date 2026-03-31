@@ -81,7 +81,14 @@ io.on('connection', (socket) => {
 
       console.log(`User ${socket.userId} authenticated and connected`);
 
-      // Emit user online status
+      // Send list of currently online users to the newly connected user
+      const onlineUserIds = Array.from(activeUsers.keys()).map(id => parseInt(id));
+      socket.emit('online_users_list', {
+        userIds: onlineUserIds
+      });
+      console.log(`Sent online users list to user ${socket.userId}:`, onlineUserIds);
+
+      // Emit user online status to all users
       io.emit('user_status', {
         userId: socket.userId,
         status: 'online'
@@ -96,36 +103,63 @@ io.on('connection', (socket) => {
   });
 
   // Handle sending messages
-  socket.on(send_message, async (data) => {
+  socket.on('send_message', async (data) => {
     try {
       const { receiverId, content, bookingId } = data;
 
       if (!socket.userId) {
-        socket.emit(error, { message: Not authenticated });
+        socket.emit('error', { message: 'Not authenticated' });
         return;
       }
 
-      // Check for block status
-      const blockCheckQuery = ;
+      // Check if either user has blocked the other
+      const blockCheckQuery = `
+        SELECT EXISTS (
+          SELECT 1 FROM user_blocks
+          WHERE (
+            (blocker_user_id = $1 AND blocked_user_id = $2) OR
+            (blocker_user_id = $2 AND blocked_user_id = $1)
+          )
+          AND is_active = true
+        ) as is_blocked
+      `;
 
       const blockCheckResult = await pool.query(blockCheckQuery, [socket.userId, receiverId]);
 
       if (blockCheckResult.rows[0].is_blocked) {
-        socket.emit(error, {
-          message: Cannot send message. This conversation has been blocked.,
-          code: BLOCKED
+        socket.emit('error', {
+          message: 'Cannot send message. This conversation has been blocked.',
+          code: 'BLOCKED'
         });
         return;
       }
 
       // Save message to database (PostgreSQL)
-      const insertQuery = ;
+      const insertQuery = `
+        INSERT INTO messages (sender_id, receiver_id, booking_id, content, is_read, created_at)
+        VALUES ($1, $2, $3, $4, $5, NOW())
+        RETURNING id
+      `;
 
       const insertResult = await pool.query(insertQuery, [socket.userId, receiverId, bookingId || null, content, false]);
       const messageId = insertResult.rows[0].id;
 
       // Fetch the complete message with sender info
-      const fetchQuery = ;
+      const fetchQuery = `
+        SELECT m.*,
+               u.email as sender_email,
+               u.user_type as sender_type,
+               CASE
+                 WHEN u.user_type = 'brand' THEN bp.company_name
+                 WHEN u.user_type = 'creator' THEN cpr.username
+                 ELSE NULL
+               END as sender_name
+        FROM messages m
+        JOIN users u ON m.sender_id = u.id
+        LEFT JOIN brand_profiles bp ON bp.user_id = u.id AND u.user_type = 'brand'
+        LEFT JOIN creator_profiles cpr ON cpr.user_id = u.id AND u.user_type = 'creator'
+        WHERE m.id = $1
+      `;
 
       const fetchResult = await pool.query(fetchQuery, [messageId]);
       const message = fetchResult.rows[0];
@@ -137,7 +171,7 @@ io.on('connection', (socket) => {
         booking_id: message.booking_id,
         custom_request_id: message.custom_request_id,
         custom_offer_id: message.custom_offer_id,
-        message_type: message.message_type || text,
+        message_type: message.message_type || 'text',
         content: message.content,
         is_read: message.is_read,
         attachment_url: message.attachment_url,
@@ -150,18 +184,18 @@ io.on('connection', (socket) => {
       };
 
       // Send to sender (confirmation)
-      socket.emit(message_sent, messageData);
+      socket.emit('message_sent', messageData);
 
       // Send to receiver if online
       const receiverSocketId = activeUsers.get(receiverId.toString());
       if (receiverSocketId) {
-        io.to(receiverSocketId).emit(new_message, messageData);
+        io.to(receiverSocketId).emit('new_message', messageData);
       }
 
-      console.log();
+      console.log(`Message ${messageId} sent from ${socket.userId} to ${receiverId}`);
     } catch (error) {
-      console.error(Error in send_message:, error);
-      socket.emit(error, { message: Server error });
+      console.error('Error in send_message:', error);
+      socket.emit('error', { message: 'Server error' });
     }
   });
 

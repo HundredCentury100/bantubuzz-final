@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
-import api from '../services/api';
+import api, { analyticsAPI } from '../services/api';
 import toast from 'react-hot-toast';
+import AudienceCharts from '../components/AudienceCharts';
 import {
   ChartBarIcon,
   ArrowTrendingUpIcon,
@@ -27,10 +28,13 @@ const BrandAnalytics = () => {
   const [collaboration, setCollaboration] = useState(null);
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const [audienceData, setAudienceData] = useState(null);
+  const [audienceLoading, setAudienceLoading] = useState(true);
 
   useEffect(() => {
     if (collaborationId) {
       fetchAnalytics();
+      fetchCollaborationAudience();
     }
   }, [collaborationId]);
 
@@ -57,6 +61,20 @@ const BrandAnalytics = () => {
       }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchCollaborationAudience = async () => {
+    try {
+      setAudienceLoading(true);
+      const response = await analyticsAPI.getCollaborationAudience(collaborationId);
+      setAudienceData(response.data);
+    } catch (error) {
+      console.error('Error fetching audience data:', error);
+      // Don't show error toast as audience data is optional
+      setAudienceData(null);
+    } finally {
+      setAudienceLoading(false);
     }
   };
 
@@ -243,6 +261,21 @@ const BrandAnalytics = () => {
           </div>
         </div>
 
+        {/* Audience Demographics */}
+        {audienceData && audienceData.totalPlatforms > 0 && (
+          <div className="mb-8">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h2 className="text-2xl font-bold text-dark">Audience Demographics</h2>
+                <p className="text-sm text-gray-500 mt-1">
+                  Creator's audience across {audienceData.totalPlatforms} connected platforms
+                </p>
+              </div>
+            </div>
+            <AudienceCharts audienceData={audienceData} loading={audienceLoading} />
+          </div>
+        )}
+
         {/* Actionable Insights */}
         <div className="mb-8">
           <h2 className="text-2xl font-bold text-dark mb-4">Actionable Insights</h2>
@@ -257,16 +290,14 @@ const BrandAnalytics = () => {
               <p className="text-xs text-gray-500 mt-2">Lower is better</p>
             </div>
 
-            {/* ROI */}
+            {/* Total Views/Impressions */}
             <div className="card">
               <div className="flex items-center gap-3 mb-3">
-                <ArrowTrendingUpIcon className="w-5 h-5 text-primary" />
-                <p className="text-sm text-gray-600">ROI</p>
+                <EyeIcon className="w-5 h-5 text-primary" />
+                <p className="text-sm text-gray-600">Total Views</p>
               </div>
-              <p className={`text-2xl font-bold ${insights.roi_percentage >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                {insights.roi_percentage >= 0 ? '+' : ''}{insights.roi_percentage}%
-              </p>
-              <p className="text-xs text-gray-500 mt-2">Return on investment</p>
+              <p className="text-2xl font-bold text-dark">{formatNumber(raw_data.impressions)}</p>
+              <p className="text-xs text-gray-500 mt-2">Total impressions</p>
             </div>
 
             {/* Performance Rating */}

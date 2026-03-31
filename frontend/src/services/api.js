@@ -140,31 +140,44 @@ export const packagesAPI = {
   deletePackage: (id) => api.delete(`/packages/${id}`),
 };
 
-// Campaigns API
+// Campaigns API - Brand Side
 export const campaignsAPI = {
-  // Basic CRUD
+  // Brand: Campaign Management
   getCampaigns: (params) => api.get('/campaigns', { params }),
   getCampaign: (id) => api.get(`/campaigns/${id}`),
   createCampaign: (data) => api.post('/campaigns', data),
   updateCampaign: (id, data) => api.put(`/campaigns/${id}`, data),
   deleteCampaign: (id) => api.delete(`/campaigns/${id}`),
 
-  // Package Management
+  // Brand: Review Proposals (Applications)
+  getCampaignProposals: (campaignId) => api.get(`/campaigns/${campaignId}/proposals`),
+  acceptProposal: (proposalId) => api.post(`/campaigns/proposals/${proposalId}/accept`),
+  rejectProposal: (proposalId, data) => api.post(`/campaigns/proposals/${proposalId}/reject`, data),
+  completeProposalPayment: (proposalId) => api.post(`/campaigns/proposals/${proposalId}/complete-payment`),
+
+  // Brand: Package Management
   addPackageToCampaign: (campaignId, packageId) => api.post(`/campaigns/${campaignId}/packages`, { package_id: packageId }),
   removePackageFromCampaign: (campaignId, packageId) => api.delete(`/campaigns/${campaignId}/packages/${packageId}`),
   getCampaignPackages: (campaignId) => api.get(`/campaigns/${campaignId}/packages`),
+  completePackagePayment: (campaignId, packageId, bookingId) =>
+    api.post(`/campaigns/${campaignId}/packages/${packageId}/complete-payment`, { booking_id: bookingId }),
+};
 
-  // Creator Applications
-  browseCampaigns: (params) => api.get('/campaigns/browse', { params }),
-  applyToCampaign: (campaignId, data) => api.post(`/campaigns/${campaignId}/apply`, data),
+// Opportunities API - Creator Side
+// Same backend endpoints, different naming for creator UX
+export const opportunitiesAPI = {
+  // Creator: Browse Opportunities
+  browseOpportunities: (params) => api.get('/campaigns/browse', { params }),
+
+  // Creator: View Opportunity Details
+  getOpportunity: (id) => api.get(`/campaigns/${id}`),
+
+  // Creator: Apply to Opportunity
+  applyToOpportunity: (opportunityId, proposalData) =>
+    api.post(`/campaigns/${opportunityId}/apply`, proposalData),
+
+  // Creator: My Applications
   getMyApplications: (params) => api.get('/campaigns/my-applications', { params }),
-  getCampaignApplications: (campaignId) => api.get(`/campaigns/${campaignId}/applications`),
-  getApplicationDetails: (campaignId, applicationId) => api.get(`/campaigns/${campaignId}/applications/${applicationId}`),
-  updateApplicationStatus: (campaignId, applicationId, status) => api.patch(`/campaigns/${campaignId}/applications/${applicationId}`, { status }),
-
-  // Payment Completion
-  completeApplicationPayment: (applicationId) => api.post(`/campaigns/applications/${applicationId}/complete-payment`),
-  completePackagePayment: (campaignId, packageId) => api.post(`/campaigns/${campaignId}/packages/${packageId}/complete-payment`),
 };
 
 // Bookings API
@@ -217,6 +230,12 @@ export const notificationsAPI = {
 export const analyticsAPI = {
   getDashboardStats: () => api.get('/analytics/dashboard'),
   getEarnings: (params) => api.get('/analytics/earnings', { params }),
+
+  // Audience Demographics
+  getCampaignAudience: (campaignId) => api.get(`/campaigns/${campaignId}/audience`),
+  getCollaborationAudience: (collaborationId) => api.get(`/collaborations/${collaborationId}/audience`),
+  getCreatorAudience: (creatorId) => api.get(`/creators/${creatorId}/audience`),
+  getBrandAudience: () => api.get(`/brands/audience`),  // Gets brand's overall audience across all collaborations
 };
 
 // Collaborations API

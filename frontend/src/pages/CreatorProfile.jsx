@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { creatorsAPI, packagesAPI, brandsAPI, reviewsAPI, BASE_URL } from '../services/api';
+import { creatorsAPI, packagesAPI, brandsAPI, reviewsAPI, analyticsAPI, BASE_URL } from '../services/api';
 import { useAuth } from '../hooks/useAuth';
 import { useCart } from '../contexts/CartContext';
 import Navbar from '../components/Navbar';
@@ -8,7 +8,9 @@ import Footer from '../components/Footer';
 import ReviewCard from '../components/ReviewCard';
 import CreatorBadge from '../components/CreatorBadge';
 import CustomPackageRequestModal from '../components/CustomPackageRequestModal';
+import InviteToCampaignModal from '../components/InviteToCampaignModal';
 import PlatformAnalytics from '../components/creator/PlatformAnalytics';
+import AudienceCharts from '../components/AudienceCharts';
 import SEO from '../components/SEO';
 import toast from 'react-hot-toast';
 import { PLATFORM_CONFIGS, PACKAGE_TYPES } from '../constants/platformConfig';
@@ -27,11 +29,17 @@ const CreatorProfile = () => {
   const [isSaved, setIsSaved] = useState(false);
   const [selectedImage, setSelectedImage] = useState(null);
   const [showCustomRequestModal, setShowCustomRequestModal] = useState(false);
+  const [showInviteModal, setShowInviteModal] = useState(false);
   const [activeTab, setActiveTab] = useState('All');
+  const [audienceData, setAudienceData] = useState(null);
+  const [audienceLoading, setAudienceLoading] = useState(true);
+  const [showAnalytics, setShowAnalytics] = useState(false);
+  const [showDemographics, setShowDemographics] = useState(false);
 
   useEffect(() => {
     fetchCreatorData();
     fetchReviews();
+    fetchCreatorAudience();
   }, [id]);
 
   const fetchCreatorData = async () => {
@@ -83,6 +91,20 @@ const CreatorProfile = () => {
       console.error('Error fetching reviews:', error);
     } finally {
       setReviewsLoading(false);
+    }
+  };
+
+  const fetchCreatorAudience = async () => {
+    try {
+      setAudienceLoading(true);
+      const response = await analyticsAPI.getCreatorAudience(id);
+      setAudienceData(response.data);
+    } catch (error) {
+      console.error('Error fetching audience data:', error);
+      // Don't show error toast as audience data is optional
+      setAudienceData(null);
+    } finally {
+      setAudienceLoading(false);
     }
   };
 
@@ -281,7 +303,13 @@ const CreatorProfile = () => {
                   <div className="flex flex-col gap-3 w-full md:w-auto md:flex-row md:gap-2 md:flex-shrink-0">
                     <Link
                       to="/messages"
-                      state={{ startConversationWith: { id: creator.user_id, email: creator.user?.email } }}
+                      state={{ startConversationWith: {
+                        id: creator.user_id,
+                        email: creator.user?.email,
+                        display_name: creator.display_name,
+                        username: creator.username,
+                        profile_picture: creator.profile_picture
+                      } }}
                       className="px-6 py-3 rounded-full border border-primary bg-primary text-white hover:bg-primary/90 transition-colors flex items-center justify-center gap-2 whitespace-nowrap font-medium w-full md:w-auto"
                     >
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -289,21 +317,32 @@ const CreatorProfile = () => {
                       </svg>
                       Send Message
                     </Link>
-                    {/* Save button only for brands */}
+                    {/* Invite to Campaign and Save buttons only for brands */}
                     {user?.user_type === 'brand' && (
-                      <button
-                        onClick={handleSaveCreator}
-                        className={`px-6 py-3 rounded-full border transition-colors flex items-center justify-center gap-2 whitespace-nowrap font-medium w-full md:w-auto ${
-                          isSaved
-                            ? 'bg-primary text-white border-primary'
-                            : 'bg-white text-gray-600 border-gray-300 hover:border-primary hover:text-primary'
-                        }`}
-                      >
-                        <svg className="w-5 h-5" fill={isSaved ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
-                        </svg>
-                        {isSaved ? 'Saved' : 'Save Creator'}
-                      </button>
+                      <>
+                        <button
+                          onClick={() => setShowInviteModal(true)}
+                          className="px-6 py-3 rounded-full border border-primary bg-white text-primary hover:bg-primary hover:text-white transition-colors flex items-center justify-center gap-2 whitespace-nowrap font-medium w-full md:w-auto"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                          </svg>
+                          Invite to Campaign
+                        </button>
+                        <button
+                          onClick={handleSaveCreator}
+                          className={`px-6 py-3 rounded-full border transition-colors flex items-center justify-center gap-2 whitespace-nowrap font-medium w-full md:w-auto ${
+                            isSaved
+                              ? 'bg-primary text-white border-primary'
+                              : 'bg-white text-gray-600 border-gray-300 hover:border-primary hover:text-primary'
+                          }`}
+                        >
+                          <svg className="w-5 h-5" fill={isSaved ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                          </svg>
+                          {isSaved ? 'Saved' : 'Save Creator'}
+                        </button>
+                      </>
                     )}
                   </div>
                 )}
@@ -345,9 +384,6 @@ const CreatorProfile = () => {
             </div>
           </div>
         </div>
-
-        {/* Platform Analytics */}
-        <PlatformAnalytics creatorId={creator.id} />
 
         {/* Bio Section */}
         <div className="card mb-8">
@@ -463,6 +499,74 @@ const CreatorProfile = () => {
               )}
         </div>
 
+        {/* Audience Demographics Section with Toggle */}
+        {audienceData && audienceData.totalPlatforms > 0 && (
+          <div className="mb-8">
+            <button
+              onClick={() => setShowDemographics(!showDemographics)}
+              className="w-full flex items-center justify-between p-4 bg-white rounded-2xl shadow-md hover:shadow-lg transition-shadow mb-4"
+            >
+              <div className="flex items-center gap-3">
+                <svg className="w-6 h-6 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+                <div className="text-left">
+                  <h2 className="text-xl font-bold text-dark">Audience Demographics</h2>
+                  <p className="text-sm text-gray-500">
+                    Audience reach across {audienceData.totalPlatforms} connected platform{audienceData.totalPlatforms !== 1 ? 's' : ''}
+                  </p>
+                </div>
+              </div>
+              <svg
+                className={`w-6 h-6 text-gray-400 transition-transform ${showDemographics ? 'rotate-180' : ''}`}
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+
+            {showDemographics && (
+              <div className="transition-all duration-300">
+                <AudienceCharts audienceData={audienceData} loading={audienceLoading} />
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Platform Analytics Section with Toggle */}
+        <div className="mb-8">
+          <button
+            onClick={() => setShowAnalytics(!showAnalytics)}
+            className="w-full flex items-center justify-between p-4 bg-white rounded-2xl shadow-md hover:shadow-lg transition-shadow mb-4"
+          >
+            <div className="flex items-center gap-3">
+              <svg className="w-6 h-6 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+              <div className="text-left">
+                <h2 className="text-xl font-bold text-dark">Platform Analytics</h2>
+                <p className="text-sm text-gray-500">View detailed platform performance metrics</p>
+              </div>
+            </div>
+            <svg
+              className={`w-6 h-6 text-gray-400 transition-transform ${showAnalytics ? 'rotate-180' : ''}`}
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+
+          {showAnalytics && (
+            <div className="transition-all duration-300">
+              <PlatformAnalytics creatorId={creator.id} />
+            </div>
+          )}
+        </div>
+
         {/* Packages Section */}
         <div className="mb-8">
           <h2 className="text-2xl font-bold text-dark mb-6">Available Packages</h2>
@@ -549,8 +653,30 @@ const CreatorProfile = () => {
                   })
                   .map((pkg) => (
                     <div key={pkg.id} className="card hover:shadow-lg transition-shadow">
-                      {/* Platform Badge */}
-                      {pkg.platform_type && PLATFORM_CONFIGS[pkg.platform_type] && (
+                      {/* Platform Badge(s) */}
+                      {pkg.is_multi_platform && pkg.platforms && pkg.platforms.length > 0 ? (
+                        <div className="mb-3">
+                          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200">
+                            <svg className="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h4a1 1 0 011 1v7a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM14 5a1 1 0 011-1h4a1 1 0 011 1v7a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 16a1 1 0 011-1h4a1 1 0 011 1v3a1 1 0 01-1 1H5a1 1 0 01-1-1v-3zM14 16a1 1 0 011-1h4a1 1 0 011 1v3a1 1 0 01-1 1h-4a1 1 0 01-1-1v-3z" />
+                            </svg>
+                            <span className="text-sm font-semibold text-purple-700">Multi-Platform</span>
+                            <span className="text-xs text-purple-600">({pkg.platforms.length} platforms)</span>
+                          </div>
+                          <div className="flex flex-wrap gap-2 mt-2">
+                            {pkg.platforms.map(platform => PLATFORM_CONFIGS[platform] && (
+                              <div key={platform} className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md ${PLATFORM_CONFIGS[platform].bgColor}`}>
+                                <svg className={`w-3.5 h-3.5 ${PLATFORM_CONFIGS[platform].color}`} viewBox="0 0 24 24" fill="currentColor">
+                                  {PLATFORM_CONFIGS[platform].icon}
+                                </svg>
+                                <span className={`text-xs font-medium ${PLATFORM_CONFIGS[platform].color}`}>
+                                  {platform}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ) : pkg.platform_type && PLATFORM_CONFIGS[pkg.platform_type] ? (
                         <div className="mb-3">
                           <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg ${PLATFORM_CONFIGS[pkg.platform_type].bgColor}`}>
                             <svg
@@ -568,7 +694,7 @@ const CreatorProfile = () => {
                             )}
                           </div>
                         </div>
-                      )}
+                      ) : null}
 
                       <h3 className="font-bold text-lg text-dark mb-2">{pkg.title}</h3>
                       <p className="text-gray-600 text-sm mb-4 line-clamp-2">{pkg.description}</p>
@@ -854,6 +980,16 @@ const CreatorProfile = () => {
             // Redirect to messages to start conversation
             navigate('/messages');
           }}
+        />
+      )}
+
+      {/* Invite to Campaign Modal */}
+      {showInviteModal && (
+        <InviteToCampaignModal
+          creatorId={creator.id}
+          creatorName={creator.display_name || creator.username}
+          isOpen={showInviteModal}
+          onClose={() => setShowInviteModal(false)}
         />
       )}
     </div>

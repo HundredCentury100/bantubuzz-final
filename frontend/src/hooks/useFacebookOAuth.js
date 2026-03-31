@@ -7,7 +7,7 @@ import { toast } from 'react-hot-toast';
 import api from '../services/api';
 
 const FACEBOOK_APP_ID = '1863571634283956';
-const FACEBOOK_CONFIG_ID = '1233734415390648'; // TEST: Using "Thunzi" config instead of BantuBuzz
+const FACEBOOK_CONFIG_ID = '1404830888084532'; // Updated config ID
 
 export const useFacebookOAuth = () => {
   const [isSDKLoaded, setIsSDKLoaded] = useState(false);

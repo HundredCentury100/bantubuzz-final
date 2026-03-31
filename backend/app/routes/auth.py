@@ -6,7 +6,7 @@ from flask_jwt_extended import (
     get_jwt_identity,
     get_jwt
 )
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import re
 from app import db
 from app.models import User, CreatorProfile, BrandProfile, OTP
@@ -354,7 +354,7 @@ def reset_password(token):
             return jsonify({'error': 'Invalid reset token'}), 400
 
         # Check if token is expired
-        if user.reset_token_expires < datetime.utcnow():
+        if user.reset_token_expires < datetime.now(timezone.utc):
             return jsonify({'error': 'Reset token has expired'}), 400
 
         # Update password

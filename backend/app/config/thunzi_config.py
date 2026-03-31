@@ -15,7 +15,7 @@ THUNZI_CONFIG = {
 # https://developers.facebook.com/apps/1863571634283956
 FACEBOOK_OAUTH_CONFIG = {
     'app_id': '1863571634283956',
-    'config_id': '1233734415390648',
+    'config_id': '1404830888084532',
     'redirect_uri': 'https://bantubuzz.com/oauth/facebook/callback',
     'scopes': [
         'pages_show_list',

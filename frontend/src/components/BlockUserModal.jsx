@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import toast from 'react-hot-toast';
+import messagingService from '../services/messagingAPI';
 
 const BlockUserModal = ({ isOpen, onClose, user, onBlockSuccess }) => {
   const [loading, setLoading] = useState(false);
@@ -10,27 +11,15 @@ const BlockUserModal = ({ isOpen, onClose, user, onBlockSuccess }) => {
     try {
       setLoading(true);
 
-      const token = localStorage.getItem('access_token');
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/messaging/block/${user.id}`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
+      await messagingService.blockUser(user.id);
 
-      const data = await response.json();
-
-      if (response.ok) {
-        toast.success('User blocked successfully');
-        onBlockSuccess?.();
-        onClose();
-      } else {
-        toast.error(data.error || 'Failed to block user');
-      }
+      toast.success('User blocked successfully');
+      onBlockSuccess?.();
+      onClose();
     } catch (error) {
       console.error('Error blocking user:', error);
-      toast.error('Failed to block user. Please try again.');
+      const errorMessage = error.response?.data?.error || error.message || 'Failed to block user. Please try again.';
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
