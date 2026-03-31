@@ -266,15 +266,20 @@ class PostMetricsService:
                 except:
                     pass
 
-            # Core metrics (ThunziAI doesn't provide impressions, only reach)
+            # Core metrics
+            # Note: Thunzi's post API returns views:0 for Instagram/most posts
+            # but reach has the actual view/impression count. Use reach for impressions
+            # since that's the only field with real data
             metrics.reach = post_data.get('reach') or 0
+            metrics.impressions = post_data.get('reach') or 0  # Use reach since views field is broken in Thunzi
             metrics.likes = post_data.get('likes') or 0
             metrics.comments = post_data.get('comments') or 0
             metrics.shares = post_data.get('shares') or 0
             metrics.saves = post_data.get('saves') or 0
 
             # Video metrics (if available)
-            metrics.video_views = post_data.get('videoViews') or post_data.get('views') or 0
+            # For video posts, try videoViews first, then fall back to reach
+            metrics.video_views = post_data.get('videoViews') or post_data.get('reach') or 0
 
             # Calculate engagement
             metrics.calculate_engagement()
