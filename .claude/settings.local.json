@@ -8,7 +8,10 @@
       "Bash(npm run build:*)",
       "Bash(tar:*)",
       "Bash(scp:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$(cat <<''EOF''\nfeat: Add custom package negotiation with in-messaging creation and counter-offers\n\nCustom Package Enhancements:\n- Fix datetime comparison bug in custom_package_offer model (timezone-aware)\n- Add counter-offer functionality in decline modal with 3 options\n- Add custom package action button in messaging for both brands and creators\n- Implement creator-initiated direct offers without existing requests\n- Add validation to prevent creator-to-creator and brand-to-brand packages\n\nBackend Changes:\n- Update CustomPackageOffer model to use timezone-aware datetimes\n- Enhance create_custom_offer endpoint to support brand_id parameter\n- Auto-create placeholder requests for creator-initiated offers\n- Maintain full negotiation history and relationships\n\nFrontend Changes:\n- Add CustomRequestModal component for brands\n- Update CustomOfferModal to support direct offers with brand_id\n- Enhance CustomPackageMessage with counter-offer button in decline modal\n- Add document icon button in Messages page for custom package creation\n- Add user type validation with helpful error messages\n\nDashboard Fixes:\n- Fix CreatorDashboard API import (campaignsAPI → opportunitiesAPI)\n- Remove duplicate banners and sections from creator dashboard\n- Fix package count calculation to show actual totals\n- Remove \"Browse Briefs\" and update labels to \"Browse Opportunities\"\n- Fix profile completion logic\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
+      "Bash(python:*)",
+      "Bash(git commit:*)"
     ],
     "deny": [],
     "ask": []

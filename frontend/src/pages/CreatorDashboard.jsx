@@ -159,28 +159,28 @@ const CreatorDashboard = () => {
          verificationSubscription.status === 'active' &&
          (!verificationStatus || !verificationStatus.has_pending_application) &&
          (!verificationStatus || !verificationStatus.is_verified) && (
-          <div className="mb-8 p-6 bg-green-50 border-2 border-green-500 rounded-3xl relative animate-pulse-slow">
-            <div className="flex items-start gap-3">
-              <div className="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center flex-shrink-0">
-                <svg className="w-6 h-6 text-white" fill="currentColor" viewBox="0 0 20 20">
+          <div className="mb-6 sm:mb-8 p-4 sm:p-6 bg-green-50 border-2 border-green-500 rounded-2xl sm:rounded-3xl relative animate-pulse-slow">
+            <div className="flex flex-col sm:flex-row items-start gap-3">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-green-500 rounded-full flex items-center justify-center flex-shrink-0">
+                <svg className="w-5 h-5 sm:w-6 sm:h-6 text-white" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                 </svg>
               </div>
-              <div className="flex-1">
-                <h3 className="font-bold text-green-900 text-xl mb-2">Payment Verified! Complete Your Verification Application</h3>
-                <p className="text-green-800 mb-4 leading-relaxed">
+              <div className="flex-1 w-full">
+                <h3 className="font-bold text-green-900 text-lg sm:text-xl mb-2">Payment Verified! Complete Your Verification Application</h3>
+                <p className="text-sm sm:text-base text-green-800 mb-4 leading-relaxed">
                   Great news! Your verification subscription payment has been confirmed. You can now proceed to fill out your verification application form and upload your identity documents.
                 </p>
-                <div className="flex flex-wrap gap-3">
+                <div className="flex flex-col sm:flex-row flex-wrap gap-2 sm:gap-3">
                   <Link
                     to="/creator/verification/apply"
-                    className="inline-flex items-center px-6 py-3 bg-green-600 text-white rounded-full hover:bg-green-700 transition-colors font-semibold shadow-lg hover:shadow-xl"
+                    className="inline-flex items-center justify-center px-4 sm:px-6 py-2 sm:py-3 bg-green-600 text-white rounded-full hover:bg-green-700 transition-colors text-sm sm:text-base font-semibold shadow-lg hover:shadow-xl"
                   >
                     Complete Application Form →
                   </Link>
                   <Link
                     to="/creator/verification/pending"
-                    className="inline-flex items-center px-6 py-3 bg-white text-green-700 border-2 border-green-600 rounded-full hover:bg-green-50 transition-colors font-semibold"
+                    className="inline-flex items-center justify-center px-4 sm:px-6 py-2 sm:py-3 bg-white text-green-700 border-2 border-green-600 rounded-full hover:bg-green-50 transition-colors text-sm sm:text-base font-semibold"
                   >
                     View Details
                   </Link>
@@ -192,34 +192,34 @@ const CreatorDashboard = () => {
 
         {/* Verification Banner - Priority 1: Show if not verified */}
         {(!verificationStatus || !verificationStatus.is_verified) && !verificationBannerDismissed && (
-          <div className="mb-8 p-6 bg-primary border border-primary rounded-3xl relative">
+          <div className="mb-6 sm:mb-8 p-4 sm:p-6 bg-primary border border-primary rounded-2xl sm:rounded-3xl relative">
             <button
               onClick={handleDismissVerificationBanner}
-              className="absolute top-4 right-4 text-primary-dark hover:text-dark transition-colors"
+              className="absolute top-3 right-3 sm:top-4 sm:right-4 text-primary-dark hover:text-dark transition-colors z-10"
               aria-label="Dismiss banner"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
-            <div className="flex items-start gap-3 pr-8">
-              <svg className="w-6 h-6 text-primary-dark mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+            <div className="flex flex-col sm:flex-row items-start gap-3 pr-8 sm:pr-10">
+              <svg className="w-5 h-5 sm:w-6 sm:h-6 text-primary-dark mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
               </svg>
-              <div className="flex-1">
-                <h3 className="font-bold text-primary-dark text-lg mb-2">Get Verified - Build Trust with Brands</h3>
-                <p className="text-sm text-primary-dark mb-4 leading-relaxed">
+              <div className="flex-1 w-full">
+                <h3 className="font-bold text-primary-dark text-base sm:text-lg mb-2">Get Verified - Build Trust with Brands</h3>
+                <p className="text-sm text-primary-dark mb-3 sm:mb-4 leading-relaxed">
                   Earn the verified badge on your profile. Stand out from the crowd, increase trust, and get more bookings from top brands.
                 </p>
-                <div className="flex flex-wrap gap-3 mb-4">
-                  <span className="text-xs px-3 py-1 bg-white/50 text-primary-dark rounded-full font-medium">✓ Verified Badge</span>
-                  <span className="text-xs px-3 py-1 bg-white/50 text-primary-dark rounded-full font-medium">✓ Increased Trust</span>
-                  <span className="text-xs px-3 py-1 bg-white/50 text-primary-dark rounded-full font-medium">✓ Priority in Search</span>
-                  <span className="text-xs px-3 py-1 bg-white/50 text-primary-dark rounded-full font-medium">$5/month</span>
+                <div className="flex flex-wrap gap-2 sm:gap-3 mb-3 sm:mb-4">
+                  <span className="text-xs px-2 sm:px-3 py-1 bg-white/50 text-primary-dark rounded-full font-medium">✓ Verified Badge</span>
+                  <span className="text-xs px-2 sm:px-3 py-1 bg-white/50 text-primary-dark rounded-full font-medium">✓ Increased Trust</span>
+                  <span className="text-xs px-2 sm:px-3 py-1 bg-white/50 text-primary-dark rounded-full font-medium">✓ Priority in Search</span>
+                  <span className="text-xs px-2 sm:px-3 py-1 bg-white/50 text-primary-dark rounded-full font-medium">$5/month</span>
                 </div>
                 <Link
                   to="/creator/subscriptions"
-                  className="inline-block px-6 py-2 bg-dark text-white rounded-full hover:bg-gray-800 transition-colors text-sm font-semibold"
+                  className="inline-block px-4 sm:px-6 py-2 bg-dark text-white rounded-full hover:bg-gray-800 transition-colors text-xs sm:text-sm font-semibold"
                 >
                   Subscribe to Verification →
                 </Link>
@@ -230,34 +230,34 @@ const CreatorDashboard = () => {
 
         {/* Featured Banner - Priority 2: Show after verified */}
         {verificationStatus && verificationStatus.is_verified && !featuredBannerDismissed && (
-          <div className="mb-8 p-6 bg-primary border border-primary rounded-3xl relative">
+          <div className="mb-6 sm:mb-8 p-4 sm:p-6 bg-primary border border-primary rounded-2xl sm:rounded-3xl relative">
             <button
               onClick={handleDismissFeaturedBanner}
-              className="absolute top-4 right-4 text-primary-dark hover:text-dark transition-colors"
+              className="absolute top-3 right-3 sm:top-4 sm:right-4 text-primary-dark hover:text-dark transition-colors z-10"
               aria-label="Dismiss banner"
             >
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
-            <div className="flex items-start gap-3 pr-8">
-              <svg className="w-6 h-6 text-primary-dark mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+            <div className="flex flex-col sm:flex-row items-start gap-3 pr-8 sm:pr-10">
+              <svg className="w-5 h-5 sm:w-6 sm:h-6 text-primary-dark mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                 <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
               </svg>
-              <div className="flex-1">
-                <h3 className="font-bold text-primary-dark text-lg mb-2">Get Featured - Boost Your Visibility</h3>
-                <p className="text-sm text-primary-dark mb-4 leading-relaxed">
+              <div className="flex-1 w-full">
+                <h3 className="font-bold text-primary-dark text-base sm:text-lg mb-2">Get Featured - Boost Your Visibility</h3>
+                <p className="text-sm text-primary-dark mb-3 sm:mb-4 leading-relaxed">
                   Get priority placement in search results and homepage featured sections. Available for General, Facebook, Instagram, and TikTok categories.
                 </p>
-                <div className="flex flex-wrap gap-3 mb-4">
-                  <span className="text-xs px-3 py-1 bg-white/50 text-primary-dark rounded-full font-medium">✓ Featured Badge</span>
-                  <span className="text-xs px-3 py-1 bg-white/50 text-primary-dark rounded-full font-medium">✓ Priority Placement</span>
-                  <span className="text-xs px-3 py-1 bg-white/50 text-primary-dark rounded-full font-medium">✓ 7 Days Visibility</span>
-                  <span className="text-xs px-3 py-1 bg-white/50 text-primary-dark rounded-full font-medium">$5-$10/week</span>
+                <div className="flex flex-wrap gap-2 sm:gap-3 mb-3 sm:mb-4">
+                  <span className="text-xs px-2 sm:px-3 py-1 bg-white/50 text-primary-dark rounded-full font-medium">✓ Featured Badge</span>
+                  <span className="text-xs px-2 sm:px-3 py-1 bg-white/50 text-primary-dark rounded-full font-medium">✓ Priority Placement</span>
+                  <span className="text-xs px-2 sm:px-3 py-1 bg-white/50 text-primary-dark rounded-full font-medium">✓ 7 Days Visibility</span>
+                  <span className="text-xs px-2 sm:px-3 py-1 bg-white/50 text-primary-dark rounded-full font-medium">$5-$10/week</span>
                 </div>
                 <Link
                   to="/creator/subscriptions"
-                  className="inline-block px-6 py-2 bg-dark text-white rounded-full hover:bg-gray-800 transition-colors text-sm font-semibold"
+                  className="inline-block px-4 sm:px-6 py-2 bg-dark text-white rounded-full hover:bg-gray-800 transition-colors text-xs sm:text-sm font-semibold"
                 >
                   Browse Featured Plans →
                 </Link>
@@ -267,21 +267,21 @@ const CreatorDashboard = () => {
         )}
 
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold text-dark leading-tight mb-2">Creator Dashboard</h1>
-          <p className="text-gray-600 leading-relaxed">Welcome back! Here's your overview.</p>
+        <div className="mb-6 sm:mb-8">
+          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-dark leading-tight mb-2">Creator Dashboard</h1>
+          <p className="text-sm sm:text-base text-gray-600 leading-relaxed">Welcome back! Here's your overview.</p>
         </div>
 
         {/* Onboarding Journey Guide */}
         {(!profileComplete || connectedPlatforms.length === 0 || stats.totalPackages === 0) && (
-          <div className="mb-8 bg-white border-2 border-primary/20 rounded-2xl p-6 shadow-sm">
-            <div className="flex items-start gap-3 mb-6">
-              <svg className="w-6 h-6 text-primary mt-1 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <div className="mb-6 sm:mb-8 bg-white border-2 border-primary/20 rounded-xl sm:rounded-2xl p-4 sm:p-6 shadow-sm">
+            <div className="flex items-start gap-2 sm:gap-3 mb-4 sm:mb-6">
+              <svg className="w-5 h-5 sm:w-6 sm:h-6 text-primary mt-1 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
               </svg>
               <div>
-                <h3 className="text-lg font-bold text-dark mb-1">Your Creator Journey</h3>
-                <p className="text-sm text-gray-600">Complete these steps to maximize your success on BantuBuzz</p>
+                <h3 className="text-base sm:text-lg font-bold text-dark mb-1">Your Creator Journey</h3>
+                <p className="text-xs sm:text-sm text-gray-600">Complete these steps to maximize your success on BantuBuzz</p>
               </div>
             </div>
 
@@ -448,16 +448,16 @@ const CreatorDashboard = () => {
 
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 sm:gap-6 mb-6 sm:mb-8">
           {/* Total Packages */}
           <div className="card">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600 mb-1">Total Packages</p>
-                <p className="text-3xl font-bold text-dark">{stats.totalPackages}</p>
+                <p className="text-xs sm:text-sm text-gray-600 mb-1">Total Packages</p>
+                <p className="text-2xl sm:text-3xl font-bold text-dark">{stats.totalPackages}</p>
               </div>
-              <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
-                <svg className="w-6 h-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                <svg className="w-5 h-5 sm:w-6 sm:h-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                 </svg>
               </div>
@@ -469,11 +469,11 @@ const CreatorDashboard = () => {
           <div className="card">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600 mb-1">Total Bookings</p>
-                <p className="text-3xl font-bold text-dark">{stats.totalBookings}</p>
+                <p className="text-xs sm:text-sm text-gray-600 mb-1">Total Bookings</p>
+                <p className="text-2xl sm:text-3xl font-bold text-dark">{stats.totalBookings}</p>
               </div>
-              <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
-                <svg className="w-6 h-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                <svg className="w-5 h-5 sm:w-6 sm:h-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                 </svg>
               </div>
@@ -484,12 +484,12 @@ const CreatorDashboard = () => {
           {/* Total Earnings */}
           <div className="card">
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 mb-1">Total Earnings</p>
-                <p className="text-3xl font-bold text-dark">${(Number(stats.totalEarnings) || 0).toFixed(2)}</p>
+              <div className="min-w-0 flex-1 pr-2">
+                <p className="text-xs sm:text-sm text-gray-600 mb-1">Total Earnings</p>
+                <p className="text-xl sm:text-2xl lg:text-3xl font-bold text-dark truncate">${(Number(stats.totalEarnings) || 0).toFixed(2)}</p>
               </div>
-              <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
-                <svg className="w-6 h-6 text-primary-dark" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                <svg className="w-5 h-5 sm:w-6 sm:h-6 text-primary-dark" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </div>
@@ -500,12 +500,12 @@ const CreatorDashboard = () => {
           {/* Followers */}
           <div className="card">
             <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600 mb-1">Followers</p>
-                <p className="text-3xl font-bold text-dark">{profile?.follower_count?.toLocaleString() || 0}</p>
+              <div className="min-w-0 flex-1 pr-2">
+                <p className="text-xs sm:text-sm text-gray-600 mb-1">Followers</p>
+                <p className="text-2xl sm:text-3xl font-bold text-dark truncate">{profile?.follower_count?.toLocaleString() || 0}</p>
               </div>
-              <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
-                <svg className="w-6 h-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
+                <svg className="w-5 h-5 sm:w-6 sm:h-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
                 </svg>
               </div>
@@ -517,10 +517,10 @@ const CreatorDashboard = () => {
           <div className="card">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600 mb-1">Profile Status</p>
-                <p className="text-lg font-bold text-dark capitalize">{profile?.availability_status || 'Available'}</p>
+                <p className="text-xs sm:text-sm text-gray-600 mb-1">Profile Status</p>
+                <p className="text-base sm:text-lg font-bold text-dark capitalize">{profile?.availability_status || 'Available'}</p>
               </div>
-              <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${
+              <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-lg flex items-center justify-center flex-shrink-0 ${
                 profile?.availability_status === 'available' ? 'bg-primary/10' :
                 profile?.availability_status === 'busy' ? 'bg-primary' : 'bg-red-100'
               }`}>
