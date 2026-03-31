@@ -43,13 +43,12 @@ const PlatformAnalytics = ({ creatorId }) => {
 
     const totalFollowers = analytics.platforms.reduce((sum, p) => sum + (p.followers || 0), 0);
 
-    // Calculate total views/engagement across all platforms
-    // In BantuBuzz, views/engagement = reach (impressions)
-    // Calculate as avg_reach * total_posts for each platform
+    // Calculate total views across all platforms
+    // Use avg_views from Thunzi platform-level data
     const totalViews = analytics.platforms.reduce((sum, p) => {
-      const avgReach = p.metrics?.avg_reach || 0;
+      const avgViews = p.metrics?.avg_views || 0;
       const totalPosts = p.total_posts || 0;
-      return sum + (avgReach * totalPosts);
+      return sum + (avgViews * totalPosts);
     }, 0);
 
     // Calculate weighted average engagement rate
