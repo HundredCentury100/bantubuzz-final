@@ -23,20 +23,34 @@ def emit_collaboration_update(collaboration_id):
 @jwt_required()
 def get_collaborations():
     """Get all collaborations for current user (brand or creator)"""
+    from flask import current_app
     try:
         user_id = int(get_jwt_identity())
+        current_app.logger.info(f"[GET_COLLABORATIONS] Fetching for user_id: {user_id}")
         user = User.query.get(user_id)
+
+        if not user:
+            current_app.logger.error(f"[GET_COLLABORATIONS] User {user_id} not found")
+            return jsonify({'error': 'User not found'}), 404
 
         page = request.args.get('page', 1, type=int)
         per_page = request.args.get('per_page', 10, type=int)
         status_filter = request.args.get('status')  # in_progress, completed, cancelled
         collab_type = request.args.get('type')  # campaign, package
 
+        current_app.logger.info(f"[GET_COLLABORATIONS] User type: {user.user_type}")
+
         if user.user_type == 'creator':
             creator = CreatorProfile.query.filter_by(user_id=user_id).first()
+            if not creator:
+                current_app.logger.error(f"[GET_COLLABORATIONS] Creator profile not found for user {user_id}")
+                return jsonify({'error': 'Creator profile not found'}), 404
             query = Collaboration.query.filter_by(creator_id=creator.id)
         else:
             brand = BrandProfile.query.filter_by(user_id=user_id).first()
+            if not brand:
+                current_app.logger.error(f"[GET_COLLABORATIONS] Brand profile not found for user {user_id}")
+                return jsonify({'error': 'Brand profile not found'}), 404
             query = Collaboration.query.filter_by(brand_id=brand.id)
 
         if status_filter:
@@ -45,12 +59,15 @@ def get_collaborations():
         if collab_type:
             query = query.filter_by(collaboration_type=collab_type)
 
+        current_app.logger.info(f"[GET_COLLABORATIONS] Running query...")
         pagination = query.order_by(Collaboration.created_at.desc()).paginate(
             page=page, per_page=per_page, error_out=False
         )
 
+        current_app.logger.info(f"[GET_COLLABORATIONS] Found {pagination.total} collaborations, converting to_dict...")
         collaborations = [collab.to_dict(include_relations=True) for collab in pagination.items]
 
+        current_app.logger.info(f"[GET_COLLABORATIONS] SUCCESS: Returning {len(collaborations)} collaborations")
         return jsonify({
             'collaborations': collaborations,
             'total': pagination.total,
@@ -59,6 +76,9 @@ def get_collaborations():
         }), 200
 
     except Exception as e:
+        import traceback
+        error_traceback = traceback.format_exc()
+        current_app.logger.error(f"[GET_COLLABORATIONS] ERROR: {str(e)}\n{error_traceback}")
         return jsonify({'error': str(e)}), 500
 
 

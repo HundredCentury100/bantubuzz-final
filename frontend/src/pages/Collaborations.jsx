@@ -12,6 +12,7 @@ const Collaborations = () => {
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const [pagination, setPagination] = useState({
     current_page: 1,
     total_pages: 1,
@@ -74,6 +75,24 @@ const Collaborations = () => {
     );
   };
 
+  // Filter collaborations based on search query (with safety check)
+  const filteredCollaborations = Array.isArray(collaborations) ? collaborations.filter((collab) => {
+    if (!searchQuery.trim()) return true;
+
+    const query = searchQuery.toLowerCase();
+    const title = (collab?.title || '').toLowerCase();
+    const partnerName = isBrand
+      ? (collab?.creator?.user?.email?.split('@')[0] || '').toLowerCase()
+      : (collab?.brand?.company_name || '').toLowerCase();
+    const status = (collab?.status || '').toLowerCase();
+    const lastUpdate = (collab?.last_update || '').toLowerCase();
+
+    return title.includes(query) ||
+           partnerName.includes(query) ||
+           status.includes(query) ||
+           lastUpdate.includes(query);
+  }) : [];
+
   return (
     <div className="min-h-screen bg-light">
       <Navbar />
@@ -97,51 +116,51 @@ const Collaborations = () => {
           </p>
         </div>
 
-        {/* Filters */}
-        <div className="bg-white rounded-lg shadow p-6 mb-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* Status Filter */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
-              <select
-                value={statusFilter}
-                onChange={(e) => {
-                  setStatusFilter(e.target.value);
-                  setPagination(prev => ({ ...prev, current_page: 1 }));
-                }}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-              >
-                <option value="">All Statuses</option>
-                <option value="in_progress">In Progress</option>
-                <option value="completed">Completed</option>
-                <option value="cancelled">Cancelled</option>
-              </select>
+        {/* Search and Filters */}
+        <div className="bg-white rounded-3xl shadow-sm p-6 mb-6">
+          <div className="flex flex-col md:flex-row gap-4">
+            {/* Search */}
+            <div className="relative flex-1">
+              <svg className="w-5 h-5 text-gray-400 absolute left-3 top-1/2 transform -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              <input
+                type="text"
+                placeholder="Search collaborations..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent"
+              />
             </div>
+
+            {/* Status Filter */}
+            <select
+              value={statusFilter}
+              onChange={(e) => {
+                setStatusFilter(e.target.value);
+                setPagination(prev => ({ ...prev, current_page: 1 }));
+              }}
+              className="px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent"
+            >
+              <option value="">All Statuses</option>
+              <option value="in_progress">In Progress</option>
+              <option value="completed">Completed</option>
+              <option value="cancelled">Cancelled</option>
+            </select>
 
             {/* Type Filter */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Type</label>
-              <select
-                value={typeFilter}
-                onChange={(e) => {
-                  setTypeFilter(e.target.value);
-                  setPagination(prev => ({ ...prev, current_page: 1 }));
-                }}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-              >
-                <option value="">All Types</option>
-                <option value="campaign">Campaigns</option>
-                <option value="package">Packages</option>
-              </select>
-            </div>
-
-            {/* Stats */}
-            <div className="flex items-end">
-              <div className="bg-primary/10 rounded-lg p-4 w-full">
-                <p className="text-sm text-gray-600">Total Collaborations</p>
-                <p className="text-2xl font-bold text-primary">{pagination.total}</p>
-              </div>
-            </div>
+            <select
+              value={typeFilter}
+              onChange={(e) => {
+                setTypeFilter(e.target.value);
+                setPagination(prev => ({ ...prev, current_page: 1 }));
+              }}
+              className="px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent"
+            >
+              <option value="">All Types</option>
+              <option value="campaign">Campaigns</option>
+              <option value="package">Packages</option>
+            </select>
           </div>
         </div>
 
@@ -150,20 +169,22 @@ const Collaborations = () => {
           <div className="flex justify-center items-center py-20">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
           </div>
-        ) : collaborations.length === 0 ? (
+        ) : filteredCollaborations.length === 0 ? (
           <div className="bg-white rounded-lg shadow p-12 text-center">
             <svg className="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
             <h3 className="text-lg font-medium text-gray-700 mb-2">No collaborations found</h3>
             <p className="text-gray-500 mb-4">
-              {statusFilter || typeFilter
+              {searchQuery
+                ? 'No collaborations match your search. Try a different search term.'
+                : statusFilter || typeFilter
                 ? 'Try adjusting your filters'
                 : isBrand
                 ? 'Start by accepting campaign applications or adding packages to campaigns'
                 : 'Apply to campaigns or wait for brands to book your packages'}
             </p>
-            {!statusFilter && !typeFilter && (
+            {!statusFilter && !typeFilter && !searchQuery && (
               <Link
                 to={isBrand ? '/brand/campaigns' : '/creator/campaigns'}
                 className="inline-block px-6 py-3 bg-primary hover:bg-primary-dark text-white font-medium rounded-lg transition-colors"
@@ -175,7 +196,7 @@ const Collaborations = () => {
         ) : (
           <>
             <div className="space-y-4">
-              {collaborations.map((collab) => (
+              {filteredCollaborations.map((collab) => (
                 <div
                   key={collab.id}
                   className="block bg-white rounded-lg shadow hover:shadow-lg transition-shadow p-6"

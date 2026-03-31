@@ -28,6 +28,7 @@ class Collaboration(db.Model):
     # Status tracking
     status = db.Column(db.String(20), default='in_progress')  # in_progress, completed, cancelled
     progress_percentage = db.Column(db.Integer, default=0)  # 0-100
+    escrow_status = db.Column(db.String(20))  # pending, escrowed, released, failed
 
     # Deliverables tracking
     deliverables = db.Column(db.JSON, default=list)  # List of expected deliverables

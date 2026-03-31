@@ -62,7 +62,7 @@ class Booking(db.Model):
         if include_relations:
             if self.package:
                 data['package'] = self.package.to_dict()
-            if self.campaign:
+            if hasattr(self, 'campaign') and self.campaign:
                 data['campaign'] = self.campaign.to_dict()
             if hasattr(self, 'brief') and self.brief:
                 data['brief'] = self.brief.to_dict(include_relations=True)

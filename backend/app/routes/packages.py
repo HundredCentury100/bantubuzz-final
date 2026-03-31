@@ -210,6 +210,24 @@ def create_package():
         if not category:
             return jsonify({'error': 'Category or collaboration type is required'}), 400
 
+        # Handle multi-platform packages
+        is_multi_platform = data.get('is_multi_platform', False)
+        platforms = data.get('platforms', [])
+
+        # Validate multi-platform data
+        if is_multi_platform and len(platforms) < 2:
+            return jsonify({'error': 'Multi-platform packages must have at least 2 platforms selected'}), 400
+
+        # Expand deliverables for multi-platform packages
+        deliverables = data.get('deliverables', [])
+        if is_multi_platform and platforms and deliverables:
+            # Expand each deliverable to include platform suffix
+            expanded_deliverables = []
+            for deliverable in deliverables:
+                for platform in platforms:
+                    expanded_deliverables.append(f"{deliverable} on {platform}")
+            deliverables = expanded_deliverables
+
         package = Package(
             creator_id=creator.id,
             title=data['title'],
@@ -217,9 +235,11 @@ def create_package():
             price=data['price'],
             duration_days=data['duration_days'],
             category=category,
-            platform_type=data.get('platform_type'),
+            platform_type=data.get('platform_type') if not is_multi_platform else None,
             content_type=data.get('content_type'),
-            deliverables=data.get('deliverables', [])
+            is_multi_platform=is_multi_platform,
+            platforms=platforms if is_multi_platform else [],
+            deliverables=deliverables
         )
 
         db.session.add(package)
@@ -251,11 +271,36 @@ def update_package(package_id):
             return jsonify({'error': 'Unauthorized'}), 403
 
         data = request.get_json()
+
+        # Handle multi-platform updates
+        if 'is_multi_platform' in data:
+            is_multi_platform = data['is_multi_platform']
+            platforms = data.get('platforms', [])
+
+            # Validate multi-platform data
+            if is_multi_platform and len(platforms) < 2:
+                return jsonify({'error': 'Multi-platform packages must have at least 2 platforms selected'}), 400
+
+            package.is_multi_platform = is_multi_platform
+            package.platforms = platforms if is_multi_platform else []
+            package.platform_type = None if is_multi_platform else data.get('platform_type')
+
+        # Expand deliverables if updating them for a multi-platform package
+        if 'deliverables' in data:
+            deliverables = data['deliverables']
+            if package.is_multi_platform and package.platforms and deliverables:
+                # Expand each deliverable to include platform suffix
+                expanded_deliverables = []
+                for deliverable in deliverables:
+                    for platform in package.platforms:
+                        expanded_deliverables.append(f"{deliverable} on {platform}")
+                data['deliverables'] = expanded_deliverables
+
         updatable_fields = ['title', 'description', 'price', 'duration_days',
                           'deliverables', 'category', 'platform_type', 'content_type', 'is_active']
 
         for field in updatable_fields:
-            if field in data:
+            if field in data and field != 'platform_type':  # platform_type handled above
                 setattr(package, field, data[field])
 
         db.session.commit()

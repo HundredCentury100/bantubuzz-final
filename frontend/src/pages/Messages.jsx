@@ -34,6 +34,7 @@ const Messages = () => {
   const [loading, setLoading] = useState(true);
   const [showMobileChat, setShowMobileChat] = useState(false); // Mobile chat view state
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false); // Desktop sidebar toggle
+  const [searchQuery, setSearchQuery] = useState(''); // Search query for filtering conversations
   const messagesEndRef = useRef(null);
   const typingTimeoutRef = useRef(null);
 
@@ -50,12 +51,33 @@ const Messages = () => {
     loadConversations();
   }, []);
 
+  // Listen for real-time message events to refresh conversation list
+  useEffect(() => {
+    const handleNewMessage = (event) => {
+      console.log('New message event detected, refreshing conversations');
+      loadConversations();
+    };
+
+    const handleMessageSent = (event) => {
+      console.log('Message sent event detected, refreshing conversations');
+      loadConversations();
+    };
+
+    window.addEventListener('new_message_received', handleNewMessage);
+    window.addEventListener('message_sent', handleMessageSent);
+
+    return () => {
+      window.removeEventListener('new_message_received', handleNewMessage);
+      window.removeEventListener('message_sent', handleMessageSent);
+    };
+  }, []);
+
   // Handle starting a new conversation from another page
   useEffect(() => {
     if (location.state?.startConversationWith && !loading) {
-      const { id, email } = location.state.startConversationWith;
+      const { id, email, display_name, username, company_name, profile_picture } = location.state.startConversationWith;
 
-      console.log('Starting conversation with:', { id, email });
+      console.log('Starting conversation with:', location.state.startConversationWith);
       console.log('Available conversations:', conversations);
 
       // Check if conversation already exists
@@ -66,15 +88,20 @@ const Messages = () => {
         loadConversation(existingConv);
       } else {
         console.log('Creating new conversation');
-        // Create a new conversation object for display
+        // Create a new conversation object for display with full user info
         const newConversation = {
           id: id,
           email: email,
+          display_name: display_name,
+          username: username,
+          company_name: company_name,
+          profile_picture: profile_picture,
           user_type: null,
           last_message: null,
           unread_count: 0
         };
         setSelectedConversation(newConversation);
+        setShowMobileChat(true); // Show chat view on mobile
         loadConversationMessages(id, []); // Empty messages initially
       }
 
@@ -296,6 +323,24 @@ const Messages = () => {
     ? (messages[selectedConversation.id] || [])
     : [];
 
+  // Filter conversations based on search query
+  const filteredConversations = conversations.filter((conversation) => {
+    if (!searchQuery.trim()) return true;
+
+    const query = searchQuery.toLowerCase();
+    const displayName = (conversation.display_name || '').toLowerCase();
+    const username = (conversation.username || '').toLowerCase();
+    const companyName = (conversation.company_name || '').toLowerCase();
+    const email = (conversation.email || '').toLowerCase();
+    const lastMessage = (conversation.last_message || '').toLowerCase();
+
+    return displayName.includes(query) ||
+           username.includes(query) ||
+           companyName.includes(query) ||
+           email.includes(query) ||
+           lastMessage.includes(query);
+  });
+
   return (
     <div className="min-h-screen bg-light">
       <Navbar />
@@ -305,12 +350,13 @@ const Messages = () => {
           <h1 className="text-4xl font-bold">Messages</h1>
           <Link
             to="/browse/creators"
-            className="px-6 py-3 bg-primary hover:bg-primary-dark text-white font-medium rounded-lg transition-colors flex items-center gap-2"
+            className="lg:px-6 lg:py-3 p-3 bg-primary hover:bg-primary-dark text-white font-medium rounded-lg lg:rounded-lg transition-colors flex items-center gap-2 lg:rounded-lg rounded-full"
+            title="New Conversation"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
             </svg>
-            New Conversation
+            <span className="hidden lg:inline">New Conversation</span>
           </Link>
         </div>
 
@@ -341,26 +387,64 @@ const Messages = () => {
               </button>
             </div>
 
+            {/* Search Bar */}
+            {!sidebarCollapsed && conversations.length > 0 && (
+              <div className="p-3 border-b border-gray-200">
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search conversations..."
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary text-sm"
+                  />
+                  <svg className="w-5 h-5 text-gray-400 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                  {searchQuery && (
+                    <button
+                      onClick={() => setSearchQuery('')}
+                      className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600"
+                    >
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
             <div className="overflow-y-auto h-full">
               {loading ? (
                 <div className="p-4 text-center text-gray-500">
                   Loading conversations...
                 </div>
-              ) : conversations.length === 0 ? (
-                <div className="p-6 text-center">
-                  <svg className="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                  </svg>
-                  <p className="text-gray-500 mb-4">No conversations yet</p>
-                  <Link
-                    to="/browse/creators"
-                    className="inline-block text-primary hover:text-primary-dark font-medium text-sm"
-                  >
-                    Browse Creators →
-                  </Link>
-                </div>
+              ) : filteredConversations.length === 0 ? (
+                conversations.length === 0 ? (
+                  <div className="p-6 text-center">
+                    <svg className="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                    </svg>
+                    <p className="text-gray-500 mb-4">No conversations yet</p>
+                    <Link
+                      to="/browse/creators"
+                      className="inline-block text-primary hover:text-primary-dark font-medium text-sm"
+                    >
+                      Browse Creators →
+                    </Link>
+                  </div>
+                ) : (
+                  <div className="p-6 text-center">
+                    <svg className="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                    <p className="text-gray-500 mb-2">No conversations found</p>
+                    <p className="text-gray-400 text-sm">Try a different search term</p>
+                  </div>
+                )
               ) : (
-                conversations.map((conversation) => (
+                filteredConversations.map((conversation) => (
                   <div
                     key={conversation.id}
                     onClick={() => loadConversation(conversation)}
@@ -450,7 +534,7 @@ const Messages = () => {
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                         </svg>
                       </button>
-                      <div className="relative">
+                      <div className="relative flex-shrink-0">
                         {selectedConversation.profile_picture ? (
                           <img
                             src={`${BASE_URL}${selectedConversation.profile_picture}`}
@@ -464,17 +548,22 @@ const Messages = () => {
                           />
                         )}
                         {isUserOnline(selectedConversation.id) && (
-                          <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
+                          <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white z-10"></div>
                         )}
                       </div>
-                      <div>
-                        <p className="font-semibold text-gray-900">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-gray-900 truncate">
                           {selectedConversation.display_name || selectedConversation.username || selectedConversation.company_name || selectedConversation.email || 'Unknown User'}
                         </p>
-                        <p className="text-sm text-gray-500">
-                          {isUserOnline(selectedConversation.id)
-                            ? 'Online'
-                            : 'Offline'}
+                        <p className="text-sm text-gray-500 flex items-center gap-1">
+                          {isUserOnline(selectedConversation.id) ? (
+                            <>
+                              <span className="inline-block w-2 h-2 bg-green-500 rounded-full"></span>
+                              <span>Online</span>
+                            </>
+                          ) : (
+                            'Offline'
+                          )}
                         </p>
                       </div>
                     </div>
@@ -584,22 +673,28 @@ const Messages = () => {
                 </div>
 
                 {/* Message Input */}
-                <form onSubmit={handleSendMessage} className="p-4 border-t border-gray-200">
-                  <div className="flex space-x-2">
-                    <input
-                      type="text"
-                      value={messageText}
-                      onChange={handleTyping}
-                      placeholder="Type a message..."
-                      className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
-                      disabled={!isConnected}
-                    />
+                <form onSubmit={handleSendMessage} className="p-3 sm:p-4 border-t border-gray-200 bg-white">
+                  <div className="flex items-center gap-2 w-full max-w-full">
+                    <div className="flex-1 min-w-0">
+                      <input
+                        type="text"
+                        value={messageText}
+                        onChange={handleTyping}
+                        placeholder="Type a message..."
+                        className="w-full px-4 py-3 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-primary text-base"
+                        disabled={!isConnected}
+                      />
+                    </div>
                     <button
                       type="submit"
                       disabled={!messageText.trim() || !isConnected}
-                      className="btn-primary px-6 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="bg-primary hover:bg-primary-dark text-white rounded-full disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center flex-shrink-0 w-12 h-12 min-w-[48px] min-h-[48px] shadow-lg active:scale-95"
+                      title="Send message"
+                      aria-label="Send message"
                     >
-                      Send
+                      <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+                      </svg>
                     </button>
                   </div>
                 </form>

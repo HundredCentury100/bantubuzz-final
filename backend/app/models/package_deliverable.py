@@ -12,8 +12,9 @@ class PackageDeliverable(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     collaboration_id = db.Column(db.Integer, db.ForeignKey('collaborations.id'), nullable=False)
     title = db.Column(db.String(200), nullable=False)
-    url = db.Column(db.Text, nullable=False)
+    url = db.Column(db.Text, nullable=True)  # Made nullable since URL is submitted later
     description = db.Column(db.Text, nullable=True)
+    platform = db.Column(db.String(50), nullable=True)  # For multi-platform packages: Instagram, Facebook, LinkedIn, TikTok, YouTube
     status = db.Column(db.String(20), default='pending_review')  # pending_review, revision_requested, approved
     submitted_at = db.Column(db.DateTime, default=datetime.utcnow)
     approved_at = db.Column(db.DateTime, nullable=True)
@@ -61,6 +62,7 @@ class PackageDeliverable(db.Model):
             'title': self.title,
             'url': self.url,
             'description': self.description,
+            'platform': self.platform,  # Platform for multi-platform packages
             'status': self.status,
             'submitted_at': self.submitted_at.isoformat() if self.submitted_at else None,
             'approved_at': self.approved_at.isoformat() if self.approved_at else None,

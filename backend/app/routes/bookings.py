@@ -22,6 +22,34 @@ def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
+def create_multiplatform_deliverables(collaboration, package):
+    """
+    Auto-create platform-specific deliverables for multi-platform packages.
+
+    Example: If package has deliverable "Post 30 sec video" and platforms ["Instagram", "Facebook", "TikTok"],
+    this creates 3 deliverables:
+    - "Post 30 sec video on Instagram"
+    - "Post 30 sec video on Facebook"
+    - "Post 30 sec video on TikTok"
+    """
+    if not package or not package.is_multi_platform or not package.platforms:
+        return
+
+    from app.models.package_deliverable import PackageDeliverable
+
+    for deliverable_title in (package.deliverables or []):
+        for platform in package.platforms:
+            # Create a deliverable for each platform
+            platform_deliverable = PackageDeliverable(
+                collaboration_id=collaboration.id,
+                title=f"{deliverable_title} on {platform}",
+                platform=platform,
+                status='pending_review',
+                description=f"Submit URL for {deliverable_title} posted on {platform}"
+            )
+            db.session.add(platform_deliverable)
+
+
 @bp.route('/', methods=['GET'])
 @jwt_required()
 def get_bookings():
@@ -226,6 +254,10 @@ def update_booking_status(booking_id):
                     progress_percentage=0
                 )
                 db.session.add(collaboration)
+                db.session.flush()  # Get collaboration ID
+
+                # Auto-create platform-specific deliverables for multi-platform packages
+                create_multiplatform_deliverables(collaboration, package)
 
         db.session.commit()
 
@@ -600,6 +632,10 @@ def cart_payment_status():
                         progress_percentage=0
                     )
                     db.session.add(collab)
+                    db.session.flush()  # Get collaboration ID
+
+                    # Auto-create platform-specific deliverables for multi-platform packages
+                    create_multiplatform_deliverables(collab, package)
 
             db.session.commit()
             return jsonify({'paid': True, 'status': 'paid'}), 200
