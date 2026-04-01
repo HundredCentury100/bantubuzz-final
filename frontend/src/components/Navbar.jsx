@@ -17,12 +17,14 @@ import NotificationBell from './NotificationBell';
 import { messagingService } from '../services/messagingAPI';
 import { creatorsAPI, brandsAPI } from '../services/api';
 import Avatar from './Avatar';
+import api from '../services/api';
 
 const Navbar = () => {
   const { isAuthenticated, user, logout } = useAuth();
   const navigate = useNavigate();
   const [unreadMessageCount, setUnreadMessageCount] = useState(0);
   const [userProfile, setUserProfile] = useState(null);
+  const [walletBalance, setWalletBalance] = useState(0);
 
   // Fetch user profile for avatar
   useEffect(() => {
@@ -65,6 +67,27 @@ const Navbar = () => {
     const interval = setInterval(fetchUnreadCount, 30000);
     return () => clearInterval(interval);
   }, [isAuthenticated]);
+
+  // Fetch brand wallet balance
+  useEffect(() => {
+    const fetchWalletBalance = async () => {
+      if (isAuthenticated && user?.user_type === 'brand') {
+        try {
+          const response = await api.get('/brand/wallet/balance');
+          if (response.data.success) {
+            setWalletBalance(response.data.wallet.available_balance || 0);
+          }
+        } catch (error) {
+          console.error('Error fetching wallet balance:', error);
+        }
+      }
+    };
+
+    fetchWalletBalance();
+    // Refresh every 60 seconds
+    const interval = setInterval(fetchWalletBalance, 60000);
+    return () => clearInterval(interval);
+  }, [isAuthenticated, user]);
 
   const handleLogout = () => {
     logout();
@@ -152,6 +175,18 @@ const Navbar = () => {
                     className="text-gray-700 hover:text-gray-900 transition-colors text-sm font-medium"
                   >
                     Earnings
+                  </Link>
+                )}
+                {user?.user_type === 'brand' && (
+                  <Link
+                    to="/brand/wallet"
+                    className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 hover:bg-primary/20 transition-colors"
+                    title="Wallet Balance"
+                  >
+                    <CurrencyDollarIcon className="w-5 h-5 text-primary" />
+                    <span className="font-semibold text-primary">
+                      ${walletBalance.toFixed(2)}
+                    </span>
                   </Link>
                 )}
 
@@ -408,6 +443,23 @@ const Navbar = () => {
                                 } block px-4 py-2 text-sm text-gray-700 rounded-lg`}
                               >
                                 Earnings
+                              </Link>
+                            )}
+                          </Menu.Item>
+                        )}
+                        {user?.user_type === 'brand' && (
+                          <Menu.Item>
+                            {({ active }) => (
+                              <Link
+                                to="/brand/wallet"
+                                className={`${
+                                  active ? 'bg-light' : ''
+                                } flex items-center justify-between px-4 py-2 text-sm text-gray-700 rounded-lg`}
+                              >
+                                <span>Wallet</span>
+                                <span className="font-semibold text-primary">
+                                  ${walletBalance.toFixed(2)}
+                                </span>
                               </Link>
                             )}
                           </Menu.Item>

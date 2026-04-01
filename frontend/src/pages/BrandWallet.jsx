@@ -20,8 +20,8 @@ export default function BrandWallet() {
     try {
       setLoading(true);
       const [walletRes, transactionsRes] = await Promise.all([
-        api.get('/brand/wallet'),
-        api.get('/brand/wallet/transactions?limit=20')
+        api.get('/brand/wallet/balance'),
+        api.get('/brand/wallet/transactions?page=1&per_page=20')
       ]);
 
       setWallet(walletRes.data.wallet);
@@ -91,7 +91,7 @@ export default function BrandWallet() {
         )}
 
         {/* Balance Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <div className="card">
             <div className="flex items-center justify-between">
               <div>
@@ -112,15 +112,32 @@ export default function BrandWallet() {
           <div className="card">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600 mb-1">Total Credits</p>
+                <p className="text-sm text-gray-600 mb-1">Total Deposited</p>
                 <p className="text-3xl font-bold text-primary mt-2">
-                  {formatCurrency(wallet?.total_earned)}
+                  {formatCurrency(wallet?.total_deposited)}
                 </p>
-                <p className="text-sm text-gray-500 mt-2">Lifetime refunds and credits received</p>
+                <p className="text-sm text-gray-500 mt-2">All-time deposits and refunds</p>
               </div>
               <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center">
                 <svg className="w-6 h-6 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                </svg>
+              </div>
+            </div>
+          </div>
+
+          <div className="card">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600 mb-1">Total Spent</p>
+                <p className="text-3xl font-bold text-dark mt-2">
+                  {formatCurrency(wallet?.total_spent)}
+                </p>
+                <p className="text-sm text-gray-500 mt-2">All-time spending on collaborations</p>
+              </div>
+              <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
+                <svg className="w-6 h-6 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
                 </svg>
               </div>
             </div>
@@ -136,9 +153,10 @@ export default function BrandWallet() {
             <div>
               <p className="text-sm font-medium text-primary-dark leading-snug mb-1">How Brand Wallet Works</p>
               <ul className="text-sm text-dark leading-relaxed space-y-1">
-                <li>• Credits are automatically added when creators reject paid bookings</li>
-                <li>• Refunds are added when you cancel paid collaborations</li>
-                <li>• Use your balance for any future bookings or collaborations on the platform</li>
+                <li>• Refunds are automatically added when creators decline your paid bookings</li>
+                <li>• Credits are added when you cancel paid collaborations</li>
+                <li>• Use your balance to pay for future bookings and collaborations</li>
+                <li>• Top up your wallet anytime via Paynow or Bank Transfer (coming soon)</li>
               </ul>
             </div>
           </div>
