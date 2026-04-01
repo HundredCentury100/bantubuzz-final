@@ -8,6 +8,7 @@ import api from '../services/api';
 const Payment = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const authUser = JSON.parse(localStorage.getItem('user') || '{}');
   const [booking, setBooking] = useState(null);
   const [loading, setLoading] = useState(true);
   const [paymentLoading, setPaymentLoading] = useState(false);
@@ -21,7 +22,14 @@ const Payment = () => {
 
   useEffect(() => {
     fetchBooking();
-    fetchWalletBalance();
+
+    // Only fetch wallet balance for brands
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    if (user.user_type === 'brand') {
+      fetchWalletBalance();
+    } else {
+      setLoadingWallet(false);
+    }
   }, [id]);
 
   const fetchWalletBalance = async () => {
@@ -33,6 +41,7 @@ const Payment = () => {
       }
     } catch (error) {
       console.error('Error fetching wallet balance:', error);
+      setWalletBalance(0); // Set to 0 on error
     } finally {
       setLoadingWallet(false);
     }
@@ -342,39 +351,41 @@ const Payment = () => {
               <h2 className="text-xl font-bold text-dark mb-4">Select Payment Method</h2>
 
               <div className="space-y-4 mb-6">
-                {/* Wallet Option */}
-                <label className="flex items-start p-4 border-2 rounded-3xl cursor-pointer hover:border-primary transition-colors"
-                       style={{ borderColor: paymentMethod === 'wallet' ? '#F15A29' : '#e5e7eb' }}>
-                  <input
-                    type="radio"
-                    name="paymentMethod"
-                    value="wallet"
-                    checked={paymentMethod === 'wallet'}
-                    onChange={(e) => setPaymentMethod(e.target.value)}
-                    className="mt-1"
-                    disabled={loadingWallet}
-                  />
-                  <div className="ml-3 flex-1">
-                    <div className="flex items-center justify-between">
-                      <span className="font-semibold text-dark">Wallet Balance</span>
-                      {!loadingWallet && (
-                        <span className={`text-sm font-semibold ${walletBalance >= booking?.amount ? 'text-green-600' : 'text-red-600'}`}>
-                          Available: ${walletBalance.toFixed(2)}
-                        </span>
+                {/* Wallet Option - Only for brands */}
+                {authUser.user_type === 'brand' && (
+                  <label className="flex items-start p-4 border-2 rounded-3xl cursor-pointer hover:border-primary transition-colors"
+                         style={{ borderColor: paymentMethod === 'wallet' ? '#F15A29' : '#e5e7eb' }}>
+                    <input
+                      type="radio"
+                      name="paymentMethod"
+                      value="wallet"
+                      checked={paymentMethod === 'wallet'}
+                      onChange={(e) => setPaymentMethod(e.target.value)}
+                      className="mt-1"
+                      disabled={loadingWallet}
+                    />
+                    <div className="ml-3 flex-1">
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold text-dark">Wallet Balance</span>
+                        {!loadingWallet && (
+                          <span className={`text-sm font-semibold ${walletBalance >= booking?.amount ? 'text-green-600' : 'text-red-600'}`}>
+                            Available: ${walletBalance.toFixed(2)}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-sm text-gray-600 mt-1">
+                        Pay instantly using your wallet balance. {walletBalance < booking?.amount && (
+                          <span className="text-red-600 font-medium">Insufficient balance.</span>
+                        )}
+                      </p>
+                      {walletBalance < booking?.amount && (
+                        <Link to="/brand/wallet" className="text-sm text-primary hover:text-primary-dark font-medium mt-1 inline-block">
+                          Top up wallet →
+                        </Link>
                       )}
                     </div>
-                    <p className="text-sm text-gray-600 mt-1">
-                      Pay instantly using your wallet balance. {walletBalance < booking?.amount && (
-                        <span className="text-red-600 font-medium">Insufficient balance.</span>
-                      )}
-                    </p>
-                    {walletBalance < booking?.amount && (
-                      <Link to="/brand/wallet" className="text-sm text-primary hover:text-primary-dark font-medium mt-1 inline-block">
-                        Top up wallet →
-                      </Link>
-                    )}
-                  </div>
-                </label>
+                  </label>
+                )}
 
                 {/* Paynow Option */}
                 <label className="flex items-start p-4 border-2 rounded-3xl cursor-pointer hover:border-primary transition-colors"
