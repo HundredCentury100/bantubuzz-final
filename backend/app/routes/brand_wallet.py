@@ -18,7 +18,7 @@ def get_wallet_balance():
 
         # Verify user is a brand
         user = User.query.get(user_id)
-        if not user or user.role != 'brand':
+        if not user or user.user_type != 'brand':
             return jsonify({'error': 'Unauthorized: Brand access only'}), 403
 
         wallet = brand_wallet_service.calculate_brand_wallet_balance(user_id)
@@ -41,7 +41,7 @@ def get_wallet_statistics():
 
         # Verify user is a brand
         user = User.query.get(user_id)
-        if not user or user.role != 'brand':
+        if not user or user.user_type != 'brand':
             return jsonify({'error': 'Unauthorized: Brand access only'}), 403
 
         stats = brand_wallet_service.get_wallet_statistics(user_id)
@@ -64,7 +64,7 @@ def get_transactions():
 
         # Verify user is a brand
         user = User.query.get(user_id)
-        if not user or user.role != 'brand':
+        if not user or user.user_type != 'brand':
             return jsonify({'error': 'Unauthorized: Brand access only'}), 403
 
         page = request.args.get('page', 1, type=int)
@@ -93,7 +93,7 @@ def create_deposit():
 
         # Verify user is a brand
         user = User.query.get(user_id)
-        if not user or user.role != 'brand':
+        if not user or user.user_type != 'brand':
             return jsonify({'error': 'Unauthorized: Brand access only'}), 403
 
         data = request.get_json()
@@ -138,7 +138,7 @@ def get_deposits():
 
         # Verify user is a brand
         user = User.query.get(user_id)
-        if not user or user.role != 'brand':
+        if not user or user.user_type != 'brand':
             return jsonify({'error': 'Unauthorized: Brand access only'}), 403
 
         page = request.args.get('page', 1, type=int)
@@ -167,7 +167,7 @@ def get_deposit_details(deposit_id):
 
         # Verify user is a brand
         user = User.query.get(user_id)
-        if not user or user.role != 'brand':
+        if not user or user.user_type != 'brand':
             return jsonify({'error': 'Unauthorized: Brand access only'}), 403
 
         from app.models import DepositRequest
@@ -198,7 +198,7 @@ def upload_proof_of_deposit(deposit_id):
 
         # Verify user is a brand
         user = User.query.get(user_id)
-        if not user or user.role != 'brand':
+        if not user or user.user_type != 'brand':
             return jsonify({'error': 'Unauthorized: Brand access only'}), 403
 
         from app.models import DepositRequest
@@ -247,7 +247,7 @@ def cancel_deposit(deposit_id):
 
         # Verify user is a brand
         user = User.query.get(user_id)
-        if not user or user.role != 'brand':
+        if not user or user.user_type != 'brand':
             return jsonify({'error': 'Unauthorized: Brand access only'}), 403
 
         data = request.get_json() or {}
@@ -278,7 +278,7 @@ def check_balance():
 
         # Verify user is a brand
         user = User.query.get(user_id)
-        if not user or user.role != 'brand':
+        if not user or user.user_type != 'brand':
             return jsonify({'error': 'Unauthorized: Brand access only'}), 403
 
         data = request.get_json()
