@@ -289,6 +289,44 @@ def update_booking_status(booking_id):
         return jsonify({'error': str(e)}), 500
 
 
+@bp.route('/<int:booking_id>/pay-with-wallet', methods=['POST'])
+@jwt_required()
+def pay_with_wallet(booking_id):
+    """Pay for booking using brand wallet balance"""
+    try:
+        user_id = int(get_jwt_identity())
+        user = User.query.get(user_id)
+        booking = Booking.query.get(booking_id)
+
+        if not booking:
+            return jsonify({'error': 'Booking not found'}), 404
+
+        # Check if user is authorized (brand who made the booking)
+        brand = BrandProfile.query.filter_by(user_id=user_id).first()
+        if not brand or booking.brand_id != brand.id:
+            return jsonify({'error': 'Unauthorized'}), 403
+
+        # Check if payment already exists
+        if booking.payment_status == 'paid':
+            return jsonify({'error': 'Booking already paid'}), 400
+
+        # Get payment source from request
+        data = request.get_json()
+        payment_source = data.get('payment_source', 'wallet_only')
+
+        # Process wallet payment
+        from app.services.payment_service import process_payment_with_wallet
+        result = process_payment_with_wallet(booking, user_id, payment_source)
+
+        if result['success']:
+            return jsonify(result), 200
+        else:
+            return jsonify(result), 400
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @bp.route('/<int:booking_id>/initiate-payment', methods=['POST'])
 @jwt_required()
 def initiate_booking_payment(booking_id):

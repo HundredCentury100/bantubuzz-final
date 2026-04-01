@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { bookingsAPI } from '../services/api';
 import Navbar from '../components/Navbar';
 import toast from 'react-hot-toast';
+import api from '../services/api';
 
 const Payment = () => {
   const { id } = useParams();
@@ -15,10 +16,27 @@ const Payment = () => {
   const [paymentMethod, setPaymentMethod] = useState('paynow');
   const [proofFile, setProofFile] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [walletBalance, setWalletBalance] = useState(0);
+  const [loadingWallet, setLoadingWallet] = useState(true);
 
   useEffect(() => {
     fetchBooking();
+    fetchWalletBalance();
   }, [id]);
+
+  const fetchWalletBalance = async () => {
+    try {
+      setLoadingWallet(true);
+      const response = await api.get('/brand/wallet/balance');
+      if (response.data.success) {
+        setWalletBalance(response.data.wallet.available_balance || 0);
+      }
+    } catch (error) {
+      console.error('Error fetching wallet balance:', error);
+    } finally {
+      setLoadingWallet(false);
+    }
+  };
 
   const fetchBooking = async () => {
     try {
@@ -156,6 +174,32 @@ const Payment = () => {
       toast.error('Failed to check payment status');
     } finally {
       setCheckingStatus(false);
+    }
+  };
+
+  const handleWalletPayment = async () => {
+    if (walletBalance < booking.amount) {
+      toast.error('Insufficient wallet balance');
+      return;
+    }
+
+    try {
+      setPaymentLoading(true);
+      const response = await api.post(`/bookings/${id}/pay-with-wallet`, {
+        payment_source: 'wallet_only'
+      });
+
+      if (response.data.success) {
+        toast.success('Payment completed successfully using wallet!');
+        navigate('/brand/dashboard');
+      } else {
+        toast.error(response.data.message || 'Payment failed');
+      }
+    } catch (error) {
+      console.error('Wallet payment error:', error);
+      toast.error(error.response?.data?.error || 'Failed to process wallet payment');
+    } finally {
+      setPaymentLoading(false);
     }
   };
 
@@ -298,6 +342,40 @@ const Payment = () => {
               <h2 className="text-xl font-bold text-dark mb-4">Select Payment Method</h2>
 
               <div className="space-y-4 mb-6">
+                {/* Wallet Option */}
+                <label className="flex items-start p-4 border-2 rounded-3xl cursor-pointer hover:border-primary transition-colors"
+                       style={{ borderColor: paymentMethod === 'wallet' ? '#F15A29' : '#e5e7eb' }}>
+                  <input
+                    type="radio"
+                    name="paymentMethod"
+                    value="wallet"
+                    checked={paymentMethod === 'wallet'}
+                    onChange={(e) => setPaymentMethod(e.target.value)}
+                    className="mt-1"
+                    disabled={loadingWallet}
+                  />
+                  <div className="ml-3 flex-1">
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold text-dark">Wallet Balance</span>
+                      {!loadingWallet && (
+                        <span className={`text-sm font-semibold ${walletBalance >= booking?.amount ? 'text-green-600' : 'text-red-600'}`}>
+                          Available: ${walletBalance.toFixed(2)}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-sm text-gray-600 mt-1">
+                      Pay instantly using your wallet balance. {walletBalance < booking?.amount && (
+                        <span className="text-red-600 font-medium">Insufficient balance.</span>
+                      )}
+                    </p>
+                    {walletBalance < booking?.amount && (
+                      <Link to="/brand/wallet" className="text-sm text-primary hover:text-primary-dark font-medium mt-1 inline-block">
+                        Top up wallet →
+                      </Link>
+                    )}
+                  </div>
+                </label>
+
                 {/* Paynow Option */}
                 <label className="flex items-start p-4 border-2 rounded-3xl cursor-pointer hover:border-primary transition-colors"
                        style={{ borderColor: paymentMethod === 'paynow' ? '#F15A29' : '#e5e7eb' }}>
@@ -389,23 +467,32 @@ const Payment = () => {
 
               {/* Payment Button */}
               <button
-                onClick={paymentMethod === 'paynow' ? handleProceedToPayment : handleBankTransferPayment}
-                disabled={(paymentMethod === 'paynow' && !paymentData?.redirect_url) || (paymentMethod === 'bank_transfer' && !proofFile) || uploading}
+                onClick={
+                  paymentMethod === 'wallet' ? handleWalletPayment :
+                  paymentMethod === 'paynow' ? handleProceedToPayment :
+                  handleBankTransferPayment
+                }
+                disabled={
+                  paymentLoading || uploading ||
+                  (paymentMethod === 'wallet' && walletBalance < booking?.amount) ||
+                  (paymentMethod === 'paynow' && !paymentData?.redirect_url) ||
+                  (paymentMethod === 'bank_transfer' && !proofFile)
+                }
                 className="bg-primary hover:bg-primary-dark text-white font-medium px-6 py-3 rounded-full w-full disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-colors"
               >
-                {uploading ? (
+                {(paymentLoading || uploading) ? (
                   <>
                     <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                    Uploading...
+                    {uploading ? 'Uploading...' : 'Processing...'}
                   </>
                 ) : (
                   <>
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
                     </svg>
-                    {paymentMethod === 'paynow'
-                      ? (!paymentData?.redirect_url ? 'Initializing Payment...' : 'Proceed to Payment')
-                      : 'Submit Payment'}
+                    {paymentMethod === 'wallet' ? 'Pay with Wallet' :
+                     paymentMethod === 'paynow' ? (!paymentData?.redirect_url ? 'Initializing Payment...' : 'Proceed to Payment') :
+                     'Submit Payment'}
                   </>
                 )}
               </button>
