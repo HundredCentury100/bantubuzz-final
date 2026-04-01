@@ -26,9 +26,14 @@ class Collaboration(db.Model):
     amount = db.Column(db.Numeric(10, 2), nullable=False)
 
     # Status tracking
-    status = db.Column(db.String(20), default='in_progress')  # in_progress, completed, cancelled
+    status = db.Column(db.String(20), default='in_progress')  # pending_creator_acceptance, in_progress, completed, cancelled, creator_declined
     progress_percentage = db.Column(db.Integer, default=0)  # 0-100
     escrow_status = db.Column(db.String(20))  # pending, escrowed, released, failed
+
+    # Creator response tracking (for package bookings)
+    creator_response_at = db.Column(db.DateTime)  # When creator accepted/declined
+    creator_decline_reason = db.Column(db.Text)  # Why creator declined (if applicable)
+    refund_processed = db.Column(db.Boolean, default=False)  # Prevent double refunds
 
     # Deliverables tracking
     deliverables = db.Column(db.JSON, default=list)  # List of expected deliverables
@@ -97,6 +102,9 @@ class Collaboration(db.Model):
             'amount': self.amount,
             'status': self.status,
             'progress_percentage': self.progress_percentage,
+            'creator_response_at': self.creator_response_at.isoformat() if self.creator_response_at else None,
+            'creator_decline_reason': self.creator_decline_reason,
+            'refund_processed': self.refund_processed,
             'deliverables': self.deliverables or [],
             'submitted_deliverables': self.submitted_deliverables or [],
             'draft_deliverables': self.draft_deliverables or [],

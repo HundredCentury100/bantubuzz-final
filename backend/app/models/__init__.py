@@ -14,6 +14,7 @@ from .category import Category
 from .wallet import Wallet, WalletTransaction
 from .payment import Payment, PaymentVerification
 from .cashout import CashoutRequest
+from .deposit_request import DepositRequest
 from .custom_package_request import CustomPackageRequest
 from .custom_package_offer import CustomPackageOffer
 from .dispute import Dispute
@@ -71,6 +72,7 @@ __all__ = [
     'Payment',
     'PaymentVerification',
     'CashoutRequest',
+    'DepositRequest',
     'CustomPackageRequest',
     'CustomPackageOffer',
     'Dispute',

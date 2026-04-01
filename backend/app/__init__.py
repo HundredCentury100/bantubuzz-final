@@ -96,7 +96,7 @@ def create_app(config_name='development'):
     app.register_blueprint(analytics.bp, url_prefix='/api/analytics')
     app.register_blueprint(categories.bp, url_prefix='/api/categories')
     app.register_blueprint(wallet.bp, url_prefix='/api')
-    app.register_blueprint(brand_wallet.bp)  # Brand wallet routes at /api/brand/wallet
+    app.register_blueprint(brand_wallet.bp, url_prefix='/api')  # Brand wallet routes at /api/brand/wallet/*
     app.register_blueprint(admin.bp, url_prefix='/api/admin')  # Admin routes at /api/admin/*
     app.register_blueprint(admin_extended.bp, url_prefix='/api/admin')  # Extended admin routes (bookings, campaigns, etc.)
     app.register_blueprint(custom_packages.bp)  # Custom packages routes at /api/custom-packages/*

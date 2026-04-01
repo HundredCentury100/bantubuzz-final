@@ -8,11 +8,18 @@ class Wallet(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), unique=True, nullable=False)
 
+    # User type (determines wallet behavior)
+    user_type = db.Column(db.String(20), default='creator')  # 'creator' or 'brand'
+
     # Balance breakdown
-    pending_clearance = db.Column(db.Numeric(10, 2), default=0.00)  # Money in 30-day hold
-    available_balance = db.Column(db.Numeric(10, 2), default=0.00)  # Money ready to withdraw
-    withdrawn_total = db.Column(db.Numeric(10, 2), default=0.00)    # Lifetime withdrawals
-    total_earned = db.Column(db.Numeric(10, 2), default=0.00)       # Lifetime NET earnings (after platform fees)
+    pending_clearance = db.Column(db.Numeric(10, 2), default=0.00)  # Money in 30-day hold (creators only)
+    available_balance = db.Column(db.Numeric(10, 2), default=0.00)  # Money ready to withdraw/use
+    withdrawn_total = db.Column(db.Numeric(10, 2), default=0.00)    # Lifetime withdrawals (creators only)
+    total_earned = db.Column(db.Numeric(10, 2), default=0.00)       # Lifetime NET earnings (creators, after platform fees)
+
+    # Brand-specific fields
+    total_deposited = db.Column(db.Numeric(10, 2), default=0.00)    # Total deposits by brand
+    total_spent = db.Column(db.Numeric(10, 2), default=0.00)        # Total spent on collaborations
 
     # Metadata
     currency = db.Column(db.String(3), default='USD')
@@ -28,10 +35,13 @@ class Wallet(db.Model):
         return {
             'id': self.id,
             'user_id': self.user_id,
+            'user_type': self.user_type,
             'pending_clearance': float(self.pending_clearance),
             'available_balance': float(self.available_balance),
             'withdrawn_total': float(self.withdrawn_total),
             'total_earned': float(self.total_earned),
+            'total_deposited': float(self.total_deposited),
+            'total_spent': float(self.total_spent),
             'currency': self.currency,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
@@ -49,7 +59,7 @@ class WalletTransaction(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
 
     # Transaction details
-    transaction_type = db.Column(db.String(20), nullable=False)  # 'earning', 'cashout', 'refund', 'fee', 'bonus'
+    transaction_type = db.Column(db.String(20), nullable=False)  # 'earning', 'cashout', 'refund', 'fee', 'bonus', 'deposit', 'payment', 'credit'
     amount = db.Column(db.Numeric(10, 2), nullable=False)
     currency = db.Column(db.String(3), default='USD')
 

@@ -1977,3 +1977,128 @@ def get_collaboration_audience(collaboration_id):
         import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
+
+
+# ============================================================================
+# COLLABORATION RESPONSE ENDPOINTS (Creator Accept/Decline)
+# ============================================================================
+
+@bp.route('/pending-response', methods=['GET'])
+@jwt_required()
+def get_pending_collaborations():
+    """Get collaborations pending creator acceptance"""
+    try:
+        user_id = int(get_jwt_identity())
+        user = User.query.get(user_id)
+
+        if not user or user.user_type != 'creator':
+            return jsonify({'error': 'Unauthorized: Creator access only'}), 403
+
+        creator = CreatorProfile.query.filter_by(user_id=user_id).first()
+        if not creator:
+            return jsonify({'error': 'Creator profile not found'}), 404
+
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 20, type=int)
+
+        from app.services import collaboration_response_service
+        result = collaboration_response_service.get_pending_collaborations(
+            creator.id, page, per_page
+        )
+
+        return jsonify({
+            'success': True,
+            **result
+        }), 200
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@bp.route('/pending-count', methods=['GET'])
+@jwt_required()
+def get_pending_count():
+    """Get count of collaborations pending creator response"""
+    try:
+        user_id = int(get_jwt_identity())
+        user = User.query.get(user_id)
+
+        if not user or user.user_type != 'creator':
+            return jsonify({'error': 'Unauthorized: Creator access only'}), 403
+
+        from app.services import collaboration_response_service
+        count = collaboration_response_service.bulk_get_pending_count(user_id)
+
+        return jsonify({
+            'success': True,
+            'count': count
+        }), 200
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@bp.route('/<int:collab_id>/accept', methods=['POST'])
+@jwt_required()
+def accept_collaboration(collab_id):
+    """Creator accepts the collaboration"""
+    try:
+        user_id = int(get_jwt_identity())
+        user = User.query.get(user_id)
+
+        if not user or user.user_type != 'creator':
+            return jsonify({'error': 'Unauthorized: Creator access only'}), 403
+
+        from app.services import collaboration_response_service
+        collaboration = collaboration_response_service.creator_accept_collaboration(
+            collab_id, user_id
+        )
+
+        # Emit socket event for real-time update
+        emit_collaboration_update(collab_id)
+
+        return jsonify({
+            'success': True,
+            'message': 'Collaboration accepted successfully',
+            'collaboration': collaboration.to_dict(include_relations=True)
+        }), 200
+
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@bp.route('/<int:collab_id>/decline', methods=['POST'])
+@jwt_required()
+def decline_collaboration(collab_id):
+    """Creator declines the collaboration"""
+    try:
+        user_id = int(get_jwt_identity())
+        user = User.query.get(user_id)
+
+        if not user or user.user_type != 'creator':
+            return jsonify({'error': 'Unauthorized: Creator access only'}), 403
+
+        data = request.get_json()
+        reason = data.get('reason', 'No reason provided')
+        counter_offer = data.get('counter_offer')  # Optional
+
+        from app.services import collaboration_response_service
+        collaboration = collaboration_response_service.creator_decline_collaboration(
+            collab_id, user_id, reason, counter_offer
+        )
+
+        # Emit socket event for real-time update
+        emit_collaboration_update(collab_id)
+
+        return jsonify({
+            'success': True,
+            'message': 'Collaboration declined successfully. Brand has been refunded to their wallet.',
+            'collaboration': collaboration.to_dict(include_relations=True)
+        }), 200
+
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500

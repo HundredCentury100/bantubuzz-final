@@ -980,3 +980,105 @@ def check_subscription_payment_status(subscription):
             'paid': False,
             'message': f'Error checking status: {str(e)}'
         }
+
+
+def process_payment_with_wallet(booking, user_id, payment_source='wallet'):
+    """
+    Process payment using brand wallet balance
+
+    Args:
+        booking: Booking object
+        user_id: Brand user ID
+        payment_source: 'wallet_only', 'wallet_partial', or 'paynow'
+
+    Returns:
+        dict with success status and details
+    """
+    from app.services import brand_wallet_service
+
+    try:
+        amount = float(booking.amount)
+
+        if payment_source == 'wallet_only':
+            # Pay entirely from wallet
+            if not brand_wallet_service.check_sufficient_balance(user_id, amount):
+                return {
+                    'success': False,
+                    'error': 'Insufficient wallet balance',
+                    'message': 'Your wallet balance is insufficient for this booking'
+                }
+
+            # Deduct from wallet
+            transaction = brand_wallet_service.deduct_from_brand_wallet(
+                user_id=user_id,
+                amount=amount,
+                collaboration_id=None,  # Will be set when collaboration is created
+                description=f'Payment for booking #{booking.id}',
+                metadata={
+                    'booking_id': booking.id,
+                    'package_id': booking.package_id,
+                    'creator_id': booking.creator_id
+                }
+            )
+
+            # Update booking payment status
+            booking.payment_status = 'paid'
+            booking.payment_method = 'wallet'
+            booking.payment_reference = f'WALLET-{transaction.id}'
+            booking.escrow_status = 'escrowed'
+            booking.escrowed_at = datetime.utcnow()
+
+            # Create payment record
+            payment = Payment(
+                booking_id=booking.id,
+                user_id=user_id,
+                amount=amount,
+                payment_method='wallet',
+                payment_type='wallet',
+                status='completed',
+                completed_at=datetime.utcnow(),
+                escrow_status='escrowed',
+                held_amount=amount,
+                payment_reference=f'WALLET-{transaction.id}'
+            )
+            db.session.add(payment)
+
+            # Update collaboration if exists
+            if hasattr(booking, 'collaboration') and booking.collaboration:
+                booking.collaboration.payment_status = 'paid'
+                # Update the transaction with collaboration_id
+                transaction.collaboration_id = booking.collaboration.id
+
+            db.session.commit()
+
+            return {
+                'success': True,
+                'message': 'Payment completed successfully using wallet',
+                'payment_method': 'wallet',
+                'amount_paid': amount,
+                'transaction_id': transaction.id
+            }
+
+        elif payment_source == 'wallet_partial':
+            # Not implemented yet - would use wallet + Paynow
+            return {
+                'success': False,
+                'error': 'Partial wallet payment not yet implemented',
+                'message': 'Please use wallet-only or Paynow payment'
+            }
+
+        else:  # paynow
+            # Use existing Paynow flow
+            return {
+                'success': False,
+                'error': 'Invalid payment source',
+                'message': 'Use initiate_payment for Paynow payments'
+            }
+
+    except Exception as e:
+        db.session.rollback()
+        return {
+            'success': False,
+            'error': str(e),
+            'message': f'Payment failed: {str(e)}'
+        }
