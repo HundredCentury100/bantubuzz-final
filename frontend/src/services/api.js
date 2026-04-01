@@ -290,6 +290,12 @@ export const collaborationsAPI = {
   completeCollaboration: (id) => api.patch(`/collaborations/${id}/complete`),
   cancelCollaboration: (id, reason) => api.patch(`/collaborations/${id}/cancel`, { reason }),
   requestCancellation: (id, reason) => api.post(`/collaborations/${id}/cancel-request`, { reason }),
+
+  // Creator response to collaboration requests
+  getPendingCollaborations: () => api.get('/collaborations/pending-response'),
+  getPendingCount: () => api.get('/collaborations/pending-count'),
+  accept: (id) => api.post(`/collaborations/${id}/accept`),
+  decline: (id, data) => api.post(`/collaborations/${id}/decline`, data),
 };
 
 // Reviews API

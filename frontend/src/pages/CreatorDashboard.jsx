@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { creatorsAPI, packagesAPI, bookingsAPI, opportunitiesAPI } from '../services/api';
+import { creatorsAPI, packagesAPI, bookingsAPI, opportunitiesAPI, collaborationsAPI } from '../services/api';
 import api from '../services/api';
 import Navbar from '../components/Navbar';
+import CollaborationResponseModal from '../components/CollaborationResponseModal';
 import toast from 'react-hot-toast';
 import { SparklesIcon, RocketLaunchIcon, BuildingOfficeIcon, ArrowUpIcon } from '@heroicons/react/24/outline';
 
@@ -17,6 +18,9 @@ const CreatorDashboard = () => {
   const [verificationStatus, setVerificationStatus] = useState(null);
   const [verificationSubscription, setVerificationSubscription] = useState(null);
   const [connectedPlatforms, setConnectedPlatforms] = useState([]);
+  const [pendingCollaborations, setPendingCollaborations] = useState([]);
+  const [selectedCollaboration, setSelectedCollaboration] = useState(null);
+  const [showResponseModal, setShowResponseModal] = useState(false);
   const [stats, setStats] = useState({
     totalPackages: 0,
     activePackages: 0,
@@ -53,6 +57,21 @@ const CreatorDashboard = () => {
     setFeaturedBannerDismissed(true);
   };
 
+  const handleRespondToCollaboration = (collaboration) => {
+    setSelectedCollaboration(collaboration);
+    setShowResponseModal(true);
+  };
+
+  const handleResponseSuccess = (updatedCollaboration) => {
+    // Remove the collaboration from pending list
+    setPendingCollaborations(prev => prev.filter(c => c.id !== updatedCollaboration.id));
+    setShowResponseModal(false);
+    setSelectedCollaboration(null);
+
+    // Refresh dashboard data to update stats
+    fetchDashboardData();
+  };
+
   const fetchDashboardData = async () => {
     try {
       // Fetch all data in parallel for faster loading
@@ -64,7 +83,8 @@ const CreatorDashboard = () => {
         subsRes,
         verRes,
         verSubRes,
-        platformsRes
+        platformsRes,
+        pendingCollabsRes
       ] = await Promise.allSettled([
         creatorsAPI.getOwnProfile(),
         packagesAPI.getMyPackages(),
@@ -73,7 +93,8 @@ const CreatorDashboard = () => {
         api.get('/subscriptions/my-subscription'),
         api.get('/creator/verification/status'),
         api.get('/creator/subscriptions/my-subscription'),
-        api.get('/creator/platforms')
+        api.get('/creator/platforms'),
+        collaborationsAPI.getPendingCollaborations()
       ]);
 
       // Handle profile
@@ -111,6 +132,11 @@ const CreatorDashboard = () => {
       // Handle connected platforms
       if (platformsRes.status === 'fulfilled' && platformsRes.value.data.success) {
         setConnectedPlatforms(platformsRes.value.data.platforms || []);
+      }
+
+      // Handle pending collaborations
+      if (pendingCollabsRes.status === 'fulfilled' && pendingCollabsRes.value.data.success) {
+        setPendingCollaborations(pendingCollabsRes.value.data.collaborations || []);
       }
 
       // Calculate stats from FULL arrays (before slicing)
@@ -445,7 +471,82 @@ const CreatorDashboard = () => {
           </div>
         )}
 
+        {/* Pending Collaboration Requests */}
+        {pendingCollaborations.length > 0 && (
+          <div className="mb-6 sm:mb-8 bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-2xl sm:rounded-3xl p-4 sm:p-6">
+            <div className="flex items-start gap-3 mb-4">
+              <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center flex-shrink-0">
+                <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <div className="flex-1">
+                <h3 className="text-lg sm:text-xl font-bold text-blue-900 mb-1">
+                  Pending Collaboration Requests ({pendingCollaborations.length})
+                </h3>
+                <p className="text-sm text-blue-700">
+                  You have collaboration requests waiting for your response. Review and accept or decline them below.
+                </p>
+              </div>
+            </div>
 
+            <div className="space-y-3">
+              {pendingCollaborations.map((collaboration) => (
+                <div
+                  key={collaboration.id}
+                  className="bg-white border-2 border-blue-100 rounded-xl p-4 hover:border-blue-300 transition-colors"
+                >
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="flex-1">
+                      <div className="flex items-start gap-3 mb-2">
+                        <div className="w-12 h-12 bg-gradient-to-br from-primary to-primary-dark rounded-lg flex items-center justify-center text-white font-bold text-lg flex-shrink-0">
+                          {collaboration.brand?.company_name?.charAt(0) || 'B'}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h4 className="font-bold text-dark text-lg mb-1">
+                            {collaboration.custom_package?.title || 'Custom Package'}
+                          </h4>
+                          <p className="text-sm text-gray-600 mb-2">
+                            From <span className="font-semibold text-dark">{collaboration.brand?.company_name || 'Brand'}</span>
+                          </p>
+                          <div className="flex flex-wrap items-center gap-3 text-sm">
+                            <span className="flex items-center gap-1 text-primary font-bold text-lg">
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                              ${parseFloat(collaboration.amount || 0).toFixed(2)}
+                            </span>
+                            <span className="flex items-center gap-1 text-gray-600">
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                              {collaboration.custom_package?.delivery_time_days || 'N/A'} days
+                            </span>
+                            <span className="flex items-center gap-1 text-gray-600">
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                              </svg>
+                              {collaboration.custom_package?.revisions_allowed || 0} revisions
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row gap-2 sm:ml-4">
+                      <button
+                        onClick={() => handleRespondToCollaboration(collaboration)}
+                        className="btn btn-primary whitespace-nowrap px-6"
+                      >
+                        Review Request
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 sm:gap-6 mb-6 sm:mb-8">
@@ -810,6 +911,18 @@ const CreatorDashboard = () => {
           </div>
         </div>
       </div>
+
+      {/* Collaboration Response Modal */}
+      {showResponseModal && selectedCollaboration && (
+        <CollaborationResponseModal
+          collaboration={selectedCollaboration}
+          onClose={() => {
+            setShowResponseModal(false);
+            setSelectedCollaboration(null);
+          }}
+          onSuccess={handleResponseSuccess}
+        />
+      )}
     </div>
   );
 };
