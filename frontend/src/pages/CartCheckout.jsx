@@ -4,6 +4,7 @@ import { toast } from 'react-hot-toast';
 import { useCart } from '../contexts/CartContext';
 import { useAuth } from '../hooks/useAuth';
 import { bookingsAPI } from '../services/api';
+import api from '../services/api';
 import Navbar from '../components/Navbar';
 
 const CartCheckout = () => {
@@ -11,8 +12,12 @@ const CartCheckout = () => {
   const { user } = useAuth();
   const { cartItems, clearCart, getCartTotal } = useCart();
 
-  const [paymentMethod, setPaymentMethod] = useState('paynow');
+  const [paymentMethod, setPaymentMethod] = useState('wallet');
   const [proofFile, setProofFile] = useState(null);
+
+  // Wallet state
+  const [walletBalance, setWalletBalance] = useState(0);
+  const [loadingWallet, setLoadingWallet] = useState(true);
 
   // Cart checkout state
   const [checkoutLoading, setCheckoutLoading] = useState(false);
@@ -27,6 +32,30 @@ const CartCheckout = () => {
 
   // Payment success
   const [paymentComplete, setPaymentComplete] = useState(false);
+
+  // Fetch wallet balance on mount
+  useEffect(() => {
+    if (user?.user_type === 'brand') {
+      fetchWalletBalance();
+    } else {
+      setLoadingWallet(false);
+    }
+  }, [user]);
+
+  const fetchWalletBalance = async () => {
+    try {
+      setLoadingWallet(true);
+      const response = await api.get('/brand/wallet/balance');
+      if (response.data.success) {
+        setWalletBalance(response.data.wallet.available_balance || 0);
+      }
+    } catch (error) {
+      console.error('Error fetching wallet balance:', error);
+      setWalletBalance(0);
+    } finally {
+      setLoadingWallet(false);
+    }
+  };
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount || 0);
@@ -163,6 +192,32 @@ const CartCheckout = () => {
     }
   };
 
+  // Handle wallet payment for cart
+  const handleWalletPayment = async () => {
+    if (walletBalance < totalAmount) {
+      toast.error('Insufficient wallet balance');
+      return;
+    }
+
+    setCheckoutLoading(true);
+    try {
+      const packageIds = cartItems.map((item) => item.package_id);
+      // Call backend endpoint to pay for cart with wallet
+      const response = await bookingsAPI.cartPayWithWallet(packageIds);
+
+      if (response.data.success) {
+        toast.success('Payment completed successfully using wallet!');
+        clearCart();
+        setPaymentComplete(true);
+      }
+    } catch (error) {
+      console.error('Wallet payment error:', error);
+      toast.error(error.response?.data?.error || 'Failed to process wallet payment');
+    } finally {
+      setCheckoutLoading(false);
+    }
+  };
+
   const isSubmitting = checkoutLoading || uploading;
   const packageCount = checkoutData ? checkoutData.booking_ids?.length : cartItems.length;
   const totalAmount = checkoutData?.total ?? getCartTotal();
@@ -279,6 +334,44 @@ const CartCheckout = () => {
                 <h2 className="text-xl font-bold text-dark mb-5">Select Payment Method</h2>
 
                 <div className="space-y-3 mb-6">
+                  {/* Wallet Option - Only for brands */}
+                  {user?.user_type === 'brand' && (
+                    <label
+                      className="flex items-start p-4 border-2 rounded-2xl cursor-pointer transition-colors"
+                      style={{ borderColor: paymentMethod === 'wallet' ? '#c8ff09' : '#e5e7eb' }}
+                    >
+                      <input
+                        type="radio"
+                        name="paymentMethod"
+                        value="wallet"
+                        checked={paymentMethod === 'wallet'}
+                        onChange={(e) => setPaymentMethod(e.target.value)}
+                        className="mt-1"
+                        disabled={loadingWallet}
+                      />
+                      <div className="ml-3 flex-1">
+                        <div className="flex items-center justify-between mb-1">
+                          <p className="font-semibold text-dark">Wallet Balance</p>
+                          {!loadingWallet && (
+                            <span className={`text-sm font-semibold ${walletBalance >= totalAmount ? 'text-green-600' : 'text-red-600'}`}>
+                              Available: {formatCurrency(walletBalance)}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-sm text-gray-500">
+                          Pay instantly using your wallet balance. {walletBalance < totalAmount && (
+                            <span className="text-red-600 font-medium">Insufficient balance.</span>
+                          )}
+                        </p>
+                        {walletBalance < totalAmount && (
+                          <Link to="/brand/wallet" className="text-sm text-primary hover:text-primary/80 font-medium mt-1 inline-block">
+                            Top up wallet →
+                          </Link>
+                        )}
+                      </div>
+                    </label>
+                  )}
+
                   {/* Paynow */}
                   <label
                     className="flex items-start p-4 border-2 rounded-2xl cursor-pointer transition-colors"
@@ -448,6 +541,29 @@ const CartCheckout = () => {
                       You'll be redirected to Paynow to complete payment securely
                     </p>
                   </>
+                )}
+
+                {/* --- Wallet flow --- */}
+                {paymentMethod === 'wallet' && (
+                  <button
+                    onClick={handleWalletPayment}
+                    disabled={isSubmitting || walletBalance < totalAmount}
+                    className="w-full bg-primary text-dark font-bold py-4 rounded-2xl hover:bg-primary/90 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-lg"
+                  >
+                    {checkoutLoading ? (
+                      <>
+                        <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-dark"></div>
+                        Processing payment...
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                        </svg>
+                        Pay {formatCurrency(totalAmount)} with Wallet
+                      </>
+                    )}
+                  </button>
                 )}
 
                 {/* --- Bank Transfer flow --- */}

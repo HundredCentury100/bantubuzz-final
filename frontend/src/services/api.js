@@ -209,6 +209,7 @@ export const bookingsAPI = {
       headers: { 'Content-Type': 'multipart/form-data' }
     });
   },
+  cartPayWithWallet: (packageIds) => api.post('/bookings/cart/pay-with-wallet', { package_ids: packageIds }),
 };
 
 // Messages API
