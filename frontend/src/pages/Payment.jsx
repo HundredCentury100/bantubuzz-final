@@ -189,7 +189,7 @@ const Payment = () => {
   };
 
   const handleWalletPayment = async () => {
-    if (walletBalance < booking.amount) {
+    if (walletBalance < Number(booking.amount)) {
       toast.error('Insufficient wallet balance');
       return;
     }
@@ -320,7 +320,7 @@ const Payment = () => {
 
               <div className="flex justify-between items-center py-4 bg-light rounded-lg px-4">
                 <span className="text-lg font-bold text-dark">Total Amount</span>
-                <span className="text-2xl font-bold text-primary">${booking.amount?.toFixed(2) || '0.00'}</span>
+                <span className="text-2xl font-bold text-primary">${(Number(booking.amount) || 0).toFixed(2)}</span>
               </div>
             </div>
           </div>
@@ -370,17 +370,17 @@ const Payment = () => {
                       <div className="flex items-center justify-between">
                         <span className="font-semibold text-dark">Wallet Balance</span>
                         {!loadingWallet && (
-                          <span className={`text-sm font-semibold ${walletBalance >= booking?.amount ? 'text-green-600' : 'text-red-600'}`}>
+                          <span className={`text-sm font-semibold ${walletBalance >= Number(booking?.amount) ? 'text-green-600' : 'text-red-600'}`}>
                             Available: ${(Number(walletBalance) || 0).toFixed(2)}
                           </span>
                         )}
                       </div>
                       <p className="text-sm text-gray-600 mt-1">
-                        Pay instantly using your wallet balance. {walletBalance < booking?.amount && (
+                        Pay instantly using your wallet balance. {walletBalance < Number(booking?.amount) && (
                           <span className="text-red-600 font-medium">Insufficient balance.</span>
                         )}
                       </p>
-                      {walletBalance < booking?.amount && (
+                      {walletBalance < Number(booking?.amount) && (
                         <Link to="/brand/wallet" className="text-sm text-primary hover:text-primary-dark font-medium mt-1 inline-block">
                           Top up wallet →
                         </Link>
@@ -447,7 +447,7 @@ const Payment = () => {
                         {booking?.payment_reference || `BOOKING-${id}`}
                       </span>
                     </p>
-                    <p><strong>Amount:</strong> ${booking?.amount?.toFixed(2) || '0.00'}</p>
+                    <p><strong>Amount:</strong> ${(Number(booking?.amount) || 0).toFixed(2)}</p>
                   </div>
                   <p className="text-xs text-blue-700 italic mt-3">
                     Use the reference above when making your transfer so we can match your payment.
@@ -487,7 +487,7 @@ const Payment = () => {
                 }
                 disabled={
                   paymentLoading || uploading ||
-                  (paymentMethod === 'wallet' && walletBalance < booking?.amount) ||
+                  (paymentMethod === 'wallet' && walletBalance < Number(booking?.amount)) ||
                   (paymentMethod === 'paynow' && !paymentData?.redirect_url) ||
                   (paymentMethod === 'bank_transfer' && !proofFile)
                 }
