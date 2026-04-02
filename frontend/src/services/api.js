@@ -210,6 +210,7 @@ export const bookingsAPI = {
     });
   },
   cartPayWithWallet: (packageIds) => api.post('/bookings/cart/pay-with-wallet', { package_ids: packageIds }),
+  cartBankTransfer: (packageIds) => api.post('/bookings/cart/bank-transfer', { package_ids: packageIds }),
 };
 
 // Messages API

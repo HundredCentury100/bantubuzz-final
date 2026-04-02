@@ -750,6 +750,79 @@ def cart_upload_pop():
         return jsonify({'error': str(e)}), 500
 
 
+@bp.route('/cart/bank-transfer', methods=['POST'])
+@jwt_required()
+def cart_bank_transfer():
+    """
+    Create bank transfer bookings for cart.
+    Body: { package_ids: [1, 2, ...] }
+    Returns: { success: True, booking_ids, total }
+    """
+    try:
+        user_id = int(get_jwt_identity())
+        user = User.query.get(user_id)
+        brand = BrandProfile.query.filter_by(user_id=user_id).first()
+
+        if not brand or not user:
+            return jsonify({'error': 'Brand profile not found'}), 404
+
+        data = request.get_json()
+        package_ids = data.get('package_ids', [])
+        if not package_ids:
+            return jsonify({'error': 'No packages provided'}), 400
+
+        # Create all bookings with bank_transfer payment method
+        bookings = []
+        total = 0.0
+        for pkg_id in package_ids:
+            package = Package.query.get(pkg_id)
+            if not package:
+                return jsonify({'error': f'Package {pkg_id} not found'}), 404
+
+            booking = Booking(
+                package_id=package.id,
+                creator_id=package.creator_id,
+                brand_id=brand.id,
+                amount=package.price,
+                total_price=package.price,
+                payment_method='bank_transfer',
+                payment_status='pending'
+            )
+            db.session.add(booking)
+            db.session.flush()
+            bookings.append((booking, package))
+            total += float(package.price)
+
+        db.session.commit()
+
+        # Notify creators
+        for booking, package in bookings:
+            creator_user = User.query.get(package.creator.user_id)
+            if creator_user:
+                notify_new_booking(
+                    creator_id=creator_user.id,
+                    brand_name=brand.company_name or user.email,
+                    booking_id=booking.id
+                )
+
+        booking_ids = [b.id for b, _ in bookings]
+        cart_ref = f"CART-{'_'.join(str(i) for i in booking_ids)}"
+
+        return jsonify({
+            'success': True,
+            'booking_ids': booking_ids,
+            'total': total,
+            'payment_reference': cart_ref,
+            'payment_method': 'bank_transfer'
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        import traceback
+        print(traceback.format_exc())
+        return jsonify({'error': str(e)}), 500
+
+
 @bp.route('/cart/pay-with-wallet', methods=['POST'])
 @jwt_required()
 def cart_pay_with_wallet():

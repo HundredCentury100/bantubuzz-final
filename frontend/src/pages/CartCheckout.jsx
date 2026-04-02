@@ -148,17 +148,14 @@ const CartCheckout = () => {
       return;
     }
 
-    // If bookings not yet created, create them first via bank transfer endpoint
+    // If bookings not yet created, create them via bank transfer endpoint
     if (!checkoutData) {
       setUploading(true);
       try {
         const packageIds = cartItems.map((item) => item.package_id);
-        const formData = new FormData();
-        formData.append('file', proofFile);
-        packageIds.forEach((id) => formData.append('package_ids[]', id));
-        // Use cartUploadPop which accepts package_ids + file together
-        // We need to first create bookings — call cartCheckout first for bank transfer
-        const checkoutResponse = await bookingsAPI.cartCheckout(packageIds);
+
+        // Call bank transfer endpoint to create bookings with bank_transfer payment_method
+        const checkoutResponse = await bookingsAPI.cartBankTransfer(packageIds);
         const data = checkoutResponse.data;
         clearCart();
 
