@@ -37,7 +37,9 @@ const Payment = () => {
       setLoadingWallet(true);
       const response = await api.get('/brand/wallet/balance');
       if (response.data.success) {
-        setWalletBalance(response.data.wallet.available_balance || 0);
+        setWalletBalance(Number(response.data.wallet.available_balance) || 0);
+      } else {
+        setWalletBalance(0);
       }
     } catch (error) {
       console.error('Error fetching wallet balance:', error);
@@ -369,7 +371,7 @@ const Payment = () => {
                         <span className="font-semibold text-dark">Wallet Balance</span>
                         {!loadingWallet && (
                           <span className={`text-sm font-semibold ${walletBalance >= booking?.amount ? 'text-green-600' : 'text-red-600'}`}>
-                            Available: ${walletBalance.toFixed(2)}
+                            Available: ${(Number(walletBalance) || 0).toFixed(2)}
                           </span>
                         )}
                       </div>
