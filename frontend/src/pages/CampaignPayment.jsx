@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { paymentsAPI, campaignsAPI } from '../services/api';
+import api from '../services/api';
 import Navbar from '../components/Navbar';
 import toast from 'react-hot-toast';
 
@@ -8,10 +9,14 @@ const CampaignPayment = () => {
   const { bookingId } = useParams();
   const navigate = useNavigate();
   const [paymentData, setPaymentData] = useState(null);
-  const [paymentMethod, setPaymentMethod] = useState('paynow');
+  const [paymentMethod, setPaymentMethod] = useState('wallet');
   const [proofFile, setProofFile] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [processing, setProcessing] = useState(false);
+
+  // Wallet state
+  const [walletBalance, setWalletBalance] = useState(0);
+  const [loadingWallet, setLoadingWallet] = useState(true);
 
   useEffect(() => {
     // Get payment context from localStorage
@@ -32,7 +37,32 @@ const CampaignPayment = () => {
     }
 
     setPaymentData(context);
+
+    // Fetch wallet balance for brand users
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    if (user.user_type === 'brand') {
+      fetchWalletBalance();
+    } else {
+      setLoadingWallet(false);
+    }
   }, [bookingId, navigate]);
+
+  const fetchWalletBalance = async () => {
+    try {
+      setLoadingWallet(true);
+      const response = await api.get('/brand/wallet/balance');
+      if (response.data.success) {
+        setWalletBalance(Number(response.data.wallet.available_balance) || 0);
+      } else {
+        setWalletBalance(0);
+      }
+    } catch (error) {
+      console.error('Error fetching wallet balance:', error);
+      setWalletBalance(0);
+    } finally {
+      setLoadingWallet(false);
+    }
+  };
 
   const handleFileChange = (e) => {
     const file = e.target.files[0];
@@ -54,7 +84,48 @@ const CampaignPayment = () => {
     }
   };
 
+  const handleWalletPayment = async () => {
+    if (walletBalance < Number(paymentData.amount)) {
+      toast.error('Insufficient wallet balance');
+      return;
+    }
+
+    setProcessing(true);
+
+    try {
+      // Call campaign wallet payment endpoint
+      const response = await paymentsAPI.createCampaignPayment({
+        payment_method: 'wallet',
+        ...paymentData
+      });
+
+      if (response.data.success) {
+        toast.success('Payment completed successfully using wallet!');
+        localStorage.removeItem('payment_context');
+
+        // Redirect based on context type
+        if (paymentData.type === 'campaign_application') {
+          navigate(`/brand/campaigns/${paymentData.campaign_id}`);
+        } else if (paymentData.type === 'campaign_package') {
+          navigate(`/brand/campaigns/${paymentData.campaign_id}`);
+        } else {
+          navigate('/brand/campaigns');
+        }
+      }
+    } catch (error) {
+      console.error('Wallet payment error:', error);
+      toast.error(error.response?.data?.error || 'Failed to process wallet payment');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
   const handlePayment = async () => {
+    if (paymentMethod === 'wallet') {
+      await handleWalletPayment();
+      return;
+    }
+
     if (paymentMethod === 'bank_transfer' && !proofFile) {
       toast.error('Please upload proof of payment');
       return;
@@ -175,6 +246,39 @@ const CampaignPayment = () => {
           <h2 className="text-xl font-bold text-gray-900 mb-4">Select Payment Method</h2>
 
           <div className="space-y-4">
+            {/* Wallet Option */}
+            <label className="flex items-start p-4 border-2 rounded-3xl cursor-pointer hover:border-primary transition-colors"
+                   style={{ borderColor: paymentMethod === 'wallet' ? '#F15A29' : '#e5e7eb' }}>
+              <input
+                type="radio"
+                name="paymentMethod"
+                value="wallet"
+                checked={paymentMethod === 'wallet'}
+                onChange={(e) => setPaymentMethod(e.target.value)}
+                className="mt-1"
+              />
+              <div className="ml-3 flex-1">
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-gray-900">Wallet Balance</span>
+                  {!loadingWallet && paymentData?.amount && (
+                    <span className={`text-sm font-semibold ${walletBalance >= Number(paymentData.amount) ? 'text-green-600' : 'text-red-600'}`}>
+                      Available: ${(Number(walletBalance) || 0).toFixed(2)}
+                    </span>
+                  )}
+                </div>
+                <p className="text-sm text-gray-600 mt-1">
+                  Pay instantly using your wallet balance. {paymentData?.amount && walletBalance < Number(paymentData.amount) && (
+                    <span className="text-red-600 font-medium">Insufficient balance.</span>
+                  )}
+                </p>
+                {paymentData?.amount && walletBalance < Number(paymentData.amount) && (
+                  <a href="/brand/wallet" className="text-sm text-primary hover:text-primary-dark font-medium mt-1 inline-block">
+                    Top up wallet →
+                  </a>
+                )}
+              </div>
+            </label>
+
             {/* Paynow Option */}
             <label className="flex items-start p-4 border-2 rounded-3xl cursor-pointer hover:border-primary transition-colors"
                    style={{ borderColor: paymentMethod === 'paynow' ? '#F15A29' : '#e5e7eb' }}>
@@ -281,7 +385,7 @@ const CampaignPayment = () => {
           </button>
           <button
             onClick={handlePayment}
-            disabled={processing || uploading || (paymentMethod === 'bank_transfer' && !proofFile)}
+            disabled={processing || uploading || (paymentMethod === 'bank_transfer' && !proofFile) || (paymentMethod === 'wallet' && walletBalance < Number(paymentData?.amount))}
             className="flex-1 px-6 py-3 bg-primary hover:bg-primary-dark text-white font-medium rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             {processing || uploading ? (
@@ -294,7 +398,9 @@ const CampaignPayment = () => {
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
                 </svg>
-                {paymentMethod === 'paynow' ? 'Proceed to Paynow' : 'Submit Payment'}
+                {paymentMethod === 'wallet' ? 'Pay with Wallet' :
+                 paymentMethod === 'paynow' ? 'Proceed to Paynow' :
+                 'Submit Payment'}
               </>
             )}
           </button>

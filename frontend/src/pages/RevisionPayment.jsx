@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import { collaborationsAPI, paymentsAPI, bookingsAPI } from '../services/api';
+import api from '../services/api';
 import { useAuth } from '../hooks/useAuth';
 
 const RevisionPayment = () => {
@@ -11,9 +12,13 @@ const RevisionPayment = () => {
   const [loading, setLoading] = useState(true);
   const [revisionData, setRevisionData] = useState(null);
   const [collaboration, setCollaboration] = useState(null);
-  const [paymentMethod, setPaymentMethod] = useState('paynow');
+  const [paymentMethod, setPaymentMethod] = useState('wallet');
   const [processing, setProcessing] = useState(false);
   const [proofFile, setProofFile] = useState(null);
+
+  // Wallet state
+  const [walletBalance, setWalletBalance] = useState(0);
+  const [loadingWallet, setLoadingWallet] = useState(true);
 
   useEffect(() => {
     // Get revision data from localStorage
@@ -33,6 +38,14 @@ const RevisionPayment = () => {
 
     setRevisionData(data);
     fetchCollaboration(data.collaboration_id);
+
+    // Fetch wallet balance for brand users
+    const userData = JSON.parse(localStorage.getItem('user') || '{}');
+    if (userData.user_type === 'brand') {
+      fetchWalletBalance();
+    } else {
+      setLoadingWallet(false);
+    }
   }, [bookingId]);
 
   const fetchCollaboration = async (collabId) => {
@@ -44,6 +57,23 @@ const RevisionPayment = () => {
       toast.error('Failed to load collaboration details');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchWalletBalance = async () => {
+    try {
+      setLoadingWallet(true);
+      const response = await api.get('/brand/wallet/balance');
+      if (response.data.success) {
+        setWalletBalance(Number(response.data.wallet.available_balance) || 0);
+      } else {
+        setWalletBalance(0);
+      }
+    } catch (error) {
+      console.error('Error fetching wallet balance:', error);
+      setWalletBalance(0);
+    } finally {
+      setLoadingWallet(false);
     }
   };
 
@@ -68,7 +98,43 @@ const RevisionPayment = () => {
     toast.success('File selected. Click Pay to submit.');
   };
 
+  const handleWalletPayment = async () => {
+    if (walletBalance < Number(revisionData.fee)) {
+      toast.error('Insufficient wallet balance');
+      return;
+    }
+
+    setProcessing(true);
+
+    try {
+      // Call revision wallet payment endpoint
+      const paymentResponse = await paymentsAPI.createRevisionPayment({
+        collaboration_id: revisionData.collaboration_id,
+        deliverable_id: revisionData.deliverable_id,
+        amount: revisionData.fee,
+        payment_method: 'wallet',
+        notes: revisionData.notes
+      });
+
+      if (paymentResponse.data.success) {
+        toast.success('Payment completed successfully using wallet!');
+        localStorage.removeItem('pending_revision_request');
+        navigate(`/brand/collaborations/${revisionData.collaboration_id}`);
+      }
+    } catch (error) {
+      console.error('Wallet payment error:', error);
+      toast.error(error.response?.data?.error || 'Failed to process wallet payment');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
   const handlePayment = async () => {
+    if (paymentMethod === 'wallet') {
+      await handleWalletPayment();
+      return;
+    }
+
     if (paymentMethod === 'bank_transfer' && !proofFile) {
       toast.error('Please upload proof of payment');
       return;
@@ -150,6 +216,39 @@ const RevisionPayment = () => {
               Select Payment Method
             </label>
             <div className="space-y-3">
+              {/* Wallet Option */}
+              <label className="flex items-center p-4 border-2 rounded-3xl cursor-pointer hover:border-primary transition-colors"
+                     style={{ borderColor: paymentMethod === 'wallet' ? '#F15A29' : '#e5e7eb' }}>
+                <input
+                  type="radio"
+                  name="paymentMethod"
+                  value="wallet"
+                  checked={paymentMethod === 'wallet'}
+                  onChange={(e) => setPaymentMethod(e.target.value)}
+                  className="h-4 w-4 text-primary focus:ring-primary"
+                />
+                <div className="ml-3 flex-1">
+                  <div className="flex items-center justify-between">
+                    <p className="font-medium text-gray-900">Wallet Balance</p>
+                    {!loadingWallet && revisionData?.fee && (
+                      <span className={`text-sm font-semibold ${walletBalance >= Number(revisionData.fee) ? 'text-green-600' : 'text-red-600'}`}>
+                        Available: ${(Number(walletBalance) || 0).toFixed(2)}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-sm text-gray-500">
+                    Pay instantly using your wallet balance. {revisionData?.fee && walletBalance < Number(revisionData.fee) && (
+                      <span className="text-red-600 font-medium">Insufficient balance.</span>
+                    )}
+                  </p>
+                  {revisionData?.fee && walletBalance < Number(revisionData.fee) && (
+                    <a href="/brand/wallet" className="text-sm text-primary hover:text-primary-dark font-medium mt-1 inline-block">
+                      Top up wallet →
+                    </a>
+                  )}
+                </div>
+              </label>
+
               <label className="flex items-center p-4 border-2 rounded-3xl cursor-pointer hover:border-primary transition-colors"
                      style={{ borderColor: paymentMethod === 'paynow' ? '#F15A29' : '#e5e7eb' }}>
                 <input
@@ -225,10 +324,12 @@ const RevisionPayment = () => {
           <div className="flex gap-4">
             <button
               onClick={handlePayment}
-              disabled={processing || (paymentMethod === 'bank_transfer' && !proofFile)}
+              disabled={processing || (paymentMethod === 'bank_transfer' && !proofFile) || (paymentMethod === 'wallet' && walletBalance < Number(revisionData.fee))}
               className="flex-1 px-6 py-3 bg-primary hover:bg-primary-dark text-white font-medium rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {processing ? 'Processing...' : `Pay $${revisionData.fee}`}
+              {processing ? 'Processing...' :
+               paymentMethod === 'wallet' ? `Pay $${revisionData.fee} with Wallet` :
+               `Pay $${revisionData.fee}`}
             </button>
             <button
               onClick={() => {
