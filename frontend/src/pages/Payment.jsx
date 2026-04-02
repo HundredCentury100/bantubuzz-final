@@ -14,7 +14,7 @@ const Payment = () => {
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [paymentData, setPaymentData] = useState(null);
   const [checkingStatus, setCheckingStatus] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState('paynow');
+  const [paymentMethod, setPaymentMethod] = useState(''); // Will be set based on booking data
   const [proofFile, setProofFile] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [walletBalance, setWalletBalance] = useState(0);
@@ -56,6 +56,10 @@ const Payment = () => {
       console.log('Booking data:', response.data); // Debug log
       setBooking(response.data);
 
+      // Set payment method based on booking's stored payment_method, default to paynow if not set
+      const bookingPaymentMethod = response.data.payment_method || 'paynow';
+      setPaymentMethod(bookingPaymentMethod);
+
       // If payment data exists in the booking, set it
       if (response.data.payment) {
         console.log('Payment data from booking:', response.data.payment); // Debug log
@@ -66,12 +70,8 @@ const Payment = () => {
         if (storedPayment) {
           console.log('Payment data from localStorage:', storedPayment); // Debug log
           setPaymentData(JSON.parse(storedPayment));
-        } else {
-          // No payment data found, initiate payment if PayNow is selected and payment not complete
-          if (response.data.payment_status !== 'paid' && paymentMethod === 'paynow') {
-            await initiatePayment();
-          }
         }
+        // Don't auto-trigger payment - let user click the button to initiate
       }
     } catch (error) {
       console.error('Error fetching booking:', error);
@@ -482,13 +482,12 @@ const Payment = () => {
               <button
                 onClick={
                   paymentMethod === 'wallet' ? handleWalletPayment :
-                  paymentMethod === 'paynow' ? handleProceedToPayment :
+                  paymentMethod === 'paynow' ? (paymentData?.redirect_url ? handleProceedToPayment : initiatePayment) :
                   handleBankTransferPayment
                 }
                 disabled={
                   paymentLoading || uploading ||
                   (paymentMethod === 'wallet' && walletBalance < Number(booking?.amount)) ||
-                  (paymentMethod === 'paynow' && !paymentData?.redirect_url) ||
                   (paymentMethod === 'bank_transfer' && !proofFile)
                 }
                 className="bg-primary hover:bg-primary-dark text-white font-medium px-6 py-3 rounded-full w-full disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-colors"
@@ -504,17 +503,11 @@ const Payment = () => {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
                     </svg>
                     {paymentMethod === 'wallet' ? 'Pay with Wallet' :
-                     paymentMethod === 'paynow' ? (!paymentData?.redirect_url ? 'Initializing Payment...' : 'Proceed to Payment') :
+                     paymentMethod === 'paynow' ? (!paymentData?.redirect_url ? 'Initialize Payment' : 'Proceed to Payment') :
                      'Submit Payment'}
                   </>
                 )}
               </button>
-
-              {paymentMethod === 'paynow' && !paymentData?.redirect_url && (
-                <p className="text-sm text-gray-500 mt-2 text-center">
-                  Payment link is being generated...
-                </p>
-              )}
 
               <div className="text-center mt-6">
                 <p className="text-sm text-gray-600 mb-3">
