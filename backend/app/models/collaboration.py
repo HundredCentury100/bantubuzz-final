@@ -26,7 +26,7 @@ class Collaboration(db.Model):
     amount = db.Column(db.Numeric(10, 2), nullable=False)
 
     # Status tracking
-    status = db.Column(db.String(20), default='in_progress')  # pending_creator_acceptance, in_progress, completed, cancelled, creator_declined
+    status = db.Column(db.String(50), default='in_progress')  # pending_creator_acceptance, in_progress, completed, cancelled, creator_declined
     progress_percentage = db.Column(db.Integer, default=0)  # 0-100
     escrow_status = db.Column(db.String(20))  # pending, escrowed, released, failed
 
