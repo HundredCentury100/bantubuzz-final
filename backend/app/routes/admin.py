@@ -699,3 +699,128 @@ def delete_niche(niche_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
+
+
+# ============================================================================
+# DEPOSIT & PAYMENT MANAGEMENT  
+# ============================================================================
+
+@bp.route('/deposits', methods=['GET'])
+@admin_required
+def list_deposits():
+    """List all deposit requests (wallet top-ups) for admin verification"""
+    try:
+        from app.models import DepositRequest
+        
+        page = request.args.get('page', 1, type=int)
+        per_page = request.args.get('per_page', 20, type=int)
+        status = request.args.get('status')  # pending, completed, failed
+        payment_method = request.args.get('payment_method')  # paynow, bank_transfer
+        
+        query = DepositRequest.query
+        
+        # Apply filters
+        if status:
+            query = query.filter_by(status=status)
+        if payment_method:
+            query = query.filter_by(payment_method=payment_method)
+        
+        # Order by created_at descending (newest first)
+        query = query.order_by(desc(DepositRequest.created_at))
+        
+        # Paginate
+        pagination = query.paginate(page=page, per_page=per_page, error_out=False)
+        
+        deposits = [deposit.to_dict(include_relations=True) for deposit in pagination.items]
+        
+        return jsonify({
+            'deposits': deposits,
+            'pagination': {
+                'page': pagination.page,
+                'per_page': pagination.per_page,
+                'total': pagination.total,
+                'pages': pagination.pages
+            }
+        }), 200
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@bp.route('/deposits/<int:deposit_id>', methods=['GET'])
+@admin_required
+def get_deposit_details(deposit_id):
+    """Get detailed deposit information"""
+    try:
+        from app.models import DepositRequest
+        
+        deposit = DepositRequest.query.get(deposit_id)
+        if not deposit:
+            return jsonify({'error': 'Deposit not found'}), 404
+        
+        return jsonify({
+            'deposit': deposit.to_dict(include_relations=True)
+        }), 200
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@bp.route('/deposits/<int:deposit_id>/verify', methods=['POST'])
+@admin_required
+def verify_deposit(deposit_id):
+    """Verify and confirm a bank transfer deposit (credits wallet)"""
+    try:
+        from app.services import brand_wallet_service
+        
+        data = request.get_json() or {}
+        notes = data.get('notes', '')
+        
+        # Confirm deposit (credits wallet)
+        deposit = brand_wallet_service.confirm_deposit(deposit_id, notes)
+        
+        return jsonify({
+            'success': True,
+            'message': 'Deposit verified and wallet credited successfully',
+            'deposit': deposit.to_dict(include_relations=True)
+        }), 200
+        
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@bp.route('/deposits/<int:deposit_id>/reject', methods=['POST'])
+@admin_required
+def reject_deposit(deposit_id):
+    """Reject a deposit request"""
+    try:
+        from app.models import DepositRequest
+        
+        data = request.get_json() or {}
+        reason = data.get('reason', 'Rejected by admin')
+        
+        deposit = DepositRequest.query.get(deposit_id)
+        if not deposit:
+            return jsonify({'error': 'Deposit not found'}), 404
+        
+        if deposit.status != 'pending':
+            return jsonify({'error': 'Can only reject pending deposits'}), 400
+        
+        deposit.status = 'failed'
+        deposit.admin_notes = reason
+        db.session.commit()
+        
+        # TODO: Send email notification to brand about rejection
+        
+        return jsonify({
+            'success': True,
+            'message': 'Deposit rejected',
+            'deposit': deposit.to_dict(include_relations=True)
+        }), 200
+        
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500

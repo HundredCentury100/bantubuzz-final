@@ -38,8 +38,9 @@
 - **Backend**: Python Flask + PostgreSQL
 - **Messaging**: Node.js + Socket.io
 - **Server**: Ubuntu VPS (173.212.245.22)
-- **Web Server**: Apache2 (ports 80/443) → Express.js (port 8080)
-- **Process Manager**: PM2
+- **Web Server**: Apache2 (serves frontend directly from `/var/www/bantubuzz/frontend/dist`)
+- **Backend API**: Gunicorn (port 8002) - Flask app
+- **Messaging Service**: Node.js (port 3002) - Socket.io server
 
 ---
 
@@ -292,21 +293,28 @@ npm run build       # Creates frontend/dist/ folder
 cd frontend
 npm run build
 
-# 2. Create tarball
-tar -czf dist.tar.gz -C frontend dist
+# 2. Create tarball from dist folder
+cd ..
+tar -czf frontend_dist.tar.gz -C frontend dist
 
-# 3. Upload to server
-scp "D:\Bantubuzz Platform\frontend\dist.tar.gz" root@173.212.245.22:/tmp/
+# 3. Upload tarball to server
+scp frontend_dist.tar.gz root@173.212.245.22:/tmp/
 
-# 4. Deploy on server
-ssh root@173.212.245.22 "cd /var/www/bantubuzz/frontend && rm -rf dist && tar -xzf /tmp/dist.tar.gz && rm /tmp/dist.tar.gz"
+# 4. Deploy on server (Apache DocumentRoot: /var/www/bantubuzz/frontend/dist)
+ssh root@173.212.245.22 "cd /var/www/bantubuzz/frontend && rm -rf dist && tar -xzf /tmp/frontend_dist.tar.gz && rm /tmp/frontend_dist.tar.gz"
 
-# 5. Restart frontend service
-ssh root@173.212.245.22 "pm2 restart bantubuzz-frontend"
+# 5. Restart Apache to load new frontend
+ssh root@173.212.245.22 "systemctl restart apache2"
 
 # 6. Clean up local tarball
-rm "D:\Bantubuzz Platform\frontend\dist.tar.gz"
+rm frontend_dist.tar.gz
 ```
+
+**IMPORTANT:**
+- Frontend is served by Apache (not PM2/Express)
+- Apache DocumentRoot: `/var/www/bantubuzz/frontend/dist`
+- Always deploy to `/var/www/bantubuzz/frontend/dist` (NOT `/var/www/bantubuzz/dist`)
+- Restart Apache after deployment: `systemctl restart apache2`
 
 **Quick Deploy Script** (if exists):
 ```bash
@@ -544,20 +552,27 @@ Our platform uses a multi-layer proxy architecture. Understanding this is ESSENT
 ```
 User Browser (https://bantubuzz.com/admin/bookings)
     ↓
-Apache2 (Port 80/443) - SSL Termination
+Apache2 (Port 80/443) - SSL Termination & Frontend Server
+    ↓ DocumentRoot: /var/www/bantubuzz/frontend/dist
     ↓ ProxyPass /api/* → http://localhost:8002/api/*
-    ↓ ProxyPass /* → http://localhost:8080/*
+    ↓ ProxyPass /socket.io/* → ws://localhost:3002/socket.io/*
+    ↓ ProxyPass /messaging/* → http://localhost:3002/
     ↓
-├─→ Express.js (Port 8080) - Frontend Server
-│   └─→ Serves /var/www/bantubuzz/frontend/dist/
+├─→ Apache serves React frontend directly (NO Express.js)
+│   └─→ /var/www/bantubuzz/frontend/dist/
 │       • React Router handles client-side routing
 │       • /admin/bookings → React component
 │       • React makes API call to /api/admin/bookings
 │
-└─→ Gunicorn (Port 8002) - Backend API
-    └─→ Flask App (Python)
-        • Blueprint-based routing
-        • /api/admin/bookings → admin_extended.bp route
+├─→ Gunicorn (Port 8002) - Backend API
+│   └─→ Flask App (Python)
+│       • Blueprint-based routing
+│       • /api/admin/bookings → admin_extended.bp route
+│
+└─→ Node.js (Port 3002) - Messaging Service
+    └─→ Socket.io WebSocket server
+        • /socket.io/* → WebSocket connections
+        • /messaging/* → Messaging API
 ```
 
 #### URL Construction Rules:

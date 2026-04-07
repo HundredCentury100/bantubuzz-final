@@ -113,9 +113,48 @@ def create_deposit():
 
         # If Paynow, initiate payment
         if payment_method == 'paynow':
-            # TODO: Integrate with Paynow gateway to get redirect URL
-            # For now, return deposit request details
-            pass
+            from app.services.payment_service import PaymentService
+            from app.models import BrandProfile
+            from app import db
+
+            # Get user email
+            brand = BrandProfile.query.filter_by(user_id=user_id).first()
+            email = user.email
+            reference = deposit.reference
+            description = f'Wallet Deposit - ${amount}'
+
+            # Initiate Paynow payment
+            paynow_result = PaymentService.initiate_paynow_payment(
+                amount=amount,
+                email=email,
+                reference=reference,
+                description=description
+            )
+
+            if paynow_result.get('success'):
+                # Update deposit with Paynow URLs
+                deposit.paynow_poll_url = paynow_result.get('poll_url')
+                deposit.paynow_redirect_url = paynow_result.get('redirect_url')
+                deposit.paynow_payment_reference = paynow_result.get('reference')
+                db.session.commit()
+
+                return jsonify({
+                    'success': True,
+                    'message': 'Paynow payment initiated',
+                    'deposit': deposit.to_dict(include_relations=True),
+                    'redirect_url': paynow_result.get('redirect_url'),
+                    'poll_url': paynow_result.get('poll_url')
+                }), 201
+            else:
+                # Paynow initiation failed, mark deposit as failed
+                deposit.status = 'failed'
+                deposit.admin_notes = f"Paynow initiation failed: {paynow_result.get('message')}"
+                db.session.commit()
+
+                return jsonify({
+                    'success': False,
+                    'error': paynow_result.get('message', 'Failed to initiate Paynow payment')
+                }), 400
 
         return jsonify({
             'success': True,
@@ -222,10 +261,27 @@ def upload_proof_of_deposit(deposit_id):
         if file.filename == '':
             return jsonify({'error': 'No file selected'}), 400
 
-        # TODO: Save file to storage and update deposit.proof_of_payment
-        # For now, just mark as uploaded
+        # Save file to storage
+        import os
+        from werkzeug.utils import secure_filename
+        from flask import current_app
         from app import db
-        deposit.proof_of_payment = f'/uploads/deposit_proofs/{deposit_id}_{file.filename}'
+
+        # Create uploads directory if it doesn't exist
+        upload_folder = current_app.config.get('UPLOAD_FOLDER', 'uploads')
+        deposit_proofs_folder = os.path.join(upload_folder, 'deposit_proofs')
+        os.makedirs(deposit_proofs_folder, exist_ok=True)
+
+        # Generate secure filename
+        filename = secure_filename(file.filename)
+        unique_filename = f'{deposit_id}_{filename}'
+        file_path = os.path.join(deposit_proofs_folder, unique_filename)
+
+        # Save file
+        file.save(file_path)
+
+        # Update deposit with file path
+        deposit.proof_of_payment = file_path
         db.session.commit()
 
         return jsonify({

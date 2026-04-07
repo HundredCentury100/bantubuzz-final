@@ -317,8 +317,20 @@ export const categoriesAPI = {
 
 // Brand Wallet API
 export const brandWalletAPI = {
-  getWallet: () => api.get('/brand/wallet'),
+  getWallet: () => api.get('/brand/wallet/balance'),
+  getBalance: () => api.get('/brand/wallet/balance'),
+  getStatistics: () => api.get('/brand/wallet/statistics'),
   getTransactions: (params) => api.get('/brand/wallet/transactions', { params }),
+  checkBalance: (amount) => api.post('/brand/wallet/check-balance', { amount }),
+
+  // Deposits
+  createDeposit: (data) => api.post('/brand/wallet/deposit', data),
+  getDeposits: (params) => api.get('/brand/wallet/deposits', { params }),
+  getDeposit: (id) => api.get(`/brand/wallet/deposits/${id}`),
+  uploadDepositProof: (id, formData) => api.post(`/brand/wallet/deposits/${id}/upload-proof`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }),
+  cancelDeposit: (id, reason) => api.delete(`/brand/wallet/deposits/${id}`, { data: { reason } }),
 };
 
 // Creator Wallet API

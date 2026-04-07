@@ -1,16 +1,20 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../services/api';
+import { brandWalletAPI } from '../services/api';
 import Navbar from '../components/Navbar';
 import StatusBadge from '../components/admin/StatusBadge';
+import AddFundsModal from '../components/AddFundsModal';
 
 export default function BrandWallet() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [wallet, setWallet] = useState(null);
   const [transactions, setTransactions] = useState([]);
+  const [deposits, setDeposits] = useState([]);
   const [activeTab, setActiveTab] = useState('overview');
   const [error, setError] = useState('');
+  const [showAddFundsModal, setShowAddFundsModal] = useState(false);
 
   useEffect(() => {
     fetchWalletData();
@@ -19,18 +23,24 @@ export default function BrandWallet() {
   const fetchWalletData = async () => {
     try {
       setLoading(true);
-      const [walletRes, transactionsRes] = await Promise.all([
+      const [walletRes, transactionsRes, depositsRes] = await Promise.all([
         api.get('/brand/wallet/balance'),
-        api.get('/brand/wallet/transactions?page=1&per_page=20')
+        api.get('/brand/wallet/transactions?page=1&per_page=20'),
+        brandWalletAPI.getDeposits({ page: 1, per_page: 20 })
       ]);
 
       setWallet(walletRes.data.wallet);
       setTransactions(transactionsRes.data.transactions || []);
+      setDeposits(depositsRes.data.deposits || []);
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to load wallet data');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleDepositSuccess = () => {
+    fetchWalletData();
   };
 
   const formatCurrency = (amount) => {
@@ -69,7 +79,7 @@ export default function BrandWallet() {
       <div className="container-custom section-padding">
         {/* Header with Back Button */}
         <div className="mb-8">
-          <div className="flex items-center gap-4 mb-4">
+          <div className="flex items-center justify-between gap-4 mb-4">
             <button
               onClick={() => navigate('/brand/dashboard')}
               className="flex items-center text-primary hover:text-primary-dark transition-colors"
@@ -79,9 +89,18 @@ export default function BrandWallet() {
               </svg>
               Back to Dashboard
             </button>
+            <button
+              onClick={() => setShowAddFundsModal(true)}
+              className="btn btn-primary flex items-center gap-2"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+              </svg>
+              Add Funds
+            </button>
           </div>
           <h1 className="text-4xl font-bold text-dark leading-tight mb-2">Brand Wallet</h1>
-          <p className="text-gray-600 leading-relaxed">Manage your refunds and credits</p>
+          <p className="text-gray-600 leading-relaxed">Manage your wallet, deposits, and payments</p>
         </div>
 
         {error && (
@@ -156,7 +175,7 @@ export default function BrandWallet() {
                 <li>• Refunds are automatically added when creators decline your paid bookings</li>
                 <li>• Credits are added when you cancel paid collaborations</li>
                 <li>• Use your balance to pay for future bookings and collaborations</li>
-                <li>• Top up your wallet anytime via Paynow or Bank Transfer (coming soon)</li>
+                <li>• Top up your wallet anytime via Paynow or Bank Transfer</li>
               </ul>
             </div>
           </div>
@@ -166,7 +185,7 @@ export default function BrandWallet() {
         <div className="card overflow-hidden">
           <div className="border-b border-gray-200">
             <nav className="flex -mb-px">
-              {['overview', 'transactions'].map((tab) => (
+              {['overview', 'transactions', 'deposits'].map((tab) => (
                 <button
                   key={tab}
                   onClick={() => setActiveTab(tab)}
@@ -261,9 +280,64 @@ export default function BrandWallet() {
                 )}
               </div>
             )}
+
+            {/* Deposits Tab */}
+            {activeTab === 'deposits' && (
+              <div>
+                <h3 className="text-lg font-semibold mb-4">Deposit History</h3>
+                {deposits.length === 0 ? (
+                  <div className="text-center py-12">
+                    <svg className="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <p className="text-gray-500">No deposits yet</p>
+                    <p className="text-sm text-gray-400 mt-2">Click "Add Funds" to make your first deposit</p>
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="min-w-full divide-y divide-gray-200">
+                      <thead className="bg-gray-50">
+                        <tr>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Reference</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Method</th>
+                          <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase">Amount</th>
+                          <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="bg-white divide-y divide-gray-200">
+                        {deposits.map((deposit) => (
+                          <tr key={deposit.id}>
+                            <td className="px-4 py-4 text-sm text-gray-900">{formatDate(deposit.created_at)}</td>
+                            <td className="px-4 py-4 text-sm text-gray-600 font-mono">{deposit.reference}</td>
+                            <td className="px-4 py-4 text-sm text-gray-600 capitalize">
+                              {deposit.payment_method === 'bank_transfer' ? 'Bank Transfer' : 'Paynow'}
+                            </td>
+                            <td className="px-4 py-4 text-sm text-right font-medium text-primary-dark">
+                              {formatCurrency(deposit.amount)}
+                            </td>
+                            <td className="px-4 py-4 text-center">
+                              <StatusBadge status={deposit.status} />
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>
+
+      {/* Add Funds Modal */}
+      <AddFundsModal
+        isOpen={showAddFundsModal}
+        onClose={() => setShowAddFundsModal(false)}
+        currentBalance={wallet?.available_balance || 0}
+        onDepositSuccess={handleDepositSuccess}
+      />
     </div>
   );
 }
