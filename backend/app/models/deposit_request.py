@@ -78,13 +78,13 @@ class DepositRequest(db.Model):
             if self.user:
                 data['user'] = {
                     'id': self.user.id,
-                    'username': self.user.username,
-                    'email': self.user.email
+                    'email': self.user.email,
+                    'user_type': self.user.user_type
                 }
             if self.verifier:
                 data['verifier'] = {
                     'id': self.verifier.id,
-                    'username': self.verifier.username
+                    'email': self.verifier.email
                 }
             if self.transaction:
                 data['transaction'] = self.transaction.to_dict()
