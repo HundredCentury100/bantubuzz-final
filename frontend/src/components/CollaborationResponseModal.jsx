@@ -98,29 +98,29 @@ const CollaborationResponseModal = ({ collaboration, onClose, onSuccess }) => {
                 <div>
                   <p className="text-sm text-gray-600">Package</p>
                   <p className="font-semibold text-dark">
-                    {collaboration.custom_package?.title || 'Custom Package'}
+                    {collaboration.booking?.package?.title || collaboration.title || 'Package Booking'}
                   </p>
                 </div>
                 <div>
                   <p className="text-sm text-gray-600">Delivery Time</p>
                   <p className="font-semibold text-dark">
-                    {collaboration.custom_package?.delivery_time_days || 'N/A'} days
+                    {collaboration.booking?.package?.duration_days || collaboration.booking?.package?.delivery_time_days || 'N/A'} days
                   </p>
                 </div>
               </div>
 
-              {collaboration.custom_package?.description && (
+              {(collaboration.booking?.package?.description || collaboration.description) && (
                 <div className="mt-4">
                   <p className="text-sm text-gray-600 mb-1">Description</p>
-                  <p className="text-dark">{collaboration.custom_package.description}</p>
+                  <p className="text-dark">{collaboration.booking?.package?.description || collaboration.description}</p>
                 </div>
               )}
 
-              {collaboration.custom_package?.deliverables && collaboration.custom_package.deliverables.length > 0 && (
+              {collaboration.booking?.package?.deliverables && collaboration.booking.package.deliverables.length > 0 && (
                 <div className="mt-4">
                   <p className="text-sm text-gray-600 mb-2">Deliverables</p>
                   <ul className="list-disc list-inside space-y-1">
-                    {collaboration.custom_package.deliverables.map((deliverable, index) => (
+                    {collaboration.booking.package.deliverables.map((deliverable, index) => (
                       <li key={index} className="text-dark">{deliverable}</li>
                     ))}
                   </ul>
@@ -194,9 +194,9 @@ const CollaborationResponseModal = ({ collaboration, onClose, onSuccess }) => {
                 </p>
                 <ul className="list-disc list-inside text-sm text-blue-700 mt-2 space-y-1 ml-2">
                   <li>Delivering all agreed-upon deliverables</li>
-                  <li>Meeting the {collaboration.custom_package?.delivery_time_days || 'specified'} day deadline</li>
+                  <li>Meeting the {collaboration.booking?.package?.duration_days || collaboration.booking?.package?.delivery_time_days || 'specified'} day deadline</li>
                   <li>Communicating professionally with the brand</li>
-                  <li>Providing {collaboration.custom_package?.revisions_allowed || 'agreed-upon'} revisions if needed</li>
+                  <li>Providing {collaboration.booking?.package?.revisions_allowed || 'agreed-upon'} revisions if needed</li>
                 </ul>
               </div>
             </div>

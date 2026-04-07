@@ -499,12 +499,21 @@ const CreatorDashboard = () => {
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                     <div className="flex-1">
                       <div className="flex items-start gap-3 mb-2">
-                        <div className="w-12 h-12 bg-gradient-to-br from-primary to-primary-dark rounded-lg flex items-center justify-center text-white font-bold text-lg flex-shrink-0">
-                          {collaboration.brand?.company_name?.charAt(0) || 'B'}
-                        </div>
+                        {/* Brand Logo */}
+                        {collaboration.brand?.logo ? (
+                          <img
+                            src={collaboration.brand.logo}
+                            alt={collaboration.brand?.company_name || 'Brand'}
+                            className="w-12 h-12 rounded-lg object-cover flex-shrink-0"
+                          />
+                        ) : (
+                          <div className="w-12 h-12 bg-gradient-to-br from-primary to-primary-dark rounded-lg flex items-center justify-center text-white font-bold text-lg flex-shrink-0">
+                            {collaboration.brand?.company_name?.charAt(0) || 'B'}
+                          </div>
+                        )}
                         <div className="flex-1 min-w-0">
                           <h4 className="font-bold text-dark text-lg mb-1">
-                            {collaboration.custom_package?.title || 'Custom Package'}
+                            {collaboration.booking?.package?.title || collaboration.title || 'Package Booking'}
                           </h4>
                           <p className="text-sm text-gray-600 mb-2">
                             From <span className="font-semibold text-dark">{collaboration.brand?.company_name || 'Brand'}</span>
@@ -520,13 +529,13 @@ const CreatorDashboard = () => {
                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                               </svg>
-                              {collaboration.custom_package?.delivery_time_days || 'N/A'} days
+                              {collaboration.booking?.package?.duration_days || collaboration.booking?.package?.delivery_time_days || 'N/A'} days
                             </span>
                             <span className="flex items-center gap-1 text-gray-600">
                               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                               </svg>
-                              {collaboration.custom_package?.revisions_allowed || 0} revisions
+                              {collaboration.booking?.package?.revisions_allowed || 0} revisions
                             </span>
                           </div>
                         </div>

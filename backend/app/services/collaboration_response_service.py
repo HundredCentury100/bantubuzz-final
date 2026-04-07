@@ -137,7 +137,7 @@ def send_collaboration_acceptance_notification(collaboration):
         return
 
     creator = CreatorProfile.query.get(collaboration.creator_id)
-    creator_name = creator.user.username if creator and creator.user else 'Creator'
+    creator_name = creator.display_name if creator else (creator.user.email.split('@')[0] if creator and creator.user else 'Creator')
 
     notification = Notification(
         user_id=brand.user_id,
@@ -162,7 +162,7 @@ def send_collaboration_decline_notification(collaboration, counter_offer=None):
         return
 
     creator = CreatorProfile.query.get(collaboration.creator_id)
-    creator_name = creator.user.username if creator and creator.user else 'Creator'
+    creator_name = creator.display_name if creator else (creator.user.email.split('@')[0] if creator and creator.user else 'Creator')
 
     message = f'{creator_name} has declined your booking for "{collaboration.title}". '
     message += f'Reason: {collaboration.creator_decline_reason}. '
