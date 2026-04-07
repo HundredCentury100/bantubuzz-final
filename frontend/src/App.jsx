@@ -72,6 +72,7 @@ import AdminSubscriptions from './pages/admin/Subscriptions';
 import RaiseDispute from './pages/RaiseDispute';
 import DisputeStatus from './pages/DisputeStatus';
 import AdminCashouts from './pages/admin/Cashouts';
+import AdminDeposits from './pages/admin/Deposits';
 import AdminFeaturedCreators from './pages/admin/FeaturedCreators';
 import AdminCategories from './pages/admin/Categories';
 import AdminCollaborations from './pages/AdminCollaborations';
@@ -741,6 +742,14 @@ function App() {
         element={
           <AdminRoute>
             <AdminCashouts />
+          </AdminRoute>
+        }
+      />
+      <Route
+        path="/admin/deposits"
+        element={
+          <AdminRoute>
+            <AdminDeposits />
           </AdminRoute>
         }
       />

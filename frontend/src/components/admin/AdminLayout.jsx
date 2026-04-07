@@ -20,6 +20,7 @@ import {
   CheckBadgeIcon,
   ShieldExclamationIcon,
   LifebuoyIcon,
+  WalletIcon,
 } from '@heroicons/react/24/outline';
 
 const AdminLayout = ({ children }) => {
@@ -42,6 +43,7 @@ const AdminLayout = ({ children }) => {
     { name: 'Reports', href: '/admin/reports', icon: ChartBarIcon },
     { name: 'Bookings', href: '/admin/bookings', icon: CalendarDaysIcon },
     { name: 'Cashouts', href: '/admin/cashouts', icon: BanknotesIcon },
+    { name: 'Deposits', href: '/admin/deposits', icon: WalletIcon },
     { name: 'Collaborations', href: '/admin/collaborations', icon: BriefcaseIcon },
     { name: 'Categories', href: '/admin/categories', icon: FolderIcon },
     { name: 'Featured Creators', href: '/admin/featured', icon: StarIcon },
