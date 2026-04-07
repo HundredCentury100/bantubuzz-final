@@ -12,7 +12,7 @@ from app.models import (
     Notification, Message, Payment, Wallet, CashoutRequest
 )
 
-bp = Blueprint('admin', __name__, url_prefix='/admin')
+bp = Blueprint('admin', __name__)
 
 # Base upload directory
 UPLOAD_FOLDER = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'uploads')
