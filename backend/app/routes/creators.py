@@ -792,8 +792,9 @@ def get_creator_platform_analytics(creator_id):
     Get platform analytics for a creator (public endpoint)
     Shows aggregated post metrics with conditional display (platform-specific availability)
 
-    Uses PostMetricsService to aggregate from stored post metrics in database
-    instead of querying ThunziAI directly (faster and uses conditional logic)
+    HYBRID APPROACH:
+    1. Try PostMetricsService first (uses stored post metrics with conditional logic)
+    2. Fallback to CreatorAnalyticsService (live ThunziAI data) if no post metrics exist
     """
     try:
         from app.services.post_metrics_service import PostMetricsService
@@ -803,11 +804,21 @@ def get_creator_platform_analytics(creator_id):
         if not creator:
             return jsonify({"error": "Creator not found"}), 404
 
-        # Get analytics from PostMetricsService (aggregates from PostMetrics table)
+        # Try PostMetricsService first (aggregates from PostMetrics table)
         # This uses conditional aggregation - only non-null values are included
         analytics = PostMetricsService.get_creator_analytics(creator_id)
 
-        return jsonify(analytics), 200
+        # If we have platform data from PostMetrics, use it
+        if analytics.get('has_platforms') and len(analytics.get('platforms', [])) > 0:
+            return jsonify(analytics), 200
+
+        # Fallback to ThunziAI direct query if no post metrics exist yet
+        # This allows creators to see their analytics before any posts are synced
+        fallback_analytics = CreatorAnalyticsService.get_creator_platform_analytics(
+            creator.user_id
+        )
+
+        return jsonify(fallback_analytics), 200
 
     except Exception as e:
         return jsonify({"error": str(e)}), 500
