@@ -8,6 +8,7 @@ import Navbar from '../components/Navbar';
 import Avatar from '../components/Avatar';
 import DeliverableURLInput from '../components/DeliverableURLInput';
 import PostMetricsDisplay from '../components/PostMetricsDisplay';
+import CollaborationAnalytics from '../components/CollaborationAnalytics';
 import toast from 'react-hot-toast';
 
 const CollaborationDetails = () => {
@@ -236,19 +237,34 @@ const CollaborationDetails = () => {
 
   const handleCancel = async () => {
     if (isBrand) {
-      // Brands must request cancellation
+      // Brands must request cancellation - creates a formal dispute
       const reason = window.prompt(
-        'Please provide a reason for your cancellation request. Our support team will review it:'
+        'Please provide a detailed reason for your cancellation request (minimum 20 characters). A dispute will be created and reviewed by our support team:'
       );
       if (!reason) return;
 
+      if (reason.trim().length < 20) {
+        toast.error('Please provide a detailed reason (minimum 20 characters)');
+        return;
+      }
+
       try {
-        await collaborationsAPI.requestCancellation(id, reason);
-        toast.success('Cancellation request submitted to support team for review');
+        const response = await collaborationsAPI.requestCancellation(id, reason);
+
+        if (response.data.dispute_reference) {
+          toast.success(
+            `Cancellation dispute ${response.data.dispute_reference} created. Support team will review your request.`,
+            { duration: 5000 }
+          );
+        } else {
+          toast.success('Cancellation request submitted to support team for review');
+        }
+
         fetchCollaboration();
       } catch (error) {
         console.error('Error requesting cancellation:', error);
-        toast.error(error.response?.data?.error || 'Failed to submit cancellation request');
+        const errorMessage = error.response?.data?.error || error.response?.data?.message || 'Failed to submit cancellation request';
+        toast.error(errorMessage);
       }
     } else {
       // Creators can cancel directly
@@ -359,18 +375,39 @@ const CollaborationDetails = () => {
 
         {/* Cancellation Request Pending Alert */}
         {collaboration.cancellation_request && collaboration.cancellation_request.status === 'pending' && (
-          <div className="mb-6 bg-yellow-50 border-l-4 border-yellow-400 p-4">
-            <div className="flex">
-              <div className="flex-shrink-0">
-                <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                </svg>
-              </div>
-              <div className="ml-3">
-                <p className="text-sm text-yellow-700">
-                  <span className="font-medium">Cancellation Pending:</span> A cancellation request has been submitted to the support team for review.
-                </p>
-                <p className="text-xs text-yellow-600 mt-1">Reason: {collaboration.cancellation_request.reason}</p>
+          <div className="mb-6 bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-r-lg">
+            <div className="flex items-start justify-between">
+              <div className="flex">
+                <div className="flex-shrink-0">
+                  <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div className="ml-3">
+                  <p className="text-sm text-yellow-700">
+                    <span className="font-medium">Cancellation Dispute Pending:</span> {collaboration.cancellation_request.dispute_reference && (
+                      <span className="font-mono bg-yellow-100 px-2 py-0.5 rounded text-xs">
+                        {collaboration.cancellation_request.dispute_reference}
+                      </span>
+                    )}
+                  </p>
+                  <p className="text-sm text-yellow-600 mt-2">
+                    A cancellation dispute has been submitted to the support team for review.
+                  </p>
+                  <p className="text-xs text-yellow-600 mt-2">
+                    <span className="font-medium">Reason:</span> {collaboration.cancellation_request.reason}
+                  </p>
+                  {isBrand && collaboration.cancellation_request.dispute_reference && (
+                    <p className="text-xs text-yellow-700 mt-2">
+                      You can track this dispute in your notifications or contact support for updates.
+                    </p>
+                  )}
+                  {!isBrand && (
+                    <p className="text-xs text-yellow-700 mt-2">
+                      The brand has requested to cancel this collaboration. Support will review and notify you of the decision.
+                    </p>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -647,6 +684,15 @@ const CollaborationDetails = () => {
                   ))}
                 </div>
               </div>
+            )}
+
+            {/* Collaboration Analytics (Aggregated Post Metrics) */}
+            {totalApproved > 0 && (
+              <CollaborationAnalytics
+                collaborationId={parseInt(id)}
+                isBrand={isBrand}
+                collaborationAmount={collaboration.amount}
+              />
             )}
 
             {/* Description */}

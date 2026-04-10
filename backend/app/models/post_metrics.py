@@ -80,14 +80,26 @@ class PostMetrics(db.Model):
         return None
 
     def calculate_engagement(self):
-        """Calculate total engagement and engagement rate"""
-        self.total_engagement = (self.likes or 0) + (self.comments or 0) + (self.shares or 0) + (self.saves or 0)
+        """
+        Calculate total engagement and engagement rate from available metrics
+        Only includes non-null values in calculations (platform-specific availability)
+        """
+        # Sum only non-null engagement metrics
+        self.total_engagement = (
+            (self.likes or 0) +
+            (self.comments or 0) +
+            (self.shares or 0) +
+            (self.saves or 0)
+        )
 
-        # Calculate engagement rate based on reach (ThunziAI only provides reach, not impressions)
-        if self.reach and self.reach > 0:
-            self.engagement_rate = round((self.total_engagement / self.reach) * 100, 2)
-        else:
-            self.engagement_rate = 0
+        # Only calculate engagement rate if we don't already have it from ThunziAI
+        # (TikTok, Facebook, Instagram provide engagementRate directly)
+        if self.engagement_rate is None or self.engagement_rate == 0:
+            # Calculate our own engagement rate if we have reach data
+            if self.reach and self.reach > 0:
+                self.engagement_rate = round((self.total_engagement / self.reach) * 100, 2)
+            else:
+                self.engagement_rate = 0
 
     def to_dict(self):
         return {

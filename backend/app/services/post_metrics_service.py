@@ -150,12 +150,14 @@ class PostMetricsService:
             start_date = end_date - timedelta(days=90)
 
             current_app.logger.info(
-                f"Fetching posts for ThunziAI creator {thunzi_account.bantubuzz_id} "
+                f"Fetching posts for ThunziAI company {thunzi_account.thunzi_company_id} "
                 f"from {start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')}"
             )
 
-            thunzi_posts = thunzi_service.get_creator_posts_by_bantubuzz_id(
-                thunzi_account.bantubuzz_id,
+            # Use company ID endpoint instead of bantubuzz_id
+            # The creator-specific endpoint returns empty results, but company endpoint works
+            thunzi_posts = thunzi_service.get_posts_by_company_id(
+                thunzi_account.thunzi_company_id,
                 start_date.strftime('%Y-%m-%d'),
                 end_date.strftime('%Y-%m-%d')
             )
@@ -266,32 +268,67 @@ class PostMetricsService:
                 except:
                     pass
 
-            # Core metrics
-            # Note: Thunzi's post API returns views:0 for Instagram/most posts
-            # but reach has the actual view/impression count. Use reach for impressions
-            # since that's the only field with real data
-            metrics.reach = post_data.get('reach') or 0
-            metrics.impressions = post_data.get('reach') or 0  # Use reach since views field is broken in Thunzi
-            metrics.likes = post_data.get('likes') or 0
-            metrics.comments = post_data.get('comments') or 0
-            metrics.shares = post_data.get('shares') or 0
-            metrics.saves = post_data.get('saves') or 0
+            # Core metrics - Store only non-null values from ThunziAI
+            # Platform-specific availability:
+            # - reach: YouTube✅, TikTok❌, Facebook✅, Instagram✅
+            # - saves: YouTube✅, TikTok❌, Facebook❌, Instagram✅
+            # - engagementRate: YouTube❌, TikTok✅, Facebook✅, Instagram✅
+
+            # Only store values if they are not None (preserving 0 as valid data)
+            reach_value = post_data.get('reach')
+            if reach_value is not None:
+                metrics.reach = reach_value
+                metrics.impressions = reach_value  # Use reach for impressions
+
+            likes_value = post_data.get('likes')
+            if likes_value is not None:
+                metrics.likes = likes_value
+
+            comments_value = post_data.get('comments')
+            if comments_value is not None:
+                metrics.comments = comments_value
+
+            shares_value = post_data.get('shares')
+            if shares_value is not None:
+                metrics.shares = shares_value
+
+            saves_value = post_data.get('saves')
+            if saves_value is not None:
+                metrics.saves = saves_value
+
+            # Store ThunziAI's engagement rate if available (TikTok, Facebook, Instagram)
+            engagement_rate_value = post_data.get('engagementRate')
+            if engagement_rate_value is not None:
+                metrics.engagement_rate = engagement_rate_value
 
             # Video metrics (if available)
-            # For video posts, try videoViews first, then fall back to reach
-            metrics.video_views = post_data.get('videoViews') or post_data.get('reach') or 0
+            video_views_value = post_data.get('videoViews') or post_data.get('views')
+            if video_views_value is not None:
+                metrics.video_views = video_views_value
 
-            # Calculate engagement
+            # Calculate total engagement from available metrics
             metrics.calculate_engagement()
 
-            # Sentiment analysis
-            metrics.sentiment = post_data.get('sentiment')
-            metrics.sentiment_score = post_data.get('sentimentScore')
+            # Sentiment analysis (YouTube-only has sentiment score)
+            sentiment_value = post_data.get('sentiment')
+            if sentiment_value is not None:
+                # ThunziAI returns sentiment as a percentage (0-100)
+                # Convert to -100 to 100 scale: negative (0-33), neutral (34-66), positive (67-100)
+                if sentiment_value <= 33:
+                    metrics.sentiment = 'negative'
+                    metrics.sentiment_score = sentiment_value - 50  # Map to -50 to -17
+                elif sentiment_value <= 66:
+                    metrics.sentiment = 'neutral'
+                    metrics.sentiment_score = 0
+                else:
+                    metrics.sentiment = 'positive'
+                    metrics.sentiment_score = sentiment_value - 50  # Map to 17 to 50
+
             # Handle ThunziAI's typo: they return "postive" instead of "positive"
             metrics.positive_comments = sentiment_data.get('positive', sentiment_data.get('postive', 0))
             metrics.negative_comments = sentiment_data.get('negative', 0)
             metrics.neutral_comments = sentiment_data.get('neutral', 0)
-            metrics.critical_comments = sentiment_data.get('critical', 0)  # From ThunziAI insights
+            metrics.critical_comments = sentiment_data.get('critical', 0)
 
             # Sync metadata
             metrics.last_synced_at = datetime.utcnow()
@@ -471,6 +508,335 @@ class PostMetricsService:
             return metrics.to_dict()
 
         return None
+
+    @staticmethod
+    def get_collaboration_analytics(collaboration_id: int) -> Dict:
+        """
+        Get aggregated analytics for all posts in a collaboration
+        Only aggregates non-null metrics (platform-specific availability)
+
+        Platform availability matrix:
+        - reach: YouTube✅, TikTok❌, Facebook✅, Instagram✅
+        - saves: YouTube✅, TikTok❌, Facebook❌, Instagram✅
+        - engagementRate: YouTube❌, TikTok✅, Facebook✅, Instagram✅
+        - sentiment: YouTube✅, TikTok❌, Facebook❌, Instagram❌
+
+        Args:
+            collaboration_id: Collaboration ID
+
+        Returns:
+            {
+                'total_posts': int,
+                'total_reach': int,
+                'total_likes': int,
+                'total_comments': int,
+                'total_shares': int,
+                'total_saves': int,
+                'total_engagement': int,
+                'avg_engagement_rate': float,
+                'platforms': {platform: count},
+                'posts': [post metrics list]
+            }
+        """
+        from app.models import Collaboration
+
+        collaboration = Collaboration.query.filter_by(id=collaboration_id).first()
+        if not collaboration:
+            return {
+                'success': False,
+                'message': 'Collaboration not found',
+                'analytics': None
+            }
+
+        # Get all post metrics for this collaboration
+        all_metrics = PostMetrics.query.filter_by(collaboration_id=collaboration_id).all()
+
+        if not all_metrics:
+            return {
+                'success': True,
+                'analytics': {
+                    'total_posts': 0,
+                    'total_reach': 0,
+                    'total_likes': 0,
+                    'total_comments': 0,
+                    'total_shares': 0,
+                    'total_saves': 0,
+                    'total_engagement': 0,
+                    'avg_engagement_rate': 0,
+                    'platforms': {},
+                    'posts': []
+                }
+            }
+
+        # Initialize aggregation counters
+        analytics = {
+            'total_posts': len(all_metrics),
+            'total_reach': 0,
+            'total_likes': 0,
+            'total_comments': 0,
+            'total_shares': 0,
+            'total_saves': 0,
+            'total_engagement': 0,
+            'platforms': {},
+            'posts': []
+        }
+
+        # Counters for averaging (only count non-null values)
+        reach_count = 0
+        engagement_rate_sum = 0
+        engagement_rate_count = 0
+
+        for metrics in all_metrics:
+            # Track platform distribution
+            platform = metrics.post_platform
+            analytics['platforms'][platform] = analytics['platforms'].get(platform, 0) + 1
+
+            # Aggregate only non-null metrics
+            if metrics.reach is not None:
+                analytics['total_reach'] += metrics.reach
+                reach_count += 1
+
+            if metrics.likes is not None:
+                analytics['total_likes'] += metrics.likes
+
+            if metrics.comments is not None:
+                analytics['total_comments'] += metrics.comments
+
+            if metrics.shares is not None:
+                analytics['total_shares'] += metrics.shares
+
+            if metrics.saves is not None:
+                analytics['total_saves'] += metrics.saves
+
+            if metrics.total_engagement is not None:
+                analytics['total_engagement'] += metrics.total_engagement
+
+            if metrics.engagement_rate is not None and metrics.engagement_rate > 0:
+                engagement_rate_sum += metrics.engagement_rate
+                engagement_rate_count += 1
+
+            # Add individual post data
+            analytics['posts'].append({
+                'deliverable_id': metrics.deliverable_id,
+                'deliverable_type': metrics.deliverable_type,
+                'platform': metrics.post_platform,
+                'post_url': metrics.post_url,
+                'reach': metrics.reach,
+                'likes': metrics.likes,
+                'comments': metrics.comments,
+                'shares': metrics.shares,
+                'saves': metrics.saves,
+                'total_engagement': metrics.total_engagement,
+                'engagement_rate': metrics.engagement_rate,
+                'published_at': metrics.published_at.isoformat() if metrics.published_at else None,
+                'last_synced_at': metrics.last_synced_at.isoformat() if metrics.last_synced_at else None
+            })
+
+        # Calculate average engagement rate (only from platforms that provide it)
+        if engagement_rate_count > 0:
+            analytics['avg_engagement_rate'] = round(engagement_rate_sum / engagement_rate_count, 2)
+        else:
+            analytics['avg_engagement_rate'] = 0
+
+        # Add metadata about metric availability
+        analytics['metrics_availability'] = {
+            'reach_available': reach_count > 0,
+            'reach_post_count': reach_count,
+            'engagement_rate_available': engagement_rate_count > 0,
+            'engagement_rate_post_count': engagement_rate_count
+        }
+
+        return {
+            'success': True,
+            'analytics': analytics
+        }
+
+    @staticmethod
+    def get_creator_analytics(creator_id: int) -> Dict:
+        """
+        Get aggregated analytics for all of a creator's posts across all collaborations
+        Only aggregates non-null metrics (platform-specific availability)
+        Groups data by platform for comparison
+
+        Args:
+            creator_id: Creator profile ID
+
+        Returns:
+            {
+                'success': bool,
+                'has_platforms': bool,
+                'platforms': [
+                    {
+                        'platform': str,
+                        'account_name': str,
+                        'total_posts': int,
+                        'followers': int,
+                        'metrics': {
+                            'avg_engagement_rate': float,
+                            'avg_likes': int,
+                            'avg_comments': int,
+                            'avg_reach': int,
+                            'avg_views': int,
+                            'avg_shares': int,
+                            'avg_saves': int,
+                            'avg_sentiment_score': float
+                        },
+                        'last_synced': str
+                    }
+                ],
+                'last_updated': str
+            }
+        """
+        from app.models import Collaboration, ConnectedPlatform
+        from sqlalchemy import func
+
+        try:
+            # Get creator profile
+            creator = CreatorProfile.query.get(creator_id)
+            if not creator:
+                return {
+                    'success': False,
+                    'has_platforms': False,
+                    'platforms': [],
+                    'error': 'Creator not found'
+                }
+
+            # Get all post metrics for this creator
+            all_metrics = PostMetrics.query.filter_by(creator_id=creator_id).all()
+
+            if not all_metrics:
+                return {
+                    'success': True,
+                    'has_platforms': False,
+                    'platforms': [],
+                    'verified_by': 'ThunziAI',
+                    'last_updated': datetime.utcnow().isoformat()
+                }
+
+            # Get connected platforms for account names and followers
+            connected_platforms = ConnectedPlatform.query.filter_by(
+                user_id=creator.user_id,
+                is_connected=True
+            ).all()
+
+            platform_map = {}
+            for cp in connected_platforms:
+                key = cp.platform
+                if key not in platform_map or (cp.thunzi_platform_id and not platform_map[key].get('thunzi_platform_id')):
+                    platform_map[key] = {
+                        'account_name': cp.account_name or 'Unknown',
+                        'followers': cp.follower_count or 0,
+                        'thunzi_platform_id': cp.thunzi_platform_id
+                    }
+
+            # Group metrics by platform
+            platform_analytics = {}
+
+            for metrics in all_metrics:
+                platform = metrics.post_platform
+                if platform not in platform_analytics:
+                    platform_analytics[platform] = {
+                        'posts': [],
+                        'last_synced': None
+                    }
+
+                platform_analytics[platform]['posts'].append(metrics)
+
+                # Track latest sync time
+                if metrics.last_synced_at:
+                    if (not platform_analytics[platform]['last_synced'] or
+                        metrics.last_synced_at > platform_analytics[platform]['last_synced']):
+                        platform_analytics[platform]['last_synced'] = metrics.last_synced_at
+
+            # Calculate aggregated metrics per platform
+            platforms = []
+
+            for platform, data in platform_analytics.items():
+                posts = data['posts']
+                total_posts = len(posts)
+
+                # Get platform info
+                platform_info = platform_map.get(platform, {
+                    'account_name': 'Unknown',
+                    'followers': 0
+                })
+
+                # Calculate averages (conditional based on availability)
+                # Only count non-null values for each metric
+
+                # Engagement Rate (TikTok✅, Facebook✅, Instagram✅, YouTube❌)
+                engagement_rates = [p.engagement_rate for p in posts if p.engagement_rate is not None and p.engagement_rate > 0]
+                avg_engagement_rate = round(sum(engagement_rates) / len(engagement_rates), 2) if engagement_rates else 0
+
+                # Likes (all platforms✅)
+                likes = [p.likes for p in posts if p.likes is not None]
+                avg_likes = round(sum(likes) / len(likes)) if likes else 0
+
+                # Comments (all platforms✅)
+                comments = [p.comments for p in posts if p.comments is not None]
+                avg_comments = round(sum(comments) / len(comments)) if comments else 0
+
+                # Reach (YouTube✅, Facebook✅, Instagram✅, TikTok❌)
+                reaches = [p.reach for p in posts if p.reach is not None]
+                avg_reach = round(sum(reaches) / len(reaches)) if reaches else 0
+
+                # Views (all video platforms)
+                views = [p.video_views for p in posts if p.video_views is not None]
+                avg_views = round(sum(views) / len(views)) if views else 0
+
+                # Shares (all platforms✅)
+                shares = [p.shares for p in posts if p.shares is not None]
+                avg_shares = round(sum(shares) / len(shares)) if shares else 0
+
+                # Saves (YouTube✅, Instagram✅, TikTok❌, Facebook❌)
+                saves = [p.saves for p in posts if p.saves is not None]
+                avg_saves = round(sum(saves) / len(saves)) if saves else 0
+
+                # Sentiment Score (YouTube✅ only)
+                sentiment_scores = [p.sentiment_score for p in posts if p.sentiment_score is not None]
+                avg_sentiment_score = round(sum(sentiment_scores) / len(sentiment_scores), 2) if sentiment_scores else 0
+
+                platforms.append({
+                    'platform': platform,
+                    'account_name': platform_info['account_name'],
+                    'followers': platform_info['followers'],
+                    'total_posts': total_posts,
+                    'metrics': {
+                        'avg_engagement_rate': avg_engagement_rate,
+                        'avg_likes': avg_likes,
+                        'avg_comments': avg_comments,
+                        'avg_reach': avg_reach,
+                        'avg_views': avg_views,
+                        'avg_shares': avg_shares,
+                        'avg_saves': avg_saves,
+                        'avg_sentiment_score': avg_sentiment_score
+                    },
+                    'last_synced': data['last_synced'].isoformat() if data['last_synced'] else None
+                })
+
+            # Sort platforms by followers (descending)
+            platforms.sort(key=lambda x: x['followers'], reverse=True)
+
+            return {
+                'success': True,
+                'has_platforms': len(platforms) > 0,
+                'platforms': platforms,
+                'verified_by': 'ThunziAI',
+                'last_updated': datetime.utcnow().isoformat()
+            }
+
+        except Exception as e:
+            from flask import current_app
+            current_app.logger.error(
+                f"Error getting creator analytics for creator {creator_id}: {str(e)}\n"
+                f"{traceback.format_exc()}"
+            )
+            return {
+                'success': False,
+                'has_platforms': False,
+                'platforms': [],
+                'error': str(e)
+            }
 
 
 # Singleton instance

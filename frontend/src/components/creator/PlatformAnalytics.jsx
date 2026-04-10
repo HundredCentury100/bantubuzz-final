@@ -35,24 +35,39 @@ const PlatformAnalytics = ({ creatorId }) => {
     return num.toLocaleString();
   };
 
-  // Calculate overall stats from all platforms
+  // Calculate overall stats from all platforms (Conditional Aggregation)
+  // Only aggregates non-null metrics based on platform availability
   const getOverallStats = () => {
     if (!analytics || !analytics.platforms || analytics.platforms.length === 0) {
-      return { totalFollowers: 0, totalViews: 0, avgEngagementRate: 0, totalReach: 0, totalLikes: 0, platformCount: 0 };
+      return {
+        totalFollowers: 0,
+        totalViews: 0,
+        avgEngagementRate: 0,
+        totalReach: 0,
+        totalLikes: 0,
+        platformCount: 0,
+        hasReach: false,
+        hasViews: false,
+        hasEngagementRate: false
+      };
     }
 
     const totalFollowers = analytics.platforms.reduce((sum, p) => sum + (p.followers || 0), 0);
 
-    // Calculate total views across all platforms
-    // Use avg_views from Thunzi platform-level data
-    const totalViews = analytics.platforms.reduce((sum, p) => {
+    // Calculate total views (only from platforms that provide it)
+    let totalViews = 0;
+    let viewsCount = 0;
+    analytics.platforms.forEach(p => {
       const avgViews = p.metrics?.avg_views || 0;
       const totalPosts = p.total_posts || 0;
-      return sum + (avgViews * totalPosts);
-    }, 0);
+      if (avgViews > 0) {
+        totalViews += (avgViews * totalPosts);
+        viewsCount++;
+      }
+    });
 
-    // Calculate weighted average engagement rate
-    // Weight each platform's engagement by its follower count for accurate overall metric
+    // Calculate weighted average engagement rate (only from platforms that provide it)
+    // TikTok✅, Facebook✅, Instagram✅, YouTube❌
     let weightedEngagementSum = 0;
     let totalFollowersWithEngagement = 0;
 
@@ -67,19 +82,23 @@ const PlatformAnalytics = ({ creatorId }) => {
       ? weightedEngagementSum / totalFollowersWithEngagement
       : 0;
 
-    // Calculate total reach across all platforms
-    const totalReach = analytics.platforms.reduce((sum, p) => {
+    // Calculate total reach (only from platforms that provide it)
+    // YouTube✅, Facebook✅, Instagram✅, TikTok❌
+    let totalReach = 0;
+    let reachCount = 0;
+    analytics.platforms.forEach(p => {
       const reach = p.metrics?.avg_reach || 0;
       const posts = p.total_posts || 0;
-      // Multiply avg reach by number of posts to get total reach
-      return sum + (reach * posts);
-    }, 0);
+      if (reach > 0) {
+        totalReach += (reach * posts);
+        reachCount++;
+      }
+    });
 
-    // Calculate total likes across all platforms
+    // Calculate total likes (all platforms)
     const totalLikes = analytics.platforms.reduce((sum, p) => {
       const likes = p.metrics?.avg_likes || 0;
       const posts = p.total_posts || 0;
-      // Multiply avg likes by number of posts to get total likes
       return sum + (likes * posts);
     }, 0);
 
@@ -89,7 +108,11 @@ const PlatformAnalytics = ({ creatorId }) => {
       avgEngagementRate: avgEngagementRate.toFixed(2),
       totalReach,
       totalLikes,
-      platformCount: analytics.platforms.length
+      platformCount: analytics.platforms.length,
+      // Metadata about metric availability
+      hasReach: reachCount > 0,
+      hasViews: viewsCount > 0,
+      hasEngagementRate: totalFollowersWithEngagement > 0
     };
   };
 
@@ -131,7 +154,7 @@ const PlatformAnalytics = ({ creatorId }) => {
         </div>
       </div>
 
-      {/* Overall Summary Card */}
+      {/* Overall Summary Card (Conditional Display) */}
       <div className="card mb-6 bg-gradient-to-br from-primary/5 to-primary/10">
         <h3 className="text-lg font-semibold text-dark mb-4">Overall Summary</h3>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
@@ -139,22 +162,28 @@ const PlatformAnalytics = ({ creatorId }) => {
             <p className="text-3xl font-bold text-primary">{formatNumber(overallStats.totalFollowers)}</p>
             <p className="text-sm text-gray-600 mt-1">Total Followers</p>
           </div>
-          <div className="text-center">
-            <p className="text-3xl font-bold text-primary">{formatNumber(overallStats.totalViews)}</p>
-            <p className="text-sm text-gray-600 mt-1">Total Views</p>
-          </div>
-          <div className="text-center">
-            <p className="text-3xl font-bold text-primary">{formatNumber(overallStats.totalReach)}</p>
-            <p className="text-sm text-gray-600 mt-1">Total Reach</p>
-          </div>
+          {overallStats.hasViews && (
+            <div className="text-center">
+              <p className="text-3xl font-bold text-primary">{formatNumber(overallStats.totalViews)}</p>
+              <p className="text-sm text-gray-600 mt-1">Total Views</p>
+            </div>
+          )}
+          {overallStats.hasReach && (
+            <div className="text-center">
+              <p className="text-3xl font-bold text-primary">{formatNumber(overallStats.totalReach)}</p>
+              <p className="text-sm text-gray-600 mt-1">Total Reach</p>
+            </div>
+          )}
           <div className="text-center">
             <p className="text-3xl font-bold text-primary">{formatNumber(overallStats.totalLikes)}</p>
             <p className="text-sm text-gray-600 mt-1">Total Likes</p>
           </div>
-          <div className="text-center">
-            <p className="text-3xl font-bold text-primary">{overallStats.avgEngagementRate}%</p>
-            <p className="text-sm text-gray-600 mt-1">Avg Engagement</p>
-          </div>
+          {overallStats.hasEngagementRate && (
+            <div className="text-center">
+              <p className="text-3xl font-bold text-primary">{overallStats.avgEngagementRate}%</p>
+              <p className="text-sm text-gray-600 mt-1">Avg Engagement</p>
+            </div>
+          )}
           <div className="text-center">
             <p className="text-3xl font-bold text-primary">{overallStats.platformCount}</p>
             <p className="text-sm text-gray-600 mt-1">Platforms</p>
@@ -204,16 +233,19 @@ const PlatformAnalytics = ({ creatorId }) => {
                 </div>
               </div>
 
-              {/* Expanded Metrics - Show on Click */}
+              {/* Expanded Metrics - Show on Click (Conditional Display) */}
               {isExpanded && platform.metrics && (
                 <div className="mt-4 pt-4 border-t border-gray-100 space-y-2">
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-gray-600">Engagement Rate:</span>
-                    <span className="font-semibold text-primary">{platform.metrics.avg_engagement_rate}%</span>
-                  </div>
+                  {/* Engagement Rate (TikTok✅, Facebook✅, Instagram✅, YouTube❌) */}
+                  {platform.metrics.avg_engagement_rate > 0 && (
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-gray-600">Engagement Rate:</span>
+                      <span className="font-semibold text-primary">{platform.metrics.avg_engagement_rate}%</span>
+                    </div>
+                  )}
 
-                  {/* Sentiment Score (NEW) */}
-                  {platform.metrics.avg_sentiment_score !== undefined && platform.metrics.avg_sentiment_score > 0 && (
+                  {/* Sentiment Score (YouTube✅ only) */}
+                  {platform.metrics.avg_sentiment_score !== undefined && platform.metrics.avg_sentiment_score !== 0 && (
                     <div className="flex justify-between items-center text-sm">
                       <span className="text-gray-600">Sentiment Score:</span>
                       <span className={`font-semibold ${
@@ -226,25 +258,47 @@ const PlatformAnalytics = ({ creatorId }) => {
                     </div>
                   )}
 
-                  {/* Additional Metrics */}
+                  {/* Likes (all platforms✅) */}
                   {platform.metrics.avg_likes > 0 && (
                     <div className="flex justify-between items-center text-sm">
                       <span className="text-gray-600">Avg Likes:</span>
                       <span className="font-semibold text-dark">{formatNumber(platform.metrics.avg_likes)}</span>
                     </div>
                   )}
+
+                  {/* Comments (all platforms✅) */}
                   {platform.metrics.avg_comments > 0 && (
                     <div className="flex justify-between items-center text-sm">
                       <span className="text-gray-600">Avg Comments:</span>
                       <span className="font-semibold text-dark">{formatNumber(platform.metrics.avg_comments)}</span>
                     </div>
                   )}
+
+                  {/* Shares (all platforms✅) */}
+                  {platform.metrics.avg_shares > 0 && (
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-gray-600">Avg Shares:</span>
+                      <span className="font-semibold text-dark">{formatNumber(platform.metrics.avg_shares)}</span>
+                    </div>
+                  )}
+
+                  {/* Saves (YouTube✅, Instagram✅, TikTok❌, Facebook❌) */}
+                  {platform.metrics.avg_saves > 0 && (
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-gray-600">Avg Saves:</span>
+                      <span className="font-semibold text-dark">{formatNumber(platform.metrics.avg_saves)}</span>
+                    </div>
+                  )}
+
+                  {/* Reach (YouTube✅, Facebook✅, Instagram✅, TikTok❌) */}
                   {platform.metrics.avg_reach > 0 && (
                     <div className="flex justify-between items-center text-sm">
                       <span className="text-gray-600">Avg Reach:</span>
                       <span className="font-semibold text-dark">{formatNumber(platform.metrics.avg_reach)}</span>
                     </div>
                   )}
+
+                  {/* Views (all video platforms) */}
                   {platform.metrics.avg_views > 0 && (
                     <div className="flex justify-between items-center text-sm">
                       <span className="text-gray-600">Avg Views:</span>

@@ -13,6 +13,7 @@ const MetricCard = ({
   trend,
   trendDirection,
   formatter,
+  subtitle,
   className = ''
 }) => {
   // Format value if formatter is provided, otherwise use default number formatter
@@ -37,6 +38,11 @@ const MetricCard = ({
       {/* Value */}
       <p className="text-2xl font-bold text-dark mb-1">{formattedValue}</p>
 
+      {/* Optional Subtitle */}
+      {subtitle && (
+        <p className="text-xs text-gray-500">{subtitle}</p>
+      )}
+
       {/* Optional Trend */}
       {trend && (
         <div className="flex items-center gap-1">
@@ -58,6 +64,7 @@ MetricCard.propTypes = {
   trend: PropTypes.string,
   trendDirection: PropTypes.oneOf(['up', 'down', 'neutral']),
   formatter: PropTypes.func,
+  subtitle: PropTypes.string,
   className: PropTypes.string,
 };
 

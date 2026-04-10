@@ -190,6 +190,17 @@ const PostMetricsDisplay = ({
     ? calculateCostPerEngagement(collaborationAmount, metrics.total_engagement)
     : 0;
 
+  // Determine which metrics are available (platform-specific)
+  // Only show metrics that have non-null values
+  const availableMetrics = metrics ? {
+    reach: metrics.reach !== null && metrics.reach !== undefined,
+    impressions: metrics.impressions !== null && metrics.impressions !== undefined,
+    saves: metrics.saves !== null && metrics.saves !== undefined,
+    engagementRate: metrics.engagement_rate !== null && metrics.engagement_rate !== undefined,
+    videoViews: metrics.video_views !== null && metrics.video_views > 0,
+    sentiment: metrics.sentiment !== null && metrics.sentiment !== undefined,
+  } : {};
+
   return (
     <div className="mt-4 space-y-4">
       {/* Main Metrics Card */}
@@ -238,35 +249,41 @@ const PostMetricsDisplay = ({
           </div>
         )}
 
-        {/* Core Metrics Grid - First Row */}
+        {/* Core Metrics Grid - First Row (Conditional) */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
-          <MetricCard
-            title="Reach"
-            value={metrics.reach}
-            icon="👥"
-            formatter={formatNumber}
-          />
-          <MetricCard
-            title="Impressions"
-            value={metrics.impressions}
-            icon="👁️"
-            formatter={formatNumber}
-          />
+          {availableMetrics.reach && (
+            <MetricCard
+              title="Reach"
+              value={metrics.reach}
+              icon="👥"
+              formatter={formatNumber}
+            />
+          )}
+          {availableMetrics.impressions && (
+            <MetricCard
+              title="Impressions"
+              value={metrics.impressions}
+              icon="👁️"
+              formatter={formatNumber}
+            />
+          )}
           <MetricCard
             title="Engagement"
             value={metrics.total_engagement}
             icon="💖"
             formatter={formatNumber}
           />
-          <MetricCard
-            title="Eng. Rate"
-            value={metrics.engagement_rate}
-            icon="📈"
-            formatter={(val) => formatPercentage(val, 2)}
-          />
+          {availableMetrics.engagementRate && (
+            <MetricCard
+              title="Eng. Rate"
+              value={metrics.engagement_rate}
+              icon="📈"
+              formatter={(val) => formatPercentage(val, 2)}
+            />
+          )}
         </div>
 
-        {/* Engagement Breakdown - Second Row */}
+        {/* Engagement Breakdown - Second Row (Conditional) */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           <MetricCard
             title="Likes"
@@ -286,17 +303,47 @@ const PostMetricsDisplay = ({
             icon="🔄"
             formatter={formatNumber}
           />
-          <MetricCard
-            title="Saves"
-            value={metrics.saves}
-            icon="🔖"
-            formatter={formatNumber}
-          />
+          {availableMetrics.saves && (
+            <MetricCard
+              title="Saves"
+              value={metrics.saves}
+              icon="🔖"
+              formatter={formatNumber}
+            />
+          )}
         </div>
       </div>
 
-      {/* Sentiment Analysis */}
-      {metrics.comments > 0 && (
+      {/* Sentiment Analysis (only if available - YouTube has this) */}
+      {availableMetrics.sentiment && metrics.comments > 0 && (
+        <div className="bg-white rounded-3xl shadow-sm hover:shadow-md p-6">
+          <h4 className="text-lg font-semibold text-dark mb-4">😊 Sentiment Analysis</h4>
+          <div className="mb-4">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium text-gray-700">Overall Sentiment</span>
+              <span className={`text-sm font-semibold ${
+                metrics.sentiment === 'positive' ? 'text-green-600' :
+                metrics.sentiment === 'negative' ? 'text-red-600' : 'text-gray-600'
+              }`}>
+                {metrics.sentiment?.toUpperCase()}
+              </span>
+            </div>
+            {metrics.sentiment_score !== null && (
+              <div className="text-xs text-gray-500">
+                Score: {metrics.sentiment_score}
+              </div>
+            )}
+          </div>
+          <SentimentChart
+            positiveCount={metrics.positive_comments}
+            neutralCount={metrics.neutral_comments}
+            negativeCount={metrics.negative_comments}
+          />
+        </div>
+      )}
+
+      {/* Comment Sentiment Breakdown (if comments exist but no overall sentiment) */}
+      {!availableMetrics.sentiment && metrics.comments > 0 && (
         <SentimentChart
           positiveCount={metrics.positive_comments}
           neutralCount={metrics.neutral_comments}

@@ -3,6 +3,7 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 from datetime import datetime, timedelta
 from app import db, socketio
 from app.models import Collaboration, BrandProfile, CreatorProfile, User, CollaborationMilestone, MilestoneDeliverable, PackageDeliverable
+from app.models.dispute import Dispute
 from app.utils.notifications import notify_collaboration_status, notify_collaboration_update
 
 bp = Blueprint('collaborations', __name__)
@@ -1081,24 +1082,62 @@ def request_cancellation(collab_id):
                 return jsonify({'error': 'Unauthorized'}), 403
 
         data = request.get_json()
-        cancellation_reason = data.get('reason', '')
+        cancellation_reason = data.get('reason', '').strip()
+        evidence_urls = data.get('evidence_urls', [])
 
+        # Validate cancellation reason (minimum 20 characters for detailed explanation)
         if not cancellation_reason:
             return jsonify({'error': 'Cancellation reason is required'}), 400
 
-        # For brands, create a cancellation request that needs support approval
-        if user.user_type == 'brand':
-            if collaboration.cancellation_request and collaboration.cancellation_request.get('status') == 'pending':
-                return jsonify({'error': 'Cancellation request already pending'}), 400
+        if len(cancellation_reason) < 20:
+            return jsonify({'error': 'Please provide a detailed cancellation reason (minimum 20 characters)'}), 400
 
+        # For brands, create a formal dispute instead of JSON field
+        if user.user_type == 'brand':
+            # Check for existing open cancellation dispute
+            existing_dispute = Dispute.query.filter_by(
+                collaboration_id=collab_id,
+                issue_type='cancellation_request',
+                status='open'
+            ).first()
+
+            if existing_dispute:
+                return jsonify({
+                    'error': f'Cancellation request already pending',
+                    'message': f'An open cancellation dispute ({existing_dispute.reference}) already exists for this collaboration'
+                }), 409
+
+            # Determine the other party (creator)
+            creator_user = User.query.get(collaboration.creator.user_id)
+            if not creator_user:
+                return jsonify({'error': 'Creator not found'}), 404
+
+            # Generate dispute reference
+            reference = Dispute.generate_reference()
+
+            # Create formal Dispute record
+            dispute = Dispute(
+                reference=reference,
+                collaboration_id=collab_id,
+                raised_by_user_id=user_id,
+                against_user_id=creator_user.id,
+                issue_type='cancellation_request',
+                description=cancellation_reason,
+                evidence_urls=evidence_urls,
+                status='open'
+            )
+            db.session.add(dispute)
+
+            # Also update collaboration JSON for backward compatibility
             cancellation_request = {
+                'dispute_reference': reference,
+                'dispute_id': None,  # Will be set after commit
                 'requested_by': 'brand',
                 'user_id': user_id,
                 'reason': cancellation_reason,
                 'requested_at': datetime.utcnow().isoformat(),
                 'status': 'pending'
             }
-
             collaboration.cancellation_request = cancellation_request
             collaboration.updated_at = datetime.utcnow()
 
@@ -1106,23 +1145,46 @@ def request_cancellation(collab_id):
             from sqlalchemy.orm.attributes import flag_modified
             flag_modified(collaboration, 'cancellation_request')
 
+            db.session.flush()  # Get the dispute ID
+
+            # Update the cancellation_request with dispute ID
+            collaboration.cancellation_request['dispute_id'] = dispute.id
+            flag_modified(collaboration, 'cancellation_request')
+
             db.session.commit()
 
-            # TODO: Send email/notification to support team
-            # For now, notify the creator about the cancellation request
-            creator_user = User.query.get(collaboration.creator.user_id)
-            if creator_user:
-                notify_collaboration_update(
-                    user_id=creator_user.id,
-                    collaboration_title=collaboration.title,
-                    collaboration_id=collaboration.id,
-                    update_message="Brand has requested to cancel this collaboration. Support team is reviewing."
+            # Notify all admins about the new cancellation request
+            from app.models import Notification
+            admins = User.query.filter_by(user_type='admin').all()
+            brand_name = user.brand_profile[0].brand_name if user.brand_profile else user.email
+
+            for admin in admins:
+                notif = Notification(
+                    user_id=admin.id,
+                    title='New Cancellation Request',
+                    message=f'{brand_name} requested to cancel "{collaboration.title}" - Dispute {reference}',
+                    type='dispute',
+                    reference_id=dispute.id,
                 )
+                db.session.add(notif)
+
+            # Notify the creator about the cancellation request
+            notify_collaboration_update(
+                user_id=creator_user.id,
+                collaboration_title=collaboration.title,
+                collaboration_id=collaboration.id,
+                update_message=f"Brand has requested to cancel this collaboration (Dispute {reference}). Support team is reviewing."
+            )
+
+            db.session.commit()
 
             return jsonify({
-                'message': 'Cancellation request submitted to support team for review',
+                'success': True,
+                'message': f'Cancellation request submitted to support team for review. Dispute {reference} has been created.',
+                'dispute_reference': reference,
+                'dispute_id': dispute.id,
                 'collaboration': collaboration.to_dict()
-            }), 200
+            }), 201
 
         else:
             # Creators can still cancel directly
@@ -1807,41 +1869,47 @@ def sync_package_deliverable_metrics(collab_id, deliverable_id):
 @jwt_required()
 def get_collaboration_analytics(collab_id):
     """
-    Get comprehensive analytics for a single collaboration/campaign
+    Get aggregated post metrics analytics for a collaboration
 
     Returns:
-    - Raw performance data (reach, impressions, likes, comments, etc.)
-    - Actionable insights (ROI, cost per engagement, performance rating)
-    - Sentiment analysis (positive/negative/neutral comments)
-    - Brand mentions tracking
+    - Aggregated metrics from all deliverables (conditional based on platform availability)
+    - Platform breakdown
+    - Sentiment analysis (if available)
+    - Metric availability metadata
 
-    Accessible by brand only.
+    Accessible by both brand and creator.
 
-    Part of: Brand Analytics Dashboard
+    Part of: Post Metrics Analytics - Phase 2
     """
     try:
         from flask import current_app
-        from app.services.analytics_service import AnalyticsService
+        from app.services.post_metrics_service import PostMetricsService
         import traceback
 
         user_id = int(get_jwt_identity())
         user = User.query.get(user_id)
 
-        # Only brands can access analytics
-        if user.user_type != 'brand':
-            return jsonify({'error': 'Unauthorized - Brand access only'}), 403
-
         collaboration = Collaboration.query.get(collab_id)
         if not collaboration:
             return jsonify({'error': 'Collaboration not found'}), 404
 
-        # Get comprehensive analytics
-        analytics = AnalyticsService.get_collaboration_analytics(collab_id, user_id)
+        # Check authorization (both brand and creator can view analytics)
+        if user.user_type == 'creator':
+            creator = CreatorProfile.query.filter_by(user_id=user_id).first()
+            if collaboration.creator_id != creator.id:
+                return jsonify({'error': 'Unauthorized'}), 403
+        else:
+            brand = BrandProfile.query.filter_by(user_id=user_id).first()
+            if collaboration.brand_id != brand.id:
+                return jsonify({'error': 'Unauthorized'}), 403
+
+        # Get aggregated analytics using PostMetricsService
+        analytics = PostMetricsService.get_collaboration_analytics(collab_id)
 
         if not analytics:
             return jsonify({
-                'error': 'Unable to calculate analytics',
-                'message': 'Analytics data not available for this collaboration'
+                'success': False,
+                'message': 'No analytics data available for this collaboration'
             }), 404
 
         return jsonify({

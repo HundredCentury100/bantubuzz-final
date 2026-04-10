@@ -283,6 +283,9 @@ export const collaborationsAPI = {
   // Sync metrics for all deliverables in a collaboration
   syncAllCollaborationMetrics: (collabId) =>
     api.post(`/collaborations/${collabId}/sync-all-metrics`),
+  // Get aggregated analytics for entire collaboration
+  getCollaborationAnalytics: (collabId) =>
+    api.get(`/collaborations/${collabId}/analytics`),
 
   // Paid Revision
   createRevisionBooking: (id, data) => api.post(`/collaborations/${id}/revision/create-booking`, data),

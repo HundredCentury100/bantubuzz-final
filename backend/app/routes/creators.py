@@ -790,18 +790,22 @@ def delete_gallery_image(index):
 def get_creator_platform_analytics(creator_id):
     """
     Get platform analytics for a creator (public endpoint)
-    Shows verified data from connected platforms via ThunziAI
+    Shows aggregated post metrics with conditional display (platform-specific availability)
+
+    Uses PostMetricsService to aggregate from stored post metrics in database
+    instead of querying ThunziAI directly (faster and uses conditional logic)
     """
     try:
-        # Get creator to get their user_id
+        from app.services.post_metrics_service import PostMetricsService
+
+        # Get creator to verify they exist
         creator = CreatorProfile.query.get(creator_id)
         if not creator:
             return jsonify({"error": "Creator not found"}), 404
 
-        # Get platform analytics
-        analytics = CreatorAnalyticsService.get_creator_platform_analytics(
-            creator.user_id
-        )
+        # Get analytics from PostMetricsService (aggregates from PostMetrics table)
+        # This uses conditional aggregation - only non-null values are included
+        analytics = PostMetricsService.get_creator_analytics(creator_id)
 
         return jsonify(analytics), 200
 
