@@ -41,7 +41,7 @@ const PlatformAnalytics = ({ creatorId }) => {
     if (!analytics || !analytics.platforms || analytics.platforms.length === 0) {
       return {
         totalFollowers: 0,
-        totalViews: 0,
+        avgViews: 0,
         avgEngagementRate: 0,
         totalReach: 0,
         totalLikes: 0,
@@ -54,14 +54,13 @@ const PlatformAnalytics = ({ creatorId }) => {
 
     const totalFollowers = analytics.platforms.reduce((sum, p) => sum + (p.followers || 0), 0);
 
-    // Calculate total views (only from platforms that provide it)
-    let totalViews = 0;
+    // Calculate average views (sum avg_views from all platforms)
+    let avgViews = 0;
     let viewsCount = 0;
     analytics.platforms.forEach(p => {
-      const avgViews = p.metrics?.avg_views || 0;
-      const totalPosts = p.total_posts || 0;
-      if (avgViews > 0) {
-        totalViews += (avgViews * totalPosts);
+      const platformAvgViews = p.metrics?.avg_views || 0;
+      if (platformAvgViews > 0) {
+        avgViews += platformAvgViews;
         viewsCount++;
       }
     });
@@ -104,7 +103,7 @@ const PlatformAnalytics = ({ creatorId }) => {
 
     return {
       totalFollowers,
-      totalViews,
+      avgViews,
       avgEngagementRate: avgEngagementRate.toFixed(2),
       totalReach,
       totalLikes,
@@ -164,8 +163,8 @@ const PlatformAnalytics = ({ creatorId }) => {
           </div>
           {overallStats.hasViews && (
             <div className="text-center">
-              <p className="text-3xl font-bold text-primary">{formatNumber(overallStats.totalViews)}</p>
-              <p className="text-sm text-gray-600 mt-1">Total Views</p>
+              <p className="text-3xl font-bold text-primary">{formatNumber(overallStats.avgViews)}</p>
+              <p className="text-sm text-gray-600 mt-1">Avg Views</p>
             </div>
           )}
           {overallStats.hasReach && (
