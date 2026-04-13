@@ -52,6 +52,9 @@ const Messages = () => {
   const [showCustomRequestModal, setShowCustomRequestModal] = useState(false);
   const [showCustomOfferModal, setShowCustomOfferModal] = useState(false);
 
+  // Block status state
+  const [blockStatus, setBlockStatus] = useState(null);
+
   // Load all conversations on mount
   useEffect(() => {
     loadConversations();
@@ -178,6 +181,11 @@ const Messages = () => {
     try {
       setSelectedConversation(conversation);
       setShowMobileChat(true); // Show chat view on mobile
+
+      // Check block status
+      const blockResponse = await messagingService.checkBlockStatus(conversation.id);
+      setBlockStatus(blockResponse.data);
+
       const response = await messagingService.getConversation(conversation.id);
       loadConversationMessages(conversation.id, response.data.messages || []);
     } catch (error) {
@@ -200,6 +208,7 @@ const Messages = () => {
   const handleBackToConversations = () => {
     setShowMobileChat(false);
     setSelectedConversation(null);
+    setBlockStatus(null);
   };
 
   const handleSendMessage = (e) => {
@@ -270,11 +279,24 @@ const Messages = () => {
 
   const handleBlockSuccess = () => {
     toast.success('User blocked successfully');
+    // Update block status immediately
+    setBlockStatus({ blocked_by_me: true, blocked_me: false, can_message: false });
     // Refresh conversations to update UI
     loadConversations();
-    // Go back to conversation list
-    setSelectedConversation(null);
-    setShowMobileChat(false);
+  };
+
+  const handleUnblockUser = async () => {
+    try {
+      await messagingService.unblockUser(selectedConversation.id);
+      toast.success('User unblocked successfully');
+      // Update block status
+      setBlockStatus({ blocked_by_me: false, blocked_me: false, can_message: true });
+      // Refresh conversations
+      loadConversations();
+    } catch (error) {
+      console.error('Error unblocking user:', error);
+      toast.error('Failed to unblock user. Please try again.');
+    }
   };
 
   const handleTyping = (e) => {
@@ -678,6 +700,33 @@ const Messages = () => {
                   <div ref={messagesEndRef} />
                 </div>
 
+                {/* Blocked User Banner */}
+                {blockStatus?.blocked_by_me && (
+                  <div className="px-4 py-3 bg-orange-50 border-t border-b border-orange-200 flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-orange-800">
+                      <svg className="w-5 h-5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+                      </svg>
+                      <span className="text-sm font-medium">You have blocked this user</span>
+                    </div>
+                    <button
+                      onClick={handleUnblockUser}
+                      className="px-3 py-1.5 text-sm font-medium text-primary hover:text-primary-dark hover:bg-primary/10 rounded-lg transition-colors"
+                    >
+                      Unblock
+                    </button>
+                  </div>
+                )}
+
+                {blockStatus?.blocked_me && !blockStatus?.blocked_by_me && (
+                  <div className="px-4 py-3 bg-red-50 border-t border-b border-red-200 flex items-center gap-2">
+                    <svg className="w-5 h-5 flex-shrink-0 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                    <span className="text-sm font-medium text-red-800">This user has blocked you</span>
+                  </div>
+                )}
+
                 {/* Message Input */}
                 <form onSubmit={handleSendMessage} className="p-3 sm:p-4 border-t border-gray-200 bg-white">
                   <div className="flex items-center gap-2 w-full max-w-full">
@@ -704,13 +753,19 @@ const Messages = () => {
                           setShowCustomOfferModal(true);
                         }
                       }}
-                      className="flex-shrink-0 p-2.5 text-primary hover:bg-primary/10 rounded-full transition-all"
+                      className="flex-shrink-0 p-2.5 text-primary hover:bg-primary/10 rounded-full transition-all group relative"
                       title={user?.user_type === 'brand' ? 'Request Custom Package' : 'Send Custom Offer'}
                       disabled={!isConnected}
                     >
+                      {/* Package Icon */}
                       <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
                       </svg>
+                      {/* Tooltip */}
+                      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
+                        {user?.user_type === 'brand' ? 'Create custom package request' : 'Send custom package offer'}
+                        <div className="absolute top-full left-1/2 transform -translate-x-1/2 -mt-1 border-4 border-transparent border-t-gray-900"></div>
+                      </div>
                     </button>
 
                     <div className="flex-1 min-w-0">
@@ -721,6 +776,11 @@ const Messages = () => {
                         placeholder="Type a message..."
                         className="w-full px-4 py-3 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-primary text-base"
                         disabled={!isConnected}
+                        inputMode="text"
+                        autoComplete="off"
+                        autoCorrect="on"
+                        autoCapitalize="sentences"
+                        enterKeyHint="send"
                       />
                     </div>
                     <button
