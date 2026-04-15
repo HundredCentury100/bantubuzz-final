@@ -1,4 +1,4 @@
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { Fragment, useState, useEffect } from 'react';
 import { Menu, Transition } from '@headlessui/react';
@@ -12,6 +12,7 @@ import {
   LifebuoyIcon,
   CurrencyDollarIcon,
   ChatBubbleLeftRightIcon,
+  SparklesIcon,
 } from '@heroicons/react/24/outline';
 import NotificationBell from './NotificationBell';
 import { messagingService } from '../services/messagingAPI';
@@ -22,9 +23,16 @@ import api from '../services/api';
 const Navbar = () => {
   const { isAuthenticated, user, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [unreadMessageCount, setUnreadMessageCount] = useState(0);
   const [userProfile, setUserProfile] = useState(null);
   const [walletBalance, setWalletBalance] = useState(0);
+  const [creatorEarnings, setCreatorEarnings] = useState(0);
+
+  // Helper function to check if a link is active
+  const isActive = (path) => {
+    return location.pathname === path || location.pathname.startsWith(path + '/');
+  };
 
   // Fetch user profile for avatar
   useEffect(() => {
@@ -89,6 +97,27 @@ const Navbar = () => {
     return () => clearInterval(interval);
   }, [isAuthenticated, user]);
 
+  // Fetch creator earnings balance
+  useEffect(() => {
+    const fetchCreatorEarnings = async () => {
+      if (isAuthenticated && user?.user_type === 'creator') {
+        try {
+          const response = await api.get('/wallet/balance');
+          if (response.data.success) {
+            setCreatorEarnings(response.data.wallet.available_balance || 0);
+          }
+        } catch (error) {
+          console.error('Error fetching creator earnings:', error);
+        }
+      }
+    };
+
+    fetchCreatorEarnings();
+    // Refresh every 60 seconds
+    const interval = setInterval(fetchCreatorEarnings, 60000);
+    return () => clearInterval(interval);
+  }, [isAuthenticated, user]);
+
   const handleLogout = () => {
     logout();
   };
@@ -123,7 +152,9 @@ const Navbar = () => {
                 {/* Dashboard Link - First and prominent */}
                 <Link
                   to={`/${user?.user_type}/dashboard`}
-                  className="text-primary hover:text-primary-dark transition-colors text-sm font-bold"
+                  className={`text-gray-700 hover:text-gray-900 transition-colors text-sm font-bold ${
+                    isActive(`/${user?.user_type}/dashboard`) ? 'border-b-2 border-primary pb-1' : ''
+                  }`}
                 >
                   Dashboard
                 </Link>
@@ -131,13 +162,17 @@ const Navbar = () => {
                   <>
                     <Link
                       to="/brand/analytics"
-                      className="text-gray-700 hover:text-gray-900 transition-colors text-sm font-medium"
+                      className={`text-gray-700 hover:text-gray-900 transition-colors text-sm font-medium ${
+                        isActive('/brand/analytics') ? 'border-b-2 border-primary pb-1' : ''
+                      }`}
                     >
                       Analytics
                     </Link>
                     <Link
                       to="/brand/campaigns"
-                      className="text-gray-700 hover:text-gray-900 transition-colors text-sm font-medium"
+                      className={`text-gray-700 hover:text-gray-900 transition-colors text-sm font-medium ${
+                        isActive('/brand/campaigns') ? 'border-b-2 border-primary pb-1' : ''
+                      }`}
                     >
                       Campaigns
                     </Link>
@@ -146,20 +181,26 @@ const Navbar = () => {
                 {user?.user_type === 'creator' && (
                   <Link
                     to="/creator/campaigns"
-                    className="text-gray-700 hover:text-gray-900 transition-colors text-sm font-medium"
+                    className={`text-gray-700 hover:text-gray-900 transition-colors text-sm font-medium ${
+                      isActive('/creator/campaigns') || isActive('/creator/opportunities') ? 'border-b-2 border-primary pb-1' : ''
+                    }`}
                   >
                     Opportunities
                   </Link>
                 )}
                 <Link
                   to={`/${user?.user_type}/collaborations`}
-                  className="text-gray-700 hover:text-gray-900 transition-colors text-sm font-medium"
+                  className={`text-gray-700 hover:text-gray-900 transition-colors text-sm font-medium ${
+                    isActive(`/${user?.user_type}/collaborations`) ? 'border-b-2 border-primary pb-1' : ''
+                  }`}
                 >
                   Collaborations
                 </Link>
                 <Link
                   to="/messages"
-                  className="text-gray-700 hover:text-gray-900 transition-colors relative p-2"
+                  className={`text-gray-700 hover:text-gray-900 transition-colors relative p-2 ${
+                    isActive('/messages') ? 'border-b-2 border-primary pb-1' : ''
+                  }`}
                   title="Messages"
                 >
                   <ChatBubbleLeftRightIcon className="w-6 h-6" />
@@ -169,18 +210,31 @@ const Navbar = () => {
                     </span>
                   )}
                 </Link>
+
+                {/* Notification Bell */}
+                <NotificationBell />
+
+                {/* Wallet Links - Moved to end after notifications */}
                 {user?.user_type === 'creator' && (
                   <Link
                     to="/wallet"
-                    className="text-gray-700 hover:text-gray-900 transition-colors text-sm font-medium"
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 hover:bg-primary/20 transition-colors ${
+                      isActive('/wallet') ? 'border-b-2 border-primary' : ''
+                    }`}
+                    title="Earnings Balance"
                   >
-                    Earnings
+                    <CurrencyDollarIcon className="w-5 h-5 text-primary" />
+                    <span className="font-semibold text-primary">
+                      ${creatorEarnings.toFixed(2)}
+                    </span>
                   </Link>
                 )}
                 {user?.user_type === 'brand' && (
                   <Link
                     to="/brand/wallet"
-                    className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 hover:bg-primary/20 transition-colors"
+                    className={`flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 hover:bg-primary/20 transition-colors ${
+                      isActive('/brand/wallet') ? 'border-b-2 border-primary' : ''
+                    }`}
                     title="Wallet Balance"
                   >
                     <CurrencyDollarIcon className="w-5 h-5 text-primary" />
@@ -189,9 +243,6 @@ const Navbar = () => {
                     </span>
                   </Link>
                 )}
-
-                {/* Notification Bell */}
-                <NotificationBell />
 
                 {/* User Menu - Cleaner with avatar */}
                 <Menu as="div" className="relative ml-3">
@@ -227,6 +278,19 @@ const Navbar = () => {
 
                       {/* Menu Items */}
                       <div className="py-1">
+                        <Menu.Item>
+                          {({ active }) => (
+                            <Link
+                              to={user?.user_type === 'creator' ? '/creator/subscriptions' : '/subscription/manage'}
+                              className={`${
+                                active ? 'bg-gray-50' : ''
+                              } flex items-center px-4 py-2 text-sm text-gray-700`}
+                            >
+                              <SparklesIcon className="h-5 w-5 mr-3 text-gray-400" />
+                              Manage Subscriptions
+                            </Link>
+                          )}
+                        </Menu.Item>
                         <Menu.Item>
                           {({ active }) => (
                             <Link
@@ -353,8 +417,8 @@ const Navbar = () => {
                             <Link
                               to={`/${user?.user_type}/dashboard`}
                               className={`${
-                                active ? 'bg-primary/10' : ''
-                              } block px-4 py-2 text-sm text-primary font-bold rounded-lg`}
+                                active || isActive(`/${user?.user_type}/dashboard`) ? 'bg-light' : ''
+                              } block px-4 py-2 text-sm text-gray-900 font-bold rounded-lg`}
                             >
                               Dashboard
                             </Link>
@@ -366,7 +430,7 @@ const Navbar = () => {
                               <Link
                                 to="/brand/analytics"
                                 className={`${
-                                  active ? 'bg-light' : ''
+                                  active || isActive('/brand/analytics') ? 'bg-light' : ''
                                 } block px-4 py-2 text-sm text-gray-700 rounded-lg`}
                               >
                                 Analytics
@@ -380,7 +444,7 @@ const Navbar = () => {
                               <Link
                                 to="/brand/campaigns"
                                 className={`${
-                                  active ? 'bg-light' : ''
+                                  active || isActive('/brand/campaigns') ? 'bg-light' : ''
                                 } block px-4 py-2 text-sm text-gray-700 rounded-lg`}
                               >
                                 Campaigns
@@ -394,7 +458,7 @@ const Navbar = () => {
                               <Link
                                 to="/creator/campaigns"
                                 className={`${
-                                  active ? 'bg-light' : ''
+                                  active || isActive('/creator/campaigns') || isActive('/creator/opportunities') ? 'bg-light' : ''
                                 } block px-4 py-2 text-sm text-gray-700 rounded-lg`}
                               >
                                 Opportunities
@@ -407,7 +471,7 @@ const Navbar = () => {
                             <Link
                               to={`/${user?.user_type}/collaborations`}
                               className={`${
-                                active ? 'bg-light' : ''
+                                active || isActive(`/${user?.user_type}/collaborations`) ? 'bg-light' : ''
                               } block px-4 py-2 text-sm text-gray-700 rounded-lg`}
                             >
                               Collaborations
@@ -419,7 +483,7 @@ const Navbar = () => {
                             <Link
                               to="/messages"
                               className={`${
-                                active ? 'bg-light' : ''
+                                active || isActive('/messages') ? 'bg-light' : ''
                               } block px-4 py-2 text-sm text-gray-700 rounded-lg relative`}
                             >
                               <span className="flex items-center justify-between">
@@ -439,10 +503,13 @@ const Navbar = () => {
                               <Link
                                 to="/wallet"
                                 className={`${
-                                  active ? 'bg-light' : ''
-                                } block px-4 py-2 text-sm text-gray-700 rounded-lg`}
+                                  active || isActive('/wallet') ? 'bg-light' : ''
+                                } flex items-center justify-between px-4 py-2 text-sm text-gray-700 rounded-lg`}
                               >
-                                Earnings
+                                <span>Earnings</span>
+                                <span className="font-semibold text-primary">
+                                  ${creatorEarnings.toFixed(2)}
+                                </span>
                               </Link>
                             )}
                           </Menu.Item>
@@ -453,7 +520,7 @@ const Navbar = () => {
                               <Link
                                 to="/brand/wallet"
                                 className={`${
-                                  active ? 'bg-light' : ''
+                                  active || isActive('/brand/wallet') ? 'bg-light' : ''
                                 } flex items-center justify-between px-4 py-2 text-sm text-gray-700 rounded-lg`}
                               >
                                 <span>Wallet</span>
@@ -464,6 +531,18 @@ const Navbar = () => {
                             )}
                           </Menu.Item>
                         )}
+                        <Menu.Item>
+                          {({ active }) => (
+                            <Link
+                              to={user?.user_type === 'creator' ? '/creator/subscriptions' : '/subscription/manage'}
+                              className={`${
+                                active ? 'bg-light' : ''
+                              } block px-4 py-2 text-sm text-gray-700 rounded-lg`}
+                            >
+                              Manage Subscriptions
+                            </Link>
+                          )}
+                        </Menu.Item>
                         <Menu.Item>
                           {({ active }) => (
                             <Link
