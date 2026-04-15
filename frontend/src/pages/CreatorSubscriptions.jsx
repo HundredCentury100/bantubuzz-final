@@ -443,6 +443,61 @@ export default function CreatorSubscriptions() {
           </div>
         </div>
 
+        {/* Spotlight Boost Section */}
+        <div className="max-w-4xl mx-auto mt-16 mb-12 border-t border-gray-200 pt-16">
+          <div className="text-center mb-10">
+            <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary/10 rounded-full mb-4">
+              <BoltIcon className="h-5 w-5 text-primary" />
+              <span className="text-xs font-medium text-primary uppercase tracking-wide">Add-On · Available on all tiers</span>
+            </div>
+            <h2 className="text-3xl font-bold mb-3 text-dark">⚡ Spotlight Boost</h2>
+            <p className="text-gray-600 max-w-2xl mx-auto">
+              Need more visibility right now? Boost your profile across the homepage and all platform sections — no subscription required.
+            </p>
+          </div>
+
+          <div className="flex gap-6 justify-center flex-wrap">
+            {[
+              { days: "3 Days", price: 3, icon: "🌱", note: "Quick push", best: false },
+              { days: "7 Days", price: 6, icon: "⚡", note: "Standard boost", best: true },
+              { days: "30 Days", price: 18, icon: "🔥", note: "Sustained presence", best: false },
+            ].map((boost, idx) => (
+              <div
+                key={idx}
+                className={`flex-1 min-w-[200px] max-w-[240px] text-center rounded-3xl p-8 relative transition-all hover:shadow-md ${
+                  boost.best ? 'bg-primary/10 border-2 border-primary' : 'bg-white border border-gray-200'
+                }`}
+              >
+                {boost.best && (
+                  <div className="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-dark text-white px-3 py-1 rounded-full text-xs font-semibold">
+                    Best Deal
+                  </div>
+                )}
+                <div className="text-4xl mb-3">{boost.icon}</div>
+                <div className="text-3xl font-black text-dark mb-2">${boost.price}</div>
+                <div className="text-lg font-bold text-dark mb-1">{boost.days}</div>
+                <div className="text-sm text-gray-600 mb-6">{boost.note}</div>
+                <button
+                  onClick={() => {
+                    toast.info('Spotlight Boost coming soon! This feature is under development.');
+                  }}
+                  className={`w-full py-2.5 rounded-full text-sm font-semibold transition-all ${
+                    boost.best
+                      ? 'bg-primary hover:bg-primary-dark text-dark'
+                      : 'border-2 border-gray-300 hover:border-dark text-dark hover:bg-gray-50'
+                  }`}
+                >
+                  Get Boost
+                </button>
+              </div>
+            ))}
+          </div>
+
+          <p className="text-center text-xs text-gray-500 mt-8">
+            Includes: Homepage placement · Priority badge · All platform sections · Visible to all brands
+          </p>
+        </div>
+
         {/* Back Link */}
         <div className="max-w-4xl mx-auto mt-12 text-center">
           <Link
