@@ -1,84 +1,140 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import Navbar from '../components/Navbar';
+import { useNavigate, Link } from 'react-router-dom';
+import { toast } from 'react-hot-toast';
 import api from '../services/api';
-import toast from 'react-hot-toast';
+import Navbar from '../components/Navbar';
 import { useAuth } from '../hooks/useAuth';
-import { SparklesIcon, StarIcon, CheckBadgeIcon, ArrowRightIcon } from '@heroicons/react/24/outline';
+import {
+  CheckIcon,
+  XMarkIcon,
+  ArrowPathIcon,
+  CreditCardIcon,
+  StarIcon,
+  SparklesIcon,
+  TrophyIcon,
+  ChartBarIcon,
+  BoltIcon,
+} from '@heroicons/react/24/outline';
 
-const CreatorSubscriptions = () => {
-  const navigate = useNavigate();
-  const { profile: authProfile } = useAuth();
+export default function CreatorSubscriptions() {
+  const [currentSubscription, setCurrentSubscription] = useState(null);
   const [plans, setPlans] = useState([]);
-  const [mySubscriptions, setMySubscriptions] = useState([]);
-  const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [subscribing, setSubscribing] = useState(null);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [billingCycle, setBillingCycle] = useState('monthly');
+  const { user } = useAuth();
+  const navigate = useNavigate();
 
   useEffect(() => {
-    fetchSubscriptionData();
+    fetchData();
   }, []);
 
-  const fetchSubscriptionData = async () => {
+  const fetchData = async () => {
     try {
-      const [plansRes, subsRes, profileRes] = await Promise.all([
-        api.get('/creator/subscriptions/plans'),
-        api.get('/creator/subscriptions'),
-        api.get('/creators/profile')
+      setLoading(true);
+      const [subsRes, plansRes] = await Promise.all([
+        api.get('/subscriptions/my-subscription'),
+        api.get('/subscriptions/plans?user_type=creator'),
       ]);
 
-      setPlans(plansRes.data.plans || []);
-      setMySubscriptions(subsRes.data.subscriptions || []);
-      setProfile(profileRes.data?.profile || authProfile);
+      setCurrentSubscription(subsRes.data.data);
+      setPlans(plansRes.data.data);
     } catch (error) {
       console.error('Error fetching subscription data:', error);
-      toast.error('Failed to load subscription plans');
+      toast.error('Failed to load subscription information');
     } finally {
       setLoading(false);
     }
   };
 
   const handleSubscribe = async (planId) => {
-    setSubscribing(planId);
     try {
-      const response = await api.post('/creator/subscriptions/subscribe', {
+      setActionLoading(true);
+      const plan = plans.find(p => p.id === planId);
+
+      // For free plan, subscribe immediately
+      if (plan.slug === 'creator-free' || (plan.price_monthly === 0 && plan.price_yearly === 0)) {
+        const res = await api.post('/subscriptions/subscribe', {
+          plan_id: planId,
+          billing_cycle: billingCycle
+        });
+
+        if (res.data.success) {
+          toast.success('Successfully subscribed to Free plan!');
+          await fetchData();
+        }
+        return;
+      }
+
+      // For paid plans, initiate payment
+      const res = await api.post('/subscriptions/subscribe', {
         plan_id: planId,
-        payment_method: 'paynow'
+        billing_cycle: billingCycle
       });
 
-      if (response.data.subscription) {
-        // Navigate to payment page to choose payment method
+      if (res.data.success && res.data.data) {
+        localStorage.setItem('lastSubscriptionId', res.data.data.subscription_id);
+
         navigate('/subscription/payment', {
           state: {
-            subscription: response.data.subscription,
-            plan: response.data.subscription.plan,
-            paymentData: response.data.payment
+            paymentData: {
+              subscription_id: res.data.data.subscription_id,
+              redirect_url: res.data.data.redirect_url,
+              poll_url: res.data.data.poll_url,
+              payment_reference: res.data.data.payment_reference
+            },
+            plan: plan,
+            billingCycle: billingCycle
           }
         });
-      } else {
-        toast.error('Failed to create subscription');
       }
     } catch (error) {
       console.error('Error subscribing:', error);
       toast.error(error.response?.data?.error || 'Failed to subscribe');
     } finally {
-      setSubscribing(null);
+      setActionLoading(false);
     }
   };
 
-  const isSubscribed = (planSlug, category) => {
-    return mySubscriptions.some(sub =>
-      sub.plan?.slug === planSlug &&
-      (sub.plan?.featured_category === category || !category) &&
-      sub.is_active
-    );
+  const handleUpgrade = async (planId) => {
+    try {
+      setActionLoading(true);
+      const plan = plans.find(p => p.id === planId);
+
+      const res = await api.put('/subscriptions/upgrade', {
+        plan_id: planId,
+        billing_cycle: billingCycle
+      });
+
+      if (res.data.success && res.data.data) {
+        if (res.data.data.redirect_url) {
+          const actualSubscription = currentSubscription?.subscription || currentSubscription;
+          localStorage.setItem('lastSubscriptionId', actualSubscription?.id);
+
+          navigate('/subscription/payment', {
+            state: {
+              paymentData: {
+                subscription_id: actualSubscription?.id,
+                redirect_url: res.data.data.redirect_url,
+                poll_url: res.data.data.poll_url,
+                payment_reference: res.data.data.payment_reference
+              },
+              plan: plan,
+              billingCycle: billingCycle
+            }
+          });
+        } else {
+          toast.success('Successfully upgraded subscription!');
+          await fetchData();
+        }
+      }
+    } catch (error) {
+      console.error('Error upgrading:', error);
+      toast.error(error.response?.data?.error || 'Failed to upgrade');
+    } finally {
+      setActionLoading(false);
+    }
   };
-
-  const featuredPlans = plans.filter(p => p.subscription_type === 'featured');
-  const verificationPlan = plans.find(p => p.subscription_type === 'verification');
-
-  // Check if user is already verified
-  const isVerified = profile?.badges?.includes('verified_creator') || false;
 
   if (loading) {
     return (
@@ -90,6 +146,18 @@ const CreatorSubscriptions = () => {
       </div>
     );
   }
+
+  const hasActiveSubscription = currentSubscription?.has_subscription && currentSubscription?.subscription?.status === 'active';
+  const currentPlan = hasActiveSubscription ? currentSubscription.subscription.plan : null;
+  const actualSubscription = currentSubscription?.subscription || currentSubscription;
+
+  // Calculate savings
+  const calculateSavings = (plan) => {
+    if (plan.price_yearly === 0 || plan.price_monthly === 0) return 0;
+    const monthlyTotal = plan.price_monthly * 12;
+    const savings = monthlyTotal - plan.price_yearly;
+    return savings;
+  };
 
   return (
     <div className="min-h-screen bg-light">
@@ -103,242 +171,291 @@ const CreatorSubscriptions = () => {
             <span className="text-sm font-medium text-primary">Creator Subscriptions</span>
           </div>
           <h1 className="text-4xl lg:text-5xl font-bold text-dark mb-4 leading-tight">
-            Boost Your Visibility
+            Choose Your Creator Plan
           </h1>
           <p className="text-lg text-gray-600 leading-relaxed max-w-2xl mx-auto">
-            Get featured on the homepage, earn your verification badge, and stand out to top brands
+            Unlock powerful features and grow your creator business with reduced fees
           </p>
         </div>
 
-        {/* Verification Plan - Only show if not already verified */}
-        {verificationPlan && !isVerified && (
+        {/* Current Plan Display */}
+        {hasActiveSubscription && (
           <div className="max-w-4xl mx-auto mb-12">
-            <div className="card bg-gradient-to-br from-primary to-primary-dark text-white overflow-hidden relative">
-              <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -mr-32 -mt-32"></div>
-              <div className="absolute bottom-0 left-0 w-48 h-48 bg-white/10 rounded-full -ml-24 -mb-24"></div>
-
-              <div className="relative p-8 md:p-10">
-                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-4">
-                      <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center">
-                        <CheckBadgeIcon className="h-7 w-7 text-white" />
-                      </div>
-                      <div>
-                        <h2 className="text-2xl font-bold">Get Verified</h2>
-                        <p className="text-white/90 text-sm">Earn the trusted creator badge</p>
-                      </div>
-                    </div>
-
-                    <ul className="space-y-3 mb-6">
-                      <li className="flex items-start gap-2">
-                        <svg className="w-5 h-5 text-white flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                        </svg>
-                        <span className="text-white/95">Verified badge on your profile</span>
-                      </li>
-                      <li className="flex items-start gap-2">
-                        <svg className="w-5 h-5 text-white flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                        </svg>
-                        <span className="text-white/95">Increased trust from brands</span>
-                      </li>
-                      <li className="flex items-start gap-2">
-                        <svg className="w-5 h-5 text-white flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                        </svg>
-                        <span className="text-white/95">Stand out in search results</span>
-                      </li>
-                    </ul>
-
-                    <div className="flex items-baseline gap-2 mb-6">
-                      <span className="text-4xl font-bold">${verificationPlan.price}</span>
-                      <span className="text-white/80">/ {verificationPlan.duration_display}</span>
-                    </div>
+            <div className="bg-white rounded-3xl shadow-sm p-8">
+              <div className="flex items-start justify-between mb-6">
+                <div>
+                  <div className="flex items-center gap-3 mb-2">
+                    <h2 className="text-2xl font-bold text-dark">Current Plan</h2>
+                    <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-medium">
+                      Active
+                    </span>
                   </div>
-
-                  <div className="flex-shrink-0 w-full md:w-auto">
-                    {isSubscribed(verificationPlan.slug) ? (
-                      <button
-                        onClick={() => navigate('/creator/verification/apply')}
-                        className="w-full md:w-auto px-8 py-4 bg-white text-primary rounded-2xl font-bold hover:shadow-2xl transform hover:scale-105 transition-all duration-200 flex items-center justify-center gap-2"
-                      >
-                        Apply for Verification
-                        <ArrowRightIcon className="h-5 w-5" />
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => handleSubscribe(verificationPlan.id)}
-                        disabled={subscribing === verificationPlan.id}
-                        className="w-full md:w-auto px-8 py-4 bg-white text-primary rounded-2xl font-bold hover:shadow-2xl transform hover:scale-105 transition-all duration-200 flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
-                      >
-                        {subscribing === verificationPlan.id ? (
-                          <>
-                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary"></div>
-                            Processing...
-                          </>
-                        ) : (
-                          <>
-                            Subscribe & Apply
-                            <ArrowRightIcon className="h-5 w-5" />
-                          </>
-                        )}
-                      </button>
-                    )}
-                  </div>
+                  <p className="text-gray-600">{currentPlan?.description || 'Your current subscription plan'}</p>
                 </div>
               </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 p-6 bg-light rounded-2xl">
+                <div>
+                  <p className="text-sm text-gray-600 mb-1">Plan</p>
+                  <p className="text-xl font-bold text-dark">{currentPlan?.name}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600 mb-1">Billing</p>
+                  <p className="text-xl font-bold text-dark capitalize">{actualSubscription?.billing_cycle || 'Monthly'}</p>
+                </div>
+                <div>
+                  <p className="text-sm text-gray-600 mb-1">Platform Fee</p>
+                  <p className="text-xl font-bold text-primary">{currentPlan?.platform_fee_percentage || 15}%</p>
+                </div>
+              </div>
+
+              {actualSubscription?.current_period_end && (
+                <div className="mt-6 flex items-center gap-2 text-sm text-gray-600">
+                  <CreditCardIcon className="h-5 w-5" />
+                  <span>
+                    Next billing date: {new Date(actualSubscription.current_period_end).toLocaleDateString('en-US', {
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric'
+                    })}
+                  </span>
+                </div>
+              )}
             </div>
           </div>
         )}
 
-        {/* Featured Plans */}
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-8">
-            <h2 className="text-3xl font-bold text-dark mb-2">Featured Creator Plans</h2>
-            <p className="text-gray-600">Get priority placement in search results and homepage sections</p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {featuredPlans.map((plan) => {
-              const subscribed = isSubscribed(plan.slug, plan.featured_category);
-
-              // Platform-specific icons and colors
-              const getPlatformIcon = (category) => {
-                switch(category) {
-                  case 'facebook':
-                    return (
-                      <svg className="w-12 h-12 text-blue-600" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
-                      </svg>
-                    );
-                  case 'instagram':
-                    return (
-                      <svg className="w-12 h-12 text-pink-600" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
-                      </svg>
-                    );
-                  case 'tiktok':
-                    return (
-                      <svg className="w-12 h-12 text-gray-900" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M19.59 6.69a4.83 4.83 0 01-3.77-4.25V2h-3.45v13.67a2.89 2.89 0 01-5.2 1.74 2.89 2.89 0 012.31-4.64 2.93 2.93 0 01.88.13V9.4a6.84 6.84 0 00-1-.05A6.33 6.33 0 005 20.1a6.34 6.34 0 0010.86-4.43v-7a8.16 8.16 0 004.77 1.52v-3.4a4.85 4.85 0 01-1-.1z"/>
-                      </svg>
-                    );
-                  case 'general':
-                  default:
-                    return (
-                      <svg className="w-12 h-12 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
-                      </svg>
-                    );
-                }
-              };
-
-              return (
-                <div key={plan.id} className={`card group hover:shadow-2xl transition-all duration-300 ${subscribed ? 'ring-2 ring-primary' : ''}`}>
-                  <div className="text-center mb-6">
-                    <div className="flex justify-center mb-4">
-                      {getPlatformIcon(plan.featured_category)}
-                    </div>
-                    <h3 className="text-xl font-bold text-dark mb-2">{plan.name}</h3>
-                    <p className="text-sm text-gray-600 leading-relaxed">{plan.description}</p>
-                  </div>
-
-                  <div className="text-center mb-6">
-                    <div className="flex items-baseline justify-center gap-2">
-                      <span className="text-3xl font-bold text-dark">${plan.price}</span>
-                      <span className="text-gray-500 text-sm">/ week</span>
-                    </div>
-                  </div>
-
-                  <ul className="space-y-3 mb-6">
-                    <li className="flex items-start gap-2 text-sm">
-                      <svg className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                      </svg>
-                      <span className="text-gray-700">Priority in search results</span>
-                    </li>
-                    <li className="flex items-start gap-2 text-sm">
-                      <svg className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                      </svg>
-                      <span className="text-gray-700">Featured badge</span>
-                    </li>
-                    <li className="flex items-start gap-2 text-sm">
-                      <svg className="w-5 h-5 text-primary flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                      </svg>
-                      <span className="text-gray-700">7 days visibility</span>
-                    </li>
-                  </ul>
-
-                  {subscribed ? (
-                    <button
-                      disabled
-                      className="w-full py-3 bg-primary/10 text-primary rounded-xl font-semibold cursor-not-allowed"
-                    >
-                      <div className="flex items-center justify-center gap-2">
-                        <StarIcon className="h-5 w-5" />
-                        Active
-                      </div>
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => handleSubscribe(plan.id)}
-                      disabled={subscribing === plan.id}
-                      className="w-full py-3 bg-primary text-white rounded-xl font-semibold hover:bg-primary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {subscribing === plan.id ? (
-                        <div className="flex items-center justify-center gap-2">
-                          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                          Processing...
-                        </div>
-                      ) : (
-                        'Subscribe Now'
-                      )}
-                    </button>
-                  )}
-                </div>
-              );
-            })}
+        {/* Billing Cycle Toggle */}
+        <div className="max-w-4xl mx-auto mb-8">
+          <div className="flex justify-center items-center gap-4">
+            <span className={`text-sm font-medium ${billingCycle === 'monthly' ? 'text-dark' : 'text-gray-500'}`}>
+              Monthly
+            </span>
+            <button
+              onClick={() => setBillingCycle(billingCycle === 'monthly' ? 'yearly' : 'monthly')}
+              className="relative inline-flex h-8 w-14 items-center rounded-full bg-gray-200 transition-colors focus:outline-none"
+              style={{ backgroundColor: billingCycle === 'yearly' ? '#ccdb53' : '#e5e7eb' }}
+            >
+              <span
+                className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${
+                  billingCycle === 'yearly' ? 'translate-x-7' : 'translate-x-1'
+                }`}
+              />
+            </button>
+            <span className={`text-sm font-medium ${billingCycle === 'yearly' ? 'text-dark' : 'text-gray-500'}`}>
+              Yearly
+            </span>
+            {billingCycle === 'yearly' && (
+              <span className="px-3 py-1 bg-primary/20 text-primary text-xs font-bold rounded-full">
+                SAVE UP TO $38
+              </span>
+            )}
           </div>
         </div>
 
-        {/* My Active Subscriptions */}
-        {mySubscriptions.filter(s => s.is_active).length > 0 && (
-          <div className="max-w-4xl mx-auto mt-12">
-            <h2 className="text-2xl font-bold text-dark mb-6">My Active Subscriptions</h2>
-            <div className="space-y-4">
-              {mySubscriptions.filter(s => s.is_active).map((sub) => (
-                <div key={sub.id} className="card">
-                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
-                        <h3 className="font-bold text-dark text-lg">{sub.plan?.name}</h3>
-                        <span className="px-3 py-1 bg-green-100 text-green-800 rounded-full text-xs font-semibold">
-                          Active
+        {/* Plan Cards Grid */}
+        <div className="overflow-x-auto pb-4 pt-4">
+          <div className="flex gap-6 min-w-max px-4 mx-auto justify-center flex-wrap">
+            {plans.filter((plan) => !hasActiveSubscription || plan.id !== currentPlan?.id)
+              .map((plan) => {
+                const price = billingCycle === 'yearly' ? plan.price_yearly : plan.price_monthly;
+                const displayPrice = billingCycle === 'yearly' ? (price / 12).toFixed(2) : price.toFixed(2);
+                const savings = calculateSavings(plan);
+                const isFree = plan.price_monthly === 0 && plan.price_yearly === 0;
+
+                // Get plan icon
+                const getPlanIcon = (slug) => {
+                  if (slug === 'creator-free') return <StarIcon className="h-8 w-8" />;
+                  if (slug === 'rising') return <ChartBarIcon className="h-8 w-8" />;
+                  if (slug === 'pro-creator') return <TrophyIcon className="h-8 w-8" />;
+                  return <SparklesIcon className="h-8 w-8" />;
+                };
+
+                // Categorize features
+                const categories = {
+                  profile: { title: 'Profile & Visibility', items: [] },
+                  campaigns: { title: 'Campaigns & Bookings', items: [] },
+                  analytics: { title: 'Analytics & Insights', items: [] },
+                  support: { title: 'Support & Extras', items: [] }
+                };
+
+                // Add platform fee
+                categories.profile.items.push({
+                  name: 'Platform Fee',
+                  value: `${plan.platform_fee_percentage}%`,
+                  highlight: true
+                });
+
+                // Add restrictions
+                if (plan.restrictions?.has_verified_badge) {
+                  categories.profile.items.push({ name: 'Verified Badge', value: true });
+                }
+                if (plan.restrictions?.max_portfolio_items) {
+                  categories.profile.items.push({
+                    name: 'Portfolio Items',
+                    value: plan.restrictions.max_portfolio_items === 999999 ? 'Unlimited' : plan.restrictions.max_portfolio_items
+                  });
+                }
+                if (plan.restrictions?.search_placement_priority > 0) {
+                  categories.profile.items.push({ name: 'Priority Search Placement', value: true });
+                }
+
+                // Add campaign features
+                if (plan.features?.max_packages !== undefined) {
+                  categories.campaigns.items.push({
+                    name: 'Packages',
+                    value: plan.features.max_packages === 999999 ? 'Unlimited' : plan.features.max_packages
+                  });
+                }
+                if (plan.features?.max_bookings_per_month !== undefined) {
+                  categories.campaigns.items.push({
+                    name: 'Bookings/Month',
+                    value: plan.features.max_bookings_per_month === 999999 ? 'Unlimited' : plan.features.max_bookings_per_month
+                  });
+                }
+                if (plan.features?.can_access_briefs) {
+                  categories.campaigns.items.push({ name: 'Campaign Briefs Access', value: true });
+                }
+                if (plan.restrictions?.can_message_brands_first) {
+                  categories.campaigns.items.push({ name: 'Message Brands First', value: true });
+                }
+
+                // Add analytics features
+                if (plan.features?.analytics_access) {
+                  categories.analytics.items.push({ name: 'Analytics Dashboard', value: true });
+                }
+                if (plan.features?.has_advanced_analytics) {
+                  categories.analytics.items.push({ name: 'Advanced Analytics', value: true });
+                }
+
+                // Add support features
+                if (plan.features?.priority_support) {
+                  categories.support.items.push({ name: 'Priority Support', value: true });
+                }
+                if (plan.features?.api_access) {
+                  categories.support.items.push({ name: 'API Access', value: true });
+                }
+
+                return (
+                  <div
+                    key={plan.id}
+                    className="bg-white rounded-3xl p-6 shadow-sm hover:shadow-xl transition-all duration-300 border-2 border-transparent hover:border-primary"
+                    style={{ width: '280px', minWidth: '280px' }}
+                  >
+                    {/* Plan Header */}
+                    <div className="text-center mb-6">
+                      <div className="w-16 h-16 bg-primary/10 rounded-2xl flex items-center justify-center mx-auto mb-4 text-primary">
+                        {getPlanIcon(plan.slug)}
+                      </div>
+                      <h3 className="text-2xl font-bold text-dark mb-2">{plan.name}</h3>
+                      {plan.badge_label && (
+                        <span className="inline-block px-3 py-1 bg-primary/20 text-primary text-xs font-bold rounded-full mb-2">
+                          {plan.badge_label}
                         </span>
-                      </div>
-                      <p className="text-sm text-gray-600 mb-2">{sub.plan?.description}</p>
-                      <div className="flex items-center gap-4 text-sm text-gray-500">
-                        <span>Expires: {new Date(sub.end_date).toLocaleDateString()}</span>
-                        <span>•</span>
-                        <span>{sub.days_remaining} days remaining</span>
-                      </div>
+                      )}
+                      <p className="text-sm text-gray-600 leading-relaxed">{plan.description}</p>
                     </div>
-                    <div className="text-right">
-                      <p className="text-2xl font-bold text-primary mb-1">${sub.plan?.price}</p>
-                      <p className="text-sm text-gray-500">{sub.plan?.duration_display}</p>
+
+                    {/* Pricing */}
+                    <div className="text-center mb-6 p-4 bg-light rounded-2xl">
+                      {isFree ? (
+                        <div className="text-4xl font-bold text-dark">Free</div>
+                      ) : (
+                        <>
+                          <div className="flex items-baseline justify-center gap-1 mb-1">
+                            <span className="text-3xl font-bold text-dark">${displayPrice}</span>
+                            <span className="text-gray-500 text-sm">/month</span>
+                          </div>
+                          {billingCycle === 'yearly' && savings > 0 && (
+                            <div className="text-xs text-primary font-semibold">
+                              Save ${savings.toFixed(0)}/year
+                            </div>
+                          )}
+                          {billingCycle === 'yearly' && (
+                            <div className="text-xs text-gray-500 mt-1">
+                              Billed ${price}/year
+                            </div>
+                          )}
+                        </>
+                      )}
                     </div>
+
+                    {/* Features by Category */}
+                    <div className="space-y-4 mb-6 text-sm">
+                      {Object.entries(categories).map(([key, category]) => {
+                        if (category.items.length === 0) return null;
+                        return (
+                          <div key={key}>
+                            <h4 className="font-bold text-dark text-xs uppercase tracking-wide mb-2 text-gray-500">
+                              {category.title}
+                            </h4>
+                            <ul className="space-y-2">
+                              {category.items.map((item, idx) => (
+                                <li key={idx} className="flex items-start justify-between gap-2">
+                                  <span className="text-gray-700 flex-1">{item.name}</span>
+                                  {item.value === true ? (
+                                    <CheckIcon className="h-4 w-4 text-primary flex-shrink-0 mt-0.5" />
+                                  ) : item.value === false ? (
+                                    <XMarkIcon className="h-4 w-4 text-gray-300 flex-shrink-0 mt-0.5" />
+                                  ) : (
+                                    <span className={`font-semibold flex-shrink-0 ${item.highlight ? 'text-primary' : 'text-dark'}`}>
+                                      {item.value}
+                                    </span>
+                                  )}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Action Button */}
+                    <button
+                      onClick={() => hasActiveSubscription ? handleUpgrade(plan.id) : handleSubscribe(plan.id)}
+                      disabled={actionLoading}
+                      className="w-full py-3 bg-primary hover:bg-primary-dark text-white font-bold rounded-2xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                    >
+                      {actionLoading ? (
+                        <>
+                          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                          Processing...
+                        </>
+                      ) : (
+                        <>
+                          {hasActiveSubscription ? (
+                            <>
+                              <ArrowPathIcon className="h-5 w-5" />
+                              Upgrade
+                            </>
+                          ) : (
+                            <>
+                              <BoltIcon className="h-5 w-5" />
+                              Get Started
+                            </>
+                          )}
+                        </>
+                      )}
+                    </button>
                   </div>
-                </div>
-              ))}
-            </div>
+                );
+              })}
           </div>
-        )}
+        </div>
+
+        {/* Back Link */}
+        <div className="max-w-4xl mx-auto mt-12 text-center">
+          <Link
+            to="/creator/dashboard"
+            className="inline-flex items-center gap-2 text-gray-600 hover:text-primary transition-colors"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+            Back to Dashboard
+          </Link>
+        </div>
       </div>
     </div>
   );
-};
-
-export default CreatorSubscriptions;
+}

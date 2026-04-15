@@ -217,15 +217,17 @@ def subscribe():
 @jwt_required()
 def upgrade_subscription():
     """
-    Upgrade to a different plan
-    Body: { plan_id: int, payment_reference: string }
+    Upgrade to a different plan (requires payment like subscription)
+    Body: { plan_id: int, billing_cycle: 'monthly'|'yearly' }
+    Returns payment initiation data for Paynow (frontend handles wallet/bank transfer separately)
     """
     try:
         user_id = get_jwt_identity()
+        user = User.query.get(user_id)
         data = request.get_json()
 
         new_plan_id = data.get('plan_id')
-        payment_reference = data.get('payment_reference')
+        billing_cycle = data.get('billing_cycle', 'monthly')
 
         if not new_plan_id:
             return jsonify({'success': False, 'error': 'plan_id is required'}), 400
@@ -244,26 +246,66 @@ def upgrade_subscription():
                 'error': 'No active subscription found. Use /subscribe instead.'
             }), 400
 
-        # Update to new plan
+        # Check if upgrading to same plan
+        if current_sub.plan_id == new_plan_id:
+            return jsonify({
+                'success': False,
+                'error': 'You are already on this plan.'
+            }), 400
+
+        # Check if upgrading to free plan (not allowed)
+        if new_plan.price_monthly == 0 and new_plan.price_yearly == 0:
+            return jsonify({
+                'success': False,
+                'error': 'Cannot upgrade to free plan. Please cancel your current subscription instead.'
+            }), 400
+
+        # Calculate upgrade amount
+        amount = new_plan.price_yearly if billing_cycle == 'yearly' else new_plan.price_monthly
+
+        # Update subscription to pending_payment status and new plan
+        # Store old plan ID in case payment fails
+        old_plan_id = current_sub.plan_id
         current_sub.plan_id = new_plan_id
-        current_sub.payment_reference = payment_reference
+        current_sub.billing_cycle = billing_cycle
+        current_sub.status = 'pending_payment'  # Will revert to active if payment fails
         current_sub.updated_at = datetime.utcnow()
 
-        # Record payment for upgrade
-        if current_sub.billing_cycle == 'yearly':
-            current_sub.last_payment_amount = new_plan.price_yearly
+        db.session.flush()
+
+        # Initiate Paynow payment
+        payment_result = initiate_subscription_payment(
+            subscription=current_sub,
+            user_email=user.email,
+            plan_name=new_plan.name,
+            amount=amount,
+            billing_cycle=billing_cycle,
+            is_upgrade=True
+        )
+
+        if payment_result['success']:
+            db.session.commit()
+            return jsonify({
+                'success': True,
+                'message': 'Upgrade payment initiated successfully',
+                'data': {
+                    'subscription_id': current_sub.id,
+                    'redirect_url': payment_result['redirect_url'],
+                    'poll_url': payment_result['poll_url'],
+                    'payment_reference': payment_result['payment_reference'],
+                    'is_upgrade': True
+                }
+            }), 200
         else:
-            current_sub.last_payment_amount = new_plan.price_monthly
-
-        current_sub.last_payment_date = datetime.utcnow()
-
-        db.session.commit()
-
-        return jsonify({
-            'success': True,
-            'message': f'Successfully upgraded to {new_plan.name} plan',
-            'data': current_sub.to_dict()
-        }), 200
+            # Revert changes on payment initiation failure
+            current_sub.plan_id = old_plan_id
+            current_sub.status = 'active'
+            db.session.rollback()
+            return jsonify({
+                'success': False,
+                'error': payment_result.get('error', 'Payment initialization failed'),
+                'message': payment_result.get('message', 'Unknown error')
+            }), 400
 
     except Exception as e:
         db.session.rollback()
