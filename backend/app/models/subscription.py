@@ -42,6 +42,10 @@ class Subscription(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
+    # Relationships
+    # Note: 'plan' backref is defined in SubscriptionPlan model
+    user = db.relationship('User', foreign_keys=[user_id], lazy=True)
+
     def set_billing_period(self, billing_cycle='monthly'):
         """Set current_period_end and next_payment_date based on billing cycle"""
         self.billing_cycle = billing_cycle

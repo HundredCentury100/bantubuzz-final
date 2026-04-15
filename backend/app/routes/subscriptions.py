@@ -23,11 +23,18 @@ def allowed_file(filename):
 def get_subscription_plans():
     """
     Get all active subscription plans for public pricing page
+    Query params: user_type (optional) - 'brand' or 'creator' to filter plans
     """
     try:
-        plans = SubscriptionPlan.query.filter_by(is_active=True).order_by(
-            SubscriptionPlan.display_order
-        ).all()
+        user_type = request.args.get('user_type')  # 'brand' or 'creator'
+
+        query = SubscriptionPlan.query.filter_by(is_active=True)
+
+        # Filter by user_type if provided
+        if user_type and user_type in ['brand', 'creator']:
+            query = query.filter_by(user_type=user_type)
+
+        plans = query.order_by(SubscriptionPlan.display_order).all()
 
         return jsonify({
             'success': True,
@@ -50,6 +57,7 @@ def get_my_subscription():
     """
     try:
         user_id = get_jwt_identity()
+        user = User.query.get(user_id)
 
         # Get active subscription
         subscription = Subscription.query.filter_by(
@@ -58,14 +66,27 @@ def get_my_subscription():
         ).first()
 
         if not subscription:
-            # User is on free plan
-            free_plan = SubscriptionPlan.query.filter_by(is_default=True).first()
+            # User is on free plan - get default plan based on user type
+            user_type = user.user_type if user.user_type in ['creator', 'brand'] else 'brand'
+            free_plan = SubscriptionPlan.query.filter_by(
+                user_type=user_type,
+                is_default=True
+            ).first()
+
+            # Fallback to any free plan if no default found
+            if not free_plan:
+                free_plan = SubscriptionPlan.query.filter_by(
+                    user_type=user_type,
+                    price_monthly=0
+                ).first()
+
             return jsonify({
                 'success': True,
                 'data': {
                     'has_subscription': False,
                     'plan': free_plan.to_dict() if free_plan else None,
-                    'is_free': True
+                    'is_free': True,
+                    'user_type': user_type
                 }
             }), 200
 
@@ -74,7 +95,8 @@ def get_my_subscription():
             'data': {
                 'has_subscription': True,
                 'subscription': subscription.to_dict(),
-                'is_free': False
+                'is_free': False,
+                'user_type': user.user_type if user.user_type in ['creator', 'brand'] else 'brand'
             }
         }), 200
 
@@ -351,6 +373,7 @@ def check_subscription_limits():
     """
     try:
         user_id = get_jwt_identity()
+        user = User.query.get(user_id)
 
         # Get active subscription or default to free plan
         subscription = Subscription.query.filter_by(
@@ -361,8 +384,17 @@ def check_subscription_limits():
         if subscription:
             plan = subscription.plan
         else:
-            # Free plan
-            plan = SubscriptionPlan.query.filter_by(is_default=True).first()
+            # Free plan - get based on user type
+            user_type = user.user_type if user.user_type in ['creator', 'brand'] else 'brand'
+            plan = SubscriptionPlan.query.filter_by(
+                user_type=user_type,
+                is_default=True
+            ).first()
+            if not plan:
+                plan = SubscriptionPlan.query.filter_by(
+                    user_type=user_type,
+                    price_monthly=0
+                ).first()
 
         if not plan:
             return jsonify({
@@ -370,25 +402,55 @@ def check_subscription_limits():
                 'error': 'No plan found'
             }), 404
 
+        # Build response based on user type
+        response_data = {
+            'plan_name': plan.name,
+            'user_type': plan.user_type,
+            'limits': {
+                'max_packages': plan.max_packages,
+                'max_bookings_per_month': plan.max_bookings_per_month,
+                'can_access_briefs': plan.can_access_briefs,
+                'can_access_campaigns': plan.can_access_campaigns,
+                'can_create_custom_packages': plan.can_create_custom_packages,
+            },
+            'features': {
+                'priority_support': plan.priority_support,
+                'analytics_access': plan.analytics_access,
+                'api_access': plan.api_access,
+                'has_advanced_analytics': plan.has_advanced_analytics,
+                'has_priority_listing': plan.has_priority_listing,
+                'has_custom_branding': plan.has_custom_branding,
+                'has_dedicated_support': plan.has_dedicated_support,
+                'has_api_access': plan.has_api_access,
+            }
+        }
+
+        # Add brand-specific restrictions
+        if plan.user_type == 'brand':
+            response_data['restrictions'] = {
+                'max_active_campaigns': plan.max_active_campaigns,
+                'max_active_collaborations': plan.max_active_collaborations,
+                'max_team_members': plan.max_team_members,
+                'max_creator_lists': plan.max_creator_lists,
+                'max_client_workspaces': plan.max_client_workspaces,
+                'service_fee_percentage': float(plan.service_fee_percentage) if plan.service_fee_percentage else 12.00,
+            }
+
+        # Add creator-specific restrictions
+        if plan.user_type == 'creator':
+            response_data['restrictions'] = {
+                'max_portfolio_items': plan.max_portfolio_items,
+                'commission_percentage': float(plan.commission_percentage) if plan.commission_percentage else 15.00,
+                'has_verified_badge': plan.has_verified_badge,
+                'search_placement_priority': plan.search_placement_priority,
+                'can_message_brands_first': plan.can_message_brands_first,
+            }
+
         # Get current usage (to be implemented with actual counts)
         # For now, return limits only
         return jsonify({
             'success': True,
-            'data': {
-                'plan_name': plan.name,
-                'limits': {
-                    'max_packages': plan.max_packages,
-                    'max_bookings_per_month': plan.max_bookings_per_month,
-                    'can_access_briefs': plan.can_access_briefs,
-                    'can_access_campaigns': plan.can_access_campaigns,
-                    'can_create_custom_packages': plan.can_create_custom_packages,
-                },
-                'features': {
-                    'priority_support': plan.priority_support,
-                    'analytics_access': plan.analytics_access,
-                    'api_access': plan.api_access
-                }
-            }
+            'data': response_data
         }), 200
 
     except Exception as e:
@@ -502,5 +564,116 @@ def upload_payment_proof():
         return jsonify({
             'success': False,
             'error': 'Failed to upload payment proof',
+            'message': str(e)
+        }), 500
+
+
+@bp.route('/pay-with-wallet', methods=['POST'])
+@jwt_required()
+def pay_subscription_with_wallet():
+    """
+    Pay for brand subscription using wallet balance
+    Body: { subscription_id: int, billing_cycle: 'monthly'|'yearly' }
+    """
+    try:
+        user_id = get_jwt_identity()
+        user = User.query.get(user_id)
+        data = request.get_json()
+
+        subscription_id = data.get('subscription_id')
+        billing_cycle = data.get('billing_cycle', 'monthly')
+
+        if not subscription_id:
+            return jsonify({'success': False, 'error': 'subscription_id is required'}), 400
+
+        # Get the subscription
+        subscription = Subscription.query.get(subscription_id)
+        if not subscription:
+            return jsonify({'success': False, 'error': 'Subscription not found'}), 404
+
+        # Verify ownership
+        if subscription.user_id != user_id:
+            return jsonify({'success': False, 'error': 'Unauthorized'}), 403
+
+        # Check subscription status
+        if subscription.status not in ['pending', 'pending_payment']:
+            return jsonify({'success': False, 'error': 'Subscription already processed or active'}), 400
+
+        # Get the plan
+        plan = subscription.plan
+        if not plan:
+            return jsonify({'success': False, 'error': 'Subscription plan not found'}), 404
+
+        # Calculate amount based on billing cycle
+        amount = plan.price_yearly if billing_cycle == 'yearly' else plan.price_monthly
+
+        # Get brand wallet (brands use brand_wallet, not creator wallet)
+        from app.models import BrandWallet, BrandWalletTransaction, BrandProfile
+        brand = BrandProfile.query.filter_by(user_id=user_id).first()
+        if not brand:
+            return jsonify({'success': False, 'error': 'Brand profile not found'}), 404
+
+        wallet = BrandWallet.query.filter_by(user_id=user_id).first()
+        if not wallet:
+            return jsonify({'success': False, 'error': 'Wallet not found'}), 404
+
+        # Check sufficient balance
+        if wallet.available_balance < amount:
+            return jsonify({
+                'success': False,
+                'error': f'Insufficient wallet balance. Available: ${float(wallet.available_balance):.2f}, Required: ${float(amount):.2f}'
+            }), 400
+
+        # Deduct from wallet
+        wallet.available_balance -= amount
+        wallet.updated_at = datetime.utcnow()
+
+        # Create wallet transaction
+        transaction = BrandWalletTransaction(
+            wallet_id=wallet.id,
+            user_id=user_id,
+            amount=amount,
+            transaction_type='subscription_payment',
+            status='completed',
+            description=f'Payment for {plan.name} subscription ({billing_cycle})',
+            metadata={
+                'subscription_id': subscription.id,
+                'plan_id': plan.id,
+                'plan_name': plan.name,
+                'billing_cycle': billing_cycle
+            }
+        )
+        db.session.add(transaction)
+
+        # Activate subscription
+        subscription.status = 'active'
+        subscription.payment_method = 'wallet'
+        subscription.last_payment_date = datetime.utcnow()
+        subscription.last_payment_amount = amount
+        subscription.billing_cycle = billing_cycle
+        subscription.payment_reference = f'WALLET-{transaction.id}'
+        subscription.updated_at = datetime.utcnow()
+
+        # Set billing period if not already set
+        if not subscription.current_period_end:
+            subscription.set_billing_period(billing_cycle)
+
+        db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'message': 'Payment successful! Your subscription is now active.',
+            'data': {
+                'subscription': subscription.to_dict(),
+                'wallet_balance': float(wallet.available_balance),
+                'transaction_id': transaction.id
+            }
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'error': 'Failed to process wallet payment',
             'message': str(e)
         }), 500

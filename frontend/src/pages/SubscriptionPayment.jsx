@@ -40,11 +40,14 @@ const SubscriptionPayment = () => {
       setLoading(false);
     }
 
-    // Fetch wallet balance for creators
-    if (user?.user_type === 'creator') {
+  }, [subscriptionId, user, stateSubscription]);
+
+  useEffect(() => {
+    // Fetch wallet balance for all users (creators and brands)
+    if (user) {
       fetchWalletBalance();
     }
-  }, [subscriptionId, user, stateSubscription]);
+  }, [user]);
 
   const fetchSubscription = async () => {
     try {
@@ -65,7 +68,11 @@ const SubscriptionPayment = () => {
   const fetchWalletBalance = async () => {
     try {
       setLoadingWallet(true);
-      const response = await creatorWalletAPI.getBalance();
+      // Use correct endpoint based on user type
+      const endpoint = user?.user_type === 'creator'
+        ? '/creator/wallet/balance'
+        : '/brand/wallet/balance';
+      const response = await api.get(endpoint);
       if (response.data.success) {
         setWalletBalance(response.data.wallet);
       }
@@ -97,7 +104,11 @@ const SubscriptionPayment = () => {
 
     try {
       setPaymentLoading(true);
-      const response = await api.post('/creator/subscriptions/pay-with-wallet', {
+      // Use correct endpoint based on user type
+      const endpoint = user?.user_type === 'creator'
+        ? '/creator/subscriptions/pay-with-wallet'
+        : '/subscriptions/pay-with-wallet';
+      const response = await api.post(endpoint, {
         subscription_id: subId,
         billing_cycle: billingCycle
       });
@@ -176,11 +187,8 @@ const SubscriptionPayment = () => {
         ? '/creator/subscriptions/upload-proof'
         : '/subscriptions/upload-proof';
 
-      const response = await api.post(endpoint, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data'
-        }
-      });
+      // Don't set Content-Type header - browser will set it automatically with boundary for multipart/form-data
+      const response = await api.post(endpoint, formData);
 
       if (response.data.success) {
         toast.success('Proof of payment uploaded successfully. Awaiting admin verification.');
@@ -291,8 +299,8 @@ const SubscriptionPayment = () => {
             <p className="text-lg md:text-xl text-gray-600 leading-relaxed">Choose your payment method</p>
           </div>
 
-          {/* Wallet Balance Card - Only show for creators */}
-          {user?.user_type === 'creator' && walletBalance && (
+          {/* Wallet Balance Card - Show for creators and brands */}
+          {walletBalance && (
             <div className="bg-gradient-to-r from-primary to-primary-dark rounded-3xl shadow-lg p-6 mb-6 text-white">
               <div className="flex items-center justify-between">
                 <div>
@@ -357,8 +365,8 @@ const SubscriptionPayment = () => {
             <h2 className="text-2xl font-bold text-dark mb-6">Select Payment Method</h2>
 
             <div className="space-y-4 mb-6">
-              {/* Wallet Option - Only for creators with sufficient balance */}
-              {user?.user_type === 'creator' && walletBalance && (
+              {/* Wallet Option - For creators and brands with sufficient balance */}
+              {walletBalance && (
                 <label
                   className={`flex items-start p-4 border-2 rounded-3xl cursor-pointer transition-colors ${
                     walletBalance.available_balance < amount ? 'opacity-50 cursor-not-allowed' : 'hover:border-primary'

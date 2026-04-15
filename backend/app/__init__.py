@@ -15,10 +15,13 @@ jwt = JWTManager()
 mail = Mail()
 socketio = SocketIO()
 migrate = Migrate()
+celery = None  # Will be initialized in create_app
 
 
 def create_app(config_name='development'):
     """Application factory pattern"""
+    global celery
+
     app = Flask(__name__)
     app.config.from_object(config[config_name])
 
@@ -38,27 +41,16 @@ def create_app(config_name='development'):
     socketio.init_app(app, cors_allowed_origins=app.config['CORS_ORIGINS'], async_mode='threading')
     migrate.init_app(app, db)
 
+    # Initialize Celery
+    from .celery_app import make_celery
+    celery = make_celery(app)
+
     # Setup comprehensive logging
     setup_logging(app)
 
-    # Request/Response logging middleware
-    @app.before_request
-    def log_request_info():
-        """Log every incoming request"""
-        app.logger.info(
-            f"→ {request.method} {request.path} | "
-            f"IP: {request.remote_addr} | "
-            f"User-Agent: {request.headers.get('User-Agent', 'Unknown')[:80]}"
-        )
-
-    @app.after_request
-    def log_response_info(response):
-        """Log every outgoing response"""
-        app.logger.info(
-            f"← {response.status_code} | {request.method} {request.path} | "
-            f"Size: {response.content_length or 0}B"
-        )
-        return response
+    # Initialize comprehensive logging middleware
+    from .middleware.logging_middleware import LoggingMiddleware
+    logging_middleware = LoggingMiddleware(app)
 
     # JWT error handlers
     @jwt.expired_token_loader
@@ -79,7 +71,7 @@ def create_app(config_name='development'):
         return {'error': 'Token has been revoked'}, 401
 
     # Register blueprints
-    from .routes import auth, users, creators, brands, packages, campaigns, bookings, messages, notifications, analytics, collaborations, reviews, wallet, categories, brand_wallet, custom_packages, disputes, subscriptions, briefs, creator_subscriptions, verification, proposals, platforms, admin_extended, messaging_safety, support
+    from .routes import auth, users, creators, brands, packages, campaigns, bookings, messages, notifications, analytics, collaborations, reviews, wallet, categories, brand_wallet, custom_packages, disputes, subscriptions, briefs, creator_subscriptions, verification, proposals, platforms, admin_extended, messaging_safety, support, admin_logs, internal
     from .routes import admin  # New admin module structure
 
     app.register_blueprint(auth.bp, url_prefix='/api/auth')
@@ -99,6 +91,7 @@ def create_app(config_name='development'):
     app.register_blueprint(brand_wallet.bp, url_prefix='/api')  # Brand wallet routes at /api/brand/wallet/*
     app.register_blueprint(admin.bp, url_prefix='/api/admin')  # Admin routes at /api/admin/*
     app.register_blueprint(admin_extended.bp, url_prefix='/api/admin')  # Extended admin routes (bookings, campaigns, etc.)
+    app.register_blueprint(admin_logs.bp, url_prefix='/api/admin')  # Admin logs routes
     app.register_blueprint(custom_packages.bp)  # Custom packages routes at /api/custom-packages/*
     app.register_blueprint(disputes.bp)  # Dispute routes at /api/disputes
     app.register_blueprint(subscriptions.bp, url_prefix='/api/subscriptions')  # Subscription routes
@@ -109,6 +102,7 @@ def create_app(config_name='development'):
     app.register_blueprint(platforms.platforms_bp)  # Platform connection routes
     app.register_blueprint(messaging_safety.bp, url_prefix='/api/messaging')  # Trust & Safety messaging routes
     app.register_blueprint(support.bp, url_prefix='/api')  # Support ticket routes
+    app.register_blueprint(internal.bp, url_prefix='/api/internal')  # Internal service routes (messaging service)
 
     # Serve uploaded files
     from flask import send_from_directory
