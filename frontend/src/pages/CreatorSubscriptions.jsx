@@ -271,69 +271,94 @@ export default function CreatorSubscriptions() {
                   return <SparklesIcon className="h-8 w-8" />;
                 };
 
-                // Categorize features
+                // Categorize features - Using hardcoded features to match Pricing page
                 const categories = {
-                  profile: { title: 'Profile & Visibility', items: [] },
-                  campaigns: { title: 'Campaigns & Bookings', items: [] },
-                  analytics: { title: 'Analytics & Insights', items: [] },
-                  support: { title: 'Support & Extras', items: [] }
+                  profile: { title: 'Profile', items: [] },
+                  visibility: { title: 'Visibility', items: [] },
+                  campaigns: { title: 'Campaigns', items: [] },
+                  extras: { title: 'Extras', items: [] }
                 };
 
-                // Add platform fee
+                // Platform commission
                 categories.profile.items.push({
-                  name: 'Platform Fee',
-                  value: `${plan.platform_fee_percentage}%`,
+                  name: `${plan.platform_fee_percentage}% commission`,
+                  value: true,
                   highlight: true
                 });
 
-                // Add restrictions
-                if (plan.restrictions?.has_verified_badge) {
-                  categories.profile.items.push({ name: 'Verified Badge', value: true });
-                }
-                if (plan.restrictions?.max_portfolio_items) {
-                  categories.profile.items.push({
-                    name: 'Portfolio Items',
-                    value: plan.restrictions.max_portfolio_items === 999999 ? 'Unlimited' : plan.restrictions.max_portfolio_items
-                  });
-                }
-                if (plan.restrictions?.search_placement_priority > 0) {
-                  categories.profile.items.push({ name: 'Priority Search Placement', value: true });
-                }
-
-                // Add campaign features
-                if (plan.features?.max_packages !== undefined) {
-                  categories.campaigns.items.push({
-                    name: 'Packages',
-                    value: plan.features.max_packages === 999999 ? 'Unlimited' : plan.features.max_packages
-                  });
-                }
-                if (plan.features?.max_bookings_per_month !== undefined) {
-                  categories.campaigns.items.push({
-                    name: 'Bookings/Month',
-                    value: plan.features.max_bookings_per_month === 999999 ? 'Unlimited' : plan.features.max_bookings_per_month
-                  });
-                }
-                if (plan.features?.can_access_briefs) {
-                  categories.campaigns.items.push({ name: 'Campaign Briefs Access', value: true });
-                }
-                if (plan.restrictions?.can_message_brands_first) {
-                  categories.campaigns.items.push({ name: 'Message Brands First', value: true });
-                }
-
-                // Add analytics features
-                if (plan.features?.analytics_access) {
-                  categories.analytics.items.push({ name: 'Analytics Dashboard', value: true });
-                }
-                if (plan.features?.has_advanced_analytics) {
-                  categories.analytics.items.push({ name: 'Advanced Analytics', value: true });
-                }
-
-                // Add support features
-                if (plan.features?.priority_support) {
-                  categories.support.items.push({ name: 'Priority Support', value: true });
-                }
-                if (plan.features?.api_access) {
-                  categories.support.items.push({ name: 'API Access', value: true });
+                // Features based on plan slug
+                if (plan.slug === 'creator-free') {
+                  // Free Plan Features
+                  categories.profile.items.push(
+                    { name: 'Basic profile listing', value: true },
+                    { name: 'Portfolio items', value: '3 items' },
+                    { name: 'Verified badge', value: false },
+                    { name: 'Performance stats for brands', value: true }
+                  );
+                  categories.visibility.items.push(
+                    { name: 'Standard search placement', value: true },
+                    { name: 'Featured in platform sections', value: false },
+                    { name: 'Homepage featured placement', value: false },
+                    { name: 'Priority search placement', value: false }
+                  );
+                  categories.campaigns.items.push(
+                    { name: 'Apply to brand campaigns', value: true },
+                    { name: 'Early access to new briefs', value: false },
+                    { name: 'Direct message brands', value: false }
+                  );
+                  categories.extras.items.push(
+                    { name: 'Referral rewards program', value: true },
+                    { name: 'Profile analytics', value: false },
+                    { name: 'Open to work badge', value: false }
+                  );
+                } else if (plan.slug === 'rising') {
+                  // Rising Plan Features
+                  categories.profile.items.push(
+                    { name: 'Verified badge included', value: true },
+                    { name: 'Portfolio items', value: '10 items' },
+                    { name: 'Performance stats for brands', value: true },
+                    { name: 'Profile analytics', value: true }
+                  );
+                  categories.visibility.items.push(
+                    { name: 'Boosted search placement', value: true },
+                    { name: 'Featured in 1 platform section', value: '1 section' },
+                    { name: 'Homepage featured placement', value: false },
+                    { name: 'Priority search placement', value: false }
+                  );
+                  categories.campaigns.items.push(
+                    { name: 'Apply to brand campaigns', value: true },
+                    { name: 'Early access to new briefs', value: true },
+                    { name: 'Direct message brands', value: true }
+                  );
+                  categories.extras.items.push(
+                    { name: 'Referral rewards program', value: true },
+                    { name: 'Profile analytics', value: true },
+                    { name: 'Open to work badge', value: true }
+                  );
+                } else if (plan.slug === 'pro-creator') {
+                  // Pro Creator Plan Features
+                  categories.profile.items.push(
+                    { name: 'Verified badge included', value: true },
+                    { name: 'Portfolio items', value: 'Unlimited' },
+                    { name: 'Performance stats for brands', value: true },
+                    { name: 'Profile analytics (who viewed you)', value: true }
+                  );
+                  categories.visibility.items.push(
+                    { name: 'Priority search placement', value: true },
+                    { name: 'Featured across ALL sections', value: true },
+                    { name: 'Homepage featured placement', value: true },
+                    { name: 'Open to work badge', value: true }
+                  );
+                  categories.campaigns.items.push(
+                    { name: 'Apply to brand campaigns', value: true },
+                    { name: 'Early access to new briefs', value: true },
+                    { name: 'Direct message brands first', value: true }
+                  );
+                  categories.extras.items.push(
+                    { name: 'Referral rewards program', value: true },
+                    { name: 'Onboarding session', value: true },
+                    { name: 'Quarterly strategy review', value: true }
+                  );
                 }
 
                 return (
