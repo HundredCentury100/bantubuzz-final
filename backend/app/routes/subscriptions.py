@@ -279,8 +279,7 @@ def upgrade_subscription():
             user_email=user.email,
             plan_name=new_plan.name,
             amount=amount,
-            billing_cycle=billing_cycle,
-            is_upgrade=True
+            billing_cycle=billing_cycle
         )
 
         if payment_result['success']:
