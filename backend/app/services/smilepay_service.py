@@ -295,79 +295,6 @@ class SmilePayService:
     def initiate_card_payment(
         order_reference: str,
         amount: float,
-        card_number: str,
-        expiry_month: str,
-        expiry_year: str,
-        cvv: str,
-        cardholder_name: str,
-        item_name: str,
-        item_description: str,
-        customer_email: str,
-        customer_first_name: str = '',
-        customer_last_name: str = '',
-        return_url: str = '',
-        result_url: str = '',
-        cancel_url: str = '',
-        failure_url: str = '',
-        currency: str = 'USD'
-    ) -> Dict[str, Any]:
-        """
-        Initiate card payment (Visa/Mastercard) via Express Checkout
-
-        May return 3D Secure HTML for authentication
-        """
-        try:
-            endpoint = smilepay_config.get_payment_endpoint('card')
-            headers = smilepay_config.get_headers()
-
-            payload = {
-                'orderReference': order_reference,
-                'amount': amount,
-                'currencyCode': smilepay_config.get_currency_code(currency),
-                'cardNumber': card_number,
-                'expiryMonth': expiry_month,
-                'expiryYear': expiry_year,
-                'cvv': cvv,
-                'cardholderName': cardholder_name,
-                'itemName': item_name,
-                'itemDescription': item_description,
-                'email': customer_email,
-                'firstName': customer_first_name,
-                'lastName': customer_last_name,
-                'returnUrl': return_url or '',
-                'resultUrl': result_url or '',
-                'cancelUrl': cancel_url or '',
-                'failureUrl': failure_url or '',
-            }
-
-            logger.info(f"Initiating card payment for order {order_reference}")
-
-            response = requests.post(endpoint, json=payload, headers=headers, timeout=30)
-            response_data = response.json()
-
-            logger.info(f"Card payment response: {response_data}")
-
-            # Check if 3D Secure is required
-            requires_3ds = 'threeDSecureHtml' in response_data or 'redirectUrl' in response_data
-
-            return {
-                'success': response.status_code == 200,
-                'status_code': response.status_code,
-                'data': response_data,
-                'requires_3ds': requires_3ds
-            }
-
-        except Exception as e:
-            logger.error(f"Card payment error: {str(e)}")
-            return {
-                'success': False,
-                'error': f"Payment initiation failed: {str(e)}"
-            }
-
-    @staticmethod
-    def initiate_card_payment(
-        order_reference: str,
-        amount: float,
         item_name: str,
         item_description: str,
         customer_email: str,
@@ -379,14 +306,17 @@ class SmilePayService:
         cancel_url: str = '',
         failure_url: str = '',
         currency: str = 'USD',
-        card_type: str = 'visa'  # 'visa' or 'mastercard'
+        card_type: str = 'visa'
     ) -> Dict[str, Any]:
         """
         Initiate card payment (Visa/Mastercard) via Express Checkout
 
         Returns redirect URL to SmilePay's hosted checkout page where
-        the user enters their card details securely (PCI compliant).
+        the user enters their card details securely (PCI compliant - no card details on our form).
         Similar to Ecocash/Innbucks flow.
+
+        Args:
+            card_type: 'visa' or 'mastercard'
         """
         try:
             endpoint = smilepay_config.get_payment_endpoint(card_type)
@@ -415,13 +345,11 @@ class SmilePayService:
 
             logger.info(f"Card payment response: {response_data}")
 
-            # Express Checkout returns a redirect URL to SmilePay's checkout page
             return {
                 'success': response.status_code == 200,
                 'status_code': response.status_code,
                 'data': response_data,
-                'redirect_url': response_data.get('redirectUrl') or response_data.get('checkoutUrl'),
-                'poll_url': response_data.get('pollUrl')
+                'redirect_url': response_data.get('paymentUrl') or response_data.get('redirectUrl') or response_data.get('checkoutUrl'),
             }
 
         except Exception as e:
