@@ -48,6 +48,44 @@ class CreatorProfile(db.Model):
     bookings_as_creator = db.relationship('Booking', foreign_keys='Booking.creator_id', backref='creator', lazy='dynamic')
     saved_by_brands = db.relationship('SavedCreator', backref='creator', lazy='dynamic', cascade='all, delete-orphan')
 
+    def get_total_followers(self):
+        """Calculate total followers across all connected platforms"""
+        from app.models.connected_platform import ConnectedPlatform
+
+        total = db.session.query(
+            db.func.sum(ConnectedPlatform.followers)
+        ).filter(
+            ConnectedPlatform.user_id == self.user_id,
+            ConnectedPlatform.is_connected == True
+        ).scalar()
+
+        return int(total) if total else self.follower_count or 0
+
+    def get_platform_stats(self):
+        """Get detailed stats for each connected platform"""
+        from app.models.connected_platform import ConnectedPlatform
+
+        platforms = ConnectedPlatform.query.filter_by(
+            user_id=self.user_id,
+            is_connected=True
+        ).all()
+
+        platform_stats = []
+        for platform in platforms:
+            platform_stats.append({
+                'platform': platform.platform,
+                'account_name': platform.account_name,
+                'followers': platform.followers,
+                'posts': platform.posts,
+                'profile_url': platform.profile_url
+            })
+
+        return platform_stats
+
+    def get_average_engagement_rate(self):
+        """Calculate average engagement rate (currently from profile, can be enhanced)"""
+        return float(self.engagement_rate) if self.engagement_rate else 0.0
+
     def get_badges(self):
         """
         Calculate creator badges based on verification and performance
@@ -156,6 +194,9 @@ class CreatorProfile(db.Model):
             'revision_fee': self.revision_fee or 0.0,
             'is_verified': self.is_verified or False,
             'badges': self.get_badges(),
+            'rating_penalty': float(getattr(self, 'rating_penalty', 0.0) or 0.0),
+            'cancelled_collaborations_count': getattr(self, 'cancelled_collaborations_count', 0) or 0,
+            'effective_rating': self.get_effective_rating(),
             'created_at': self.created_at.isoformat(),
             'updated_at': self.updated_at.isoformat()
         }
@@ -167,6 +208,12 @@ class CreatorProfile(db.Model):
                 data['user'] = self.user.to_dict()  # Full data for owner
 
         return data
+
+    def get_effective_rating(self):
+        """Calculate rating with penalty applied"""
+        base_rating = getattr(self, 'rating', 5.0) or 5.0
+        penalty = getattr(self, 'rating_penalty', 0.0) or 0.0
+        return max(0.0, float(base_rating) - float(penalty))
 
     def __repr__(self):
         return f'<CreatorProfile {self.user_id}>'

@@ -161,6 +161,19 @@ export const campaignsAPI = {
   getCampaignPackages: (campaignId) => api.get(`/campaigns/${campaignId}/packages`),
   completePackagePayment: (campaignId, packageId, bookingId) =>
     api.post(`/campaigns/${campaignId}/packages/${packageId}/complete-payment`, { booking_id: bookingId }),
+
+  // Analytics
+  getPerformance: (campaignId) => api.get(`/campaigns/${campaignId}/performance`),
+
+  // Campaign Cart (NEW - unpaid additions workflow)
+  getCart: (campaignId, params) => api.get(`/campaigns/${campaignId}/cart`, { params }),
+  addInvitationToCart: (campaignId, data) => api.post(`/campaigns/${campaignId}/cart/add-invitation`, data),
+  addApplicationToCart: (campaignId, data) => api.post(`/campaigns/${campaignId}/cart/add-application`, data),
+  addPackageToCart: (campaignId, data) => api.post(`/campaigns/${campaignId}/cart/add-package`, data),
+  removeFromCart: (campaignId, cartItemId) => api.delete(`/campaigns/${campaignId}/cart/${cartItemId}`),
+  payAllCart: (campaignId, data) => api.post(`/campaigns/${campaignId}/cart/pay-all`, data),
+  paySelectedCart: (campaignId, data) => api.post(`/campaigns/${campaignId}/cart/pay-selected`, data),
+  payIndividualCart: (campaignId, cartItemId, data) => api.post(`/campaigns/${campaignId}/cart/${cartItemId}/pay`, data),
 };
 
 // Opportunities API - Creator Side

@@ -10,6 +10,9 @@ import axios from 'axios';
 import ImageCropModal from '../components/ImageCropModal';
 import ProfilePreviewModal from '../components/ProfilePreviewModal';
 import { createCroppedImage } from '../utils/cropImage';
+import PortfolioGrid from '../components/PortfolioGrid';
+import PortfolioFormModal from '../components/PortfolioFormModal';
+import { portfolioAPI } from '../services/portfolioAPI';
 
 const CreatorProfileEdit = () => {
   const navigate = useNavigate();
@@ -29,6 +32,9 @@ const CreatorProfileEdit = () => {
   const [imageToCrop, setImageToCrop] = useState(null);
   const [originalFileName, setOriginalFileName] = useState('');
   const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [showPortfolioModal, setShowPortfolioModal] = useState(false);
+  const [editingPortfolioItem, setEditingPortfolioItem] = useState(null);
+  const [portfolioRefreshKey, setPortfolioRefreshKey] = useState(0);
 
   const {
     register,
@@ -256,6 +262,37 @@ const CreatorProfileEdit = () => {
     } finally {
       setDeletingGalleryIndex(null);
     }
+  };
+
+  const handleAddPortfolio = () => {
+    setEditingPortfolioItem(null);
+    setShowPortfolioModal(true);
+  };
+
+  const handleEditPortfolio = (item) => {
+    setEditingPortfolioItem(item);
+    setShowPortfolioModal(true);
+  };
+
+  const handleDeletePortfolio = async (item) => {
+    if (!window.confirm('Are you sure you want to delete this portfolio item?')) {
+      return;
+    }
+
+    try {
+      await portfolioAPI.deletePortfolioItem(item.id);
+      toast.success('Portfolio item deleted successfully');
+      setPortfolioRefreshKey(prev => prev + 1);
+    } catch (error) {
+      console.error('Error deleting portfolio item:', error);
+      toast.error('Failed to delete portfolio item');
+    }
+  };
+
+  const handlePortfolioSuccess = (item) => {
+    setShowPortfolioModal(false);
+    setEditingPortfolioItem(null);
+    setPortfolioRefreshKey(prev => prev + 1);
   };
 
   const onSubmit = async (data) => {
@@ -776,6 +813,30 @@ const CreatorProfileEdit = () => {
                   </div>
                 </div>
               </div>
+
+              {/* Connect Platforms Button */}
+              <div className="mt-6 p-4 bg-primary-light border border-primary/30 rounded-lg">
+                <div className="flex items-start gap-3">
+                  <svg className="w-6 h-6 text-primary-dark mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                  <div className="flex-1">
+                    <h3 className="text-sm font-semibold text-dark mb-1">Get Real-Time Analytics</h3>
+                    <p className="text-sm text-dark-light mb-3">
+                      Connect your social media platforms to automatically sync your follower counts, engagement rates, and audience demographics. This helps brands see your actual performance metrics!
+                    </p>
+                    <Link
+                      to="/creator/platforms"
+                      className="inline-flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary-dark text-dark font-medium rounded-lg transition-colors"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                      </svg>
+                      Connect Platforms
+                    </Link>
+                  </div>
+                </div>
+              </div>
             </div>
 
             {/* Categories */}
@@ -857,10 +918,55 @@ const CreatorProfileEdit = () => {
               </div>
             </div>
 
-            {/* Success Stories */}
+            {/* Portfolio & Success Stories */}
             <div className="card">
-              <h2 className="text-xl font-bold text-dark mb-4">Success Stories</h2>
-              <p className="text-sm text-gray-600 mb-4">Share your past collaboration successes</p>
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h2 className="text-xl font-bold text-dark">Portfolio & Success Stories</h2>
+                  <p className="text-sm text-gray-600 mt-1">Showcase your best work and collaborations with detailed metrics and results</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleAddPortfolio}
+                  className="px-4 py-2 bg-primary hover:bg-primary-dark text-dark font-medium rounded-lg transition-colors flex items-center gap-2 whitespace-nowrap"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                  Add Portfolio Item
+                </button>
+              </div>
+
+              {/* Portfolio Grid */}
+              <div className="mb-6" key={portfolioRefreshKey}>
+                <PortfolioGrid
+                  creatorId={profile?.id}
+                  showActions={true}
+                  onEdit={handleEditPortfolio}
+                  onDelete={handleDeletePortfolio}
+                />
+              </div>
+
+              {/* Info Banner */}
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="flex items-start gap-3">
+                  <svg className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                  </svg>
+                  <div>
+                    <p className="text-sm font-medium text-blue-900">Stand Out with Structured Portfolio Items</p>
+                    <p className="text-xs text-blue-700 mt-1">
+                      Instead of plain text, add detailed portfolio items with metrics, images, client testimonials, and campaign results. This helps brands see your proven track record and makes your profile more professional.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Success Stories (Legacy) */}
+            <div className="card">
+              <h2 className="text-xl font-bold text-dark mb-4">Additional Success Stories (Optional)</h2>
+              <p className="text-sm text-gray-600 mb-4">Any additional collaboration successes in plain text format</p>
 
               <textarea
                 rows={6}
@@ -935,6 +1041,18 @@ const CreatorProfileEdit = () => {
             is_verified: profile?.is_verified || false
           }}
           onClose={() => setShowPreviewModal(false)}
+        />
+      )}
+
+      {/* Portfolio Form Modal */}
+      {showPortfolioModal && (
+        <PortfolioFormModal
+          item={editingPortfolioItem}
+          onClose={() => {
+            setShowPortfolioModal(false);
+            setEditingPortfolioItem(null);
+          }}
+          onSuccess={handlePortfolioSuccess}
         />
       )}
     </div>

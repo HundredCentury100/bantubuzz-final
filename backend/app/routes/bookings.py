@@ -663,7 +663,7 @@ def cart_payment_status():
                         title=f"Collaboration for {package.title if package else 'Package'}",
                         description=package.description if package else '',
                         amount=booking.amount,
-                        status='pending_creator_acceptance',
+                        status='in_progress',
                         start_date=start_date,
                         expected_completion_date=expected_completion,
                         deliverables=package.deliverables if package and package.deliverables else [],
@@ -674,6 +674,27 @@ def cart_payment_status():
 
                     # Auto-create platform-specific deliverables for multi-platform packages
                     create_multiplatform_deliverables(collab, package)
+
+                    # Send email to creator about auto-accepted booking
+                    creator = CreatorProfile.query.get(booking.creator_id)
+                    if creator:
+                        creator_user = User.query.get(creator.user_id)
+                        brand = BrandProfile.query.get(booking.brand_id)
+                        if creator_user and brand:
+                            try:
+                                from app.services.email_service import EmailService
+                                EmailService.send_booking_auto_accepted_email(
+                                    creator_email=creator_user.email,
+                                    creator_name=creator.username,
+                                    brand_name=brand.company_name,
+                                    package_title=package.title if package else 'Package',
+                                    amount=float(booking.amount),
+                                    deliverables=package.deliverables if package and package.deliverables else [],
+                                    expected_days=package.duration_days if package else None,
+                                    collaboration_id=collab.id
+                                )
+                            except Exception as email_error:
+                                print(f"Failed to send booking auto-accepted email: {email_error}")
 
             db.session.commit()
             return jsonify({'paid': True, 'status': 'paid'}), 200
@@ -907,7 +928,7 @@ def cart_pay_with_wallet():
                 title=f"Collaboration for {package.title}",
                 description=package.description or '',
                 amount=booking.amount,
-                status='pending_creator_acceptance',
+                status='in_progress',
                 start_date=start_date,
                 expected_completion_date=expected_completion,
                 deliverables=package.deliverables if package.deliverables else [],
@@ -919,9 +940,25 @@ def cart_pay_with_wallet():
             # Auto-create platform-specific deliverables
             create_multiplatform_deliverables(collaboration, package)
 
-            # Notify creator
+            # Send email to creator about auto-accepted booking
             creator_user = User.query.get(package.creator.user_id)
             if creator_user:
+                try:
+                    from app.services.email_service import EmailService
+                    EmailService.send_booking_auto_accepted_email(
+                        creator_email=creator_user.email,
+                        creator_name=package.creator.username,
+                        brand_name=brand.company_name,
+                        package_title=package.title,
+                        amount=float(booking.amount),
+                        deliverables=package.deliverables if package.deliverables else [],
+                        expected_days=package.duration_days if package else None,
+                        collaboration_id=collaboration.id
+                    )
+                except Exception as email_error:
+                    print(f"Failed to send booking auto-accepted email: {email_error}")
+
+                # Also notify via in-app notification
                 notify_new_booking(
                     creator_id=creator_user.id,
                     brand_name=brand.company_name or user.email,
@@ -1472,13 +1509,38 @@ def verify_bank_transfer_payment(booking_id):
                         title=f"Collaboration for {package.title if package else 'Package'}",
                         description=package.description if package else '',
                         amount=booking.amount,
-                        status='pending_creator_acceptance',
+                        status='in_progress',
                         start_date=start_date,
                         expected_completion_date=expected_completion,
                         deliverables=package.deliverables if package and package.deliverables else [],
                         progress_percentage=0
                     )
                     db.session.add(collaboration)
+                    db.session.flush()
+
+                    # Auto-create platform-specific deliverables
+                    create_multiplatform_deliverables(collaboration, package)
+
+                    # Send email to creator about auto-accepted booking
+                    creator = CreatorProfile.query.get(booking.creator_id)
+                    if creator:
+                        creator_user = User.query.get(creator.user_id)
+                        brand = BrandProfile.query.get(booking.brand_id)
+                        if creator_user and brand:
+                            try:
+                                from app.services.email_service import EmailService
+                                EmailService.send_booking_auto_accepted_email(
+                                    creator_email=creator_user.email,
+                                    creator_name=creator.username,
+                                    brand_name=brand.company_name,
+                                    package_title=package.title if package else 'Package',
+                                    amount=float(booking.amount),
+                                    deliverables=package.deliverables if package and package.deliverables else [],
+                                    expected_days=package.duration_days if package else None,
+                                    collaboration_id=collaboration.id
+                                )
+                            except Exception as email_error:
+                                print(f"Failed to send booking auto-accepted email: {email_error}")
 
         db.session.commit()
 

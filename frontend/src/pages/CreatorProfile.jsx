@@ -14,6 +14,7 @@ import AudienceCharts from '../components/AudienceCharts';
 import SEO from '../components/SEO';
 import toast from 'react-hot-toast';
 import { PLATFORM_CONFIGS, PACKAGE_TYPES } from '../constants/platformConfig';
+import PortfolioGrid from '../components/PortfolioGrid';
 
 const CreatorProfile = () => {
   const { id } = useParams();
@@ -368,12 +369,22 @@ const CreatorProfile = () => {
                       <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
                     </svg>
                     <p className="text-2xl font-bold text-dark">
-                      {reviewsStats?.overall || 0}
+                      {creator.effective_rating !== undefined ? creator.effective_rating.toFixed(1) : (reviewsStats?.overall || creator.rating || 5.0)}
                     </p>
                   </div>
                   <p className="text-sm text-gray-600">
                     {reviews.length} {reviews.length === 1 ? 'Review' : 'Reviews'}
                   </p>
+                  {creator.rating_penalty > 0 && (
+                    <p className="text-xs text-red-600 mt-1">
+                      -{creator.rating_penalty.toFixed(2)} penalty
+                    </p>
+                  )}
+                  {creator.cancelled_collaborations_count > 0 && (
+                    <p className="text-xs text-gray-500">
+                      {creator.cancelled_collaborations_count} cancellation{creator.cancelled_collaborations_count !== 1 ? 's' : ''}
+                    </p>
+                  )}
                 </div>
                 <div className="text-center p-3 bg-light rounded-lg flex items-center justify-center">
                   <span className="text-xs px-3 py-1 border border-gray-300 rounded-full text-gray-700 capitalize">
@@ -500,7 +511,7 @@ const CreatorProfile = () => {
         </div>
 
         {/* Audience Demographics Section with Toggle */}
-        {audienceData && audienceData.totalPlatforms > 0 && (
+        {audienceData && (
           <div className="mb-8">
             <button
               onClick={() => setShowDemographics(!showDemographics)}
@@ -513,7 +524,9 @@ const CreatorProfile = () => {
                 <div className="text-left">
                   <h2 className="text-xl font-bold text-dark">Audience Demographics</h2>
                   <p className="text-sm text-gray-500">
-                    Audience reach across {audienceData.totalPlatforms} connected platform{audienceData.totalPlatforms !== 1 ? 's' : ''}
+                    {audienceData.totalPlatforms > 0
+                      ? `Audience reach across ${audienceData.totalPlatforms} connected platform${audienceData.totalPlatforms !== 1 ? 's' : ''}`
+                      : 'Instagram audience insights'}
                   </p>
                 </div>
               </div>
@@ -565,6 +578,15 @@ const CreatorProfile = () => {
               <PlatformAnalytics creatorId={creator.id} />
             </div>
           )}
+        </div>
+
+        {/* Portfolio & Success Stories Section */}
+        <div className="mb-8">
+          <h2 className="text-2xl font-bold text-dark mb-6">Portfolio & Success Stories</h2>
+          <PortfolioGrid
+            creatorId={creator.id}
+            showActions={false}
+          />
         </div>
 
         {/* Packages Section */}

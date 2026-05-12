@@ -40,8 +40,20 @@ const NotificationBell = () => {
       campaign: '📢',
       payment: '💰',
       collaboration: '🤝',
+      collaboration_declined: '❌',
+      collaboration_accepted: '✅',
     };
     return icons[type] || '🔔';
+  };
+
+  const getNotificationStyle = (type) => {
+    if (type === 'collaboration_declined') {
+      return 'border-l-4 border-red-500 bg-red-50/50';
+    }
+    if (type === 'collaboration_accepted') {
+      return 'border-l-4 border-green-500 bg-green-50/50';
+    }
+    return '';
   };
 
   const getTimeAgo = (dateString) => {
@@ -105,7 +117,7 @@ const NotificationBell = () => {
                     onClick={() => handleNotificationClick(notification)}
                     className={`block px-4 py-3 hover:bg-gray-50 transition-colors ${
                       !notification.is_read ? 'bg-primary/10' : ''
-                    }`}
+                    } ${getNotificationStyle(notification.type)}`}
                   >
                     <div className="flex items-start gap-3">
                       {/* Icon */}

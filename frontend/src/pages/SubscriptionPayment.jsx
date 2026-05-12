@@ -4,6 +4,7 @@ import api, { creatorWalletAPI } from '../services/api';
 import Navbar from '../components/Navbar';
 import toast from 'react-hot-toast';
 import { useAuth } from '../hooks/useAuth';
+import SmilePayPaymentModal from '../components/SmilePayPaymentModal';
 
 const SubscriptionPayment = () => {
   const { subscriptionId } = useParams();
@@ -15,11 +16,12 @@ const SubscriptionPayment = () => {
   const [paymentLoading, setPaymentLoading] = useState(false);
   const [paymentData, setPaymentData] = useState(null);
   const [checkingStatus, setCheckingStatus] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState('paynow');
+  const [paymentMethod, setPaymentMethod] = useState('smilepay');
   const [proofFile, setProofFile] = useState(null);
   const [uploading, setUploading] = useState(false);
   const [walletBalance, setWalletBalance] = useState(null);
   const [loadingWallet, setLoadingWallet] = useState(false);
+  const [showSmilePayModal, setShowSmilePayModal] = useState(false);
 
   // Get plan info from location state
   const planInfo = location.state?.plan;
@@ -70,7 +72,7 @@ const SubscriptionPayment = () => {
       setLoadingWallet(true);
       // Use correct endpoint based on user type
       const endpoint = user?.user_type === 'creator'
-        ? '/creator/wallet/balance'
+        ? '/api/creator/wallet/balance'
         : '/brand/wallet/balance';
       const response = await api.get(endpoint);
       if (response.data.success) {
@@ -106,7 +108,7 @@ const SubscriptionPayment = () => {
       setPaymentLoading(true);
       // Use correct endpoint based on user type
       const endpoint = user?.user_type === 'creator'
-        ? '/creator/subscriptions/pay-with-wallet'
+        ? '/api/creator/subscriptions/pay-with-wallet'
         : '/subscriptions/pay-with-wallet';
       const response = await api.post(endpoint, {
         subscription_id: subId,
@@ -153,15 +155,6 @@ const SubscriptionPayment = () => {
     }
   };
 
-  const handleProceedToPayment = () => {
-    if (paymentData?.redirect_url) {
-      // Redirect to Paynow payment page
-      window.location.href = paymentData.redirect_url;
-    } else {
-      toast.error('Payment URL not available. Please contact support.');
-    }
-  };
-
   const handleManualPayment = async () => {
     if (!proofFile) {
       toast.error('Please upload proof of payment');
@@ -184,7 +177,7 @@ const SubscriptionPayment = () => {
 
       // Use different endpoint based on user type
       const endpoint = user?.user_type === 'creator'
-        ? '/creator/subscriptions/upload-proof'
+        ? '/api/creator/subscriptions/upload-proof'
         : '/subscriptions/upload-proof';
 
       // Don't set Content-Type header - browser will set it automatically with boundary for multipart/form-data
@@ -253,6 +246,19 @@ const SubscriptionPayment = () => {
       toast.error('Failed to check payment status');
     } finally {
       setCheckingStatus(false);
+    }
+  };
+
+  const handleSmilePaySuccess = async (transaction) => {
+    toast.success('Payment successful! Your subscription is now active.');
+
+    // Check if this is a verification subscription
+    const plan = subscription?.plan || planInfo;
+    if (plan?.subscription_type === 'verification' || plan?.slug?.includes('verification')) {
+      navigate('/creator/verification/apply');
+    } else {
+      // For brand subscriptions
+      navigate('/subscription/manage');
     }
   };
 
@@ -401,21 +407,24 @@ const SubscriptionPayment = () => {
                 </label>
               )}
 
-              {/* Paynow Option */}
+              {/* SmilePay Option */}
               <label className="flex items-start p-4 border-2 rounded-3xl cursor-pointer hover:border-primary transition-colors"
-                     style={{ borderColor: paymentMethod === 'paynow' ? '#ccdb53' : '#e5e7eb' }}>
+                     style={{ borderColor: paymentMethod === 'smilepay' ? '#ccdb53' : '#e5e7eb' }}>
                 <input
                   type="radio"
                   name="paymentMethod"
-                  value="paynow"
-                  checked={paymentMethod === 'paynow'}
+                  value="smilepay"
+                  checked={paymentMethod === 'smilepay'}
                   onChange={(e) => setPaymentMethod(e.target.value)}
                   className="mt-1"
                 />
                 <div className="ml-3 flex-1">
-                  <span className="font-semibold text-dark">Paynow</span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-dark">Smile&Pay</span>
+                    <span className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full">Recommended</span>
+                  </div>
                   <p className="text-sm text-gray-600 mt-1">
-                    Pay instantly using <strong>EcoCash</strong>, <strong>Innbucks</strong>, <strong>OneMoney</strong>, <strong>Omari</strong>, <strong>Visa</strong>, or <strong>Mastercard</strong> via Paynow
+                    Pay with <strong>Ecocash</strong>, <strong>Innbucks</strong>, <strong>SmileCash</strong>, <strong>Omari</strong>, <strong>Visa</strong>, or <strong>Mastercard</strong>
                   </p>
                 </div>
               </label>
@@ -495,14 +504,13 @@ const SubscriptionPayment = () => {
               onClick={
                 paymentMethod === 'wallet'
                   ? handleWalletPayment
-                  : paymentMethod === 'paynow'
-                    ? handleProceedToPayment
+                  : paymentMethod === 'smilepay'
+                    ? () => setShowSmilePayModal(true)
                     : handleManualPayment
               }
               disabled={
                 paymentLoading ||
                 uploading ||
-                (paymentMethod === 'paynow' && !paymentData?.redirect_url) ||
                 (paymentMethod === 'bank_transfer' && !proofFile) ||
                 (paymentMethod === 'wallet' && (!walletBalance || walletBalance.available_balance < amount))
               }
@@ -520,18 +528,12 @@ const SubscriptionPayment = () => {
                   </svg>
                   {paymentMethod === 'wallet'
                     ? 'Pay with Wallet'
-                    : paymentMethod === 'paynow'
-                      ? (!paymentData?.redirect_url ? 'Initializing Payment...' : 'Proceed to Payment')
+                    : paymentMethod === 'smilepay'
+                      ? 'Continue to Smile&Pay'
                       : 'Submit Payment'}
                 </>
               )}
             </button>
-
-            {paymentMethod === 'paynow' && !paymentData?.redirect_url && (
-              <p className="text-sm text-gray-500 mt-2 text-center">
-                Payment link is being generated...
-              </p>
-            )}
 
             <div className="text-center mt-6">
               <p className="text-sm text-gray-600 mb-3">
@@ -568,13 +570,28 @@ const SubscriptionPayment = () => {
               <div>
                 <h3 className="font-semibold text-dark mb-1">Secure Payment</h3>
                 <p className="text-sm text-gray-600">
-                  All payments are processed securely through Paynow. Your financial information is encrypted and protected.
+                  All payments are processed securely through Smile&Pay. Your financial information is encrypted and protected.
                 </p>
               </div>
             </div>
           </div>
         </div>
       </div>
+
+      {/* SmilePay Payment Modal */}
+      <SmilePayPaymentModal
+        isOpen={showSmilePayModal}
+        onClose={() => setShowSmilePayModal(false)}
+        amount={amount}
+        currency="USD"
+        paymentType="subscription"
+        paymentId={subscription?.id || subscriptionId || paymentData?.subscription_id}
+        itemName={plan?.name || 'Subscription'}
+        itemDescription={`${billingCycle} subscription - ${plan?.name || ''}`}
+        onSuccess={handleSmilePaySuccess}
+        returnUrl={`${window.location.origin}/subscription/manage`}
+        resultUrl={`${window.location.origin}/api/payments/smilepay/webhook/callback`}
+      />
     </div>
   );
 };

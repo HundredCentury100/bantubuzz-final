@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { collaborationsAPI } from '../services/api';
 import toast from 'react-hot-toast';
+import { useSubscription } from '../contexts/SubscriptionContext';
 
 const CollaborationResponseModal = ({ collaboration, onClose, onSuccess }) => {
+  const { handle403Error } = useSubscription();
   const [action, setAction] = useState(null); // 'accept' or 'decline'
   const [declineReason, setDeclineReason] = useState('');
   const [counterOfferPrice, setCounterOfferPrice] = useState('');
@@ -21,6 +23,14 @@ const CollaborationResponseModal = ({ collaboration, onClose, onSuccess }) => {
       }
     } catch (error) {
       console.error('Error accepting collaboration:', error);
+
+      // Handle subscription limit errors
+      if (handle403Error(error)) {
+        // Upgrade modal shown automatically
+        setSubmitting(false);
+        return;
+      }
+
       toast.error(error.response?.data?.error || 'Failed to accept collaboration');
     } finally {
       setSubmitting(false);

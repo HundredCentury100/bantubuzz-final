@@ -3,10 +3,10 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 const EngagementBarChart = ({ data }) => {
   // Transform data for bar chart
   const chartData = [
-    { name: 'Likes', value: data.likes || 0, color: '#ec4899' },
-    { name: 'Comments', value: data.comments || 0, color: '#3b82f6' },
-    { name: 'Shares', value: data.shares || 0, color: '#10b981' },
-    { name: 'Saves', value: data.saves || 0, color: '#8b5cf6' }
+    { name: 'Likes', value: data.likes || 0, color: '#C4D82E' }, // Bright lime green
+    { name: 'Comments', value: data.comments || 0, color: '#D4B95A' }, // Golden yellow
+    { name: 'Shares', value: data.shares || 0, color: '#8FA632' }, // Medium olive green
+    { name: 'Saves', value: data.saves || 0, color: '#E89A6B' } // Coral
   ];
 
   const CustomTooltip = ({ active, payload }) => {

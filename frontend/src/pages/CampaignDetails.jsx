@@ -1,13 +1,21 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
 import { campaignsAPI, analyticsAPI } from '../services/api';
 import Navbar from '../components/Navbar';
 import AudienceCharts from '../components/AudienceCharts';
+import CreatorPackageCard from '../components/CreatorPackageCard';
+import InviteCreatorsModal from '../components/InviteCreatorsModal';
+import CampaignPerformanceTab from '../components/CampaignPerformanceTab';
+import CampaignPaymentModal from '../components/CampaignPaymentModal';
+import CampaignChatPanel from '../components/CampaignChatPanel';
+import CampaignChatWindow from '../components/CampaignChatWindow';
+import CampaignCart from '../components/CampaignCart';
 import toast from 'react-hot-toast';
 
 const CampaignDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const [campaign, setCampaign] = useState(null);
   const [proposals, setProposals] = useState([]);
   const [packages, setPackages] = useState([]);
@@ -18,10 +26,26 @@ const CampaignDetails = () => {
   const [selectedProposal, setSelectedProposal] = useState(null);
   const [rejectModal, setRejectModal] = useState(null);
   const [rejectNotes, setRejectNotes] = useState('');
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [selectedCollaborations, setSelectedCollaborations] = useState([]);
+  const [selectedChat, setSelectedChat] = useState(null);
+  const [currentUser, setCurrentUser] = useState(null);
+  const [cartPendingCount, setCartPendingCount] = useState(0);
 
   useEffect(() => {
     fetchCampaignDetails();
-  }, [id]);
+    // Get current user from localStorage
+    const user = JSON.parse(localStorage.getItem('user') || '{}');
+    setCurrentUser(user);
+
+    // Check for tab parameter in URL
+    const searchParams = new URLSearchParams(location.search);
+    const tabParam = searchParams.get('tab');
+    if (tabParam) {
+      setActiveTab(tabParam);
+    }
+  }, [id, location.search]);
 
   useEffect(() => {
     if (activeTab === 'applications') {
@@ -30,6 +54,8 @@ const CampaignDetails = () => {
       fetchPackages();
     } else if (activeTab === 'audience') {
       fetchAudienceData();
+    } else if (activeTab === 'cart') {
+      fetchCartPendingCount();
     }
   }, [activeTab]);
 
@@ -48,7 +74,7 @@ const CampaignDetails = () => {
 
   const fetchProposals = async () => {
     try {
-      const response = await campaignsAPI.getProposals(id);
+      const response = await campaignsAPI.getCampaignProposals(id);
       setProposals(response.data.proposals || []);
     } catch (error) {
       console.error('Error fetching proposals:', error);
@@ -80,19 +106,30 @@ const CampaignDetails = () => {
     }
   };
 
+  const fetchCartPendingCount = async () => {
+    try {
+      const response = await campaignsAPI.getCart(id, { payment_status: 'pending' });
+      setCartPendingCount(response.data.pending_count || 0);
+    } catch (error) {
+      console.error('Error fetching cart count:', error);
+      // Don't show toast error for cart count
+      setCartPendingCount(0);
+    }
+  };
+
   const handleAcceptProposal = async (proposalId) => {
     try {
-      const response = await campaignsAPI.acceptProposal(proposalId);
-      const { booking_id, redirect_to } = response.data;
+      // Add application to cart instead of immediate payment
+      await campaignsAPI.addApplicationToCart(id, {
+        proposal_id: proposalId
+      });
 
-      toast.success('Application approved! Redirecting to payment...');
-
-      setTimeout(() => {
-        navigate(redirect_to);
-      }, 1500);
+      toast.success('Application added to cart! Go to Cart tab to complete payment.');
+      fetchProposals(); // Refresh proposals list
+      fetchCartPendingCount(); // Update cart count badge
     } catch (error) {
       console.error('Error accepting proposal:', error);
-      toast.error(error.response?.data?.error || 'Failed to accept application');
+      toast.error(error.response?.data?.error || 'Failed to add application to cart');
     }
   };
 
@@ -207,6 +244,14 @@ const CampaignDetails = () => {
               <p className="text-gray-600">{campaign.description}</p>
             </div>
             <div className="flex gap-2">
+              {(campaign.status === 'active' || campaign.status === 'paused') && (
+                <button
+                  onClick={() => setShowInviteModal(true)}
+                  className="px-4 py-2 bg-primary text-white rounded-xl hover:bg-primary-dark transition-colors font-medium"
+                >
+                  Invite Creators
+                </button>
+              )}
               {campaign.status === 'draft' && (
                 <button
                   onClick={() => handleStatusChange('active')}
@@ -242,10 +287,10 @@ const CampaignDetails = () => {
         </div>
 
         {/* Tabs */}
-        <div className="flex gap-2 mb-6 border-b border-gray-200">
+        <div className="flex gap-2 mb-6 border-b border-gray-200 overflow-x-auto">
           <button
             onClick={() => setActiveTab('overview')}
-            className={`px-6 py-3 font-medium transition-colors ${
+            className={`px-6 py-3 font-medium transition-colors whitespace-nowrap ${
               activeTab === 'overview'
                 ? 'border-b-2 border-primary text-primary'
                 : 'text-gray-600 hover:text-gray-900'
@@ -256,7 +301,7 @@ const CampaignDetails = () => {
           {campaign.allows_applications && (
             <button
               onClick={() => setActiveTab('applications')}
-              className={`px-6 py-3 font-medium transition-colors ${
+              className={`px-6 py-3 font-medium transition-colors whitespace-nowrap ${
                 activeTab === 'applications'
                   ? 'border-b-2 border-primary text-primary'
                   : 'text-gray-600 hover:text-gray-900'
@@ -268,7 +313,7 @@ const CampaignDetails = () => {
           {campaign.allows_packages && (
             <button
               onClick={() => setActiveTab('packages')}
-              className={`px-6 py-3 font-medium transition-colors ${
+              className={`px-6 py-3 font-medium transition-colors whitespace-nowrap ${
                 activeTab === 'packages'
                   ? 'border-b-2 border-primary text-primary'
                   : 'text-gray-600 hover:text-gray-900'
@@ -278,8 +323,42 @@ const CampaignDetails = () => {
             </button>
           )}
           <button
+            onClick={() => setActiveTab('performance')}
+            className={`px-6 py-3 font-medium transition-colors whitespace-nowrap ${
+              activeTab === 'performance'
+                ? 'border-b-2 border-primary text-primary'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            Performance
+          </button>
+          <button
+            onClick={() => setActiveTab('chat')}
+            className={`px-6 py-3 font-medium transition-colors whitespace-nowrap ${
+              activeTab === 'chat'
+                ? 'border-b-2 border-primary text-primary'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            Chat
+          </button>
+          <button
+            onClick={() => setActiveTab('cart')}
+            className={`px-6 py-3 font-medium transition-colors whitespace-nowrap ${
+              activeTab === 'cart'
+                ? 'border-b-2 border-primary text-primary'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            Cart {cartPendingCount > 0 && (
+              <span className="ml-2 px-2 py-0.5 bg-primary text-white rounded-full text-xs">
+                {cartPendingCount}
+              </span>
+            )}
+          </button>
+          <button
             onClick={() => setActiveTab('audience')}
-            className={`px-6 py-3 font-medium transition-colors ${
+            className={`px-6 py-3 font-medium transition-colors whitespace-nowrap ${
               activeTab === 'audience'
                 ? 'border-b-2 border-primary text-primary'
                 : 'text-gray-600 hover:text-gray-900'
@@ -548,9 +627,12 @@ const CampaignDetails = () => {
                         </button>
                         <button
                           onClick={() => handleAcceptProposal(proposal.id)}
-                          className="px-4 py-2 bg-green-600 text-white rounded-xl hover:bg-green-700 transition-colors"
+                          className="px-4 py-2 bg-primary text-white rounded-xl hover:bg-primary-dark transition-colors flex items-center gap-2"
                         >
-                          Accept & Pay
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                          </svg>
+                          Add to Cart
                         </button>
                       </div>
                     )}
@@ -611,26 +693,65 @@ const CampaignDetails = () => {
                 </Link>
               </div>
             ) : (
-              <div className="grid md:grid-cols-2 gap-4">
+              <div className="grid md:grid-cols-2 gap-6">
                 {packages.map((pkg) => (
-                  <div
+                  <CreatorPackageCard
                     key={pkg.id}
-                    className="border border-gray-200 rounded-xl p-4 hover:border-primary transition-colors"
-                  >
-                    <h3 className="font-semibold text-gray-900 mb-2">{pkg.title}</h3>
-                    <p className="text-gray-600 text-sm mb-3">{pkg.description}</p>
-                    <div className="flex justify-between items-center">
-                      <span className="text-xl font-bold text-primary">
-                        {/* CRITICAL: NO toFixed() */}
-                        ${pkg.price}
-                      </span>
-                      <span className="text-sm text-gray-500">{pkg.creator?.stage_name}</span>
-                    </div>
-                  </div>
+                    package={pkg}
+                    onRemove={null} // Can add remove functionality later if needed
+                  />
                 ))}
               </div>
             )}
           </div>
+        )}
+
+        {/* Performance Tab */}
+        {activeTab === 'performance' && (
+          <div>
+            <CampaignPerformanceTab campaignId={campaign.id} />
+          </div>
+        )}
+
+        {/* Chat Tab */}
+        {activeTab === 'chat' && (
+          <div className="grid lg:grid-cols-3 gap-6 h-[700px]">
+            {/* Chat List Panel */}
+            <div className="lg:col-span-1">
+              <CampaignChatPanel
+                campaign={campaign}
+                userType={currentUser?.user_type}
+                onChatSelect={setSelectedChat}
+                selectedChatId={selectedChat?.id}
+              />
+            </div>
+
+            {/* Chat Window */}
+            <div className="lg:col-span-2">
+              <CampaignChatWindow
+                chat={selectedChat}
+                currentUserId={currentUser?.id}
+                onChatUpdate={() => {
+                  // Refresh chat list when chat is updated
+                  setSelectedChat({ ...selectedChat });
+                }}
+                onClose={() => setSelectedChat(null)}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Cart Tab */}
+        {activeTab === 'cart' && (
+          <CampaignCart
+            campaignId={campaign.id}
+            onPaymentComplete={() => {
+              fetchCampaignDetails();
+              fetchCartPendingCount();
+              setActiveTab('overview');
+              toast.success('Payment completed! Collaborations created.');
+            }}
+          />
         )}
 
         {/* Audience Demographics Tab */}
@@ -683,6 +804,30 @@ const CampaignDetails = () => {
           </div>
         </div>
       )}
+
+      {/* Invite Creators Modal */}
+      <InviteCreatorsModal
+        isOpen={showInviteModal}
+        onClose={() => setShowInviteModal(false)}
+        campaign={campaign}
+      />
+
+      {/* Payment Modal */}
+      <CampaignPaymentModal
+        isOpen={showPaymentModal}
+        onClose={() => {
+          setShowPaymentModal(false);
+          setSelectedCollaborations([]);
+        }}
+        campaign={campaign}
+        selectedCollaborations={selectedCollaborations}
+        onPaymentSuccess={() => {
+          setShowPaymentModal(false);
+          setSelectedCollaborations([]);
+          fetchCampaignDetails();
+          toast.success('Payment processed successfully!');
+        }}
+      />
     </div>
   );
 };

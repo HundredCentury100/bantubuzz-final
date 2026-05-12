@@ -6,13 +6,14 @@ import { useAuth } from '../hooks/useAuth';
 import { bookingsAPI } from '../services/api';
 import api from '../services/api';
 import Navbar from '../components/Navbar';
+import SmilePayPaymentModal from '../components/SmilePayPaymentModal';
 
 const CartCheckout = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { cartItems, clearCart, getCartTotal } = useCart();
 
-  const [paymentMethod, setPaymentMethod] = useState('wallet');
+  const [paymentMethod, setPaymentMethod] = useState('smilepay');
   const [proofFile, setProofFile] = useState(null);
 
   // Wallet state
@@ -21,17 +22,17 @@ const CartCheckout = () => {
 
   // Cart checkout state
   const [checkoutLoading, setCheckoutLoading] = useState(false);
-  const [checkoutData, setCheckoutData] = useState(null); // { booking_ids, redirect_url, poll_url, payment_reference, total }
+  const [checkoutData, setCheckoutData] = useState(null); // { booking_ids, payment_reference, total }
   const [checkoutError, setCheckoutError] = useState(null);
-
-  // Status checking
-  const [checkingStatus, setCheckingStatus] = useState(false);
 
   // Bank transfer upload
   const [uploading, setUploading] = useState(false);
 
   // Payment success
   const [paymentComplete, setPaymentComplete] = useState(false);
+
+  // SmilePay modal
+  const [showSmilePayModal, setShowSmilePayModal] = useState(false);
 
   // Fetch wallet balance on mount
   useEffect(() => {
@@ -89,58 +90,6 @@ const CartCheckout = () => {
     setProofFile(file);
   };
 
-  // Initialize cart checkout — creates all bookings + one Paynow payment
-  const initializeCartCheckout = async () => {
-    setCheckoutLoading(true);
-    setCheckoutError(null);
-    try {
-      const packageIds = cartItems.map((item) => item.package_id);
-      const response = await bookingsAPI.cartCheckout(packageIds);
-      const data = response.data;
-      setCheckoutData(data);
-      // Clear cart immediately — bookings are now created
-      clearCart();
-      toast.success('Cart processed! Complete payment below.');
-    } catch (error) {
-      const msg = error.response?.data?.error || 'Failed to initialize checkout. Please try again.';
-      setCheckoutError(msg);
-      toast.error(msg);
-    } finally {
-      setCheckoutLoading(false);
-    }
-  };
-
-  // Proceed to Paynow redirect
-  const handleProceedToPaynow = () => {
-    if (!checkoutData?.redirect_url) {
-      toast.error('Payment URL not available. Please try again.');
-      return;
-    }
-    window.location.href = checkoutData.redirect_url;
-  };
-
-  // Check Paynow payment status
-  const handleCheckPaymentStatus = async () => {
-    if (!checkoutData?.booking_ids || !checkoutData?.poll_url) {
-      toast.error('No payment session found. Please start checkout again.');
-      return;
-    }
-    setCheckingStatus(true);
-    try {
-      const response = await bookingsAPI.cartPaymentStatus(checkoutData.booking_ids, checkoutData.poll_url);
-      if (response.data.paid) {
-        toast.success('Payment confirmed! Your bookings are active.');
-        setPaymentComplete(true);
-      } else {
-        toast.info(`Payment status: ${response.data.status || 'pending'}. Please complete payment on Paynow.`);
-      }
-    } catch (error) {
-      toast.error(error.response?.data?.error || 'Failed to check payment status.');
-    } finally {
-      setCheckingStatus(false);
-    }
-  };
-
   // Bank transfer: create bookings + upload POP
   const handleBankTransfer = async () => {
     if (!proofFile) {
@@ -157,15 +106,20 @@ const CartCheckout = () => {
         // Call bank transfer endpoint to create bookings with bank_transfer payment_method
         const checkoutResponse = await bookingsAPI.cartBankTransfer(packageIds);
         const data = checkoutResponse.data;
-        clearCart();
 
         // Now upload POP
         const popFormData = new FormData();
         popFormData.append('file', proofFile);
         await bookingsAPI.cartUploadPop(data.booking_ids, popFormData);
 
-        toast.success('Proof of payment uploaded. Awaiting admin verification (1–2 business days).');
-        navigate('/brand/bookings');
+        // Clear cart only after successful upload
+        clearCart();
+        toast.success('Proof of payment uploaded successfully! Awaiting admin verification (1–2 business days).');
+
+        // Wait 2 seconds to show success message before redirecting
+        setTimeout(() => {
+          navigate('/brand/bookings');
+        }, 2000);
       } catch (error) {
         toast.error(error.response?.data?.error || 'Failed to process payment. Please try again.');
       } finally {
@@ -180,8 +134,15 @@ const CartCheckout = () => {
       const formData = new FormData();
       formData.append('file', proofFile);
       await bookingsAPI.cartUploadPop(checkoutData.booking_ids, formData);
-      toast.success('Proof of payment uploaded. Awaiting admin verification (1–2 business days).');
-      navigate('/brand/bookings');
+
+      // Clear cart after successful upload
+      clearCart();
+      toast.success('Proof of payment uploaded successfully! Awaiting admin verification (1–2 business days).');
+
+      // Wait 2 seconds to show success message before redirecting
+      setTimeout(() => {
+        navigate('/brand/bookings');
+      }, 2000);
     } catch (error) {
       toast.error(error.response?.data?.error || 'Failed to upload proof of payment.');
     } finally {
@@ -203,8 +164,9 @@ const CartCheckout = () => {
       const response = await bookingsAPI.cartPayWithWallet(packageIds);
 
       if (response.data.success) {
-        toast.success('Payment completed successfully using wallet!');
+        // Clear cart only after successful payment
         clearCart();
+        toast.success('Payment completed successfully! Your bookings have been confirmed.');
         setPaymentComplete(true);
       }
     } catch (error) {
@@ -213,6 +175,12 @@ const CartCheckout = () => {
     } finally {
       setCheckoutLoading(false);
     }
+  };
+
+  const handleSmilePaySuccess = (transaction) => {
+    clearCart();
+    toast.success('Payment completed successfully! Your bookings have been confirmed.');
+    setPaymentComplete(true);
   };
 
   const isSubmitting = checkoutLoading || uploading;
@@ -369,23 +337,26 @@ const CartCheckout = () => {
                     </label>
                   )}
 
-                  {/* Paynow */}
+                  {/* SmilePay */}
                   <label
                     className="flex items-start p-4 border-2 rounded-2xl cursor-pointer transition-colors"
-                    style={{ borderColor: paymentMethod === 'paynow' ? '#c8ff09' : '#e5e7eb' }}
+                    style={{ borderColor: paymentMethod === 'smilepay' ? '#c8ff09' : '#e5e7eb' }}
                   >
                     <input
                       type="radio"
                       name="paymentMethod"
-                      value="paynow"
-                      checked={paymentMethod === 'paynow'}
+                      value="smilepay"
+                      checked={paymentMethod === 'smilepay'}
                       onChange={(e) => setPaymentMethod(e.target.value)}
                       className="mt-1"
                     />
                     <div className="ml-3">
-                      <p className="font-semibold text-dark">Paynow</p>
+                      <div className="flex items-center gap-2">
+                        <p className="font-semibold text-dark">Smile&Pay</p>
+                        <span className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full">Recommended</span>
+                      </div>
                       <p className="text-sm text-gray-500 mt-0.5">
-                        Pay instantly using <strong>EcoCash</strong>, <strong>Innbucks</strong>, <strong>OneMoney</strong>, <strong>Omari</strong>, <strong>Visa</strong>, or <strong>Mastercard</strong> via Paynow
+                        Pay with <strong>Ecocash</strong>, <strong>Innbucks</strong>, <strong>SmileCash</strong>, <strong>Omari</strong>, <strong>Visa</strong>, or <strong>Mastercard</strong>
                       </p>
                     </div>
                   </label>
@@ -466,78 +437,17 @@ const CartCheckout = () => {
                   </div>
                 )}
 
-                {/* --- Paynow flow: two-step --- */}
-                {paymentMethod === 'paynow' && (
-                  <>
-                    {/* Step 1: Not yet initialized */}
-                    {!checkoutData && (
-                      <button
-                        onClick={initializeCartCheckout}
-                        disabled={isSubmitting}
-                        className="w-full bg-primary text-dark font-bold py-4 rounded-2xl hover:bg-primary/90 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 text-lg"
-                      >
-                        {checkoutLoading ? (
-                          <>
-                            <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-dark"></div>
-                            Preparing payment...
-                          </>
-                        ) : (
-                          <>
-                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
-                            </svg>
-                            Pay {formatCurrency(totalAmount)} with Paynow
-                          </>
-                        )}
-                      </button>
-                    )}
-
-                    {/* Step 2: Initialized — show redirect button + check status */}
-                    {checkoutData && (
-                      <div className="space-y-3">
-                        <button
-                          onClick={handleProceedToPaynow}
-                          className="w-full bg-primary text-dark font-bold py-4 rounded-2xl hover:bg-primary/90 transition flex items-center justify-center gap-2 text-lg"
-                        >
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                          </svg>
-                          Proceed to Paynow Payment
-                        </button>
-
-                        <p className="text-xs text-gray-500 text-center">
-                          You'll be redirected to Paynow to complete payment securely
-                        </p>
-
-                        <div className="text-center pt-2">
-                          <p className="text-sm text-gray-600 mb-2">Already completed payment on Paynow?</p>
-                          <button
-                            onClick={handleCheckPaymentStatus}
-                            disabled={checkingStatus}
-                            className="text-primary hover:text-primary/80 font-medium flex items-center gap-2 mx-auto"
-                          >
-                            {checkingStatus ? (
-                              <>
-                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
-                                Checking...
-                              </>
-                            ) : (
-                              <>
-                                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                                </svg>
-                                Check Payment Status
-                              </>
-                            )}
-                          </button>
-                        </div>
-                      </div>
-                    )}
-
-                    <p className="text-xs text-gray-500 mt-3 text-center">
-                      You'll be redirected to Paynow to complete payment securely
-                    </p>
-                  </>
+                {/* --- SmilePay flow --- */}
+                {paymentMethod === 'smilepay' && (
+                  <button
+                    onClick={() => setShowSmilePayModal(true)}
+                    className="w-full bg-primary text-dark font-bold py-4 rounded-2xl hover:bg-primary/90 transition flex items-center justify-center gap-2 text-lg"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                    </svg>
+                    Pay {formatCurrency(totalAmount)} with Smile&Pay
+                  </button>
                 )}
 
                 {/* --- Wallet flow --- */}
@@ -605,6 +515,21 @@ const CartCheckout = () => {
           </div>
         </div>
       </div>
+
+      {/* SmilePay Payment Modal */}
+      <SmilePayPaymentModal
+        isOpen={showSmilePayModal}
+        onClose={() => setShowSmilePayModal(false)}
+        amount={totalAmount}
+        currency="USD"
+        paymentType="cart_checkout"
+        paymentId={checkoutData?.booking_ids?.join(',') || 'cart'}
+        itemName="Cart Checkout"
+        itemDescription={`${packageCount} package${packageCount !== 1 ? 's' : ''}`}
+        onSuccess={handleSmilePaySuccess}
+        returnUrl={`${window.location.origin}/brand/bookings`}
+        resultUrl={`${window.location.origin}/api/payments/smilepay/webhook/callback`}
+      />
     </div>
   );
 };

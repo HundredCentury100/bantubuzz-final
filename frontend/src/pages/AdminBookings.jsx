@@ -6,13 +6,19 @@ import StatusBadge from '../components/admin/StatusBadge';
 
 export default function AdminBookings() {
   const [bookings, setBookings] = useState([]);
+  const [deposits, setDeposits] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all');
+  const [activeView, setActiveView] = useState('bookings'); // 'bookings' or 'deposits'
   const [error, setError] = useState('');
 
   useEffect(() => {
-    fetchBookings();
-  }, [filter]);
+    if (activeView === 'bookings') {
+      fetchBookings();
+    } else {
+      fetchDeposits();
+    }
+  }, [filter, activeView]);
 
   const fetchBookings = async () => {
     try {
@@ -21,6 +27,19 @@ export default function AdminBookings() {
       setBookings(response.data.bookings || []);
     } catch (err) {
       setError(err.response?.data?.error || 'Failed to load bookings');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchDeposits = async () => {
+    try {
+      setLoading(true);
+      const params = filter !== 'all' ? { status: filter } : {};
+      const response = await api.get('/admin/deposits', { params });
+      setDeposits(response.data.deposits || []);
+    } catch (err) {
+      setError(err.response?.data?.error || 'Failed to load deposits');
     } finally {
       setLoading(false);
     }
@@ -85,6 +104,35 @@ export default function AdminBookings() {
     }
   };
 
+  const handleVerifyDeposit = async (depositId) => {
+    if (!window.confirm('Are you sure you want to verify this wallet deposit? This will credit the brand wallet immediately.')) {
+      return;
+    }
+
+    try {
+      await api.post(`/admin/deposits/${depositId}/verify`, { notes: 'Verified by admin' });
+      toast.success('Deposit verified and wallet credited successfully!');
+      fetchDeposits();
+    } catch (error) {
+      toast.error(error.response?.data?.error || 'Failed to verify deposit');
+    }
+  };
+
+  const handleRejectDeposit = async (depositId) => {
+    const reason = window.prompt('Please provide a reason for rejecting this deposit:');
+    if (!reason || !reason.trim()) {
+      return;
+    }
+
+    try {
+      await api.post(`/admin/deposits/${depositId}/reject`, { reason });
+      toast.success('Deposit rejected successfully');
+      fetchDeposits();
+    } catch (error) {
+      toast.error(error.response?.data?.error || 'Failed to reject deposit');
+    }
+  };
+
   const getPaymentStatusBadge = (paymentStatus) => {
     const statusConfig = {
       'pending': { bg: 'bg-yellow-100', text: 'text-yellow-800', label: 'Pending' },
@@ -115,8 +163,38 @@ export default function AdminBookings() {
     <AdminLayout>
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 leading-tight">Booking Management</h1>
-          <p className="text-gray-600 leading-relaxed mt-2">Monitor all package bookings</p>
+          <h1 className="text-3xl font-bold text-gray-900 leading-tight">
+            {activeView === 'bookings' ? 'Booking Management' : 'Wallet Deposit Verification'}
+          </h1>
+          <p className="text-gray-600 leading-relaxed mt-2">
+            {activeView === 'bookings' ? 'Monitor all package bookings' : 'Verify brand wallet deposits and bank transfers'}
+          </p>
+        </div>
+
+        {/* View Toggle */}
+        <div className="bg-white rounded-lg shadow-md p-4">
+          <div className="flex gap-2">
+            <button
+              onClick={() => setActiveView('bookings')}
+              className={`px-6 py-2 rounded-lg font-medium transition ${
+                activeView === 'bookings'
+                  ? 'bg-primary text-dark'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              Package Bookings
+            </button>
+            <button
+              onClick={() => setActiveView('deposits')}
+              className={`px-6 py-2 rounded-lg font-medium transition ${
+                activeView === 'deposits'
+                  ? 'bg-primary text-dark'
+                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+              }`}
+            >
+              Wallet Deposits
+            </button>
+          </div>
         </div>
 
       {error && (
@@ -127,48 +205,65 @@ export default function AdminBookings() {
 
       <div className="bg-white rounded-lg shadow-md p-4">
         <div className="flex gap-2">
-          {['all', 'pending', 'confirmed', 'in_progress', 'completed', 'cancelled'].map((tab) => (
-            <button
-              key={tab}
-              onClick={() => setFilter(tab)}
-              className={`px-4 py-2 rounded-lg capitalize transition ${
-                filter === tab
-                  ? 'bg-primary text-dark'
-                  : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-              }`}
-            >
-              {tab.replace('_', ' ')}
-            </button>
-          ))}
+          {activeView === 'bookings' ? (
+            ['all', 'pending', 'confirmed', 'in_progress', 'completed', 'cancelled'].map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setFilter(tab)}
+                className={`px-4 py-2 rounded-lg capitalize transition ${
+                  filter === tab
+                    ? 'bg-primary text-dark'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                {tab.replace('_', ' ')}
+              </button>
+            ))
+          ) : (
+            ['all', 'pending', 'confirmed', 'failed'].map((tab) => (
+              <button
+                key={tab}
+                onClick={() => setFilter(tab)}
+                className={`px-4 py-2 rounded-lg capitalize transition ${
+                  filter === tab
+                    ? 'bg-primary text-dark'
+                    : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                }`}
+              >
+                {tab}
+              </button>
+            ))
+          )}
         </div>
       </div>
 
       <div className="bg-white rounded-lg shadow-md overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ID</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Package</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Brand</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Creator</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Payment Method</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Payment Status</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Created</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {bookings.length === 0 ? (
+          {activeView === 'bookings' ? (
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
                 <tr>
-                  <td colSpan="11" className="px-6 py-8 text-center text-gray-500">
-                    No bookings found
-                  </td>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">ID</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Package</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Brand</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Creator</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Payment Method</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Payment Status</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Created</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
                 </tr>
-              ) : (
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {bookings.length === 0 ? (
+                  <tr>
+                    <td colSpan="11" className="px-6 py-8 text-center text-gray-500">
+                      No bookings found
+                    </td>
+                  </tr>
+                ) : (
                 bookings.map((booking) => (
                   <tr key={booking.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 text-sm font-medium text-gray-900">#{booking.id}</td>
@@ -258,6 +353,75 @@ export default function AdminBookings() {
               )}
             </tbody>
           </table>
+          ) : (
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Reference</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Brand</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Payment Method</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {deposits.length === 0 ? (
+                  <tr>
+                    <td colSpan="7" className="px-6 py-8 text-center text-gray-500">
+                      No deposits found
+                    </td>
+                  </tr>
+                ) : (
+                  deposits.map((deposit) => (
+                    <tr key={deposit.id} className="hover:bg-gray-50">
+                      <td className="px-6 py-4 text-sm font-medium text-gray-900">{deposit.deposit_reference}</td>
+                      <td className="px-6 py-4 text-sm text-gray-600">{deposit.user?.email || 'N/A'}</td>
+                      <td className="px-6 py-4 text-sm font-semibold text-gray-900">{formatCurrency(deposit.amount)}</td>
+                      <td className="px-6 py-4">
+                        <span className="inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                          {deposit.payment_method === 'bank_transfer' ? 'Bank Transfer' : 'Paynow'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        {getPaymentStatusBadge(deposit.status)}
+                      </td>
+                      <td className="px-6 py-4 text-sm text-gray-600">{formatDate(deposit.requested_at)}</td>
+                      <td className="px-6 py-4 text-sm">
+                        {deposit.proof_of_payment && (
+                          <a
+                            href={`https://bantubuzz.com/${deposit.proof_of_payment}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-600 hover:text-blue-800 font-medium mr-3"
+                          >
+                            View Proof
+                          </a>
+                        )}
+                        {deposit.status === 'pending' && (
+                          <div className="flex gap-2 mt-2">
+                            <button
+                              onClick={() => handleVerifyDeposit(deposit.id)}
+                              className="px-3 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 transition"
+                            >
+                              Verify
+                            </button>
+                            <button
+                              onClick={() => handleRejectDeposit(deposit.id)}
+                              className="px-3 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700 transition"
+                            >
+                              Reject
+                            </button>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
 

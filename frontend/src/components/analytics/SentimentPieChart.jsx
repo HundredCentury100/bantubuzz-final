@@ -3,10 +3,10 @@ import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recha
 const SentimentPieChart = ({ sentiment }) => {
   // Prepare data for pie chart
   const data = [
-    { name: 'Positive', value: sentiment.positive, color: '#10b981' },
-    { name: 'Neutral', value: sentiment.neutral, color: '#6b7280' },
-    { name: 'Negative', value: sentiment.negative, color: '#f59e0b' },
-    { name: 'Critical', value: sentiment.critical, color: '#ef4444' }
+    { name: 'Positive', value: sentiment.positive, color: '#C4D82E' }, // Bright lime green
+    { name: 'Neutral', value: sentiment.neutral, color: '#D4B95A' }, // Golden yellow
+    { name: 'Negative', value: sentiment.negative, color: '#E89A6B' }, // Coral
+    { name: 'Critical', value: sentiment.critical, color: '#8FA632' } // Medium olive
   ].filter(item => item.value > 0); // Only show non-zero values
 
   // If no sentiment data, show message

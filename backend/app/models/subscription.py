@@ -73,6 +73,88 @@ class Subscription(db.Model):
         delta = self.next_payment_date - datetime.utcnow()
         return max(0, delta.days)
 
+    def get_restriction(self, key: str):
+        """
+        Get a specific restriction value from the plan
+
+        Args:
+            key: The restriction key (e.g., 'max_active_collaborations')
+
+        Returns:
+            The restriction value, or None if not found
+        """
+        if not self.plan:
+            return None
+
+        # Map of restriction keys to plan attributes
+        if self.plan.user_type == 'creator':
+            restrictions = {
+                'max_active_collaborations': self.plan.max_active_collaborations,
+                'max_proposals_per_month': self.plan.max_bookings_per_month,
+                'max_packages': self.plan.max_packages,
+                'max_bookings_per_month': self.plan.max_bookings_per_month,
+                'max_portfolio_items': self.plan.max_portfolio_items,
+                'commission_percentage': self.plan.commission_percentage,
+                'can_message_brands_first': self.plan.can_message_brands_first,
+                'search_placement_priority': self.plan.search_placement_priority,
+                'has_verified_badge': self.plan.has_verified_badge,
+                'can_access_briefs': self.plan.can_access_briefs,
+                'can_access_campaigns': self.plan.can_access_campaigns,
+                'can_create_custom_packages': self.plan.can_create_custom_packages,
+            }
+        else:  # brand
+            restrictions = {
+                'max_active_campaigns': self.plan.max_active_campaigns,
+                'max_active_collaborations': self.plan.max_active_collaborations,
+                'max_team_members': self.plan.max_team_members,
+                'max_creator_lists': self.plan.max_creator_lists,
+                'max_client_workspaces': self.plan.max_client_workspaces,
+                'service_fee_percentage': self.plan.service_fee_percentage,
+            }
+
+        return restrictions.get(key)
+
+    def is_feature_available(self, feature: str) -> bool:
+        """
+        Check if a feature is available on this plan
+
+        Args:
+            feature: The feature name (e.g., 'analytics', 'priority_support')
+
+        Returns:
+            True if feature is available, False otherwise
+        """
+        if not self.plan:
+            return False
+
+        # Map of feature names to plan attributes
+        feature_map = {
+            'analytics': self.plan.analytics_access,
+            'advanced_analytics': self.plan.has_advanced_analytics,
+            'priority_support': self.plan.priority_support,
+            'api_access': self.plan.has_api_access or self.plan.api_access,
+            'custom_branding': self.plan.has_custom_branding,
+            'dedicated_support': self.plan.has_dedicated_support,
+            'priority_listing': self.plan.has_priority_listing,
+            'verified_badge': self.plan.has_verified_badge if self.plan.user_type == 'creator' else False,
+            'message_brands_first': self.plan.can_message_brands_first if self.plan.user_type == 'creator' else False,
+            'access_briefs': self.plan.can_access_briefs if self.plan.user_type == 'creator' else False,
+            'access_campaigns': self.plan.can_access_campaigns if self.plan.user_type == 'creator' else False,
+            'custom_packages': self.plan.can_create_custom_packages if self.plan.user_type == 'creator' else False,
+        }
+
+        return feature_map.get(feature, False)
+
+    def get_commission_rate(self) -> float:
+        """Get the commission/service fee percentage for this subscription"""
+        if not self.plan:
+            return 15.0  # Default fallback
+
+        if self.plan.user_type == 'creator':
+            return float(self.plan.commission_percentage) if self.plan.commission_percentage else 15.0
+        else:  # brand
+            return float(self.plan.service_fee_percentage) if self.plan.service_fee_percentage else 12.0
+
     def to_dict(self):
         return {
             'id': self.id,

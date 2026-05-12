@@ -45,15 +45,15 @@ class CreatorAnalyticsService:
                     'last_updated': datetime.utcnow().isoformat()
                 }
 
-            # Login to ThunziAI with creator's credentials (password = email)
-            login_success = thunzi_service.login(
-                email=thunzi_account.thunzi_email,
-                password=thunzi_account.thunzi_email
+            # Ensure authenticated with ThunziAI (handles both verified and unverified accounts)
+            # Uses ensure_user_registered which works for API key-registered users
+            user_registered = thunzi_service.ensure_user_registered(
+                email=thunzi_account.thunzi_email
             )
 
-            if not login_success:
+            if not user_registered:
                 current_app.logger.error(
-                    f"Failed to login to ThunziAI for creator {creator_user_id}"
+                    f"Failed to authenticate with ThunziAI for creator {creator_user_id}"
                 )
                 return {
                     'success': False,
@@ -62,12 +62,13 @@ class CreatorAnalyticsService:
                     'error': 'Failed to authenticate with ThunziAI'
                 }
 
-            # Use NEW endpoint that returns pre-calculated analytics
+            # Get platforms from company (more reliable than creator-specific endpoint)
+            # This returns all platforms under the creator's ThunziAI company
             # Note: We're NOT syncing here because it's too slow (takes 2+ minutes for 4 platforms)
             # ThunziAI syncs platforms on their own schedule
             # This is much more efficient than manually calculating from posts
-            thunzi_platforms = thunzi_service.get_creator_platforms(
-                thunzi_account.bantubuzz_id
+            thunzi_platforms = thunzi_service.get_platforms(
+                thunzi_account.thunzi_company_id
             )
 
             if not thunzi_platforms:

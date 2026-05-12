@@ -42,6 +42,21 @@ def create_campaign():
         if not brand:
             return jsonify({'error': 'Brand profile not found'}), 404
 
+        # ENFORCE: Check if brand can create more campaigns this month
+        from app.services.subscription_enforcement_service import SubscriptionEnforcementService
+
+        can_proceed, error_msg, usage = SubscriptionEnforcementService.can_create_campaign(user_id)
+
+        if not can_proceed:
+            return jsonify({
+                'error': error_msg,
+                'current_usage': usage,
+                'upgrade_required': True,
+                'upgrade_prompt': SubscriptionEnforcementService.get_upgrade_prompt(
+                    user_id, 'brand', 'campaigns_per_month'
+                )
+            }), 403
+
         data = request.get_json()
 
         # Validate participation mode
@@ -850,23 +865,152 @@ def complete_package_payment(campaign_id, package_id):
         return jsonify({'error': str(e)}), 500
 
 
-@bp.route('/<int:campaign_id>/packages', methods=['GET'])
+@bp.route('/<int:campaign_id>/available-packages', methods=['GET'])
 @jwt_required()
-def get_campaign_packages(campaign_id):
-    """Get packages added to campaign"""
+def get_available_packages_for_campaign(campaign_id):
+    """
+    Get all available packages that can be added to campaign with enhanced creator details
+    Perfect for package browsing/selection UI with creator stats
+    """
     try:
         campaign = Campaign.query.get(campaign_id)
         if not campaign:
             return jsonify({'error': 'Campaign not found'}), 404
 
-        packages = [p.to_dict() for p in campaign.packages]
+        # Get all active packages
+        query = Package.query.filter_by(is_active=True)
+
+        # Filter by category if campaign has target categories
+        if campaign.target_categories and len(campaign.target_categories) > 0:
+            # Get creators in matching categories
+            creators_in_category = CreatorProfile.query.filter(
+                CreatorProfile.categories.overlap(campaign.target_categories)
+            ).all()
+            creator_ids = [c.id for c in creators_in_category]
+            query = query.filter(Package.creator_id.in_(creator_ids))
+
+        packages = query.all()
+
+        # Build enhanced package data with creator stats
+        enhanced_packages = []
+
+        for package in packages:
+            package_data = package.to_dict()
+
+            # Get creator with enhanced stats
+            creator = package.creator
+            if creator:
+                # Get total followers from connected platforms
+                total_followers = creator.get_total_followers()
+
+                # Get platform breakdown
+                platform_stats = creator.get_platform_stats()
+
+                # Calculate average engagement rate
+                avg_engagement = creator.get_average_engagement_rate()
+
+                # Enhanced creator data
+                package_data['creator'] = {
+                    'id': creator.id,
+                    'user_id': creator.user_id,
+                    'username': creator.username,
+                    'display_name': creator.username or 'Creator',
+                    'profile_picture': creator.profile_picture,
+                    'profile_picture_sizes': creator.profile_picture_sizes or {},
+                    'bio': creator.bio,
+                    'total_followers': total_followers,
+                    'engagement_rate': avg_engagement,
+                    'verified': creator.is_verified,
+                    'is_featured': creator.is_featured,
+                    'location': creator.location,
+                    'city': creator.city,
+                    'country': creator.country,
+                    'categories': creator.categories or [],
+                    'platforms': platform_stats,  # Detailed platform breakdown
+                    'badges': creator.get_badges()
+                }
+
+            enhanced_packages.append(package_data)
 
         return jsonify({
-            'packages': packages
+            'packages': enhanced_packages,
+            'count': len(enhanced_packages)
+        }), 200
+
+    except Exception as e:
+        print(f"Error fetching available packages: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@bp.route('/<int:campaign_id>/packages', methods=['GET'])
+@jwt_required()
+def get_campaign_packages(campaign_id):
+    """
+    Get packages added to campaign with enhanced creator details
+    Includes: follower counts, engagement rates, profile picture, bio
+    """
+    try:
+        campaign = Campaign.query.get(campaign_id)
+        if not campaign:
+            return jsonify({'error': 'Campaign not found'}), 404
+
+        # Build enhanced package data with creator stats
+        enhanced_packages = []
+
+        for package in campaign.packages:
+            package_data = package.to_dict()
+
+            # Get creator profile with stats
+            creator = package.creator
+            if creator:
+                # Calculate engagement rate (if metrics available)
+                engagement_rate = 0.0
+                avg_views = 0
+
+                if creator.total_posts and creator.total_posts > 0:
+                    total_engagement = (creator.total_likes or 0) + (creator.total_comments or 0)
+                    if creator.follower_count and creator.follower_count > 0:
+                        engagement_rate = (total_engagement / creator.total_posts) / creator.follower_count * 100
+
+                # Get average views per post
+                if creator.total_posts and creator.total_posts > 0 and creator.total_views:
+                    avg_views = int(creator.total_views / creator.total_posts)
+
+                # Enhanced creator data
+                package_data['creator'] = {
+                    'id': creator.id,
+                    'user_id': creator.user_id,
+                    'display_name': creator.display_name,
+                    'profile_picture': creator.profile_picture,
+                    'bio': creator.bio,
+                    'follower_count': creator.follower_count or 0,
+                    'following_count': creator.following_count or 0,
+                    'total_posts': creator.total_posts or 0,
+                    'total_likes': creator.total_likes or 0,
+                    'total_comments': creator.total_comments or 0,
+                    'total_views': creator.total_views or 0,
+                    'avg_views': avg_views,
+                    'engagement_rate': round(engagement_rate, 2),
+                    'category': creator.category,
+                    'location': creator.location,
+                    'verified': getattr(creator, 'verified', False),
+                    'rating': round(creator.average_rating, 1) if creator.average_rating else 0.0,
+                    'total_reviews': creator.total_reviews or 0,
+                }
+
+            enhanced_packages.append(package_data)
+
+        return jsonify({
+            'packages': enhanced_packages,
+            'count': len(enhanced_packages)
         }), 200
 
     except Exception as e:
         print(f"Error fetching campaign packages: {str(e)}")
+        import traceback
+        traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
 
@@ -906,8 +1050,42 @@ def remove_package_from_campaign(campaign_id, package_id):
 
 
 # ========================================
-# ANALYTICS ENDPOINTS - Audience Demographics
+# ANALYTICS ENDPOINTS - Performance & Audience
 # ========================================
+
+@bp.route('/<int:campaign_id>/performance', methods=['GET'])
+@jwt_required()
+def get_campaign_performance(campaign_id):
+    """
+    Get campaign performance analytics
+    Returns: Overview metrics, creator performance, platform breakdown, timeline
+    """
+    try:
+        user_id = int(get_jwt_identity())
+        brand = BrandProfile.query.filter_by(user_id=user_id).first()
+
+        if not brand:
+            return jsonify({'error': 'Brand profile not found'}), 404
+
+        campaign = Campaign.query.get(campaign_id)
+        if not campaign or campaign.brand_id != brand.id:
+            return jsonify({'error': 'Campaign not found or unauthorized'}), 404
+
+        # Get performance analytics
+        from app.services.campaign_analytics_service import campaign_analytics_service
+        performance = campaign_analytics_service.get_campaign_performance(campaign_id)
+
+        if not performance:
+            return jsonify({'error': 'Campaign not found'}), 404
+
+        return jsonify(performance), 200
+
+    except Exception as e:
+        print(f"Error getting campaign performance: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
 
 @bp.route('/<int:campaign_id>/audience', methods=['GET'])
 @jwt_required()

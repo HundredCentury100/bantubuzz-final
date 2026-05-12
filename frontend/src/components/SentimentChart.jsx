@@ -48,9 +48,9 @@ const SentimentChart = ({
       {
         data: [positiveCount, neutralCount, negativeCount],
         backgroundColor: [
-          '#ccdb53', // primary (positive)
-          '#9ca3af', // gray-400 (neutral)
-          '#ef4444', // red-500 (negative)
+          '#C4D82E', // Bright lime green (positive)
+          '#D4B95A', // Golden yellow (neutral)
+          '#E89A6B', // Coral/peach (negative - softer than red)
         ],
         borderWidth: 0,
         hoverOffset: 4,
@@ -70,7 +70,7 @@ const SentimentChart = ({
         padding: 12,
         titleColor: '#ffffff',
         bodyColor: '#ffffff',
-        borderColor: '#ccdb53',
+        borderColor: '#C4D82E',
         borderWidth: 1,
         callbacks: {
           label: (context) => {

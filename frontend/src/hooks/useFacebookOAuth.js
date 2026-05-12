@@ -7,7 +7,8 @@ import { toast } from 'react-hot-toast';
 import api from '../services/api';
 
 const FACEBOOK_APP_ID = '1863571634283956';
-const FACEBOOK_CONFIG_ID = '1404830888084532'; // Updated config ID
+const FACEBOOK_BUSINESS_CONFIG_ID = '1404830888084532'; // For creators WITH business portfolio
+const FACEBOOK_PERSONAL_CONFIG_ID = '1501393338364917'; // For creators WITHOUT business portfolio
 
 export const useFacebookOAuth = () => {
   const [isSDKLoaded, setIsSDKLoaded] = useState(false);
@@ -66,11 +67,18 @@ export const useFacebookOAuth = () => {
     try {
       console.log('Exchanging authorization code for access token');
 
+      // Get account type from session storage
+      const accountType = sessionStorage.getItem('facebook_account_type') || 'business';
+
+      // Use the SAME redirect URI for both flows
+      const redirectPath = '/creator/platforms';
+
       // Exchange code for access token via backend
-      const redirect_uri = window.location.origin + '/creator/platforms';
+      const redirect_uri = window.location.origin + redirectPath;
       const tokenResponse = await api.post('/creator/platforms/facebook/exchange-code', {
         code: code,
-        redirect_uri: redirect_uri
+        redirect_uri: redirect_uri,
+        accountType: accountType
       });
 
       const accessToken = tokenResponse.data.accessToken;
@@ -142,7 +150,7 @@ export const useFacebookOAuth = () => {
     }
   };
 
-  const connectFacebookPage = async (onSuccess) => {
+  const connectFacebookPage = async (onSuccess, accountType = 'business') => {
     if (!isSDKLoaded) {
       toast.error('Facebook SDK is still loading...');
       return;
@@ -151,12 +159,22 @@ export const useFacebookOAuth = () => {
     setIsConnecting(true);
 
     try {
-      // Facebook Login for Business with config_id requires manual redirect flow
-      // when using System User Access Tokens (response_type=code)
+      // Facebook Login supports TWO flows:
+      // 1. Business Login (config_id: 1404830888084532) - for creators WITH business portfolio
+      // 2. Personal Login (config_id: 1501393338364917) - for creators WITHOUT business portfolio
+
+      const configId = accountType === 'personal' ? FACEBOOK_PERSONAL_CONFIG_ID : FACEBOOK_BUSINESS_CONFIG_ID;
+
+      // Use the SAME redirect URI for both flows (must be whitelisted in Facebook App)
+      const redirectPath = '/creator/platforms';
 
       // Build the OAuth dialog URL manually
-      const redirectUri = encodeURIComponent(window.location.origin + '/creator/platforms');
-      const state = encodeURIComponent(JSON.stringify({ action: 'facebook_connect', timestamp: Date.now() }));
+      const redirectUri = encodeURIComponent(window.location.origin + redirectPath);
+      const state = encodeURIComponent(JSON.stringify({
+        action: 'facebook_connect',
+        accountType: accountType,
+        timestamp: Date.now()
+      }));
 
       // Required scopes - MUST match ALL permissions in the Facebook configuration
       const scope = 'business_management,email,instagram_basic,instagram_manage_insights,pages_manage_ads,pages_manage_metadata,pages_messaging,pages_read_engagement,pages_read_user_content,pages_show_list,read_insights';
@@ -164,16 +182,17 @@ export const useFacebookOAuth = () => {
       const oauthUrl = `https://www.facebook.com/v19.0/dialog/oauth?` +
         `client_id=${FACEBOOK_APP_ID}` +
         `&redirect_uri=${redirectUri}` +
-        `&config_id=${FACEBOOK_CONFIG_ID}` +
+        `&config_id=${configId}` +
         `&response_type=code` +
         `&scope=${scope}` +
         `&state=${state}`;
 
-      console.log('Redirecting to Facebook OAuth:', oauthUrl);
+      console.log(`Redirecting to Facebook OAuth (${accountType}):`, oauthUrl);
 
-      // Store callback for after redirect
+      // Store callback and account type for after redirect
       if (onSuccess) {
         sessionStorage.setItem('facebook_connect_callback', 'true');
+        sessionStorage.setItem('facebook_account_type', accountType);
       }
 
       // Redirect to Facebook OAuth

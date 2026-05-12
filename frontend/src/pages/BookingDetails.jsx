@@ -109,9 +109,6 @@ const BookingDetails = () => {
   }
 
   const isCreator = user?.user_type === 'creator';
-  const canAccept = isCreator && booking.status === 'pending';
-  const canDecline = isCreator && booking.status === 'pending';
-  const canComplete = isCreator && booking.status === 'accepted';
   const canPay = !isCreator && booking.status === 'pending' && booking.payment_status === 'pending';
 
   return (
@@ -270,52 +267,17 @@ const BookingDetails = () => {
             </div>
 
             {/* Actions */}
-            {(canAccept || canDecline || canComplete || canPay) && (
+            {canPay && (
               <div className="bg-white rounded-xl shadow-sm p-6">
                 <h2 className="text-lg font-bold text-gray-900 mb-4">Actions</h2>
                 <div className="space-y-3">
-                  {canAccept && (
-                    <button
-                      onClick={() => handleStatusUpdate('accepted')}
-                      disabled={updating}
-                      className="w-full btn btn-primary flex items-center justify-center"
-                    >
-                      <CheckCircleIcon className="h-5 w-5 mr-2" />
-                      Accept Booking
-                    </button>
-                  )}
-
-                  {canDecline && (
-                    <button
-                      onClick={() => handleStatusUpdate('declined')}
-                      disabled={updating}
-                      className="w-full btn btn-outline flex items-center justify-center"
-                    >
-                      <XCircleIcon className="h-5 w-5 mr-2" />
-                      Decline Booking
-                    </button>
-                  )}
-
-                  {canComplete && (
-                    <button
-                      onClick={() => handleStatusUpdate('completed')}
-                      disabled={updating}
-                      className="w-full btn btn-primary flex items-center justify-center"
-                    >
-                      <CheckCircleIcon className="h-5 w-5 mr-2" />
-                      Mark as Completed
-                    </button>
-                  )}
-
-                  {canPay && (
-                    <Link
-                      to={`/bookings/${booking.id}/payment`}
-                      className="w-full btn btn-primary flex items-center justify-center"
-                    >
-                      <CurrencyDollarIcon className="h-5 w-5 mr-2" />
-                      Proceed to Payment
-                    </Link>
-                  )}
+                  <Link
+                    to={`/bookings/${booking.id}/payment`}
+                    className="w-full btn btn-primary flex items-center justify-center"
+                  >
+                    <CurrencyDollarIcon className="h-5 w-5 mr-2" />
+                    Proceed to Payment
+                  </Link>
                 </div>
               </div>
             )}

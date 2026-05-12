@@ -58,7 +58,10 @@ export const CartProvider = ({ children }) => {
   };
 
   const getCartTotal = () => {
-    return cartItems.reduce((total, item) => total + (item.price || 0), 0);
+    return cartItems.reduce((total, item) => {
+      const price = parseFloat(item.price);
+      return total + (isNaN(price) ? 0 : price);
+    }, 0);
   };
 
   const getCartCount = () => {

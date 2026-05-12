@@ -1,6 +1,8 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './hooks/useAuth';
 import ScrollToTop from './components/ScrollToTop';
+import { SubscriptionProvider } from './contexts/SubscriptionContext';
+import SubscriptionWrapper from './components/SubscriptionWrapper';
 
 // Pages
 import Home from './pages/Home';
@@ -72,7 +74,6 @@ import AdminSubscriptions from './pages/admin/Subscriptions';
 import RaiseDispute from './pages/RaiseDispute';
 import DisputeStatus from './pages/DisputeStatus';
 import AdminCashouts from './pages/admin/Cashouts';
-import AdminDeposits from './pages/admin/Deposits';
 import AdminFeaturedCreators from './pages/admin/FeaturedCreators';
 import AdminCategories from './pages/admin/Categories';
 import AdminCollaborations from './pages/AdminCollaborations';
@@ -113,6 +114,7 @@ import MyTickets from './pages/MyTickets';
 import TicketDetail from './pages/TicketDetail';
 import AdminSupport from './pages/AdminSupport';
 import AdminSupportTicketDetail from './pages/AdminSupportTicketDetail';
+import SystemLogs from './pages/admin/SystemLogs';
 
 // Protected Route Component
 const ProtectedRoute = ({ children, requiredType }) => {
@@ -159,10 +161,14 @@ const PublicRoute = ({ children }) => {
 
 // Admin Route Component
 const AdminRoute = ({ children }) => {
+  const { location } = window;
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const token = localStorage.getItem('token');
 
   if (!token || !user.is_admin) {
+    // Save the intended URL for redirect after login
+    const returnUrl = location.pathname + location.search;
+    localStorage.setItem('adminReturnUrl', returnUrl);
     return <Navigate to="/admin/login" replace />;
   }
 
@@ -171,9 +177,10 @@ const AdminRoute = ({ children }) => {
 
 function App() {
   return (
-    <>
-      <ScrollToTop />
-      <Routes>
+    <SubscriptionProvider>
+      <SubscriptionWrapper>
+        <ScrollToTop />
+        <Routes>
       {/* Public Routes */}
       <Route path="/" element={<Home />} />
       <Route path="/creators" element={<Creators />} />
@@ -746,14 +753,6 @@ function App() {
         }
       />
       <Route
-        path="/admin/deposits"
-        element={
-          <AdminRoute>
-            <AdminDeposits />
-          </AdminRoute>
-        }
-      />
-      <Route
         path="/admin/featured"
         element={
           <AdminRoute>
@@ -833,6 +832,14 @@ function App() {
           </AdminRoute>
         }
       />
+      <Route
+        path="/admin/logs"
+        element={
+          <AdminRoute>
+            <SystemLogs />
+          </AdminRoute>
+        }
+      />
       <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
 
       {/* Public Info Pages */}
@@ -896,7 +903,8 @@ function App() {
       {/* 404 */}
       <Route path="*" element={<NotFound />} />
     </Routes>
-    </>
+      </SubscriptionWrapper>
+    </SubscriptionProvider>
   );
 }
 

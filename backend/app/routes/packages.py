@@ -179,26 +179,20 @@ def create_package():
         if not creator:
             return jsonify({'error': 'Creator profile not found'}), 404
 
-        # Check subscription limits
-        subscription = Subscription.query.filter_by(
-            user_id=user_id,
-            status='active'
-        ).first()
+        # ENFORCE: Check if creator can create more packages
+        from app.services.subscription_enforcement_service import SubscriptionEnforcementService
 
-        if subscription and subscription.plan:
-            # Get current package count for this creator
-            current_packages = Package.query.filter_by(creator_id=creator.id).count()
-            max_packages = subscription.plan.max_packages
+        can_proceed, error_msg, usage = SubscriptionEnforcementService.can_create_package(user_id)
 
-            # Check if user has reached their package limit (-1 means unlimited)
-            if max_packages != -1 and current_packages >= max_packages:
-                return jsonify({
-                    'error': f'Package limit reached. Your {subscription.plan.name} plan allows {max_packages} packages.',
-                    'limit_reached': True,
-                    'current_count': current_packages,
-                    'max_allowed': max_packages,
-                    'upgrade_required': True
-                }), 403
+        if not can_proceed:
+            return jsonify({
+                'error': error_msg,
+                'current_usage': usage,
+                'upgrade_required': True,
+                'upgrade_prompt': SubscriptionEnforcementService.get_upgrade_prompt(
+                    user_id, 'creator', 'packages'
+                )
+            }), 403
 
         data = request.get_json()
         required_fields = ['title', 'description', 'price', 'duration_days']

@@ -238,6 +238,16 @@ def submit_draft_deliverable(collab_id):
 
         db.session.commit()
 
+        # Send email notification to brand asynchronously
+        try:
+            from app.tasks.email_tasks import send_deliverable_submission_notification
+            send_deliverable_submission_notification.delay(
+                collaboration_id=collaboration.id,
+                deliverable_description=data['title']
+            )
+        except Exception as email_error:
+            print(f"Failed to queue deliverable submission notification: {str(email_error)}")
+
         # Emit Socket.IO update
         emit_collaboration_update(collaboration.id)
 
@@ -428,6 +438,16 @@ def approve_deliverable(collab_id, deliverable_id):
         print(f"[APPROVE_DELIVERABLE] Committing to database...")
         db.session.commit()
         print(f"[APPROVE_DELIVERABLE] Database commit successful")
+
+        # Send email notification to creator asynchronously
+        try:
+            from app.tasks.email_tasks import send_deliverable_approval_notification
+            send_deliverable_approval_notification.delay(
+                collaboration_id=collaboration.id,
+                deliverable_description=deliverable_to_approve.title
+            )
+        except Exception as email_error:
+            print(f"Failed to queue deliverable approval notification: {str(email_error)}")
 
         # Verify the state after commit
         print(f"[APPROVE_DELIVERABLE] Final state - Drafts: {len(collaboration.draft_deliverables or [])}, Submitted: {len(collaboration.submitted_deliverables or [])}, Progress: {collaboration.progress_percentage}%")
@@ -1215,41 +1235,61 @@ def request_cancellation(collab_id):
         return jsonify({'error': str(e)}), 500
 
 
-@bp.route('/<int:collab_id>/cancel', methods=['PATCH'])
+@bp.route('/<int:collab_id>/cancel', methods=['POST'])
 @jwt_required()
 def cancel_collaboration(collab_id):
-    """Cancel collaboration (creator only, or support admin)"""
+    """
+    Creator cancels collaboration (with rating penalty)
+    Brands cannot directly cancel - they must use cancel-request endpoint
+    """
     try:
         user_id = int(get_jwt_identity())
         user = User.query.get(user_id)
+
+        if not user or user.user_type != 'creator':
+            return jsonify({'error': 'Only creators can cancel collaborations directly'}), 403
+
+        creator = CreatorProfile.query.filter_by(user_id=user_id).first()
+        if not creator:
+            return jsonify({'error': 'Creator profile not found'}), 404
 
         collaboration = Collaboration.query.get(collab_id)
         if not collaboration:
             return jsonify({'error': 'Collaboration not found'}), 404
 
-        data = request.get_json()
-        cancellation_reason = data.get('reason', 'No reason provided')
-
-        # Only creators can directly cancel, brands must use cancel-request endpoint
-        if user.user_type == 'brand':
-            return jsonify({
-                'error': 'Brands cannot directly cancel collaborations. Please use the cancellation request endpoint.'
-            }), 403
-
-        # Check authorization for creator
-        creator = CreatorProfile.query.filter_by(user_id=user_id).first()
+        # Verify creator owns this collaboration
         if collaboration.creator_id != creator.id:
             return jsonify({'error': 'Unauthorized'}), 403
 
+        # Check if already cancelled or completed
+        if collaboration.status in ['cancelled', 'completed']:
+            return jsonify({'error': f'Cannot cancel {collaboration.status} collaboration'}), 400
+
+        data = request.get_json()
+        reason = data.get('reason', '').strip()
+
+        if not reason or len(reason) < 10:
+            return jsonify({'error': 'Cancellation reason required (min 10 characters)'}), 400
+
+        # Update collaboration
+        collaboration.cancelled_by_creator = True
+        collaboration.cancellation_reason = reason
+        collaboration.cancelled_at = datetime.utcnow()
         collaboration.status = 'cancelled'
-        collaboration.notes = f"{collaboration.notes or ''}\n\nCancelled by creator: {cancellation_reason}"
         collaboration.updated_at = datetime.utcnow()
+
+        # Apply rating penalty
+        current_penalty = creator.rating_penalty or 0.0
+        new_penalty = min(0.50, current_penalty + 0.10)  # Max -0.50 stars
+        creator.rating_penalty = new_penalty
+        creator.cancelled_collaborations_count = (creator.cancelled_collaborations_count or 0) + 1
 
         db.session.commit()
 
-        # Notify brand about cancellation
+        # Send email to brand
         brand_user = User.query.get(collaboration.brand.user_id)
         if brand_user:
+            # Send in-app notification
             notify_collaboration_status(
                 user_id=brand_user.id,
                 status='cancelled',
@@ -1258,13 +1298,31 @@ def cancel_collaboration(collab_id):
                 user_type='brand'
             )
 
+            # Send email
+            try:
+                from app.services.email_service import EmailService
+                EmailService.send_collaboration_cancelled_email(
+                    brand_email=brand_user.email,
+                    brand_name=collaboration.brand.company_name,
+                    creator_name=creator.username,
+                    collaboration_title=collaboration.title,
+                    cancellation_reason=reason
+                )
+            except Exception as email_error:
+                print(f"Failed to send collaboration cancelled email: {email_error}")
+
         return jsonify({
-            'message': 'Collaboration cancelled',
-            'collaboration': collaboration.to_dict()
+            'success': True,
+            'message': 'Collaboration cancelled. Rating penalty applied.',
+            'collaboration': collaboration.to_dict(),
+            'rating_penalty': float(new_penalty),
+            'total_cancellations': creator.cancelled_collaborations_count
         }), 200
 
     except Exception as e:
         db.session.rollback()
+        import traceback
+        print(f"Error cancelling collaboration: {traceback.format_exc()}")
         return jsonify({'error': str(e)}), 500
 
 
@@ -2116,6 +2174,21 @@ def accept_collaboration(collab_id):
 
         if not user or user.user_type != 'creator':
             return jsonify({'error': 'Unauthorized: Creator access only'}), 403
+
+        # ENFORCE: Check if creator can accept more collaborations
+        from app.services.subscription_enforcement_service import SubscriptionEnforcementService
+
+        can_proceed, error_msg, usage = SubscriptionEnforcementService.can_accept_collaboration(user_id)
+
+        if not can_proceed:
+            return jsonify({
+                'error': error_msg,
+                'current_usage': usage,
+                'upgrade_required': True,
+                'upgrade_prompt': SubscriptionEnforcementService.get_upgrade_prompt(
+                    user_id, 'creator', 'active_collaborations'
+                )
+            }), 403
 
         from app.services import collaboration_response_service
         collaboration = collaboration_response_service.creator_accept_collaboration(

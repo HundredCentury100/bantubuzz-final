@@ -4,6 +4,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { briefsAPI, proposalsAPI } from '../services/api';
 import { useAuth } from '../hooks/useAuth';
 import toast from 'react-hot-toast';
+import { useSubscription } from '../contexts/SubscriptionContext';
 import {
   DollarSign,
   Calendar,
@@ -24,6 +25,7 @@ const BriefDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { handle403Error } = useSubscription();
   const [brief, setBrief] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -206,6 +208,13 @@ const BriefDetails = () => {
       navigate('/creator/proposals');
     } catch (err) {
       console.error('Error submitting proposal:', err);
+
+      // Handle subscription limit errors
+      if (handle403Error(err)) {
+        // Upgrade modal shown automatically
+        return;
+      }
+
       const errorMsg = err.response?.data?.error || 'Failed to submit proposal';
       setError(errorMsg);
       toast.error(errorMsg);

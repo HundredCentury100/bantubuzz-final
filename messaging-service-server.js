@@ -4,6 +4,7 @@ const socketIO = require('socket.io');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
 const { Pool } = require('pg');
+const axios = require('axios');
 require('dotenv').config();
 
 const app = express();
@@ -61,6 +62,7 @@ const verifyToken = (token) => {
 
 // Store active socket connections
 const activeUsers = new Map(); // userId -> socketId
+const campaignChatRooms = new Map(); // chatId -> Set of socketIds
 
 // Socket.IO connection handling
 io.on('connection', (socket) => {
@@ -192,6 +194,27 @@ io.on('connection', (socket) => {
         io.to(receiverSocketId).emit('new_message', messageData);
       }
 
+      // Trigger email notification via Celery (Flask backend)
+      try {
+        const flaskBackendUrl = process.env.FLASK_BACKEND_URL || 'http://localhost:8002';
+
+        await axios.post(`${flaskBackendUrl}/api/internal/trigger-email-notification`, {
+          recipient_user_id: receiverId,
+          sender_name: message.sender_name || 'A user',
+          message_preview: content
+        }, {
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Internal-Service': process.env.INTERNAL_SERVICE_SECRET || 'messaging-service-secret'
+          },
+          timeout: 2000 // 2 second timeout
+        });
+        console.log(`📧 Email notification queued for user ${receiverId}`);
+      } catch (emailError) {
+        console.error(`❌ Failed to queue email notification: ${emailError.message}`);
+        // Don't fail the message sending if email fails
+      }
+
       console.log(`Message ${messageId} sent from ${socket.userId} to ${receiverId}`);
     } catch (error) {
       console.error('Error in send_message:', error);
@@ -231,6 +254,216 @@ io.on('connection', (socket) => {
     }
   });
 
+  // ==================== Campaign Chat Handlers ====================
+
+  // Join a campaign chat room
+  socket.on('join_campaign_chat', async (data) => {
+    try {
+      const { chatId } = data;
+
+      if (!socket.userId) {
+        socket.emit('error', { message: 'Not authenticated' });
+        return;
+      }
+
+      // Verify user is a participant in this chat
+      const participantQuery = `
+        SELECT * FROM campaign_chat_participants
+        WHERE chat_id = $1 AND user_id = $2 AND left_at IS NULL
+      `;
+      const participantResult = await pool.query(participantQuery, [chatId, socket.userId]);
+
+      if (participantResult.rows.length === 0) {
+        socket.emit('error', { message: 'Not authorized to join this chat' });
+        return;
+      }
+
+      // Join the Socket.IO room
+      const roomName = `campaign_chat_${chatId}`;
+      socket.join(roomName);
+
+      // Track in campaign chat rooms map
+      if (!campaignChatRooms.has(chatId)) {
+        campaignChatRooms.set(chatId, new Set());
+      }
+      campaignChatRooms.get(chatId).add(socket.id);
+
+      socket.emit('joined_campaign_chat', { chatId, roomName });
+      console.log(`User ${socket.userId} joined campaign chat ${chatId}`);
+
+      // Notify other participants
+      socket.to(roomName).emit('user_joined_chat', {
+        userId: socket.userId,
+        chatId
+      });
+    } catch (error) {
+      console.error('Error joining campaign chat:', error);
+      socket.emit('error', { message: 'Failed to join chat' });
+    }
+  });
+
+  // Leave a campaign chat room
+  socket.on('leave_campaign_chat', (data) => {
+    const { chatId } = data;
+    const roomName = `campaign_chat_${chatId}`;
+
+    socket.leave(roomName);
+
+    // Remove from tracking
+    if (campaignChatRooms.has(chatId)) {
+      campaignChatRooms.get(chatId).delete(socket.id);
+      if (campaignChatRooms.get(chatId).size === 0) {
+        campaignChatRooms.delete(chatId);
+      }
+    }
+
+    socket.emit('left_campaign_chat', { chatId });
+    console.log(`User ${socket.userId} left campaign chat ${chatId}`);
+  });
+
+  // Send message in campaign chat
+  socket.on('send_campaign_message', async (data) => {
+    try {
+      const { chatId, content, messageType = 'text', attachments = [] } = data;
+
+      if (!socket.userId) {
+        socket.emit('error', { message: 'Not authenticated' });
+        return;
+      }
+
+      // Verify user is a participant
+      const participantQuery = `
+        SELECT ccp.*, u.user_type
+        FROM campaign_chat_participants ccp
+        JOIN users u ON u.id = ccp.user_id
+        WHERE ccp.chat_id = $1 AND ccp.user_id = $2 AND ccp.left_at IS NULL
+      `;
+      const participantResult = await pool.query(participantQuery, [chatId, socket.userId]);
+
+      if (participantResult.rows.length === 0) {
+        socket.emit('error', { message: 'Not authorized to send messages in this chat' });
+        return;
+      }
+
+      const senderType = participantResult.rows[0].user_type;
+
+      // Insert message into database
+      const insertQuery = `
+        INSERT INTO campaign_chat_messages
+        (chat_id, sender_id, sender_type, message_type, content, attachments, created_at)
+        VALUES ($1, $2, $3, $4, $5, $6, NOW())
+        RETURNING id, created_at
+      `;
+
+      const insertResult = await pool.query(insertQuery, [
+        chatId,
+        socket.userId,
+        senderType,
+        messageType,
+        content,
+        JSON.stringify(attachments)
+      ]);
+
+      const messageId = insertResult.rows[0].id;
+      const createdAt = insertResult.rows[0].created_at;
+
+      // Update chat's last_message_at and last_message_preview
+      const updateChatQuery = `
+        UPDATE campaign_chats
+        SET last_message_at = NOW(),
+            last_message_preview = $1,
+            updated_at = NOW()
+        WHERE id = $2
+      `;
+      await pool.query(updateChatQuery, [content.substring(0, 100), chatId]);
+
+      // Get sender details
+      const senderQuery = `
+        SELECT u.email, u.user_type,
+               CASE
+                 WHEN u.user_type = 'brand' THEN bp.company_name
+                 WHEN u.user_type = 'creator' THEN cp.display_name
+                 ELSE NULL
+               END as sender_name,
+               CASE
+                 WHEN u.user_type = 'brand' THEN bp.logo
+                 WHEN u.user_type = 'creator' THEN cp.profile_picture
+                 ELSE NULL
+               END as sender_picture
+        FROM users u
+        LEFT JOIN brand_profiles bp ON bp.user_id = u.id AND u.user_type = 'brand'
+        LEFT JOIN creator_profiles cp ON cp.user_id = u.id AND u.user_type = 'creator'
+        WHERE u.id = $1
+      `;
+      const senderResult = await pool.query(senderQuery, [socket.userId]);
+      const sender = senderResult.rows[0];
+
+      const messageData = {
+        id: messageId,
+        chat_id: chatId,
+        sender_id: socket.userId,
+        sender_type: senderType,
+        sender_name: sender.sender_name || sender.email,
+        sender_picture: sender.sender_picture,
+        message_type: messageType,
+        content: content,
+        attachments: attachments,
+        created_at: createdAt,
+        is_edited: false,
+        is_deleted: false
+      };
+
+      // Broadcast to all users in the campaign chat room
+      const roomName = `campaign_chat_${chatId}`;
+      io.to(roomName).emit('campaign_message', messageData);
+
+      // Send confirmation to sender
+      socket.emit('campaign_message_sent', messageData);
+
+      console.log(`Message ${messageId} sent in campaign chat ${chatId} by user ${socket.userId}`);
+    } catch (error) {
+      console.error('Error sending campaign message:', error);
+      socket.emit('error', { message: 'Failed to send message' });
+    }
+  });
+
+  // Mark campaign chat as read
+  socket.on('mark_campaign_chat_read', async (data) => {
+    try {
+      const { chatId } = data;
+
+      if (!socket.userId) {
+        return;
+      }
+
+      // Update participant's last_read_at
+      const updateQuery = `
+        UPDATE campaign_chat_participants
+        SET last_read_at = NOW()
+        WHERE chat_id = $1 AND user_id = $2
+      `;
+
+      await pool.query(updateQuery, [chatId, socket.userId]);
+
+      socket.emit('campaign_chat_marked_read', { chatId });
+    } catch (error) {
+      console.error('Error marking campaign chat as read:', error);
+    }
+  });
+
+  // Typing indicator for campaign chat
+  socket.on('campaign_chat_typing', (data) => {
+    const { chatId, isTyping } = data;
+    const roomName = `campaign_chat_${chatId}`;
+
+    // Broadcast to others in the chat (not to sender)
+    socket.to(roomName).emit('campaign_chat_user_typing', {
+      userId: socket.userId,
+      chatId,
+      isTyping
+    });
+  });
+
   // Handle real-time notifications
   socket.on('send_notification', (notification) => {
     const { userId, title, message, type, link } = notification;
@@ -260,6 +493,17 @@ io.on('connection', (socket) => {
 
       console.log(`User ${socket.userId} disconnected`);
     }
+
+    // Clean up campaign chat room tracking
+    campaignChatRooms.forEach((sockets, chatId) => {
+      if (sockets.has(socket.id)) {
+        sockets.delete(socket.id);
+        if (sockets.size === 0) {
+          campaignChatRooms.delete(chatId);
+        }
+      }
+    });
+
     console.log('Client disconnected:', socket.id);
   });
 });
@@ -447,12 +691,143 @@ app.post('/api/internal/broadcast-message', async (req, res) => {
   }
 });
 
+// Get campaign chat messages
+app.get('/api/campaign-chats/:chatId/messages', async (req, res) => {
+  try {
+    const token = req.headers.authorization?.split(' ')[1];
+    const decoded = verifyToken(token);
+
+    if (!decoded) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const currentUserId = decoded.sub;
+    const chatId = req.params.chatId;
+    const limit = parseInt(req.query.limit) || 50;
+    const offset = parseInt(req.query.offset) || 0;
+
+    // Verify user is a participant
+    const participantCheck = await pool.query(
+      'SELECT * FROM campaign_chat_participants WHERE chat_id = $1 AND user_id = $2 AND left_at IS NULL',
+      [chatId, currentUserId]
+    );
+
+    if (participantCheck.rows.length === 0) {
+      return res.status(403).json({ error: 'Not authorized to view this chat' });
+    }
+
+    // Get messages
+    const query = `
+      SELECT m.*,
+             u.email as sender_email,
+             u.user_type as sender_type,
+             CASE
+               WHEN u.user_type = 'brand' THEN bp.company_name
+               WHEN u.user_type = 'creator' THEN cp.display_name
+               ELSE NULL
+             END as sender_name,
+             CASE
+               WHEN u.user_type = 'brand' THEN bp.logo
+               WHEN u.user_type = 'creator' THEN cp.profile_picture
+               ELSE NULL
+             END as sender_picture
+      FROM campaign_chat_messages m
+      JOIN users u ON m.sender_id = u.id
+      LEFT JOIN brand_profiles bp ON bp.user_id = u.id AND u.user_type = 'brand'
+      LEFT JOIN creator_profiles cp ON cp.user_id = u.id AND u.user_type = 'creator'
+      WHERE m.chat_id = $1 AND m.is_deleted = false
+      ORDER BY m.created_at DESC
+      LIMIT $2 OFFSET $3
+    `;
+
+    const result = await pool.query(query, [chatId, limit, offset]);
+    const messages = result.rows;
+
+    const formattedMessages = messages.map(m => ({
+      id: m.id,
+      chat_id: m.chat_id,
+      sender_id: m.sender_id,
+      sender_type: m.sender_type,
+      sender_name: m.sender_name || m.sender_email,
+      sender_picture: m.sender_picture,
+      message_type: m.message_type,
+      content: m.content,
+      attachments: typeof m.attachments === 'string' ? JSON.parse(m.attachments) : m.attachments,
+      created_at: m.created_at,
+      edited_at: m.edited_at,
+      is_edited: !!m.edited_at,
+      is_deleted: m.is_deleted
+    }));
+
+    res.json({ messages: formattedMessages.reverse() }); // Reverse for chronological order
+  } catch (error) {
+    console.error('Error fetching campaign chat messages:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Get campaign chat participants
+app.get('/api/campaign-chats/:chatId/participants', async (req, res) => {
+  try {
+    const token = req.headers.authorization?.split(' ')[1];
+    const decoded = verifyToken(token);
+
+    if (!decoded) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const currentUserId = decoded.sub;
+    const chatId = req.params.chatId;
+
+    // Verify user is a participant
+    const participantCheck = await pool.query(
+      'SELECT * FROM campaign_chat_participants WHERE chat_id = $1 AND user_id = $2 AND left_at IS NULL',
+      [chatId, currentUserId]
+    );
+
+    if (participantCheck.rows.length === 0) {
+      return res.status(403).json({ error: 'Not authorized to view this chat' });
+    }
+
+    // Get all participants
+    const query = `
+      SELECT ccp.*,
+             u.email,
+             u.user_type,
+             CASE
+               WHEN u.user_type = 'brand' THEN bp.company_name
+               WHEN u.user_type = 'creator' THEN cp.display_name
+               ELSE NULL
+             END as display_name,
+             CASE
+               WHEN u.user_type = 'brand' THEN bp.logo
+               WHEN u.user_type = 'creator' THEN cp.profile_picture
+               ELSE NULL
+             END as profile_picture
+      FROM campaign_chat_participants ccp
+      JOIN users u ON u.id = ccp.user_id
+      LEFT JOIN brand_profiles bp ON bp.user_id = u.id AND u.user_type = 'brand'
+      LEFT JOIN creator_profiles cp ON cp.user_id = u.id AND u.user_type = 'creator'
+      WHERE ccp.chat_id = $1 AND ccp.left_at IS NULL
+      ORDER BY ccp.joined_at ASC
+    `;
+
+    const result = await pool.query(query, [chatId]);
+
+    res.json({ participants: result.rows });
+  } catch (error) {
+    console.error('Error fetching campaign chat participants:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.json({
     status: 'ok',
     service: 'messaging-service',
-    activeUsers: activeUsers.size
+    activeUsers: activeUsers.size,
+    activeCampaignChats: campaignChatRooms.size
   });
 });
 

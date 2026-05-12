@@ -32,6 +32,11 @@ const CollaborationDetails = () => {
   const [requestingRevision, setRequestingRevision] = useState(false);
   const [approvingDeliverable, setApprovingDeliverable] = useState(null); // Track which deliverable is being approved
 
+  // Cancel collaboration state (creator only)
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [cancelReason, setCancelReason] = useState('');
+  const [cancelling, setCancelling] = useState(false);
+
   const { socket } = useMessaging();
   const [editingDeliverable, setEditingDeliverable] = useState(null);
   
@@ -267,18 +272,31 @@ const CollaborationDetails = () => {
         toast.error(errorMessage);
       }
     } else {
-      // Creators can cancel directly
-      const reason = window.prompt('Please provide a reason for cancellation:');
-      if (!reason) return;
+      // Creators: show cancel modal
+      setShowCancelModal(true);
+    }
+  };
 
-      try {
-        await collaborationsAPI.cancelCollaboration(id, reason);
-        toast.success('Collaboration cancelled');
-        fetchCollaboration();
-      } catch (error) {
-        console.error('Error cancelling collaboration:', error);
-        toast.error('Failed to cancel collaboration');
-      }
+  const handleConfirmCancel = async () => {
+    if (!cancelReason.trim() || cancelReason.trim().length < 10) {
+      toast.error('Please provide a detailed reason (minimum 10 characters)');
+      return;
+    }
+
+    try {
+      setCancelling(true);
+      const response = await collaborationsAPI.cancelCollaboration(id, cancelReason.trim());
+
+      toast.success('Collaboration cancelled. Rating penalty has been applied.');
+      setShowCancelModal(false);
+      setCancelReason('');
+      fetchCollaboration();
+    } catch (error) {
+      console.error('Error cancelling collaboration:', error);
+      const errorMessage = error.response?.data?.error || 'Failed to cancel collaboration';
+      toast.error(errorMessage);
+    } finally {
+      setCancelling(false);
     }
   };
 
@@ -810,17 +828,17 @@ const CollaborationDetails = () => {
               </div>
             )}
 
-            {/* Cancel Collaboration Link (Less Prominent) */}
-            {collaboration.status === 'in_progress' && isBrand && (
+            {/* Cancel Collaboration Link */}
+            {collaboration.status === 'in_progress' && (
               <div className="bg-white rounded-lg shadow p-6">
                 <button
                   onClick={handleCancel}
                   className="w-full text-sm text-gray-500 hover:text-red-600 underline transition-colors"
                 >
-                  Need Help? Request Cancellation
+                  {isBrand ? 'Need Help? Request Cancellation' : 'Cancel Collaboration'}
                 </button>
                 <p className="text-xs text-gray-400 mt-2 text-center">
-                  Reviewed by support team
+                  {isBrand ? 'Reviewed by support team' : 'Rating penalty applies'}
                 </p>
               </div>
             )}
@@ -959,6 +977,83 @@ const CollaborationDetails = () => {
                 className="px-6 py-3 border-2 border-gray-300 hover:border-gray-400 text-gray-700 font-medium rounded-lg transition-colors"
               >
                 Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Cancel Collaboration Modal (Creator Only) */}
+      {showCancelModal && !isBrand && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg max-w-md w-full p-6">
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Cancel Collaboration</h2>
+
+            {/* Warning Notice */}
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+              <div className="flex items-start gap-3">
+                <svg className="w-6 h-6 text-red-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                <div>
+                  <p className="font-semibold text-red-900 mb-1">Rating Penalty Warning</p>
+                  <p className="text-sm text-red-800">
+                    Cancelling this collaboration will apply a <span className="font-bold">-0.10 star penalty</span> to your creator rating (maximum -0.50 stars from cancellations).
+                  </p>
+                  <p className="text-xs text-red-700 mt-2">
+                    The brand will be automatically refunded ${parseFloat(collaboration.amount || 0).toFixed(2)} to their wallet.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Reason for Cancellation <span className="text-red-500">*</span>
+              </label>
+              <textarea
+                value={cancelReason}
+                onChange={(e) => setCancelReason(e.target.value)}
+                rows={5}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                placeholder="Please provide a detailed reason for cancelling this collaboration (minimum 10 characters)..."
+                disabled={cancelling}
+              />
+              <p className="text-xs text-gray-500 mt-1">
+                {cancelReason.length}/10 characters minimum
+              </p>
+            </div>
+
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
+              <p className="text-xs text-yellow-800">
+                <span className="font-semibold">Note:</span> Frequent cancellations can negatively impact your profile visibility and future collaboration opportunities. Please only cancel if absolutely necessary.
+              </p>
+            </div>
+
+            <div className="flex gap-3">
+              <button
+                onClick={() => {
+                  setShowCancelModal(false);
+                  setCancelReason('');
+                }}
+                disabled={cancelling}
+                className="flex-1 px-6 py-3 border-2 border-gray-300 hover:border-gray-400 text-gray-700 font-medium rounded-lg transition-colors disabled:opacity-50"
+              >
+                Keep Collaboration
+              </button>
+              <button
+                onClick={handleConfirmCancel}
+                disabled={cancelling || !cancelReason.trim() || cancelReason.trim().length < 10}
+                className="flex-1 px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {cancelling ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                    Cancelling...
+                  </span>
+                ) : (
+                  'Confirm Cancellation'
+                )}
               </button>
             </div>
           </div>

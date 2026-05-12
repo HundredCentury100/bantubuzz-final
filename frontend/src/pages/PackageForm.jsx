@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { packagesAPI } from '../services/api';
 import { PLATFORM_CONFIGS, PACKAGE_TYPES } from '../constants/platformConfig';
+import { useSubscription } from '../contexts/SubscriptionContext';
 
 const COLLABORATION_TYPES = [
   'Brand Endorsement',
@@ -23,6 +24,7 @@ const PackageForm = () => {
   const navigate = useNavigate();
   const { id } = useParams();
   const isEditMode = Boolean(id);
+  const { handle403Error } = useSubscription();
 
   const [loading, setLoading] = useState(false);
   const [deliverables, setDeliverables] = useState(['']);
@@ -114,6 +116,13 @@ const PackageForm = () => {
       navigate('/creator/packages');
     } catch (error) {
       console.error('Error saving package:', error);
+
+      // Handle subscription limit errors
+      if (handle403Error(error)) {
+        // Upgrade modal shown automatically
+        return;
+      }
+
       alert(error.response?.data?.error || 'Failed to save package');
       // Scroll to top to show error
       window.scrollTo({ top: 0, behavior: 'smooth' });

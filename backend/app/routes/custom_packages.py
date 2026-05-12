@@ -3,6 +3,7 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 from app import db
 from app.models import CustomPackageRequest, CustomPackageOffer, BrandProfile, CreatorProfile, User, Booking, Notification, Message
 from app.utils.websocket_helper import emit_message_to_websocket
+from app.services.email_service import EmailService
 from datetime import datetime, timezone
 
 bp = Blueprint('custom_packages', __name__, url_prefix='/api/custom-packages')
@@ -69,6 +70,21 @@ def create_custom_request():
             action_url=f'/messages'
         )
         db.session.add(notification)
+
+        # Send email notification to creator
+        creator_user = User.query.get(creator.user_id)
+        try:
+            EmailService.send_custom_package_request_email(
+                creator_email=creator_user.email,
+                creator_name=creator.username,
+                brand_name=brand.company_name,
+                budget=budget,
+                deliverables=expected_deliverables,
+                notes=additional_notes
+            )
+        except Exception as email_error:
+            print(f"Failed to send custom package request email: {email_error}")
+            # Continue - email failure doesn't fail the main operation
 
         # Create ONE unified message with greeting + request
         unified_content = f"Hi {creator.username}, this is {brand.company_name}. Kindly browse through my custom package request below."
@@ -146,7 +162,7 @@ def accept_offer(offer_id):
             return jsonify({'error': f'Offer is already {offer.status}'}), 400
 
         # Check if expired
-        if datetime.now(timezone.utc) > offer.expires_at:
+        if offer.expires_at and datetime.now(timezone.utc) > offer.expires_at:
             offer.status = 'expired'
             db.session.commit()
             return jsonify({'error': 'Offer has expired'}), 400
@@ -401,6 +417,22 @@ def create_custom_offer():
             action_url=f'/messages'
         )
         db.session.add(notification)
+
+        # Send email notification to brand
+        brand_user = User.query.get(brand.user_id)
+        try:
+            EmailService.send_custom_package_offer_email(
+                brand_email=brand_user.email,
+                brand_name=brand.company_name,
+                creator_name=creator.username,
+                title=title,
+                price=price,
+                deliverables=deliverables,
+                delivery_time_days=delivery_time_days
+            )
+        except Exception as email_error:
+            print(f"Failed to send custom package offer email: {email_error}")
+            # Continue - email failure doesn't fail the main operation
 
         # Create message with custom offer
         message_content = f"Custom Package Offer: {title}\n\n{description}\n\nPrice: ${price}\nDelivery Time: {delivery_time_days} days\nRevisions Allowed: {revisions_allowed}\n\nDeliverables:\n" + "\n".join([f"• {d}" for d in deliverables])

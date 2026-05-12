@@ -24,7 +24,15 @@ export default function AdminLogin() {
       localStorage.setItem('user', JSON.stringify(response.data.user));
 
       toast.success('Welcome back, Admin!');
-      navigate('/admin/dashboard');
+
+      // Check if there's a return URL and redirect there
+      const returnUrl = localStorage.getItem('adminReturnUrl');
+      if (returnUrl) {
+        localStorage.removeItem('adminReturnUrl');
+        navigate(returnUrl);
+      } else {
+        navigate('/admin/dashboard');
+      }
     } catch (error) {
       console.error('Login error:', error);
       toast.error(error.response?.data?.error || 'Invalid credentials');

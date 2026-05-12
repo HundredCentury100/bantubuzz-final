@@ -844,14 +844,17 @@ def get_creator_audience(creator_id):
             user_id=creator.user_id
         ).first()
 
-        if not thunzi_account or not thunzi_account.bantubuzz_id or not thunzi_account.thunzi_email:
+        if not thunzi_account or not thunzi_account.thunzi_email or not thunzi_account.thunzi_company_id:
             return jsonify({'error': 'Creator not connected to ThunziAI'}), 404
 
-        # Get all platforms for this creator
-        # get_creator_platforms accepts bantubuzz_id directly
-        # ThunziAI: email is the password
-        thunzi_service.login(email=thunzi_account.thunzi_email, password=thunzi_account.thunzi_email)
-        platforms = thunzi_service.get_creator_platforms(thunzi_account.bantubuzz_id)
+        # Get all platforms for this creator's company
+        # Ensure authenticated (handles both verified and unverified accounts)
+        user_registered = thunzi_service.ensure_user_registered(email=thunzi_account.thunzi_email)
+
+        if not user_registered:
+            return jsonify({'error': 'Failed to authenticate with ThunziAI'}), 500
+
+        platforms = thunzi_service.get_platforms(thunzi_account.thunzi_company_id)
 
         if not platforms:
             return jsonify({'error': 'No platforms found'}), 404
@@ -860,19 +863,47 @@ def get_creator_audience(creator_id):
         instagram_platform_ids = [p['id'] for p in platforms if p.get('isConnected') and p.get('platform') == 'instagram']
 
         if not instagram_platform_ids:
+            # Return empty data with 200 status instead of 404
+            # This allows frontend to show helpful message
             return jsonify({
-                'error': 'No audience data available',
-                'message': 'Audience demographics are currently only available for Instagram platforms. Please ensure the creator has a connected Instagram account with synced data.'
-            }), 404
+                'age': [],
+                'gender': [],
+                'countries': [],
+                'cities': [],
+                'totalPlatforms': 0,
+                'message': 'Audience demographics are currently only available for Instagram platforms with 100+ followers.'
+            }), 200
 
         # Get aggregated audience data from Instagram platforms only
         audience_data = thunzi_service.get_aggregated_audience(instagram_platform_ids)
 
-        if not audience_data:
+        if not audience_data or not any([
+            audience_data.get('age'),
+            audience_data.get('gender'),
+            audience_data.get('countries'),
+            audience_data.get('cities')
+        ]):
+            # Get follower count from connected Instagram platforms
+            instagram_followers = sum(
+                p.get('followers', 0) for p in platforms
+                if p.get('platform') == 'instagram' and p.get('isConnected')
+            )
+
+            # Return empty data with 200 status instead of 404
+            if instagram_followers < 100:
+                message = f'Instagram account connected ({instagram_followers} followers) but audience demographics require 100+ followers.'
+            else:
+                message = 'Instagram account connected with 100+ followers. Audience data will be available once synced from Instagram.'
+
             return jsonify({
-                'error': 'No audience data available',
-                'message': 'Instagram platform found but no audience data available yet. Data may need to be synced in ThunziAI.'
-            }), 404
+                'age': [],
+                'gender': [],
+                'countries': [],
+                'cities': [],
+                'totalPlatforms': len(instagram_platform_ids),
+                'followers': instagram_followers,
+                'message': message
+            }), 200
 
         return jsonify(audience_data), 200
 

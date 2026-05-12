@@ -27,6 +27,21 @@ def create_proposal():
         if not creator:
             return jsonify({'error': 'Creator profile not found'}), 404
 
+        # ENFORCE: Check if creator can send more proposals this month
+        from app.services.subscription_enforcement_service import SubscriptionEnforcementService
+
+        can_proceed, error_msg, usage = SubscriptionEnforcementService.can_send_proposal(user_id)
+
+        if not can_proceed:
+            return jsonify({
+                'error': error_msg,
+                'current_usage': usage,
+                'upgrade_required': True,
+                'upgrade_prompt': SubscriptionEnforcementService.get_upgrade_prompt(
+                    user_id, 'creator', 'proposals_per_month'
+                )
+            }), 403
+
         data = request.get_json()
 
         # Validate required fields

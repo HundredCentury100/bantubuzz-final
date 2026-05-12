@@ -118,6 +118,12 @@ export const messagingService = {
 
   // Block a user (uses main API)
   blockUser: (userId) => mainAPI.post(`/messaging/block/${userId}`),
+
+  // Check block status between users (uses main API)
+  checkBlockStatus: (userId) => mainAPI.get(`/messaging/check-block/${userId}`),
+
+  // Unblock a user (uses main API)
+  unblockUser: (userId) => mainAPI.delete(`/messaging/block/${userId}`),
 };
 
 export default messagingService;

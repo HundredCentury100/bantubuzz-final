@@ -21,6 +21,8 @@ const ConnectPlatforms = () => {
   const [accountName, setAccountName] = useState('');
   const [accessToken, setAccessToken] = useState('');
   const [youtubeAuthWindow, setYoutubeAuthWindow] = useState(null);
+  const [showFacebookAccountTypeModal, setShowFacebookAccountTypeModal] = useState(false);
+  const [facebookAccountType, setFacebookAccountType] = useState('business'); // 'business' or 'personal'
 
   // Available platforms
   const availablePlatforms = [
@@ -31,7 +33,8 @@ const ConnectPlatforms = () => {
       iconColor: 'text-pink-600',
       requiresToken: false,
       requiresOAuth: true,
-      oauthNote: 'Instagram requires OAuth authentication. You\'ll need to connect this through ThunziAI\'s dashboard first.',
+      useCustomOAuth: true,
+      oauthNote: 'Instagram requires OAuth authentication for analytics access.',
       icon: (
         <svg className="w-12 h-12" viewBox="0 0 24 24" fill="currentColor">
           <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zm0-2.163c-3.259 0-3.667.014-4.947.072-4.358.2-6.78 2.618-6.98 6.98-.059 1.281-.073 1.689-.073 4.948 0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98 1.281.058 1.689.072 4.948.072 3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98-1.281-.059-1.69-.073-4.949-.073zm0 5.838c-3.403 0-6.162 2.759-6.162 6.162s2.759 6.163 6.162 6.163 6.162-2.759 6.162-6.163c0-3.403-2.759-6.162-6.162-6.162zm0 10.162c-2.209 0-4-1.79-4-4 0-2.209 1.791-4 4-4s4 1.791 4 4c0 2.21-1.791 4-4 4zm6.406-11.845c-.796 0-1.441.645-1.441 1.44s.645 1.44 1.441 1.44c.795 0 1.439-.645 1.439-1.44s-.644-1.44-1.439-1.44z"/>
@@ -100,6 +103,29 @@ const ConnectPlatforms = () => {
       return;
     }
     fetchPlatforms();
+
+    // Check if returning from TikTok or Instagram OAuth redirect
+    const urlParams = new URLSearchParams(window.location.search);
+    const code = urlParams.get('code');
+    const state = urlParams.get('state');
+
+    if (code && state) {
+      try {
+        const stateData = JSON.parse(decodeURIComponent(state));
+
+        if (stateData.action === 'tiktok_connect') {
+          handleTikTokRedirect(code);
+          // Clean up URL
+          window.history.replaceState({}, document.title, window.location.pathname);
+        } else if (stateData.action === 'instagram_connect') {
+          handleInstagramRedirect(code);
+          // Clean up URL
+          window.history.replaceState({}, document.title, window.location.pathname);
+        }
+      } catch (error) {
+        console.error('Error parsing OAuth state:', error);
+      }
+    }
   }, [user]);
 
   const fetchPlatforms = async () => {
@@ -146,44 +172,33 @@ const ConnectPlatforms = () => {
           console.log('[ConnectPlatforms] Window origin:', window.location.origin);
           console.log('[ConnectPlatforms] Event data:', event.data);
 
-          // Security check
-          if (event.origin !== window.location.origin) {
-            console.log('[ConnectPlatforms] Origin mismatch, ignoring message');
+          // Security check - allow messages from same domain (http or https)
+          const allowedOrigins = [window.location.origin, 'https://bantubuzz.com', 'http://bantubuzz.com'];
+          if (!allowedOrigins.includes(event.origin)) {
+            console.log('[ConnectPlatforms] Origin not in allowed list, ignoring message');
             return;
           }
 
           // Handle receiving the authorization code from backend callback
           if (event.data.type === 'youtube-oauth-code') {
-            console.log('[ConnectPlatforms] Received code, exchanging for tokens...');
+            console.log('[ConnectPlatforms] Received YouTube code, connecting platform...');
             try {
-              // Exchange code for tokens using our JWT token
-              const exchangeResponse = await api.post('/creator/platforms/youtube/exchange-code', {
-                code: event.data.code
+              // WORKAROUND: ThunziAI has a bug where they try to exchange the accessToken
+              // So we send the authorization code as the accessToken and let ThunziAI exchange it
+              const connectResponse = await api.post('/creator/platforms/connect', {
+                platform: 'youtube',
+                accountName: 'YouTube Channel',  // Placeholder, ThunziAI will fetch the real name
+                accessToken: event.data.code  // Send auth code as accessToken - ThunziAI will exchange it
               });
 
-              console.log('[ConnectPlatforms] Exchange response:', exchangeResponse.data);
+              console.log('[ConnectPlatforms] YouTube connect response:', connectResponse.data);
 
-              if (exchangeResponse.data.success) {
-                // Now connect the platform with the tokens
-                // NOTE: Do NOT send accountId - ThunziAI will extract it from OAuth token or accountName
-                // This matches the Facebook implementation pattern
-                const connectResponse = await api.post('/creator/platforms/connect', {
-                  platform: 'youtube',
-                  accountName: exchangeResponse.data.channelTitle,
-                  accessToken: exchangeResponse.data.accessToken,
-                  refreshToken: exchangeResponse.data.refreshToken,
-                  tokenExpiry: new Date(Date.now() + exchangeResponse.data.expiresIn * 1000).toISOString()
-                });
-
-                console.log('[ConnectPlatforms] Connect response:', connectResponse.data);
-
-                if (connectResponse.data.success) {
-                  toast.success('YouTube connected successfully!');
-                  fetchPlatforms();
-                }
+              if (connectResponse.data.success) {
+                toast.success('YouTube connected successfully!');
+                fetchPlatforms();
               }
             } catch (error) {
-              console.error('[ConnectPlatforms] Error during exchange:', error);
+              console.error('[ConnectPlatforms] YouTube error:', error);
               toast.error(error.response?.data?.error || 'Failed to connect YouTube');
             }
             window.removeEventListener('message', handleMessage);
@@ -213,6 +228,132 @@ const ConnectPlatforms = () => {
     } catch (error) {
       console.error('YouTube OAuth error:', error);
       toast.error(error.response?.data?.error || 'Failed to initiate YouTube OAuth');
+      setConnecting(null);
+    }
+  };
+
+  // Handle TikTok OAuth redirect (called when user returns from TikTok login)
+  const handleTikTokRedirect = async (code) => {
+    setConnecting('tiktok');
+
+    try {
+      console.log('[ConnectPlatforms] Processing TikTok authorization code...');
+
+      // Send auth code to backend - ThunziAI will exchange it
+      const connectResponse = await api.post('/creator/platforms/connect', {
+        platform: 'tiktok',
+        accountName: 'TikTok Account',  // Placeholder, ThunziAI will fetch the real name
+        accessToken: code  // Send auth code as accessToken - ThunziAI will exchange it
+      });
+
+      console.log('[ConnectPlatforms] TikTok connect response:', connectResponse.data);
+
+      if (connectResponse.data.success) {
+        toast.success('TikTok connected successfully!');
+        fetchPlatforms();
+      }
+    } catch (error) {
+      console.error('[ConnectPlatforms] TikTok error:', error);
+      toast.error(error.response?.data?.error || 'Failed to connect TikTok');
+    } finally {
+      setConnecting(null);
+    }
+  };
+
+  const handleConnectTikTok = async () => {
+    try {
+      setConnecting('tiktok');
+
+      // Get the TikTok OAuth URL from backend
+      const response = await api.get('/creator/platforms/tiktok/auth-url');
+
+      if (response.data.success) {
+        // IMPORTANT: Use full-page redirect instead of popup for iOS compatibility
+        // Build the OAuth URL with state for callback handling
+        const state = encodeURIComponent(JSON.stringify({
+          action: 'tiktok_connect',
+          timestamp: Date.now()
+        }));
+
+        // Modify the authUrl to include our state parameter
+        const authUrl = response.data.authUrl.includes('?')
+          ? `${response.data.authUrl}&state=${state}`
+          : `${response.data.authUrl}?state=${state}`;
+
+        console.log('[ConnectPlatforms] Redirecting to TikTok OAuth:', authUrl);
+
+        // Save connecting state to session storage (will survive page reload)
+        sessionStorage.setItem('oauth_connecting', 'tiktok');
+
+        // Full page redirect (works on all devices including iOS)
+        window.location.href = authUrl;
+      }
+    } catch (error) {
+      console.error('TikTok OAuth error:', error);
+      toast.error(error.response?.data?.error || 'Failed to initiate TikTok OAuth');
+      setConnecting(null);
+    }
+  };
+
+  // Handle Instagram OAuth redirect (called when user returns from Instagram login)
+  const handleInstagramRedirect = async (code) => {
+    setConnecting('instagram');
+
+    try {
+      console.log('[ConnectPlatforms] Processing Instagram authorization code...');
+
+      // Send auth code to backend - ThunziAI will exchange it
+      const connectResponse = await api.post('/creator/platforms/connect', {
+        platform: 'instagram',
+        accountName: 'Instagram Account',  // Placeholder, ThunziAI will fetch the real name
+        accessToken: code  // Send auth code as accessToken - ThunziAI will exchange it
+      });
+
+      console.log('[ConnectPlatforms] Instagram connect response:', connectResponse.data);
+
+      if (connectResponse.data.success) {
+        toast.success('Instagram connected successfully!');
+        fetchPlatforms();
+      }
+    } catch (error) {
+      console.error('[ConnectPlatforms] Instagram error:', error);
+      toast.error(error.response?.data?.error || 'Failed to connect Instagram');
+    } finally {
+      setConnecting(null);
+    }
+  };
+
+  const handleConnectInstagram = async () => {
+    try {
+      setConnecting('instagram');
+
+      // Get the Instagram OAuth URL from backend
+      const response = await api.get('/creator/platforms/instagram/auth-url');
+
+      if (response.data.success) {
+        // IMPORTANT: Use full-page redirect instead of popup for iOS compatibility
+        // Build the OAuth URL with state for callback handling
+        const state = encodeURIComponent(JSON.stringify({
+          action: 'instagram_connect',
+          timestamp: Date.now()
+        }));
+
+        // Modify the authUrl to include our state parameter
+        const authUrl = response.data.authUrl.includes('?')
+          ? `${response.data.authUrl}&state=${state}`
+          : `${response.data.authUrl}?state=${state}`;
+
+        console.log('[ConnectPlatforms] Redirecting to Instagram OAuth:', authUrl);
+
+        // Save connecting state to session storage (will survive page reload)
+        sessionStorage.setItem('oauth_connecting', 'instagram');
+
+        // Full page redirect (works on all devices including iOS)
+        window.location.href = authUrl;
+      }
+    } catch (error) {
+      console.error('Instagram OAuth error:', error);
+      toast.error(error.response?.data?.error || 'Failed to initiate Instagram OAuth');
       setConnecting(null);
     }
   };
@@ -456,7 +597,7 @@ const ConnectPlatforms = () => {
                       </button>
                     ) : platform.id === 'facebook' ? (
                       <button
-                        onClick={() => connectFacebookPage(fetchPlatforms)}
+                        onClick={() => setShowFacebookAccountTypeModal(true)}
                         disabled={connected || isFacebookConnecting || !isSDKLoaded}
                         className={`w-full py-2.5 md:py-3 rounded-full font-medium transition-colors text-sm md:text-base ${
                           connected
@@ -478,6 +619,30 @@ const ConnectPlatforms = () => {
                       >
                         {connected ? 'Already Connected' : connecting === 'youtube' ? 'Connecting...' : 'Connect with YouTube'}
                       </button>
+                    ) : platform.id === 'tiktok' ? (
+                      <button
+                        onClick={handleConnectTikTok}
+                        disabled={connected || connecting === 'tiktok'}
+                        className={`w-full py-2.5 md:py-3 rounded-full font-medium transition-colors text-sm md:text-base ${
+                          connected
+                            ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                            : 'bg-dark text-white hover:bg-gray-800 disabled:opacity-50'
+                        }`}
+                      >
+                        {connected ? 'Already Connected' : connecting === 'tiktok' ? 'Connecting...' : 'Connect with TikTok'}
+                      </button>
+                    ) : platform.id === 'instagram' ? (
+                      <button
+                        onClick={handleConnectInstagram}
+                        disabled={connected || connecting === 'instagram'}
+                        className={`w-full py-2.5 md:py-3 rounded-full font-medium transition-colors text-sm md:text-base ${
+                          connected
+                            ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                            : 'bg-dark text-white hover:bg-gray-800 disabled:opacity-50'
+                        }`}
+                      >
+                        {connected ? 'Already Connected' : connecting === 'instagram' ? 'Connecting...' : 'Connect with Instagram'}
+                      </button>
                     ) : (
                       <button
                         onClick={() => handleOpenConnectModal(platform.id)}
@@ -498,6 +663,57 @@ const ConnectPlatforms = () => {
           </div>
         </div>
       </div>
+
+      {/* Facebook Account Type Modal */}
+      {showFacebookAccountTypeModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl md:rounded-3xl max-w-md w-full p-6 md:p-8">
+            <h2 className="text-xl md:text-2xl font-bold text-dark mb-4">
+              Select Your Facebook Account Type
+            </h2>
+            <p className="text-sm text-gray-600 mb-6">
+              Choose the type of Facebook account you want to connect. This ensures we use the correct authentication flow for your account.
+            </p>
+
+            <div className="space-y-3 mb-6">
+              <button
+                onClick={() => {
+                  setFacebookAccountType('business');
+                  setShowFacebookAccountTypeModal(false);
+                  connectFacebookPage(fetchPlatforms, 'business');
+                }}
+                className="w-full p-4 border-2 border-gray-300 rounded-2xl hover:border-primary hover:bg-primary/5 transition-all text-left"
+              >
+                <div className="font-bold text-dark mb-1">Business Portfolio</div>
+                <div className="text-sm text-gray-600">
+                  I have a Facebook Business Portfolio with Pages and Instagram accounts
+                </div>
+              </button>
+
+              <button
+                onClick={() => {
+                  setFacebookAccountType('personal');
+                  setShowFacebookAccountTypeModal(false);
+                  connectFacebookPage(fetchPlatforms, 'personal');
+                }}
+                className="w-full p-4 border-2 border-gray-300 rounded-2xl hover:border-primary hover:bg-primary/5 transition-all text-left"
+              >
+                <div className="font-bold text-dark mb-1">Personal Account</div>
+                <div className="text-sm text-gray-600">
+                  I don't have a Business Portfolio, just a personal Facebook account
+                </div>
+              </button>
+            </div>
+
+            <button
+              onClick={() => setShowFacebookAccountTypeModal(false)}
+              className="w-full py-3 rounded-full border-2 border-gray-300 text-dark font-medium hover:bg-gray-50 transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Connect Modal */}
       {showConnectModal && (

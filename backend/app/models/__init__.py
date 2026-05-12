@@ -20,12 +20,15 @@ from .custom_package_offer import CustomPackageOffer
 from .dispute import Dispute
 from .subscription_plan import SubscriptionPlan
 from .subscription import Subscription
+from .subscription_usage import SubscriptionUsage
 from .creator_subscription_plan import CreatorSubscriptionPlan
 from .creator_subscription import CreatorSubscription
 from .verification_application import VerificationApplication
 from .thunzi_account import ThunziAccount
 from .connected_platform import ConnectedPlatform
 from .post_metrics import PostMetrics
+from .portfolio_item import PortfolioItem
+from .smilepay_transaction import SmilePayTransaction
 
 # Trust & Safety models
 from .user_block import UserBlock
@@ -38,6 +41,9 @@ from .support_ticket import SupportTicket
 from .support_ticket_message import SupportTicketMessage
 from .support_ticket_attachment import SupportTicketAttachment
 
+# Logging models
+from .request_log import RequestLog
+
 # Import milestone models BEFORE their parent models
 from .collaboration_milestone import CollaborationMilestone
 from .milestone_deliverable import MilestoneDeliverable
@@ -49,6 +55,10 @@ from .proposal_milestone import ProposalMilestone
 from .brief import Brief
 from .proposal import Proposal
 from .campaign import Campaign, CampaignApplication, CampaignProposal, CampaignMilestone
+from .campaign_invitation import CampaignInvitation
+from .campaign_payment import CampaignPayment, CampaignPaymentItem
+from .campaign_chat import CampaignChat, CampaignChatParticipant, CampaignChatMessage
+from .campaign_cart import CampaignCartItem
 
 __all__ = [
     'User',
@@ -78,6 +88,7 @@ __all__ = [
     'Dispute',
     'SubscriptionPlan',
     'Subscription',
+    'SubscriptionUsage',
     'Proposal',
     'ProposalMilestone',
     'CollaborationMilestone',
@@ -96,4 +107,17 @@ __all__ = [
     'SupportTicket',
     'SupportTicketMessage',
     'SupportTicketAttachment',
+    'RequestLog',
+    'CampaignInvitation',
+    'CampaignPayment',
+    'CampaignPaymentItem',
+    'CampaignChat',
+    'CampaignChatParticipant',
+    'CampaignChatMessage',
+    'CampaignCartItem',
+    'PortfolioItem',
+    'SmilePayTransaction',
+    'CreatorSubscriptionPlan',
+    'CreatorSubscription',
+    'VerificationApplication',
 ]

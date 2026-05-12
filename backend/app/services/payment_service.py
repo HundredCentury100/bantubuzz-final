@@ -443,6 +443,17 @@ def release_escrow_to_wallet(collaboration_id, platform_fee_percentage=15):
     # Commit all changes
     db.session.commit()
 
+    # Send email notification to creator asynchronously
+    try:
+        from app.tasks.email_tasks import send_payment_release_notification
+        send_payment_release_notification.delay(
+            creator_user_id=creator.user_id,
+            amount=float(creator_amount),
+            collaboration_id=collaboration.id
+        )
+    except Exception as email_error:
+        print(f"Failed to queue payment release notification: {str(email_error)}")
+
     return transaction
 
 

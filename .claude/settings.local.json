@@ -1,17 +1,27 @@
 {
   "permissions": {
     "allow": [
-      "Bash(git push:*)",
-      "Bash(ssh root@173.212.245.22 \"cd /var/www/bantubuzz/backend && systemctl restart bantubuzz-backend && echo ''Backend restarted successfully''\")",
-      "Bash(ssh root@173.212.245.22 \"pm2 restart bantubuzz-backend && echo ''Backend restarted successfully''\")",
+      "Bash(ssh root@173.212.245.22 \"tail -100 /var/www/bantubuzz/backend/gunicorn_error.log | grep -i instagram\")",
       "Bash(ssh:*)",
-      "Bash(npm run build:*)",
       "Bash(tar:*)",
       "Bash(scp:*)",
+      "Bash(npm run build:*)",
       "Bash(git add:*)",
-      "Bash(git commit -m \"$(cat <<''EOF''\nfeat: Add custom package negotiation with in-messaging creation and counter-offers\n\nCustom Package Enhancements:\n- Fix datetime comparison bug in custom_package_offer model (timezone-aware)\n- Add counter-offer functionality in decline modal with 3 options\n- Add custom package action button in messaging for both brands and creators\n- Implement creator-initiated direct offers without existing requests\n- Add validation to prevent creator-to-creator and brand-to-brand packages\n\nBackend Changes:\n- Update CustomPackageOffer model to use timezone-aware datetimes\n- Enhance create_custom_offer endpoint to support brand_id parameter\n- Auto-create placeholder requests for creator-initiated offers\n- Maintain full negotiation history and relationships\n\nFrontend Changes:\n- Add CustomRequestModal component for brands\n- Update CustomOfferModal to support direct offers with brand_id\n- Enhance CustomPackageMessage with counter-offer button in decline modal\n- Add document icon button in Messages page for custom package creation\n- Add user type validation with helpful error messages\n\nDashboard Fixes:\n- Fix CreatorDashboard API import (campaignsAPI → opportunitiesAPI)\n- Remove duplicate banners and sections from creator dashboard\n- Fix package count calculation to show actual totals\n- Remove \"Browse Briefs\" and update labels to \"Browse Opportunities\"\n- Fix profile completion logic\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(python verify_analytics.py:*)",
+      "Bash(md5sum:*)",
       "Bash(python:*)",
-      "Bash(git commit:*)"
+      "Bash(python3:*)",
+      "Bash(curl:*)",
+      "Bash(npm install:*)",
+      "Bash(touch:*)",
+      "Bash(BRAND_TOKEN=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJmcmVzaCI6ZmFsc2UsImlhdCI6MTc3Njg4NjcwOCwianRpIjoiNjI0OGUzNjMtMGMxNi00MTEzLWFiODUtNGY4YWU5ODViNjQ1IiwidHlwZSI6ImFjY2VzcyIsInN1YiI6MjYsIm5iZiI6MTc3Njg4NjcwOCwiY3NyZiI6IjRkNmJlZjFjLTViMjctNGZlNS1iN2FiLTczODljMzRhZTUzYyIsImV4cCI6MTc3Njg5MDMwOH0.VvTNNY2S4uT_OS2DPydqBQOxRaYBzbgKo4gkN48u-rE\")",
+      "Bash(bash \"D:\\Bantubuzz Platform\\test_deployment_apis.sh\")",
+      "Bash(TOKEN=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJmcmVzaCI6ZmFsc2UsImlhdCI6MTc3Njg4NzA1MiwianRpIjoiYzUwMTY5MzUtZWNkMS00NDExLTgxM2UtZmZmMDYzMmQwZTMwIiwidHlwZSI6ImFjY2VzcyIsInN1YiI6MjYsIm5iZiI6MTc3Njg4NzA1MiwiY3NyZiI6IjE4NTQzNDdiLWNlNWUtNDQwOS1hZjFhLTZkOWZkZjkxMTFlNCIsImV4cCI6MTc3Njg5MDY1Mn0.NhiY81V9e9rzd1JriG95HuGgKFR762DY-6rWGIiCs1o\")",
+      "Bash(__NEW_LINE__ echo \"[TEST 1] GET /campaign-chats/campaign/1\")",
+      "Bash(BRAND_TOKEN=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJmcmVzaCI6ZmFsc2UsImlhdCI6MTc3NjkyOTk3MCwianRpIjoiNjc2NGIwNzAtZTc3MS00NzY3LTljM2EtYmU4MDE4M2FmMjlmIiwidHlwZSI6ImFjY2VzcyIsInN1YiI6IjI2IiwibmJmIjoxNzc2OTI5OTcwLCJjc3JmIjoiYzYzZjY2NzUtODI1Yi00NzYwLThhOGQtNzdiM2EzMGRlYmNiIiwiZXhwIjoxNzc2OTMzNTcwfQ.XdX60WbFEhl8-K6k2n78pD8bbUL_KEOwtGxCERCCctY\")",
+      "Bash(TOKEN=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJmcmVzaCI6ZmFsc2UsImlhdCI6MTc3NjkzMDEyOSwianRpIjoiZWE1MGFiMmQtYzg3ZS00MDk2LTkwZDktMmIwZGI2MTg3NTkyIiwidHlwZSI6ImFjY2VzcyIsInN1YiI6IjEyIiwibmJmIjoxNzc2OTMwMTI5LCJjc3JmIjoiNTgwNTQ0NTUtMWFiZC00NDZlLTlhZjYtNGQ1MDIxNTFkYTUxIiwiZXhwIjoxNzc2OTMzNzI5fQ.cPbnZ-b9FQnKJPhJ9o6N6qjIlru1LEvNlBpHQtMJQZk\")"
     ],
     "deny": [],
     "ask": []

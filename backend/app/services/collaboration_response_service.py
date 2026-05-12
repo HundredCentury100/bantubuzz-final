@@ -5,9 +5,10 @@ from datetime import datetime, timezone
 from app import db
 from app.models import (
     Collaboration, CreatorProfile, BrandProfile,
-    Notification, Booking
+    Notification, Booking, User
 )
 from app.services import brand_wallet_service
+from app.services.email_service import send_collaboration_declined_email
 
 
 def get_pending_collaborations(creator_id, page=1, per_page=20):
@@ -171,6 +172,7 @@ def send_collaboration_decline_notification(collaboration, counter_offer=None):
     if counter_offer:
         message += f' Counter offer: ${counter_offer.get("amount")} for {counter_offer.get("duration")} days.'
 
+    # Create in-app notification
     notification = Notification(
         user_id=brand.user_id,
         notification_type='collaboration_declined',
@@ -187,6 +189,24 @@ def send_collaboration_decline_notification(collaboration, counter_offer=None):
     )
     db.session.add(notification)
     db.session.commit()
+
+    # Send email notification
+    try:
+        brand_user = User.query.get(brand.user_id)
+        if brand_user and brand_user.email:
+            brand_name = brand.company_name or brand_user.email.split('@')[0]
+            send_collaboration_declined_email(
+                brand_email=brand_user.email,
+                brand_name=brand_name,
+                creator_name=creator_name,
+                collaboration_title=collaboration.title,
+                refund_amount=float(collaboration.amount),
+                decline_reason=collaboration.creator_decline_reason or 'No reason provided',
+                counter_offer=counter_offer
+            )
+    except Exception as e:
+        # Log error but don't fail the notification
+        print(f'Error sending decline email for collaboration {collaboration.id}: {str(e)}')
 
 
 def get_collaboration_for_creator_response(collaboration_id, creator_user_id):

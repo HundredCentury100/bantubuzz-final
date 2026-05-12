@@ -32,11 +32,25 @@ const Bookings = () => {
   };
 
   const getStatusColor = (status) => {
-    return 'bg-primary/20 text-primary-dark';
+    const colors = {
+      'pending': 'bg-yellow-100 text-yellow-800 border border-yellow-300',
+      'accepted': 'bg-green-100 text-green-800 border border-green-300',
+      'rejected': 'bg-red-100 text-red-800 border border-red-300',
+      'completed': 'bg-blue-100 text-blue-800 border border-blue-300',
+      'cancelled': 'bg-gray-100 text-gray-800 border border-gray-300',
+    };
+    return colors[status] || 'bg-gray-100 text-gray-800';
   };
 
   const getPaymentStatusColor = (status) => {
-    return 'bg-primary/20 text-primary-dark';
+    const colors = {
+      'pending': 'bg-yellow-100 text-yellow-800 border border-yellow-300',
+      'paid': 'bg-green-100 text-green-800 border border-green-300',
+      'verified': 'bg-blue-100 text-blue-800 border border-blue-300',
+      'failed': 'bg-red-100 text-red-800 border border-red-300',
+      'refunded': 'bg-purple-100 text-purple-800 border border-purple-300',
+    };
+    return colors[status] || 'bg-gray-100 text-gray-800';
   };
 
   const filteredBookings = bookings.filter(booking => {
@@ -126,6 +140,16 @@ const Bookings = () => {
             >
               Completed ({bookings.filter(b => b.status === 'completed').length})
             </button>
+            <button
+              onClick={() => setFilter('rejected')}
+              className={`px-4 py-2 font-medium transition-colors whitespace-nowrap flex-shrink-0 ${
+                filter === 'rejected'
+                  ? 'text-red-600 border-b-2 border-red-600'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              Rejected ({bookings.filter(b => b.status === 'rejected').length})
+            </button>
           </div>
         </div>
 
@@ -157,7 +181,9 @@ const Bookings = () => {
         ) : (
           <div className="space-y-4">
             {filteredBookings.map((booking) => (
-              <div key={booking.id} className="bg-white rounded-lg shadow hover:shadow-lg transition-shadow p-4 sm:p-6">
+              <div key={booking.id} className={`bg-white rounded-lg shadow hover:shadow-lg transition-shadow p-4 sm:p-6 ${
+                booking.status === 'rejected' ? 'border-l-4 border-red-500' : ''
+              }`}>
                 <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
                   {/* Booking Info */}
                   <div className="flex-1">
@@ -242,20 +268,10 @@ const Bookings = () => {
                     {isCreator ? (
                       // Creator Actions
                       <>
-                        {booking.status === 'pending' && (
-                          <>
-                            <Link
-                              to={`/bookings/${booking.id}`}
-                              className="px-4 py-2 bg-primary hover:bg-primary-dark text-white text-sm font-medium rounded-lg transition-colors text-center"
-                            >
-                              Accept / Decline
-                            </Link>
-                          </>
-                        )}
-                        {booking.status === 'accepted' && (
+                        {booking.payment_status === 'paid' && booking.status === 'accepted' && (
                           <Link
                             to={`/${user?.user_type}/collaborations`}
-                            className="px-4 py-2 bg-primary hover:bg-primary-dark text-dark text-sm font-medium rounded-lg transition-colors text-center"
+                            className="px-4 py-2 bg-primary hover:bg-primary-dark text-white text-sm font-medium rounded-lg transition-colors text-center"
                           >
                             View Collaboration
                           </Link>

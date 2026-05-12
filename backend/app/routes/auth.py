@@ -9,7 +9,7 @@ from flask_jwt_extended import (
 from datetime import datetime, timedelta, timezone
 import re
 from app import db
-from app.models import User, CreatorProfile, BrandProfile, OTP
+from app.models import User, CreatorProfile, BrandProfile, OTP, Subscription, SubscriptionPlan
 from app.services.email_service import send_otp_email, send_verification_email, send_password_reset_email
 
 bp = Blueprint('auth', __name__)
@@ -63,6 +63,24 @@ def register_creator():
         )
         db.session.add(creator_profile)
 
+        # Assign free creator subscription plan
+        free_plan = SubscriptionPlan.query.filter_by(
+            user_type='creator',
+            price_monthly=0
+        ).first()
+
+        if free_plan:
+            free_subscription = Subscription(
+                user_id=user.id,
+                plan_id=free_plan.id,
+                status='active',
+                billing_cycle='monthly',
+                payment_method='free'
+            )
+            free_subscription.set_billing_period('monthly')
+            free_subscription.last_payment_date = datetime.utcnow()
+            db.session.add(free_subscription)
+
         # Generate OTP
         otp = OTP(user_id=user.id, purpose='registration', expiry_minutes=10)
         db.session.add(otp)
@@ -112,6 +130,24 @@ def register_brand():
             company_name=data['company_name']
         )
         db.session.add(brand_profile)
+
+        # Assign free brand subscription plan
+        free_plan = SubscriptionPlan.query.filter_by(
+            user_type='brand',
+            price_monthly=0
+        ).first()
+
+        if free_plan:
+            free_subscription = Subscription(
+                user_id=user.id,
+                plan_id=free_plan.id,
+                status='active',
+                billing_cycle='monthly',
+                payment_method='free'
+            )
+            free_subscription.set_billing_period('monthly')
+            free_subscription.last_payment_date = datetime.utcnow()
+            db.session.add(free_subscription)
 
         # Generate OTP
         otp = OTP(user_id=user.id, purpose='registration', expiry_minutes=10)
@@ -513,6 +549,25 @@ def google_creator_auth():
             # Create empty creator profile
             creator_profile = CreatorProfile(user_id=new_user.id)
             db.session.add(creator_profile)
+
+            # Assign free creator subscription plan
+            free_plan = SubscriptionPlan.query.filter_by(
+                user_type='creator',
+                price_monthly=0
+            ).first()
+
+            if free_plan:
+                free_subscription = Subscription(
+                    user_id=new_user.id,
+                    plan_id=free_plan.id,
+                    status='active',
+                    billing_cycle='monthly',
+                    payment_method='free'
+                )
+                free_subscription.set_billing_period('monthly')
+                free_subscription.last_payment_date = datetime.utcnow()
+                db.session.add(free_subscription)
+
             db.session.commit()
 
             # Issue a temp access token for the profile completion step

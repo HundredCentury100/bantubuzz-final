@@ -10,7 +10,7 @@ from app.models.dispute import Dispute
 
 bp = Blueprint('disputes', __name__)
 
-VALID_ISSUE_TYPES = ['non_delivery', 'quality', 'payment', 'behaviour', 'other']
+VALID_ISSUE_TYPES = ['non_delivery', 'quality', 'payment', 'behaviour', 'cancellation_request', 'other']
 
 
 @bp.route('/api/disputes', methods=['POST'])

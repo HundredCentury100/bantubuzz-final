@@ -81,30 +81,33 @@ const CampaignPackageBrowser = () => {
     try {
       setLoading(true);
 
-      // Add first package to campaign (this creates booking on backend)
-      const firstPackage = selectedPackages[0];
-      const response = await campaignsAPI.addPackageToCampaign(campaignId, firstPackage.id);
+      // Add all selected packages to cart
+      let successCount = 0;
+      let failCount = 0;
 
-      if (response.data.booking_id) {
-        // Store payment context with booking_id and redirect to payment page
-        localStorage.setItem('payment_context', JSON.stringify({
-          package_id: firstPackage.id,
-          campaign_id: campaignId,
-          booking_id: response.data.booking_id,
-          creator_id: firstPackage.creator_id || firstPackage.creator?.id,
-          type: 'campaign_package',
-          amount: firstPackage.price,
-          payment_category: 'package',
-          booking_type: 'campaign_package',
-          // Store remaining packages to add after payment
-          remaining_packages: selectedPackages.slice(1).map(pkg => pkg.id)
-        }));
+      for (const pkg of selectedPackages) {
+        try {
+          await campaignsAPI.addPackageToCart(campaignId, {
+            package_id: pkg.id,
+            creator_id: pkg.creator_id || pkg.creator?.id
+          });
+          successCount++;
+        } catch (error) {
+          console.error(`Failed to add package ${pkg.id} to cart:`, error);
+          failCount++;
+        }
+      }
 
-        // Navigate to payment page
-        toast.success('Proceeding to payment...');
-        navigate(`/brand/campaigns/payment/${response.data.booking_id}`);
-      } else {
-        toast.error('Failed to create payment booking');
+      if (successCount > 0) {
+        toast.success(`Added ${successCount} package${successCount > 1 ? 's' : ''} to cart! Redirecting to campaign...`);
+        // Navigate back to campaign details (cart tab)
+        setTimeout(() => {
+          navigate(`/brand/campaigns/${campaignId}?tab=cart`);
+        }, 1500);
+      }
+
+      if (failCount > 0) {
+        toast.error(`Failed to add ${failCount} package${failCount > 1 ? 's' : ''} to cart`);
       }
     } catch (error) {
       console.error('Error adding packages to campaign:', error);

@@ -3,11 +3,13 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { campaignsAPI, categoriesAPI } from '../services/api';
 import Navbar from '../components/Navbar';
 import toast from 'react-hot-toast';
+import { useSubscription } from '../contexts/SubscriptionContext';
 
 const CampaignForm = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const isEditMode = !!id;
+  const { handle403Error } = useSubscription();
 
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -400,6 +402,13 @@ const CampaignForm = () => {
       navigate('/brand/campaigns');
     } catch (error) {
       console.error('Error saving campaign:', error);
+
+      // Handle subscription limit errors
+      if (handle403Error(error)) {
+        // Upgrade modal shown automatically
+        return;
+      }
+
       toast.error(error.response?.data?.error || 'Failed to save campaign');
     } finally {
       setLoading(false);

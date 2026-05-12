@@ -71,7 +71,7 @@ def create_app(config_name='development'):
         return {'error': 'Token has been revoked'}, 401
 
     # Register blueprints
-    from .routes import auth, users, creators, brands, packages, campaigns, bookings, messages, notifications, analytics, collaborations, reviews, wallet, categories, brand_wallet, custom_packages, disputes, subscriptions, briefs, creator_subscriptions, verification, proposals, platforms, admin_extended, messaging_safety, support, admin_logs, internal
+    from .routes import auth, users, creators, brands, packages, campaigns, bookings, messages, notifications, analytics, collaborations, reviews, wallet, categories, brand_wallet, custom_packages, disputes, subscriptions, briefs, creator_subscriptions, verification, proposals, platforms, admin_extended, messaging_safety, support, admin_logs, internal, campaign_invitations, campaign_payments, campaign_chats, campaign_cart, portfolio, smilepay_payments
     from .routes import admin  # New admin module structure
 
     app.register_blueprint(auth.bp, url_prefix='/api/auth')
@@ -103,6 +103,12 @@ def create_app(config_name='development'):
     app.register_blueprint(messaging_safety.bp, url_prefix='/api/messaging')  # Trust & Safety messaging routes
     app.register_blueprint(support.bp, url_prefix='/api')  # Support ticket routes
     app.register_blueprint(internal.bp, url_prefix='/api/internal')  # Internal service routes (messaging service)
+    app.register_blueprint(campaign_invitations.bp)  # Campaign invitations routes
+    app.register_blueprint(campaign_payments.bp)  # Campaign payments routes
+    app.register_blueprint(campaign_chats.bp)  # Campaign chats routes
+    app.register_blueprint(campaign_cart.bp)  # Campaign cart routes
+    app.register_blueprint(portfolio.bp, url_prefix='/api')  # Portfolio routes
+    app.register_blueprint(smilepay_payments.bp)  # SmilePay payment routes at /api/payments/smilepay/*
 
     # Serve uploaded files
     from flask import send_from_directory
