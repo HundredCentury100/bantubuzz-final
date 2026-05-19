@@ -58,6 +58,14 @@ class Collaboration(db.Model):
     last_update = db.Column(db.Text)  # Latest progress update from creator
     last_update_date = db.Column(db.DateTime)
 
+    # Content Review & Collaboration Details (Phase 1 - May 2026)
+    requires_content_review = db.Column(db.Boolean, default=True)  # Yes/No selection in cart
+    brief = db.Column(db.Text)  # What do you want the creator to do? (required)
+    guidelines = db.Column(db.Text)  # Brief & Guidelines (required)
+    rules = db.Column(db.Text)  # Rules & Expectations (optional)
+    additional_notes = db.Column(db.Text)  # Additional Notes (optional)
+    auto_complete_eligible_at = db.Column(db.DateTime)  # Set when 100% complete, auto-complete after 3 days
+
     # Timestamps
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -121,6 +129,12 @@ class Collaboration(db.Model):
             'notes': self.notes,
             'last_update': self.last_update,
             'last_update_date': self.last_update_date.isoformat() if self.last_update_date else None,
+            'requires_content_review': self.requires_content_review,
+            'brief': self.brief,
+            'guidelines': self.guidelines,
+            'rules': self.rules,
+            'additional_notes': self.additional_notes,
+            'auto_complete_eligible_at': self.auto_complete_eligible_at.isoformat() if self.auto_complete_eligible_at else None,
             'created_at': self.created_at.isoformat(),
             'updated_at': self.updated_at.isoformat()
         }

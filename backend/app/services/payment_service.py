@@ -1093,3 +1093,7 @@ def process_payment_with_wallet(booking, user_id, payment_source='wallet'):
             'error': str(e),
             'message': f'Payment failed: {str(e)}'
         }
+
+
+# Create singleton instance
+payment_service = PaymentService()
