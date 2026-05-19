@@ -418,7 +418,16 @@ def get_payment_status(booking_id):
 def cart_checkout():
     """
     Cart checkout: create all bookings then initiate ONE combined Paynow payment.
-    Body: { package_ids: [1, 2, ...] }
+    Body: {
+        package_ids: [1, 2, ...],
+        requires_content_review: true/false,
+        collaboration_details: {
+            brief: "...",
+            guidelines: "...",
+            rules: "...",
+            additional_notes: "..."
+        }
+    }
     Returns: { booking_ids, redirect_url, poll_url, payment_reference, total }
     """
     try:
@@ -433,6 +442,16 @@ def cart_checkout():
         package_ids = data.get('package_ids', [])
         if not package_ids:
             return jsonify({'error': 'No packages provided'}), 400
+
+        # Get collaboration details from request
+        collab_details = data.get('collaboration_details', {})
+        requires_content_review = data.get('requires_content_review', True)
+
+        # Validate required collaboration fields
+        if not collab_details.get('brief'):
+            return jsonify({'error': 'Brief is required - describe what you want the creator to do'}), 400
+        if not collab_details.get('guidelines'):
+            return jsonify({'error': 'Guidelines are required - provide brief & guidelines for the creator'}), 400
 
         # Check subscription limits
         subscription = Subscription.query.filter_by(
@@ -467,6 +486,17 @@ def cart_checkout():
         # --- 1. Create all bookings ---
         bookings = []
         total = 0.0
+
+        # Prepare collaboration details JSON to store in booking notes
+        import json
+        collaboration_data = {
+            'requires_content_review': requires_content_review,
+            'brief': collab_details.get('brief'),
+            'guidelines': collab_details.get('guidelines'),
+            'rules': collab_details.get('rules'),
+            'additional_notes': collab_details.get('additional_notes')
+        }
+
         for pkg_id in package_ids:
             package = Package.query.get(pkg_id)
             if not package:
@@ -478,6 +508,7 @@ def cart_checkout():
                 brand_id=brand.id,
                 amount=package.price,
                 total_price=package.price,
+                notes=json.dumps(collaboration_data)  # Store collaboration details
             )
             db.session.add(booking)
             db.session.flush()  # get booking.id before commit
@@ -655,6 +686,15 @@ def cart_payment_status():
                     if package and package.duration_days:
                         expected_completion = start_date + timedelta(days=package.duration_days)
 
+                    # Get collaboration details from booking notes (if provided)
+                    collab_details = {}
+                    if booking.notes:
+                        try:
+                            import json
+                            collab_details = json.loads(booking.notes)
+                        except:
+                            pass
+
                     collab = Collaboration(
                         collaboration_type='package',
                         booking_id=booking.id,
@@ -667,7 +707,13 @@ def cart_payment_status():
                         start_date=start_date,
                         expected_completion_date=expected_completion,
                         deliverables=package.deliverables if package and package.deliverables else [],
-                        progress_percentage=0
+                        progress_percentage=0,
+                        # New collaboration details fields
+                        requires_content_review=collab_details.get('requires_content_review', True),
+                        brief=collab_details.get('brief'),
+                        guidelines=collab_details.get('guidelines'),
+                        rules=collab_details.get('rules'),
+                        additional_notes=collab_details.get('additional_notes')
                     )
                     db.session.add(collab)
                     db.session.flush()  # Get collaboration ID
