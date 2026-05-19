@@ -325,14 +325,31 @@ def approve_deliverable(collab_id, deliverable_id):
 
         # Auto-complete if progress reaches 100%
         if collaboration.progress_percentage >= 100 and collaboration.status == 'in_progress':
-            print(f"[APPROVE_DELIVERABLE] Triggering auto-completion for collaboration {collaboration.id}")
-            collaboration.status = 'completed'
-            collaboration.actual_completion_date = datetime.utcnow()
-            collaboration.last_update = "Collaboration automatically completed (100% progress reached)"
-            collaboration.escrow_status = 'escrowed'
+            print(f"[APPROVE_DELIVERABLE] Progress reached 100% for collaboration {collaboration.id}")
 
-            # Release escrow to creator wallet
-            if collaboration.booking_id:
+            # Check if content review is required
+            if not collaboration.requires_content_review:
+                # Set 3-day auto-complete timer
+                print(f"[APPROVE_DELIVERABLE] Content review not required - setting 3-day auto-complete timer")
+                try:
+                    from app.tasks.collaboration_tasks import set_auto_complete_date
+                    set_auto_complete_date.delay(collaboration.id)
+                except Exception as e:
+                    print(f"[APPROVE_DELIVERABLE] WARNING: Failed to set auto-complete date: {str(e)}")
+                    # Set directly if Celery fails
+                    collaboration.auto_complete_eligible_at = datetime.utcnow() + timedelta(days=3)
+
+                collaboration.last_update = "All deliverables submitted - 3 day review period started"
+            else:
+                # Content review required - complete immediately
+                print(f"[APPROVE_DELIVERABLE] Content review required - completing immediately")
+                collaboration.status = 'completed'
+                collaboration.actual_completion_date = datetime.utcnow()
+                collaboration.last_update = "Collaboration automatically completed (100% progress reached)"
+                collaboration.escrow_status = 'escrowed'
+
+                # Release escrow to creator wallet (only for immediate completion)
+                if collaboration.booking_id:
                 from app.models import Booking
                 booking = Booking.query.get(collaboration.booking_id)
                 if booking and booking.status != 'completed':

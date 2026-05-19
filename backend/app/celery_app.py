@@ -26,7 +26,8 @@ def make_celery(app=None):
         include=[
             'app.tasks.platform_sync',
             'app.tasks.email_tasks',
-            'app.tasks.analytics_tasks'
+            'app.tasks.analytics_tasks',
+            'app.tasks.collaboration_tasks'
         ]
     )
 
@@ -68,6 +69,11 @@ def make_celery(app=None):
             'notify-inactive-users': {
                 'task': 'app.tasks.email_tasks.check_and_notify_inactive_users',
                 'schedule': crontab(minute=0, hour=9),  # Daily at 9 AM
+            },
+            # Check for auto-complete eligible collaborations every day at 10 AM
+            'check-auto-complete-collaborations': {
+                'task': 'app.tasks.collaboration_tasks.check_auto_complete_eligible',
+                'schedule': crontab(minute=0, hour=10),  # Daily at 10 AM
             },
         }
     )
