@@ -415,17 +415,132 @@ def remove_from_cart(campaign_id, cart_item_id):
         return jsonify({'error': str(e)}), 500
 
 
-# PAYMENT ENDPOINTS (stub - to be implemented with full payment integration)
+# PAYMENT ENDPOINTS
 
 @bp.route('/<int:campaign_id>/cart/pay-all', methods=['POST'])
 @jwt_required()
 def pay_all_cart_items(campaign_id):
     """
     Pay for all pending cart items in one transaction
-    Creates a single booking with multiple cart items
+    Accepts collaboration_details and requires_content_review for all collaborations
     """
-    # TODO: Implement full payment flow
-    return jsonify({'error': 'Payment endpoint not yet implemented'}), 501
+    try:
+        user_id = int(get_jwt_identity())
+        user = User.query.get(user_id)
+
+        if not user or user.user_type != 'brand':
+            return jsonify({'error': 'Unauthorized'}), 403
+
+        brand = BrandProfile.query.filter_by(user_id=user_id).first()
+        if not brand:
+            return jsonify({'error': 'Brand profile not found'}), 404
+
+        campaign = Campaign.query.get(campaign_id)
+        if not campaign or campaign.brand_id != brand.id:
+            return jsonify({'error': 'Campaign not found or access denied'}), 404
+
+        data = request.get_json()
+        payment_method = data.get('payment_method', 'wallet')
+        collaboration_details = data.get('collaboration_details')
+        requires_content_review = data.get('requires_content_review', True)
+
+        # Get all pending cart items
+        cart_items = CampaignCartItem.query.filter_by(
+            campaign_id=campaign_id,
+            payment_status='pending'
+        ).all()
+
+        if not cart_items:
+            return jsonify({'error': 'No pending items in cart'}), 400
+
+        # Calculate total
+        total_amount = sum(Decimal(str(item.amount)) for item in cart_items)
+
+        # Process payment based on method
+        if payment_method == 'wallet':
+            # Check wallet balance
+            if brand.wallet_balance < total_amount:
+                return jsonify({'error': 'Insufficient wallet balance'}), 400
+
+            # Deduct from wallet
+            brand.wallet_balance -= total_amount
+
+            # Create collaborations for each cart item
+            created_collaborations = []
+            for cart_item in cart_items:
+                collaboration = Collaboration(
+                    brand_id=brand.id,
+                    creator_id=cart_item.creator_id,
+                    campaign_id=campaign_id,
+                    package_id=cart_item.package_id,
+                    amount=cart_item.amount,
+                    status='in_progress',
+                    start_date=datetime.utcnow(),
+                    end_date=datetime.utcnow() + timedelta(days=30),
+                    requires_content_review=requires_content_review,
+                    brief=collaboration_details.get('brief') if collaboration_details else None,
+                    guidelines=collaboration_details.get('guidelines') if collaboration_details else None,
+                    rules=collaboration_details.get('rules') if collaboration_details else None,
+                    additional_notes=collaboration_details.get('additional_notes') if collaboration_details else None
+                )
+                db.session.add(collaboration)
+                created_collaborations.append(collaboration)
+
+                # Update cart item status
+                cart_item.payment_status = 'paid'
+                cart_item.paid_at = datetime.utcnow()
+
+            db.session.commit()
+
+            # Send notifications to creators
+            for collaboration in created_collaborations:
+                creator_user = User.query.get(collaboration.creator.user_id)
+                if creator_user:
+                    try:
+                        # TODO: Send email notification
+                        print(f"Collaboration {collaboration.id} created - notify creator {creator_user.id}")
+                    except Exception as e:
+                        print(f"Failed to send notification: {e}")
+
+            return jsonify({
+                'success': True,
+                'status': 'completed',
+                'message': 'Payment completed successfully',
+                'collaborations': [{'id': c.id, 'creator_id': c.creator_id} for c in created_collaborations]
+            }), 200
+
+        elif payment_method == 'bank_transfer':
+            # Return bank details for manual transfer
+            return jsonify({
+                'success': True,
+                'status': 'pending',
+                'bank_details': {
+                    'bank_name': 'Steward Bank',
+                    'account_name': 'BantuBuzz (Pvt) Ltd',
+                    'account_number': '1234567890',
+                    'branch': 'Harare',
+                    'reference': f'CART-{campaign_id}-{int(datetime.utcnow().timestamp())}'
+                },
+                'message': 'Please complete bank transfer and upload proof'
+            }), 200
+
+        elif payment_method == 'smilepay':
+            # SmilePay handled by frontend modal
+            return jsonify({
+                'success': True,
+                'status': 'pending',
+                'message': 'Proceed with SmilePay'
+            }), 200
+
+        else:
+            return jsonify({'error': 'Invalid payment method'}), 400
+
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error processing payment: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
 
 
 @bp.route('/<int:campaign_id>/cart/pay-selected', methods=['POST'])
@@ -434,8 +549,123 @@ def pay_selected_cart_items(campaign_id):
     """
     Pay for selected cart items in batch
     """
-    # TODO: Implement full payment flow
-    return jsonify({'error': 'Payment endpoint not yet implemented'}), 501
+    try:
+        user_id = int(get_jwt_identity())
+        user = User.query.get(user_id)
+
+        if not user or user.user_type != 'brand':
+            return jsonify({'error': 'Unauthorized'}), 403
+
+        brand = BrandProfile.query.filter_by(user_id=user_id).first()
+        if not brand:
+            return jsonify({'error': 'Brand profile not found'}), 404
+
+        campaign = Campaign.query.get(campaign_id)
+        if not campaign or campaign.brand_id != brand.id:
+            return jsonify({'error': 'Campaign not found or access denied'}), 404
+
+        data = request.get_json()
+        payment_method = data.get('payment_method', 'wallet')
+        cart_item_ids = data.get('cart_item_ids', [])
+        collaboration_details = data.get('collaboration_details')
+        requires_content_review = data.get('requires_content_review', True)
+
+        if not cart_item_ids:
+            return jsonify({'error': 'cart_item_ids is required'}), 400
+
+        # Get selected cart items
+        cart_items = CampaignCartItem.query.filter(
+            CampaignCartItem.id.in_(cart_item_ids),
+            CampaignCartItem.campaign_id == campaign_id,
+            CampaignCartItem.payment_status == 'pending'
+        ).all()
+
+        if not cart_items or len(cart_items) != len(cart_item_ids):
+            return jsonify({'error': 'Some cart items not found or already paid'}), 400
+
+        # Calculate total
+        total_amount = sum(Decimal(str(item.amount)) for item in cart_items)
+
+        # Process payment based on method
+        if payment_method == 'wallet':
+            # Check wallet balance
+            if brand.wallet_balance < total_amount:
+                return jsonify({'error': 'Insufficient wallet balance'}), 400
+
+            # Deduct from wallet
+            brand.wallet_balance -= total_amount
+
+            # Create collaborations
+            created_collaborations = []
+            for cart_item in cart_items:
+                collaboration = Collaboration(
+                    brand_id=brand.id,
+                    creator_id=cart_item.creator_id,
+                    campaign_id=campaign_id,
+                    package_id=cart_item.package_id,
+                    amount=cart_item.amount,
+                    status='in_progress',
+                    start_date=datetime.utcnow(),
+                    end_date=datetime.utcnow() + timedelta(days=30),
+                    requires_content_review=requires_content_review,
+                    brief=collaboration_details.get('brief') if collaboration_details else None,
+                    guidelines=collaboration_details.get('guidelines') if collaboration_details else None,
+                    rules=collaboration_details.get('rules') if collaboration_details else None,
+                    additional_notes=collaboration_details.get('additional_notes') if collaboration_details else None
+                )
+                db.session.add(collaboration)
+                created_collaborations.append(collaboration)
+
+                # Update cart item
+                cart_item.payment_status = 'paid'
+                cart_item.paid_at = datetime.utcnow()
+
+            db.session.commit()
+
+            # Send notifications
+            for collaboration in created_collaborations:
+                creator_user = User.query.get(collaboration.creator.user_id)
+                if creator_user:
+                    try:
+                        print(f"Collaboration {collaboration.id} created - notify creator {creator_user.id}")
+                    except Exception as e:
+                        print(f"Failed to send notification: {e}")
+
+            return jsonify({
+                'success': True,
+                'status': 'completed',
+                'message': 'Payment completed successfully',
+                'collaborations': [{'id': c.id, 'creator_id': c.creator_id} for c in created_collaborations]
+            }), 200
+
+        elif payment_method == 'bank_transfer':
+            return jsonify({
+                'success': True,
+                'status': 'pending',
+                'bank_details': {
+                    'bank_name': 'Steward Bank',
+                    'account_name': 'BantuBuzz (Pvt) Ltd',
+                    'account_number': '1234567890',
+                    'branch': 'Harare',
+                    'reference': f'CART-{campaign_id}-{int(datetime.utcnow().timestamp())}'
+                }
+            }), 200
+
+        elif payment_method == 'smilepay':
+            return jsonify({
+                'success': True,
+                'status': 'pending'
+            }), 200
+
+        else:
+            return jsonify({'error': 'Invalid payment method'}), 400
+
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error processing payment: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
 
 
 @bp.route('/<int:campaign_id>/cart/<int:cart_item_id>/pay', methods=['POST'])
@@ -444,5 +674,107 @@ def pay_individual_cart_item(campaign_id, cart_item_id):
     """
     Pay for single cart item
     """
-    # TODO: Implement full payment flow
-    return jsonify({'error': 'Payment endpoint not yet implemented'}), 501
+    try:
+        user_id = int(get_jwt_identity())
+        user = User.query.get(user_id)
+
+        if not user or user.user_type != 'brand':
+            return jsonify({'error': 'Unauthorized'}), 403
+
+        brand = BrandProfile.query.filter_by(user_id=user_id).first()
+        if not brand:
+            return jsonify({'error': 'Brand profile not found'}), 404
+
+        campaign = Campaign.query.get(campaign_id)
+        if not campaign or campaign.brand_id != brand.id:
+            return jsonify({'error': 'Campaign not found or access denied'}), 404
+
+        cart_item = CampaignCartItem.query.get(cart_item_id)
+        if not cart_item or cart_item.campaign_id != campaign_id:
+            return jsonify({'error': 'Cart item not found'}), 404
+
+        if cart_item.payment_status != 'pending':
+            return jsonify({'error': 'Item already paid'}), 400
+
+        data = request.get_json()
+        payment_method = data.get('payment_method', 'wallet')
+        collaboration_details = data.get('collaboration_details')
+        requires_content_review = data.get('requires_content_review', True)
+
+        amount = Decimal(str(cart_item.amount))
+
+        # Process payment
+        if payment_method == 'wallet':
+            if brand.wallet_balance < amount:
+                return jsonify({'error': 'Insufficient wallet balance'}), 400
+
+            # Deduct from wallet
+            brand.wallet_balance -= amount
+
+            # Create collaboration
+            collaboration = Collaboration(
+                brand_id=brand.id,
+                creator_id=cart_item.creator_id,
+                campaign_id=campaign_id,
+                package_id=cart_item.package_id,
+                amount=cart_item.amount,
+                status='in_progress',
+                start_date=datetime.utcnow(),
+                end_date=datetime.utcnow() + timedelta(days=30),
+                requires_content_review=requires_content_review,
+                brief=collaboration_details.get('brief') if collaboration_details else None,
+                guidelines=collaboration_details.get('guidelines') if collaboration_details else None,
+                rules=collaboration_details.get('rules') if collaboration_details else None,
+                additional_notes=collaboration_details.get('additional_notes') if collaboration_details else None
+            )
+            db.session.add(collaboration)
+
+            # Update cart item
+            cart_item.payment_status = 'paid'
+            cart_item.paid_at = datetime.utcnow()
+
+            db.session.commit()
+
+            # Notify creator
+            creator_user = User.query.get(collaboration.creator.user_id)
+            if creator_user:
+                try:
+                    print(f"Collaboration {collaboration.id} created - notify creator {creator_user.id}")
+                except Exception as e:
+                    print(f"Failed to send notification: {e}")
+
+            return jsonify({
+                'success': True,
+                'status': 'completed',
+                'message': 'Payment completed successfully',
+                'collaboration': {'id': collaboration.id, 'creator_id': collaboration.creator_id}
+            }), 200
+
+        elif payment_method == 'bank_transfer':
+            return jsonify({
+                'success': True,
+                'status': 'pending',
+                'bank_details': {
+                    'bank_name': 'Steward Bank',
+                    'account_name': 'BantuBuzz (Pvt) Ltd',
+                    'account_number': '1234567890',
+                    'branch': 'Harare',
+                    'reference': f'CART-{campaign_id}-{cart_item_id}-{int(datetime.utcnow().timestamp())}'
+                }
+            }), 200
+
+        elif payment_method == 'smilepay':
+            return jsonify({
+                'success': True,
+                'status': 'pending'
+            }), 200
+
+        else:
+            return jsonify({'error': 'Invalid payment method'}), 400
+
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error processing payment: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
