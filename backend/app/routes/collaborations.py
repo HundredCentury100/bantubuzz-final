@@ -324,123 +324,16 @@ def approve_deliverable(collab_id, deliverable_id):
         print(f"[APPROVE_DELIVERABLE] Progress updated: {old_progress}% -> {collaboration.progress_percentage}%")
 
         # Auto-complete if progress reaches 100%
+        # NOTE: Changed behavior - NO longer auto-completes on deliverable approval
+        # Now waits for live URLs to be submitted before triggering 3-day timer
         if collaboration.progress_percentage >= 100 and collaboration.status == 'in_progress':
             print(f"[APPROVE_DELIVERABLE] Progress reached 100% for collaboration {collaboration.id}")
 
-            # Check if content review is required
-            if not collaboration.requires_content_review:
-                # Set 3-day auto-complete timer
-                print(f"[APPROVE_DELIVERABLE] Content review not required - setting 3-day auto-complete timer")
-                try:
-                    from app.tasks.collaboration_tasks import set_auto_complete_date
-                    set_auto_complete_date.delay(collaboration.id)
-                except Exception as e:
-                    print(f"[APPROVE_DELIVERABLE] WARNING: Failed to set auto-complete date: {str(e)}")
-                    # Set directly if Celery fails
-                    collaboration.auto_complete_eligible_at = datetime.utcnow() + timedelta(days=3)
-
-                collaboration.last_update = "All deliverables submitted - 3 day review period started"
-            else:
-                # Content review required - complete immediately
-                print(f"[APPROVE_DELIVERABLE] Content review required - completing immediately")
-                collaboration.status = 'completed'
-                collaboration.actual_completion_date = datetime.utcnow()
-                collaboration.last_update = "Collaboration automatically completed (100% progress reached)"
-                collaboration.escrow_status = 'escrowed'
-
-                # Release escrow to creator wallet (only for immediate completion)
-                if collaboration.booking_id:
-                    from app.models import Booking
-                    booking = Booking.query.get(collaboration.booking_id)
-                    if booking and booking.status != 'completed':
-                        print(f"[APPROVE_DELIVERABLE] Marking booking {booking.id} as completed")
-                        booking.status = 'completed'
-                        booking.completion_date = datetime.utcnow()
-                        booking.escrow_status = 'escrowed'
-                        booking.escrowed_at = datetime.utcnow()
-
-                # Release funds to wallet
-                escrow_released = False
-                escrow_error = None
-                try:
-                    from app.services.payment_service import release_escrow_to_wallet
-                    from app.utils.subscription_helper import get_brand_platform_fee_percentage
-
-                    # Get brand's platform fee based on subscription tier
-                    platform_fee = get_brand_platform_fee_percentage(collaboration.brand.user_id)
-
-                    print(f"[APPROVE_DELIVERABLE] Attempting to release escrow with fee {platform_fee}%")
-                    transaction = release_escrow_to_wallet(collaboration.id, platform_fee_percentage=platform_fee)
-                    print(f"[APPROVE_DELIVERABLE] SUCCESS: Escrow released. Transaction ID: {transaction.id}")
-                    escrow_released = True
-
-                    # Update collaboration to mark escrow as released
-                    collaboration.escrow_status = 'released'
-                    collaboration.last_update = "Collaboration completed - Funds released to creator wallet"
-
-                except Exception as e:
-                    escrow_error = str(e)
-                    print(f"[APPROVE_DELIVERABLE] ERROR: Failed to auto-release escrow: {escrow_error}")
-                    import traceback
-                    traceback.print_exc()
-
-                    # Mark escrow as failed so admin can manually release
-                    collaboration.escrow_status = 'failed'
-                    collaboration.last_update = f"Collaboration completed - ESCROW RELEASE FAILED: {escrow_error[:200]}"
-
-                    # Store error details in notes for admin investigation
-                    error_note = f"\n\n[AUTO-ESCROW FAILURE - {datetime.utcnow().isoformat()}]\n"
-                    error_note += f"Error: {escrow_error}\n"
-                    error_note += "ADMIN ACTION REQUIRED: Manually release escrow to creator wallet"
-                    collaboration.notes = (collaboration.notes or '') + error_note
-
-                    # Don't fail the approval - collaboration is still completed
-                    # Admin will need to manually release escrow later
-
-                # Notify both parties
-                try:
-                    creator_user = User.query.get(collaboration.creator.user_id)
-                    brand_user = User.query.get(collaboration.brand.user_id)
-
-                    if creator_user:
-                        # Customize notification based on escrow status
-                        if escrow_released:
-                            notify_collaboration_status(
-                                user_id=creator_user.id,
-                                status='completed',
-                                collaboration_title=collaboration.title,
-                                collaboration_id=collaboration.id,
-                                user_type='creator'
-                            )
-                        else:
-                            # Escrow failed - notify creator about the delay
-                            notify_collaboration_update(
-                                user_id=creator_user.id,
-                                collaboration_title=collaboration.title,
-                                collaboration_id=collaboration.id,
-                                update_message="Collaboration completed! Payment processing encountered an issue. Our team has been notified and will process your payment manually within 24 hours."
-                            )
-                        print(f"[APPROVE_DELIVERABLE] Notified creator user {creator_user.id} (escrow_released={escrow_released})")
-
-                    if brand_user:
-                        notify_collaboration_status(
-                            user_id=brand_user.id,
-                            status='completed',
-                            collaboration_title=collaboration.title,
-                            collaboration_id=collaboration.id,
-                            user_type='brand'
-                        )
-                        print(f"[APPROVE_DELIVERABLE] Notified brand user {brand_user.id}")
-
-                    # If escrow failed, also notify admin/support
-                    if not escrow_released and escrow_error:
-                        # TODO: Send email or create support ticket for admin
-                        print(f"[APPROVE_DELIVERABLE] ADMIN ALERT: Escrow release failed for collaboration {collaboration.id}")
-                        print(f"[APPROVE_DELIVERABLE] ADMIN ALERT: Error - {escrow_error}")
-
-                except Exception as e:
-                    print(f"[APPROVE_DELIVERABLE] WARNING: Failed to send notifications: {str(e)}")
-                    # Don't fail the approval
+            # Content review required (YES): Wait for live URLs, then 3-day timer
+            # Content review NOT required (NO): Wait for live URLs, then 3-day timer
+            # Both paths now go through URL submission → 3-day timer flow
+            collaboration.last_update = "All deliverables approved - Awaiting live post URLs from creator"
+            print(f"[APPROVE_DELIVERABLE] Awaiting live URLs. 3-day timer will start when URLs submitted.")
         else:
             # Normal update
             collaboration.last_update = f"Deliverable approved: {deliverable_to_approve.title}"
@@ -1096,6 +989,174 @@ def complete_collaboration(collab_id):
         return jsonify({'error': str(e)}), 500
 
 
+@bp.route('/<int:collab_id>/mark-complete', methods=['POST'])
+@jwt_required()
+def mark_collaboration_complete(collab_id):
+    """
+    Brand marks collaboration as complete after reviewing live posts (User Stories 10 & 12)
+
+    This endpoint is called when brand clicks "Mark This Collaboration As Complete" button
+    after creator has submitted live post URLs.
+
+    Actions:
+    - Status → 'completed'
+    - Release escrow to creator wallet
+    - Send notifications to both parties
+    - Clear auto_complete_eligible_at timer (if set)
+    """
+    try:
+        user_id = int(get_jwt_identity())
+        brand = BrandProfile.query.filter_by(user_id=user_id).first()
+
+        if not brand:
+            return jsonify({'error': 'Brand profile not found'}), 404
+
+        collaboration = Collaboration.query.get(collab_id)
+        if not collaboration:
+            return jsonify({'error': 'Collaboration not found'}), 404
+
+        if collaboration.brand_id != brand.id:
+            return jsonify({'error': 'Unauthorized'}), 403
+
+        # Check if collaboration is in correct state
+        if collaboration.status == 'completed':
+            return jsonify({'error': 'Collaboration is already completed'}), 400
+
+        if collaboration.status != 'in_progress':
+            return jsonify({'error': f'Cannot complete collaboration with status: {collaboration.status}'}), 400
+
+        # Verify live post URLs have been submitted
+        if not collaboration.live_urls_submitted_at:
+            return jsonify({
+                'error': 'Cannot complete collaboration',
+                'message': 'Creator has not submitted live post URLs yet'
+            }), 400
+
+        print(f"[MARK_COMPLETE] Brand {brand.id} marking collaboration {collab_id} as complete")
+
+        # Mark collaboration as completed
+        collaboration.status = 'completed'
+        collaboration.actual_completion_date = datetime.utcnow()
+        collaboration.progress_percentage = 100
+        collaboration.auto_complete_eligible_at = None  # Clear timer since manually completing
+        collaboration.last_update = "Collaboration marked complete by brand - Funds released to creator"
+        collaboration.updated_at = datetime.utcnow()
+
+        # Mark escrow status
+        collaboration.escrow_status = 'escrowed'
+
+        # Also mark related booking as completed if exists
+        if collaboration.booking_id:
+            from app.models import Booking
+            booking = Booking.query.get(collaboration.booking_id)
+            if booking and booking.status != 'completed':
+                booking.status = 'completed'
+                booking.completion_date = datetime.utcnow()
+                booking.escrow_status = 'escrowed'
+                booking.escrowed_at = datetime.utcnow()
+
+        db.session.commit()
+
+        # Release escrow to creator wallet
+        escrow_released = False
+        escrow_error = None
+        try:
+            from app.services.payment_service import release_escrow_to_wallet
+            from app.utils.subscription_helper import get_brand_platform_fee_percentage
+
+            # Get brand's platform fee based on subscription tier
+            platform_fee = get_brand_platform_fee_percentage(collaboration.brand.user_id)
+
+            print(f"[MARK_COMPLETE] Attempting to release escrow with fee {platform_fee}%")
+            transaction = release_escrow_to_wallet(collaboration.id, platform_fee_percentage=platform_fee)
+            escrow_released = True
+
+            # Update escrow status
+            collaboration.escrow_status = 'released'
+            collaboration.last_update = "Collaboration completed - Funds released to creator wallet"
+            db.session.commit()
+
+            print(f"[MARK_COMPLETE] SUCCESS: Escrow released. Transaction ID: {transaction.id}")
+
+        except Exception as e:
+            escrow_error = str(e)
+            print(f"[MARK_COMPLETE] ERROR: Failed to release escrow: {escrow_error}")
+            import traceback
+            traceback.print_exc()
+
+            # Mark escrow as failed
+            collaboration.escrow_status = 'failed'
+            collaboration.last_update = f"Collaboration completed - ESCROW RELEASE FAILED: {escrow_error[:200]}"
+
+            # Store error details for admin
+            error_note = f"\n\n[MANUAL-COMPLETE ESCROW FAILURE - {datetime.utcnow().isoformat()}]\n"
+            error_note += f"Error: {escrow_error}\n"
+            error_note += "ADMIN ACTION REQUIRED: Manually release escrow to creator wallet"
+            collaboration.notes = (collaboration.notes or '') + error_note
+
+            db.session.commit()
+
+        # Emit Socket.IO update
+        emit_collaboration_update(collaboration.id)
+
+        # Notify both parties
+        try:
+            creator_user = User.query.get(collaboration.creator.user_id)
+            brand_user = User.query.get(collaboration.brand.user_id)
+
+            if creator_user:
+                # Customize notification based on escrow status
+                if escrow_released:
+                    notify_collaboration_status(
+                        user_id=creator_user.id,
+                        status='completed',
+                        collaboration_title=collaboration.title,
+                        collaboration_id=collaboration.id,
+                        user_type='creator'
+                    )
+                else:
+                    # Escrow failed - notify creator about delay
+                    notify_collaboration_update(
+                        user_id=creator_user.id,
+                        collaboration_title=collaboration.title,
+                        collaboration_id=collaboration.id,
+                        update_message="Collaboration completed! Payment processing encountered an issue. Our team has been notified and will process your payment manually within 24 hours."
+                    )
+                print(f"[MARK_COMPLETE] Notified creator user {creator_user.id}")
+
+            if brand_user:
+                notify_collaboration_status(
+                    user_id=brand_user.id,
+                    status='completed',
+                    collaboration_title=collaboration.title,
+                    collaboration_id=collaboration.id,
+                    user_type='brand'
+                )
+                print(f"[MARK_COMPLETE] Notified brand user {brand_user.id}")
+
+            # Alert admin if escrow failed
+            if not escrow_released and escrow_error:
+                print(f"[MARK_COMPLETE] ADMIN ALERT: Escrow release failed for collaboration {collaboration.id}")
+                print(f"[MARK_COMPLETE] ADMIN ALERT: Error - {escrow_error}")
+
+        except Exception as e:
+            print(f"[MARK_COMPLETE] WARNING: Failed to send notifications: {str(e)}")
+
+        return jsonify({
+            'success': True,
+            'message': 'Collaboration marked as complete successfully',
+            'collaboration': collaboration.to_dict(),
+            'escrow_released': escrow_released
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        print(f"[MARK_COMPLETE] FATAL ERROR: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
 @bp.route('/<int:collab_id>/cancel-request', methods=['POST'])
 @jwt_required()
 def request_cancellation(collab_id):
@@ -1574,6 +1635,41 @@ def submit_package_deliverable_url(collab_id, deliverable_id):
 
         # Parse and validate URL
         if deliverable.parse_and_validate_url():
+            # Mark deliverable type as live_post (not draft)
+            deliverable.deliverable_type = 'live_post'
+
+            # Check if this is the FIRST live URL submission for this collaboration
+            if not collaboration.live_urls_submitted_at:
+                collaboration.live_urls_submitted_at = datetime.utcnow()
+                collaboration.last_update = "Creator submitted live post URLs"
+                print(f"[SUBMIT_URL] First live URL submitted for collaboration {collab_id}")
+
+            # Check if ALL expected deliverables now have live URLs
+            expected_count = len(collaboration.deliverables or [])
+            live_url_count = PackageDeliverable.query.filter_by(
+                collaboration_id=collab_id,
+                deliverable_type='live_post'
+            ).count()
+
+            print(f"[SUBMIT_URL] Live URLs: {live_url_count}/{expected_count}")
+
+            # If ALL deliverables have live URLs → trigger 3-day timer
+            # This applies to BOTH content review YES and NO cases (User Stories 10 & 12)
+            if live_url_count >= expected_count:
+                print(f"[SUBMIT_URL] All live URLs submitted → Starting 3-day auto-complete timer")
+                try:
+                    from app.tasks.collaboration_tasks import set_auto_complete_date
+                    set_auto_complete_date.delay(collaboration.id)
+                except Exception as e:
+                    print(f"[SUBMIT_URL] WARNING: Failed to set auto-complete date: {str(e)}")
+                    # Set directly if Celery fails
+                    collaboration.auto_complete_eligible_at = datetime.utcnow() + timedelta(days=3)
+
+                collaboration.last_update = "All live posts submitted - 3 day review period started"
+                collaboration.updated_at = datetime.utcnow()
+            else:
+                collaboration.updated_at = datetime.utcnow()
+
             db.session.commit()
 
             current_app.logger.info(

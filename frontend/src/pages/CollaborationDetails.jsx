@@ -9,6 +9,7 @@ import Avatar from '../components/Avatar';
 import DeliverableURLInput from '../components/DeliverableURLInput';
 import PostMetricsDisplay from '../components/PostMetricsDisplay';
 import CollaborationAnalytics from '../components/CollaborationAnalytics';
+import MarkCompleteButton from '../components/MarkCompleteButton';
 import toast from 'react-hot-toast';
 
 const CollaborationDetails = () => {
@@ -390,6 +391,34 @@ const CollaborationDetails = () => {
             </div>
           </div>
         </div>
+
+        {/* Live URLs Submitted - Awaiting Brand Review */}
+        {isBrand && collaboration.status === 'in_progress' && collaboration.live_urls_submitted_at && (
+          <div className="mb-6 bg-green-50 border-l-4 border-green-400 p-4 rounded-r-lg">
+            <div className="flex items-start justify-between">
+              <div className="flex">
+                <div className="flex-shrink-0">
+                  <svg className="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  </svg>
+                </div>
+                <div className="ml-3">
+                  <p className="text-sm text-green-700">
+                    <span className="font-medium">Live Post URLs Submitted!</span>
+                  </p>
+                  <p className="text-sm text-green-600 mt-2">
+                    Creator submitted live post URLs on {new Date(collaboration.live_urls_submitted_at).toLocaleDateString()}. Please review the posts and mark this collaboration as complete when satisfied.
+                  </p>
+                  {collaboration.auto_complete_eligible_at && (
+                    <p className="text-xs text-green-700 mt-2">
+                      <span className="font-medium">Auto-complete:</span> This collaboration will automatically complete on {new Date(collaboration.auto_complete_eligible_at).toLocaleDateString()} if not marked complete sooner.
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Cancellation Request Pending Alert */}
         {collaboration.cancellation_request && collaboration.cancellation_request.status === 'pending' && (
@@ -837,14 +866,19 @@ const CollaborationDetails = () => {
                     Send Message
                   </Link>
 
-                  {/* Mark as Completed Button - Only for brands */}
-                  {isBrand && (
-                    <button
-                      onClick={handleComplete}
-                      className="w-full px-4 py-3 bg-primary hover:bg-primary-dark text-white font-medium rounded-lg transition-colors"
-                    >
-                      Mark as Completed
-                    </button>
+                  {/* Mark as Completed Button - Only for brands after live URLs submitted */}
+                  {isBrand && collaboration.live_urls_submitted_at && (
+                    <MarkCompleteButton
+                      collaborationId={parseInt(id)}
+                      collaborationTitle={collaboration.title}
+                      creatorName={collaboration.creator?.display_name || collaboration.creator?.username || 'Creator'}
+                      amount={collaboration.amount}
+                      onSuccess={() => {
+                        toast.success('Collaboration completed! Payment released to creator.');
+                        fetchCollaboration();
+                      }}
+                      className="w-full"
+                    />
                   )}
                 </div>
               </div>

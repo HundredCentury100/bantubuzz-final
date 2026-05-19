@@ -306,6 +306,7 @@ export const collaborationsAPI = {
 
   // Collaboration actions
   completeCollaboration: (id) => api.patch(`/collaborations/${id}/complete`),
+  markComplete: (id) => api.post(`/collaborations/${id}/mark-complete`),
   cancelCollaboration: (id, reason) => api.patch(`/collaborations/${id}/cancel`, { reason }),
   requestCancellation: (id, reason) => api.post(`/collaborations/${id}/cancel-request`, { reason }),
 
