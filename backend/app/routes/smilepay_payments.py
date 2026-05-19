@@ -524,7 +524,26 @@ def initiate_card_payment():
     """
     Initiate card payment (Visa/Mastercard) via Express Checkout
 
-    May return 3D Secure HTML for authentication
+    Customer enters card details in our UI, we send to SmilePay.
+    SmilePay returns redirectHtml with 3D Secure challenge if required.
+
+    Request Body:
+    {
+        "payment_type": "subscription|booking|campaign|cart|collaboration",
+        "payment_id": 123,
+        "amount": 100.00,
+        "currency": "USD",
+        "card_number": "4111111111111111",
+        "expiry_month": "12",
+        "expiry_year": "25",
+        "cvv": "123",
+        "item_name": "Premium Subscription",
+        "item_description": "Monthly premium plan",
+        "return_url": "https://...",
+        "result_url": "https://...",
+        "cancel_url": "https://...",
+        "failure_url": "https://..."
+    }
     """
     try:
         user_id = int(get_jwt_identity())
@@ -536,8 +555,8 @@ def initiate_card_payment():
         data = request.get_json()
 
         # Validate required fields
-        required_fields = ['payment_type', 'amount', 'card_number', 'expiry_month',
-                          'expiry_year', 'cvv', 'cardholder_name', 'item_name']
+        required_fields = ['payment_type', 'amount', 'item_name',
+                          'card_number', 'expiry_month', 'expiry_year', 'cvv']
         for field in required_fields:
             if field not in data:
                 return jsonify({'error': f'Missing required field: {field}'}), 400
@@ -551,7 +570,7 @@ def initiate_card_payment():
         # Get customer name from profile
         customer_first_name, customer_last_name = get_user_display_name(user)
 
-        # Create transaction record
+        # Create transaction record (DON'T store card details!)
         transaction = SmilePayTransaction(
             payment_type=data['payment_type'],
             payment_id=data.get('payment_id'),
@@ -568,11 +587,12 @@ def initiate_card_payment():
             customer_email=user.email,
             customer_first_name=customer_first_name,
             customer_last_name=customer_last_name,
+            customer_phone=data.get('phone', ''),
             return_url=data.get('return_url', ''),
             result_url=data.get('result_url', ''),
             cancel_url=data.get('cancel_url', ''),
             failure_url=data.get('failure_url', ''),
-            request_data=data,
+            request_data={'payment_type': data['payment_type'], 'amount': data['amount']},  # Don't store card details!
             otp_required=False
         )
 
@@ -589,12 +609,12 @@ def initiate_card_payment():
             expiry_month=data['expiry_month'],
             expiry_year=data['expiry_year'],
             cvv=data['cvv'],
-            cardholder_name=data['cardholder_name'],
             item_name=data['item_name'],
             item_description=data.get('item_description', ''),
             customer_email=user.email,
             customer_first_name=customer_first_name,
             customer_last_name=customer_last_name,
+            customer_phone=data.get('phone', ''),
             return_url=data.get('return_url', ''),
             result_url=data.get('result_url', ''),
             cancel_url=data.get('cancel_url', ''),
@@ -610,28 +630,16 @@ def initiate_card_payment():
             transaction.extra_data = response_data
             db.session.commit()
 
-            # Check if 3D Secure is required
-            if result.get('requires_3ds'):
-                return jsonify({
-                    'success': True,
-                    'order_reference': order_reference,
-                    'transaction_reference': transaction.transaction_reference,
-                    'requires_3ds': True,
-                    'three_d_secure_html': response_data.get('threeDSecureHtml'),
-                    'redirect_url': response_data.get('redirectUrl'),
-                    'message': '3D Secure authentication required',
-                    'status': 'PENDING',
-                    'response': response_data
-                }), 200
-            else:
-                return jsonify({
-                    'success': True,
-                    'order_reference': order_reference,
-                    'transaction_reference': transaction.transaction_reference,
-                    'message': 'Card payment initiated successfully',
-                    'status': 'PENDING',
-                    'response': response_data
-                }), 200
+            return jsonify({
+                'success': True,
+                'order_reference': order_reference,
+                'transaction_reference': transaction.transaction_reference,
+                'redirect_html': result.get('redirect_html'),
+                'requires_3ds': result.get('requires_3ds'),
+                'message': 'Card payment initiated - 3DS authentication may be required',
+                'status': 'PENDING',
+                'response': response_data
+            }), 200
         else:
             transaction.status = 'FAILED'
             transaction.response_message = result.get('error', 'Payment initiation failed')

@@ -33,6 +33,8 @@ const SmilePayPaymentModal = ({
   const [expiryYear, setExpiryYear] = useState('');
   const [cvv, setCvv] = useState('');
   const [cardholderName, setCardholderName] = useState('');
+  const [show3DS, setShow3DS] = useState(false);
+  const [redirectHtml, setRedirectHtml] = useState('');
   const [processing, setProcessing] = useState(false);
   const [orderReference, setOrderReference] = useState(null);
   const [paymentCode, setPaymentCode] = useState(null); // For Innbucks
@@ -325,10 +327,6 @@ const SmilePayPaymentModal = ({
       toast.error('Please enter CVV');
       return;
     }
-    if (!cardholderName) {
-      toast.error('Please enter cardholder name');
-      return;
-    }
 
     try {
       setProcessing(true);
@@ -342,7 +340,6 @@ const SmilePayPaymentModal = ({
         expiry_month: expiryMonth,
         expiry_year: expiryYear,
         cvv: cvv,
-        cardholder_name: cardholderName,
         item_name: itemName,
         item_description: itemDescription,
         return_url: returnUrl || window.location.href,
@@ -356,10 +353,14 @@ const SmilePayPaymentModal = ({
         setOrderReference(reference);
 
         // Check if 3D Secure is required
-        if (response.data.requires_3ds && response.data.redirect_url) {
-          toast.info('Redirecting to 3D Secure verification...');
-          // Open 3DS in new window or iframe
-          window.location.href = response.data.redirect_url;
+        if (response.data.requires_3ds && response.data.redirect_html) {
+          // Display 3DS challenge in overlay
+          setRedirectHtml(response.data.redirect_html);
+          setShow3DS(true);
+          toast.info('Please complete 3D Secure authentication');
+
+          // Start polling for payment status
+          startPolling(reference);
         } else {
           toast.success('Card payment initiated');
           // Start polling for payment status
@@ -402,6 +403,8 @@ const SmilePayPaymentModal = ({
     setExpiryYear('');
     setCvv('');
     setCardholderName('');
+    setShow3DS(false);
+    setRedirectHtml('');
     setOrderReference(null);
     setPaymentCode(null);
     setCountdown(120);
@@ -839,8 +842,90 @@ const SmilePayPaymentModal = ({
             </div>
           )}
 
+          {/* 3DS Challenge Overlay */}
+          {show3DS && redirectHtml && (
+            <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-[60] p-4">
+              <div className="bg-white rounded-3xl max-w-2xl w-full max-h-[80vh] overflow-y-auto">
+                {/* 3DS Header */}
+                <div className="sticky top-0 bg-white border-b border-gray-200 p-4 flex items-center justify-between rounded-t-3xl z-10">
+                  <div>
+                    <h3 className="text-lg font-bold text-dark">3D Secure Authentication</h3>
+                    <p className="text-xs text-gray-600 mt-1">Complete verification to proceed</p>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setShow3DS(false);
+                      setRedirectHtml('');
+                      handleCancelPayment();
+                    }}
+                    className="p-2 hover:bg-gray-100 rounded-full transition-colors"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+
+                {/* 3DS Challenge Content */}
+                <div className="p-4">
+                  <div
+                    ref={(el) => {
+                      if (el && redirectHtml) {
+                        // Clear existing content
+                        el.innerHTML = '';
+
+                        // Create a temporary container to parse the HTML
+                        const tempDiv = document.createElement('div');
+                        tempDiv.innerHTML = redirectHtml;
+
+                        // Find all script tags in the HTML
+                        const scripts = tempDiv.getElementsByTagName('script');
+                        const scriptContents = [];
+
+                        // Extract script content before adding HTML
+                        for (let i = 0; i < scripts.length; i++) {
+                          if (scripts[i].src) {
+                            scriptContents.push({ type: 'external', src: scripts[i].src });
+                          } else {
+                            scriptContents.push({ type: 'inline', content: scripts[i].textContent });
+                          }
+                        }
+
+                        // Add the HTML content (without scripts)
+                        el.innerHTML = redirectHtml;
+
+                        // Execute scripts in order
+                        scriptContents.forEach((script) => {
+                          const scriptEl = document.createElement('script');
+                          if (script.type === 'external') {
+                            scriptEl.src = script.src;
+                          } else {
+                            scriptEl.textContent = script.content;
+                          }
+                          el.appendChild(scriptEl);
+                        });
+                      }
+                    }}
+                    className="min-h-[400px]"
+                  />
+
+                  <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-2xl">
+                    <div className="flex items-start gap-2">
+                      <svg className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                      </svg>
+                      <p className="text-xs text-blue-900">
+                        Complete the verification above to secure your payment. This may include entering a code sent to your phone or email.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Polling / Waiting State */}
-          {polling && (
+          {polling && !show3DS && (
             <div className="text-center py-6">
               <div className="inline-block animate-spin rounded-full h-16 w-16 border-4 border-gray-300 border-t-primary mb-6"></div>
 
@@ -848,7 +933,9 @@ const SmilePayPaymentModal = ({
               <p className="text-gray-600 mb-4">
                 {selectedMethod === 'ecocash'
                   ? 'Please check your phone and approve the Ecocash prompt'
-                  : 'Waiting for payment confirmation from Innbucks'}
+                  : selectedMethod === 'card'
+                  ? 'Confirming payment after 3D Secure authentication'
+                  : 'Waiting for payment confirmation'}
               </p>
 
               {/* Countdown Timer */}

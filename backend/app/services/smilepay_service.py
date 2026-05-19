@@ -299,12 +299,12 @@ class SmilePayService:
         expiry_month: str,
         expiry_year: str,
         cvv: str,
-        cardholder_name: str,
         item_name: str,
         item_description: str,
         customer_email: str,
         customer_first_name: str = '',
         customer_last_name: str = '',
+        customer_phone: str = '',
         return_url: str = '',
         result_url: str = '',
         cancel_url: str = '',
@@ -314,26 +314,40 @@ class SmilePayService:
         """
         Initiate card payment (Visa/Mastercard) via Express Checkout
 
-        May return 3D Secure HTML for authentication
+        Based on SmilePay Express Checkout API documentation:
+        1. Customer enters card details in our UI
+        2. We send to SmilePay API with pan, expMonth, expYear, securityCode
+        3. SmilePay returns redirectHtml containing 3D Secure challenge form
+        4. We display 3DS challenge in overlay
+        5. After 3DS authentication, callback to returnUrl
+        6. Final payment status sent via webhook to resultUrl
+
+        Args:
+            card_number: Card PAN (Primary Account Number)
+            expiry_month: 2-digit expiry month (01-12)
+            expiry_year: 2-digit expiry year (e.g., 25 for 2025)
+            cvv: Card security code (CVV/CVC)
         """
         try:
-            endpoint = smilepay_config.get_payment_endpoint('card')
+            # Use MPGS endpoint for card payments
+            endpoint = smilepay_config.get_payment_endpoint('mpgs')
             headers = smilepay_config.get_headers()
 
             payload = {
                 'orderReference': order_reference,
                 'amount': amount,
                 'currencyCode': smilepay_config.get_currency_code(currency),
-                'cardNumber': card_number,
-                'expiryMonth': expiry_month,
-                'expiryYear': expiry_year,
-                'cvv': cvv,
-                'cardholderName': cardholder_name,
+                'pan': card_number.replace(' ', ''),  # Remove spaces
+                'expMonth': expiry_month,
+                'expYear': expiry_year,
+                'securityCode': cvv,
                 'itemName': item_name,
                 'itemDescription': item_description,
                 'email': customer_email,
                 'firstName': customer_first_name,
                 'lastName': customer_last_name,
+                'mobilePhoneNumber': customer_phone,
+                'paymentMethod': 'CARD',
                 'returnUrl': return_url or '',
                 'resultUrl': result_url or '',
                 'cancelUrl': cancel_url or '',
@@ -347,81 +361,17 @@ class SmilePayService:
 
             logger.info(f"Card payment response: {response_data}")
 
-            # Check if 3D Secure is required
-            requires_3ds = 'threeDSecureHtml' in response_data or 'redirectUrl' in response_data
+            # Check if 3D Secure challenge is required
+            has_redirect_html = 'redirectHtml' in response_data
 
             return {
                 'success': response.status_code == 200,
                 'status_code': response.status_code,
                 'data': response_data,
-                'requires_3ds': requires_3ds
-            }
-
-        except Exception as e:
-            logger.error(f"Card payment error: {str(e)}")
-            return {
-                'success': False,
-                'error': f"Payment initiation failed: {str(e)}"
-            }
-
-    @staticmethod
-    def initiate_card_payment(
-        order_reference: str,
-        amount: float,
-        item_name: str,
-        item_description: str,
-        customer_email: str,
-        customer_first_name: str = '',
-        customer_last_name: str = '',
-        customer_phone: str = '',
-        return_url: str = '',
-        result_url: str = '',
-        cancel_url: str = '',
-        failure_url: str = '',
-        currency: str = 'USD',
-        card_type: str = 'visa'  # 'visa' or 'mastercard'
-    ) -> Dict[str, Any]:
-        """
-        Initiate card payment (Visa/Mastercard) via Express Checkout
-
-        Returns redirect URL to SmilePay's hosted checkout page where
-        the user enters their card details securely (PCI compliant).
-        Similar to Ecocash/Innbucks flow.
-        """
-        try:
-            endpoint = smilepay_config.get_payment_endpoint(card_type)
-            headers = smilepay_config.get_headers()
-
-            payload = {
-                'orderReference': order_reference,
-                'amount': amount,
-                'currencyCode': smilepay_config.get_currency_code(currency),
-                'itemName': item_name,
-                'itemDescription': item_description,
-                'email': customer_email,
-                'firstName': customer_first_name,
-                'lastName': customer_last_name,
-                'mobilePhoneNumber': customer_phone,
-                'returnUrl': return_url or '',
-                'resultUrl': result_url or '',
-                'cancelUrl': cancel_url or '',
-                'failureUrl': failure_url or '',
-            }
-
-            logger.info(f"Initiating {card_type} payment for order {order_reference}")
-
-            response = requests.post(endpoint, json=payload, headers=headers, timeout=30)
-            response_data = response.json()
-
-            logger.info(f"Card payment response: {response_data}")
-
-            # Express Checkout returns a redirect URL to SmilePay's checkout page
-            return {
-                'success': response.status_code == 200,
-                'status_code': response.status_code,
-                'data': response_data,
-                'redirect_url': response_data.get('redirectUrl') or response_data.get('checkoutUrl'),
-                'poll_url': response_data.get('pollUrl')
+                'redirect_html': response_data.get('redirectHtml'),
+                'requires_3ds': has_redirect_html,
+                'response_message': response_data.get('responseMessage'),
+                'transaction_reference': response_data.get('transactionReference')
             }
 
         except Exception as e:
