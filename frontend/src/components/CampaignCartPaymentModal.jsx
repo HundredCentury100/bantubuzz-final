@@ -11,6 +11,8 @@ const CampaignCartPaymentModal = ({
   paymentMode, // 'all', 'selected', 'individual'
   cartItemIds = [], // For selected/individual mode
   totalAmount,
+  collaborationDetails = null, // NEW: Collaboration details from form
+  requiresContentReview = true, // NEW: Content review preference
   onPaymentSuccess
 }) => {
   const [paymentMethod, setPaymentMethod] = useState('wallet');
@@ -25,7 +27,11 @@ const CampaignCartPaymentModal = ({
       setProcessing(true);
 
       let response;
-      const paymentData = { payment_method: paymentMethod };
+      const paymentData = {
+        payment_method: paymentMethod,
+        requires_content_review: requiresContentReview,
+        collaboration_details: collaborationDetails
+      };
 
       // Call appropriate endpoint based on payment mode
       if (paymentMode === 'all') {

@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom';
 import { campaignsAPI } from '../services/api';
 import CampaignCartItem from './CampaignCartItem';
 import CampaignCartPaymentModal from './CampaignCartPaymentModal';
+import CollaborationDetailsForm from './CollaborationDetailsForm';
 import toast from 'react-hot-toast';
 
 const CampaignCart = ({ campaignId, onPaymentComplete }) => {
@@ -11,8 +12,11 @@ const CampaignCart = ({ campaignId, onPaymentComplete }) => {
   const [selectedItems, setSelectedItems] = useState(new Set());
   const [totalAmount, setTotalAmount] = useState(0);
   const [pendingCount, setPendingCount] = useState(0);
+  const [detailsFormOpen, setDetailsFormOpen] = useState(false);
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const [paymentMode, setPaymentMode] = useState(null); // 'all', 'selected', or specific item_id
+  const [collaborationDetails, setCollaborationDetails] = useState(null);
+  const [requiresContentReview, setRequiresContentReview] = useState(true);
 
   useEffect(() => {
     fetchCartItems();
@@ -68,7 +72,7 @@ const CampaignCart = ({ campaignId, onPaymentComplete }) => {
 
   const handlePayIndividual = async (itemId) => {
     setPaymentMode(itemId);
-    setPaymentModalOpen(true);
+    setDetailsFormOpen(true);
   };
 
   const handlePaySelected = () => {
@@ -77,7 +81,7 @@ const CampaignCart = ({ campaignId, onPaymentComplete }) => {
       return;
     }
     setPaymentMode('selected');
-    setPaymentModalOpen(true);
+    setDetailsFormOpen(true);
   };
 
   const handlePayAll = () => {
@@ -86,6 +90,12 @@ const CampaignCart = ({ campaignId, onPaymentComplete }) => {
       return;
     }
     setPaymentMode('all');
+    setDetailsFormOpen(true);
+  };
+
+  const handleDetailsSubmit = async (details) => {
+    setCollaborationDetails(details);
+    setDetailsFormOpen(false);
     setPaymentModalOpen(true);
   };
 
@@ -215,6 +225,65 @@ const CampaignCart = ({ campaignId, onPaymentComplete }) => {
         ))}
       </div>
 
+      {/* Content Review Selection */}
+      <div className="bg-white rounded-lg shadow p-6">
+        <h3 className="text-lg font-bold text-gray-900 mb-3">Content Review Preference</h3>
+        <p className="text-sm text-gray-600 mb-4">
+          Would you like to review content before it's posted live?
+        </p>
+
+        <div className="space-y-3">
+          <label className={`flex items-start gap-4 p-4 border-2 rounded-xl cursor-pointer transition-all ${
+            requiresContentReview
+              ? 'border-primary bg-primary/5'
+              : 'border-gray-200 hover:border-gray-300'
+          }`}>
+            <input
+              type="radio"
+              name="contentReview"
+              checked={requiresContentReview}
+              onChange={() => setRequiresContentReview(true)}
+              className="mt-1 w-5 h-5 text-primary focus:ring-primary"
+            />
+            <div className="flex-1">
+              <div className="font-semibold text-gray-900">YES - I want to review content before it goes live</div>
+              <p className="text-sm text-gray-600 mt-1">
+                Creators will submit drafts for your approval before posting. You can request revisions if needed.
+              </p>
+            </div>
+          </label>
+
+          <label className={`flex items-start gap-4 p-4 border-2 rounded-xl cursor-pointer transition-all ${
+            !requiresContentReview
+              ? 'border-primary bg-primary/5'
+              : 'border-gray-200 hover:border-gray-300'
+          }`}>
+            <input
+              type="radio"
+              name="contentReview"
+              checked={!requiresContentReview}
+              onChange={() => setRequiresContentReview(false)}
+              className="mt-1 w-5 h-5 text-primary focus:ring-primary"
+            />
+            <div className="flex-1">
+              <div className="font-semibold text-gray-900">NO - I trust this creator to follow the brief and guidelines</div>
+              <p className="text-sm text-gray-600 mt-1">
+                Creator will post directly without pre-approval. You'll have 3 days to review after posting.
+              </p>
+            </div>
+          </label>
+        </div>
+
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mt-4">
+          <p className="text-xs text-yellow-800">
+            <strong>Note:</strong> This setting will be locked once collaborations are created.
+            {requiresContentReview
+              ? ' You will review all content before it goes live.'
+              : ' Creator will post directly and you can review within 3 days.'}
+          </p>
+        </div>
+      </div>
+
       {/* Info Banner */}
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
         <div className="flex gap-3">
@@ -233,12 +302,31 @@ const CampaignCart = ({ campaignId, onPaymentComplete }) => {
         </div>
       </div>
 
+      {/* Collaboration Details Form */}
+      <CollaborationDetailsForm
+        isOpen={detailsFormOpen}
+        onClose={() => {
+          setDetailsFormOpen(false);
+          setPaymentMode(null);
+        }}
+        onSubmit={handleDetailsSubmit}
+        cartItemsCount={
+          typeof paymentMode === 'number'
+            ? 1
+            : paymentMode === 'selected'
+            ? selectedItems.size
+            : cartItems.length
+        }
+        requiresContentReview={requiresContentReview}
+      />
+
       {/* Payment Modal */}
       <CampaignCartPaymentModal
         isOpen={paymentModalOpen}
         onClose={() => {
           setPaymentModalOpen(false);
           setPaymentMode(null);
+          setCollaborationDetails(null);
         }}
         campaignId={campaignId}
         paymentMode={typeof paymentMode === 'number' ? 'individual' : paymentMode}
@@ -256,9 +344,12 @@ const CampaignCart = ({ campaignId, onPaymentComplete }) => {
             ? selectedTotal
             : totalAmount
         }
+        collaborationDetails={collaborationDetails}
+        requiresContentReview={requiresContentReview}
         onPaymentSuccess={() => {
           fetchCartItems();
           setSelectedItems(new Set());
+          setCollaborationDetails(null);
           if (onPaymentComplete) onPaymentComplete();
         }}
       />
