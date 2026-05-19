@@ -524,8 +524,8 @@ def initiate_card_payment():
     """
     Initiate card payment (Visa/Mastercard) via Express Checkout
 
-    No card details should be sent to this endpoint.
-    SmilePay will redirect user to their hosted checkout where they enter card info securely.
+    Customer enters card details in our UI, we send to SmilePay.
+    SmilePay returns redirectHtml with 3D Secure challenge if required.
 
     Request Body:
     {
@@ -533,7 +533,10 @@ def initiate_card_payment():
         "payment_id": 123,
         "amount": 100.00,
         "currency": "USD",
-        "card_type": "visa" or "mastercard",
+        "card_number": "4111111111111111",
+        "expiry_month": "12",
+        "expiry_year": "25",
+        "cvv": "123",
         "item_name": "Premium Subscription",
         "item_description": "Monthly premium plan",
         "return_url": "https://...",
@@ -552,15 +555,11 @@ def initiate_card_payment():
         data = request.get_json()
 
         # Validate required fields
-        required_fields = ['payment_type', 'amount', 'item_name', 'card_type']
+        required_fields = ['payment_type', 'amount', 'item_name',
+                          'card_number', 'expiry_month', 'expiry_year', 'cvv']
         for field in required_fields:
             if field not in data:
                 return jsonify({'error': f'Missing required field: {field}'}), 400
-
-        # Validate card type
-        card_type = data['card_type'].lower()
-        if card_type not in ['visa', 'mastercard']:
-            return jsonify({'error': 'card_type must be "visa" or "mastercard"'}), 400
 
         # Generate unique order reference
         order_reference = SmilePayTransaction.generate_order_reference(
@@ -571,7 +570,7 @@ def initiate_card_payment():
         # Get customer name from profile
         customer_first_name, customer_last_name = get_user_display_name(user)
 
-        # Create transaction record
+        # Create transaction record (DON'T store card details!)
         transaction = SmilePayTransaction(
             payment_type=data['payment_type'],
             payment_id=data.get('payment_id'),
@@ -581,7 +580,7 @@ def initiate_card_payment():
             amount=data['amount'],
             currency=data.get('currency', 'USD'),
             currency_code=smilepay_config.get_currency_code(data.get('currency', 'USD')),
-            payment_method=card_type,
+            payment_method='card',
             status='PENDING',
             item_name=data['item_name'],
             item_description=data.get('item_description', ''),
@@ -593,19 +592,23 @@ def initiate_card_payment():
             result_url=data.get('result_url', ''),
             cancel_url=data.get('cancel_url', ''),
             failure_url=data.get('failure_url', ''),
-            request_data=data,
+            request_data={'payment_type': data['payment_type'], 'amount': data['amount']},  # Don't store card details!
             otp_required=False
         )
 
         db.session.add(transaction)
         db.session.commit()
 
-        logger.info(f"Created {card_type} transaction {order_reference} for user {user_id}")
+        logger.info(f"Created Card transaction {order_reference} for user {user_id}")
 
         # Initiate payment with SmilePay
         result = smilepay_service.initiate_card_payment(
             order_reference=order_reference,
             amount=data['amount'],
+            card_number=data['card_number'],
+            expiry_month=data['expiry_month'],
+            expiry_year=data['expiry_year'],
+            cvv=data['cvv'],
             item_name=data['item_name'],
             item_description=data.get('item_description', ''),
             customer_email=user.email,
@@ -616,8 +619,7 @@ def initiate_card_payment():
             result_url=data.get('result_url', ''),
             cancel_url=data.get('cancel_url', ''),
             failure_url=data.get('failure_url', ''),
-            currency=data.get('currency', 'USD'),
-            card_type=card_type
+            currency=data.get('currency', 'USD')
         )
 
         if result.get('success'):
@@ -632,8 +634,9 @@ def initiate_card_payment():
                 'success': True,
                 'order_reference': order_reference,
                 'transaction_reference': transaction.transaction_reference,
-                'redirect_url': result.get('redirect_url'),
-                'message': f'Redirecting to {card_type} payment page',
+                'redirect_html': result.get('redirect_html'),
+                'requires_3ds': result.get('requires_3ds'),
+                'message': 'Card payment initiated - 3DS authentication may be required',
                 'status': 'PENDING',
                 'response': response_data
             }), 200

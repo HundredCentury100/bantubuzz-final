@@ -42,6 +42,8 @@ class SmilePayConfig:
         'omari': 'express-checkout/omari',
         'visa': 'express-checkout/visa',
         'mastercard': 'express-checkout/mastercard',
+        'mpgs': 'express-checkout/mpgs',  # Card payments (Mastercard Payment Gateway Services)
+        'card': 'express-checkout/mpgs',  # Alias for card payments
         'standard': 'initiate-transaction',
     }
 
