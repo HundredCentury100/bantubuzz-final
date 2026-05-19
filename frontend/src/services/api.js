@@ -214,7 +214,7 @@ export const bookingsAPI = {
     api.post(`/bookings/${bookingId}/verify-payment`),
 
   // Cart checkout (combined payment for multiple packages)
-  cartCheckout: (packageIds) => api.post('/bookings/cart/checkout', { package_ids: packageIds }),
+  cartCheckout: (data) => api.post('/bookings/cart/checkout', data),
   cartPaymentStatus: (bookingIds, pollUrl) => api.post('/bookings/cart/status', { booking_ids: bookingIds, poll_url: pollUrl }),
   cartUploadPop: (bookingIds, formData) => {
     formData.append('booking_ids', JSON.stringify(bookingIds));
@@ -222,8 +222,8 @@ export const bookingsAPI = {
       headers: { 'Content-Type': 'multipart/form-data' }
     });
   },
-  cartPayWithWallet: (packageIds) => api.post('/bookings/cart/pay-with-wallet', { package_ids: packageIds }),
-  cartBankTransfer: (packageIds) => api.post('/bookings/cart/bank-transfer', { package_ids: packageIds }),
+  cartPayWithWallet: (data) => api.post('/bookings/cart/pay-with-wallet', data),
+  cartBankTransfer: (data) => api.post('/bookings/cart/bank-transfer', data),
 };
 
 // Messages API

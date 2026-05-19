@@ -34,6 +34,13 @@ const CartCheckout = () => {
   // SmilePay modal
   const [showSmilePayModal, setShowSmilePayModal] = useState(false);
 
+  // Collaboration details state
+  const [requiresContentReview, setRequiresContentReview] = useState(true);
+  const [collaborationBrief, setCollaborationBrief] = useState('');
+  const [collaborationGuidelines, setCollaborationGuidelines] = useState('');
+  const [collaborationRules, setCollaborationRules] = useState('');
+  const [collaborationNotes, setCollaborationNotes] = useState('');
+
   // Fetch wallet balance on mount
   useEffect(() => {
     if (user?.user_type === 'brand') {
@@ -60,6 +67,18 @@ const CartCheckout = () => {
 
   const formatCurrency = (amount) => {
     return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount || 0);
+  };
+
+  const validateCollaborationDetails = () => {
+    if (!collaborationBrief.trim()) {
+      toast.error('Please describe what you want the creator to do');
+      return false;
+    }
+    if (!collaborationGuidelines.trim()) {
+      toast.error('Please provide brief and guidelines');
+      return false;
+    }
+    return true;
   };
 
   // Redirect if cart is empty and no checkout data
@@ -92,6 +111,10 @@ const CartCheckout = () => {
 
   // Bank transfer: create bookings + upload POP
   const handleBankTransfer = async () => {
+    if (!validateCollaborationDetails()) {
+      return;
+    }
+
     if (!proofFile) {
       toast.error('Please upload your proof of payment first');
       return;
@@ -104,7 +127,16 @@ const CartCheckout = () => {
         const packageIds = cartItems.map((item) => item.package_id);
 
         // Call bank transfer endpoint to create bookings with bank_transfer payment_method
-        const checkoutResponse = await bookingsAPI.cartBankTransfer(packageIds);
+        const checkoutResponse = await bookingsAPI.cartBankTransfer({
+          package_ids: packageIds,
+          requires_content_review: requiresContentReview,
+          collaboration_details: {
+            brief: collaborationBrief,
+            guidelines: collaborationGuidelines,
+            rules: collaborationRules,
+            additional_notes: collaborationNotes
+          }
+        });
         const data = checkoutResponse.data;
 
         // Now upload POP
@@ -152,6 +184,10 @@ const CartCheckout = () => {
 
   // Handle wallet payment for cart
   const handleWalletPayment = async () => {
+    if (!validateCollaborationDetails()) {
+      return;
+    }
+
     if (walletBalance < totalAmount) {
       toast.error('Insufficient wallet balance');
       return;
@@ -161,7 +197,16 @@ const CartCheckout = () => {
     try {
       const packageIds = cartItems.map((item) => item.package_id);
       // Call backend endpoint to pay for cart with wallet
-      const response = await bookingsAPI.cartPayWithWallet(packageIds);
+      const response = await bookingsAPI.cartPayWithWallet({
+        package_ids: packageIds,
+        requires_content_review: requiresContentReview,
+        collaboration_details: {
+          brief: collaborationBrief,
+          guidelines: collaborationGuidelines,
+          rules: collaborationRules,
+          additional_notes: collaborationNotes
+        }
+      });
 
       if (response.data.success) {
         // Clear cart only after successful payment
@@ -175,6 +220,13 @@ const CartCheckout = () => {
     } finally {
       setCheckoutLoading(false);
     }
+  };
+
+  const handleOpenSmilePay = async () => {
+    if (!validateCollaborationDetails()) {
+      return;
+    }
+    setShowSmilePayModal(true);
   };
 
   const handleSmilePaySuccess = (transaction) => {
@@ -290,6 +342,146 @@ const CartCheckout = () => {
                 <p className="text-xs text-gray-500 mt-3 text-center">
                   {packageCount} package{packageCount !== 1 ? 's' : ''} · Payments held in escrow until work is complete
                 </p>
+              </div>
+            </div>
+
+            {/* Collaboration Details Section */}
+            <div className="lg:col-span-3 mb-6">
+              <div className="bg-white rounded-3xl shadow-sm p-6">
+                <h2 className="text-xl font-bold text-dark mb-2">Collaboration Details</h2>
+                <p className="text-sm text-gray-600 mb-5">
+                  Provide instructions for the creators. They will see this immediately when the collaboration starts.
+                </p>
+
+                {/* Content Review Selection */}
+                <div className="mb-6 pb-6 border-b border-gray-200">
+                  <h3 className="font-semibold text-dark mb-3">Content Review</h3>
+                  <p className="text-sm text-gray-600 mb-4">
+                    Would you like to review content before it's posted?
+                  </p>
+
+                  <div className="space-y-3">
+                    {/* Yes - Review Before Posting */}
+                    <label
+                      className="flex items-start gap-3 p-4 border-2 rounded-2xl cursor-pointer hover:border-primary/50 transition-colors"
+                      style={{ borderColor: requiresContentReview ? '#c8ff09' : '#e5e7eb' }}
+                    >
+                      <input
+                        type="radio"
+                        name="contentReview"
+                        checked={requiresContentReview === true}
+                        onChange={() => setRequiresContentReview(true)}
+                        className="mt-1"
+                      />
+                      <div>
+                        <p className="font-semibold text-dark">Yes</p>
+                        <p className="text-sm text-gray-600 mt-1">
+                          I want to review content before it goes live.
+                        </p>
+                        <ul className="text-xs text-gray-500 mt-2 space-y-1 ml-4 list-disc">
+                          <li>Creator submits content for review</li>
+                          <li>You review — Looks Good or Request Revision</li>
+                          <li>Creator posts live, submits URL, syncs metrics</li>
+                          <li>You mark collaboration complete</li>
+                        </ul>
+                      </div>
+                    </label>
+
+                    {/* No - Trust Creator */}
+                    <label
+                      className="flex items-start gap-3 p-4 border-2 rounded-2xl cursor-pointer hover:border-primary/50 transition-colors"
+                      style={{ borderColor: !requiresContentReview ? '#c8ff09' : '#e5e7eb' }}
+                    >
+                      <input
+                        type="radio"
+                        name="contentReview"
+                        checked={requiresContentReview === false}
+                        onChange={() => setRequiresContentReview(false)}
+                        className="mt-1"
+                      />
+                      <div>
+                        <p className="font-semibold text-dark">No</p>
+                        <p className="text-sm text-gray-600 mt-1">
+                          I trust this creator to follow the brief and guidelines.
+                        </p>
+                        <ul className="text-xs text-gray-500 mt-2 space-y-1 ml-4 list-disc">
+                          <li>Creator posts live directly</li>
+                          <li>Submits URL and syncs metrics</li>
+                          <li>You mark collaboration complete</li>
+                        </ul>
+                      </div>
+                    </label>
+                  </div>
+
+                  <div className="mt-3 p-3 bg-yellow-50 border border-yellow-200 rounded-2xl">
+                    <p className="text-xs text-yellow-900">
+                      <strong>Note:</strong> Selection is locked when the collaboration activates.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Brief & Guidelines Form */}
+                <div className="space-y-4">
+                  {/* What do you want the creator to do? - Required */}
+                  <div>
+                    <label className="block text-sm font-medium text-dark mb-2">
+                      What do you want the creator to do? <span className="text-red-500">*</span>
+                    </label>
+                    <textarea
+                      value={collaborationBrief}
+                      onChange={(e) => setCollaborationBrief(e.target.value)}
+                      placeholder="Describe what you want the creator to do in this collaboration..."
+                      className="w-full px-4 py-3 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-primary focus:border-transparent min-h-[100px] resize-y"
+                      required
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Be specific about the deliverables, format, and expectations
+                    </p>
+                  </div>
+
+                  {/* Brief & Guidelines - Required */}
+                  <div>
+                    <label className="block text-sm font-medium text-dark mb-2">
+                      Brief &amp; Guidelines <span className="text-red-500">*</span>
+                    </label>
+                    <textarea
+                      value={collaborationGuidelines}
+                      onChange={(e) => setCollaborationGuidelines(e.target.value)}
+                      placeholder="Key messages, tone, dos and don'ts, hashtags, tags, links..."
+                      className="w-full px-4 py-3 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-primary focus:border-transparent min-h-[120px] resize-y"
+                      required
+                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      Include brand guidelines, tone of voice, required hashtags/mentions
+                    </p>
+                  </div>
+
+                  {/* Rules & Expectations - Optional */}
+                  <div>
+                    <label className="block text-sm font-medium text-dark mb-2">
+                      Rules &amp; Expectations <span className="text-gray-400">(Optional)</span>
+                    </label>
+                    <textarea
+                      value={collaborationRules}
+                      onChange={(e) => setCollaborationRules(e.target.value)}
+                      placeholder="Deadlines, format, dimensions, compliance requirements..."
+                      className="w-full px-4 py-3 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-primary focus:border-transparent min-h-[80px] resize-y"
+                    />
+                  </div>
+
+                  {/* Additional Notes - Optional */}
+                  <div>
+                    <label className="block text-sm font-medium text-dark mb-2">
+                      Additional Notes <span className="text-gray-400">(Optional)</span>
+                    </label>
+                    <textarea
+                      value={collaborationNotes}
+                      onChange={(e) => setCollaborationNotes(e.target.value)}
+                      placeholder="Anything else the creator should know..."
+                      className="w-full px-4 py-3 border border-gray-300 rounded-2xl focus:ring-2 focus:ring-primary focus:border-transparent min-h-[80px] resize-y"
+                    />
+                  </div>
+                </div>
               </div>
             </div>
 
@@ -440,7 +632,7 @@ const CartCheckout = () => {
                 {/* --- SmilePay flow --- */}
                 {paymentMethod === 'smilepay' && (
                   <button
-                    onClick={() => setShowSmilePayModal(true)}
+                    onClick={handleOpenSmilePay}
                     className="w-full bg-primary text-dark font-bold py-4 rounded-2xl hover:bg-primary/90 transition flex items-center justify-center gap-2 text-lg"
                   >
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
