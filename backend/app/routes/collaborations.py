@@ -350,97 +350,97 @@ def approve_deliverable(collab_id, deliverable_id):
 
                 # Release escrow to creator wallet (only for immediate completion)
                 if collaboration.booking_id:
-                from app.models import Booking
-                booking = Booking.query.get(collaboration.booking_id)
-                if booking and booking.status != 'completed':
-                    print(f"[APPROVE_DELIVERABLE] Marking booking {booking.id} as completed")
-                    booking.status = 'completed'
-                    booking.completion_date = datetime.utcnow()
-                    booking.escrow_status = 'escrowed'
-                    booking.escrowed_at = datetime.utcnow()
+                    from app.models import Booking
+                    booking = Booking.query.get(collaboration.booking_id)
+                    if booking and booking.status != 'completed':
+                        print(f"[APPROVE_DELIVERABLE] Marking booking {booking.id} as completed")
+                        booking.status = 'completed'
+                        booking.completion_date = datetime.utcnow()
+                        booking.escrow_status = 'escrowed'
+                        booking.escrowed_at = datetime.utcnow()
 
-            # Release funds to wallet
-            escrow_released = False
-            escrow_error = None
-            try:
-                from app.services.payment_service import release_escrow_to_wallet
-                from app.utils.subscription_helper import get_brand_platform_fee_percentage
+                # Release funds to wallet
+                escrow_released = False
+                escrow_error = None
+                try:
+                    from app.services.payment_service import release_escrow_to_wallet
+                    from app.utils.subscription_helper import get_brand_platform_fee_percentage
 
-                # Get brand's platform fee based on subscription tier
-                platform_fee = get_brand_platform_fee_percentage(collaboration.brand.user_id)
+                    # Get brand's platform fee based on subscription tier
+                    platform_fee = get_brand_platform_fee_percentage(collaboration.brand.user_id)
 
-                print(f"[APPROVE_DELIVERABLE] Attempting to release escrow with fee {platform_fee}%")
-                transaction = release_escrow_to_wallet(collaboration.id, platform_fee_percentage=platform_fee)
-                print(f"[APPROVE_DELIVERABLE] SUCCESS: Escrow released. Transaction ID: {transaction.id}")
-                escrow_released = True
+                    print(f"[APPROVE_DELIVERABLE] Attempting to release escrow with fee {platform_fee}%")
+                    transaction = release_escrow_to_wallet(collaboration.id, platform_fee_percentage=platform_fee)
+                    print(f"[APPROVE_DELIVERABLE] SUCCESS: Escrow released. Transaction ID: {transaction.id}")
+                    escrow_released = True
 
-                # Update collaboration to mark escrow as released
-                collaboration.escrow_status = 'released'
-                collaboration.last_update = "Collaboration completed - Funds released to creator wallet"
+                    # Update collaboration to mark escrow as released
+                    collaboration.escrow_status = 'released'
+                    collaboration.last_update = "Collaboration completed - Funds released to creator wallet"
 
-            except Exception as e:
-                escrow_error = str(e)
-                print(f"[APPROVE_DELIVERABLE] ERROR: Failed to auto-release escrow: {escrow_error}")
-                import traceback
-                traceback.print_exc()
+                except Exception as e:
+                    escrow_error = str(e)
+                    print(f"[APPROVE_DELIVERABLE] ERROR: Failed to auto-release escrow: {escrow_error}")
+                    import traceback
+                    traceback.print_exc()
 
-                # Mark escrow as failed so admin can manually release
-                collaboration.escrow_status = 'failed'
-                collaboration.last_update = f"Collaboration completed - ESCROW RELEASE FAILED: {escrow_error[:200]}"
+                    # Mark escrow as failed so admin can manually release
+                    collaboration.escrow_status = 'failed'
+                    collaboration.last_update = f"Collaboration completed - ESCROW RELEASE FAILED: {escrow_error[:200]}"
 
-                # Store error details in notes for admin investigation
-                error_note = f"\n\n[AUTO-ESCROW FAILURE - {datetime.utcnow().isoformat()}]\n"
-                error_note += f"Error: {escrow_error}\n"
-                error_note += "ADMIN ACTION REQUIRED: Manually release escrow to creator wallet"
-                collaboration.notes = (collaboration.notes or '') + error_note
+                    # Store error details in notes for admin investigation
+                    error_note = f"\n\n[AUTO-ESCROW FAILURE - {datetime.utcnow().isoformat()}]\n"
+                    error_note += f"Error: {escrow_error}\n"
+                    error_note += "ADMIN ACTION REQUIRED: Manually release escrow to creator wallet"
+                    collaboration.notes = (collaboration.notes or '') + error_note
 
-                # Don't fail the approval - collaboration is still completed
-                # Admin will need to manually release escrow later
+                    # Don't fail the approval - collaboration is still completed
+                    # Admin will need to manually release escrow later
 
-            # Notify both parties
-            try:
-                creator_user = User.query.get(collaboration.creator.user_id)
-                brand_user = User.query.get(collaboration.brand.user_id)
+                # Notify both parties
+                try:
+                    creator_user = User.query.get(collaboration.creator.user_id)
+                    brand_user = User.query.get(collaboration.brand.user_id)
 
-                if creator_user:
-                    # Customize notification based on escrow status
-                    if escrow_released:
+                    if creator_user:
+                        # Customize notification based on escrow status
+                        if escrow_released:
+                            notify_collaboration_status(
+                                user_id=creator_user.id,
+                                status='completed',
+                                collaboration_title=collaboration.title,
+                                collaboration_id=collaboration.id,
+                                user_type='creator'
+                            )
+                        else:
+                            # Escrow failed - notify creator about the delay
+                            notify_collaboration_update(
+                                user_id=creator_user.id,
+                                collaboration_title=collaboration.title,
+                                collaboration_id=collaboration.id,
+                                update_message="Collaboration completed! Payment processing encountered an issue. Our team has been notified and will process your payment manually within 24 hours."
+                            )
+                        print(f"[APPROVE_DELIVERABLE] Notified creator user {creator_user.id} (escrow_released={escrow_released})")
+
+                    if brand_user:
                         notify_collaboration_status(
-                            user_id=creator_user.id,
+                            user_id=brand_user.id,
                             status='completed',
                             collaboration_title=collaboration.title,
                             collaboration_id=collaboration.id,
-                            user_type='creator'
+                            user_type='brand'
                         )
-                    else:
-                        # Escrow failed - notify creator about the delay
-                        notify_collaboration_update(
-                            user_id=creator_user.id,
-                            collaboration_title=collaboration.title,
-                            collaboration_id=collaboration.id,
-                            update_message="Collaboration completed! Payment processing encountered an issue. Our team has been notified and will process your payment manually within 24 hours."
-                        )
-                    print(f"[APPROVE_DELIVERABLE] Notified creator user {creator_user.id} (escrow_released={escrow_released})")
+                        print(f"[APPROVE_DELIVERABLE] Notified brand user {brand_user.id}")
 
-                if brand_user:
-                    notify_collaboration_status(
-                        user_id=brand_user.id,
-                        status='completed',
-                        collaboration_title=collaboration.title,
-                        collaboration_id=collaboration.id,
-                        user_type='brand'
-                    )
-                    print(f"[APPROVE_DELIVERABLE] Notified brand user {brand_user.id}")
+                    # If escrow failed, also notify admin/support
+                    if not escrow_released and escrow_error:
+                        # TODO: Send email or create support ticket for admin
+                        print(f"[APPROVE_DELIVERABLE] ADMIN ALERT: Escrow release failed for collaboration {collaboration.id}")
+                        print(f"[APPROVE_DELIVERABLE] ADMIN ALERT: Error - {escrow_error}")
 
-                # If escrow failed, also notify admin/support
-                if not escrow_released and escrow_error:
-                    # TODO: Send email or create support ticket for admin
-                    print(f"[APPROVE_DELIVERABLE] ADMIN ALERT: Escrow release failed for collaboration {collaboration.id}")
-                    print(f"[APPROVE_DELIVERABLE] ADMIN ALERT: Error - {escrow_error}")
-
-            except Exception as e:
-                print(f"[APPROVE_DELIVERABLE] WARNING: Failed to send notifications: {str(e)}")
-                # Don't fail the approval
+                except Exception as e:
+                    print(f"[APPROVE_DELIVERABLE] WARNING: Failed to send notifications: {str(e)}")
+                    # Don't fail the approval
         else:
             # Normal update
             collaboration.last_update = f"Deliverable approved: {deliverable_to_approve.title}"
