@@ -790,9 +790,10 @@ const CollaborationDetails = () => {
 
                 {/* Expected Posts with Direct URL Submission */}
                 <div className="space-y-4">
-                  {collaboration.deliverables?.map((deliverable, idx) => {
-                    // For NO track, check if URL has been submitted for this expected deliverable
-                    const submittedPost = collaboration.submitted_deliverables?.find(d => d.title === deliverable || idx === collaboration.submitted_deliverables.indexOf(d));
+                  {collaboration.deliverables?.map((deliverableName, idx) => {
+                    // For NO track, find matching record from submitted_deliverables or package_deliverables
+                    const submittedPost = collaboration.submitted_deliverables?.find(d => d.title === deliverableName) ||
+                                         collaboration.package_deliverables?.find(d => d.title === deliverableName);
 
                     return (
                       <div key={idx} className={`rounded-lg p-4 border-2 ${submittedPost?.post_url ? 'border-green-200 bg-green-50' : 'border-gray-200 bg-gray-50'}`}>
@@ -801,7 +802,7 @@ const CollaborationDetails = () => {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                           </svg>
                           <div className="flex-1">
-                            <h3 className="font-medium text-gray-900 mb-1">{deliverable}</h3>
+                            <h3 className="font-medium text-gray-900 mb-1">{deliverableName}</h3>
                             {submittedPost?.post_url ? (
                               <span className="text-xs text-green-700">✓ URL Submitted</span>
                             ) : (
@@ -811,45 +812,52 @@ const CollaborationDetails = () => {
                         </div>
 
                         {/* URL Input or Display */}
-                        {submittedPost ? (
-                          submittedPost.post_url ? (
-                            <div>
-                              <a
-                                href={submittedPost.post_url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-sm text-primary hover:text-primary-dark flex items-center gap-1 mb-3"
-                              >
-                                View Live Post
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                                </svg>
-                              </a>
+                        {submittedPost?.post_url ? (
+                          <div>
+                            <a
+                              href={submittedPost.post_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-sm text-primary hover:text-primary-dark flex items-center gap-1 mb-3"
+                            >
+                              View Live Post
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                              </svg>
+                            </a>
 
-                              {/* Post Performance Metrics */}
-                              {submittedPost.url_validation_status === 'valid' && (
-                                <PostMetricsDisplay
-                                  collaborationId={parseInt(id)}
-                                  deliverableId={submittedPost.id}
-                                  deliverable={submittedPost}
-                                  milestoneId={null}
-                                  isBrand={isBrand}
-                                  collaborationAmount={collaboration.amount}
-                                />
-                              )}
-                            </div>
-                          ) : !isBrand && (
-                            <DeliverableURLInput
-                              collaborationId={parseInt(id)}
-                              deliverableId={submittedPost.id}
-                              deliverable={submittedPost}
-                              onSuccess={() => fetchCollaboration()}
-                            />
-                          )
-                        ) : !isBrand && (
-                          <div className="text-sm text-gray-600">
-                            Post this content live on your social media, then submit the URL here.
+                            {/* Post Performance Metrics */}
+                            {submittedPost.url_validation_status === 'valid' && (
+                              <PostMetricsDisplay
+                                collaborationId={parseInt(id)}
+                                deliverableId={submittedPost.id}
+                                deliverable={submittedPost}
+                                milestoneId={null}
+                                isBrand={isBrand}
+                                collaborationAmount={collaboration.amount}
+                              />
+                            )}
                           </div>
+                        ) : (
+                          // Show URL input for creator, or waiting message for brand
+                          !isBrand ? (
+                            submittedPost ? (
+                              <DeliverableURLInput
+                                collaborationId={parseInt(id)}
+                                deliverableId={submittedPost.id}
+                                deliverable={submittedPost}
+                                onSuccess={() => fetchCollaboration()}
+                              />
+                            ) : (
+                              <div className="text-sm text-gray-600 bg-blue-50 border border-blue-200 rounded p-3">
+                                Post this content live on your social media first. Once posted, you'll be able to submit your post URL here.
+                              </div>
+                            )
+                          ) : (
+                            <div className="text-sm text-gray-600">
+                              Waiting for creator to post and submit URL...
+                            </div>
+                          )
                         )}
                       </div>
                     );
