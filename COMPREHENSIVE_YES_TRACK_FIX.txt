@@ -1,0 +1,19 @@
+COMPREHENSIVE FIX FOR ALL 6 YES TRACK BUGS
+
+The current implementation has two sections (lines 511-705):
+1. "Draft Deliverables (Pending Review)" (lines 511-595) - Standalone section
+2. "CONTENT REVIEW = YES" (lines 597-705) - Conditional section
+
+PROBLEM: These sections duplicate functionality and the YES track section shows "Live Posts" during content review stage.
+
+SOLUTION: Replace BOTH sections (lines 511-705) with a single comprehensive YES track implementation that:
+
+1. Shows "Expected Content" list
+2. Shows "Content Pending Review" section ONLY when totalDrafts > 0
+3. Shows submit button when no drafts AND can submit more
+4. Shows "Live Posts" section ONLY when content is approved (totalApproved > 0)
+5. Adds creator notification after approval (Bug E)
+6. Adds brand waiting state after approval (Bug F)
+7. Replaces ALL "deliverable" language with "content" language (Bug C)
+
+The DeliverableURLInput component (Bug D) needs separate fix to NOT pre-populate with deliverable.url

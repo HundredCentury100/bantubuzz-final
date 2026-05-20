@@ -508,114 +508,12 @@ const CollaborationDetails = () => {
               </div>
             )}
 
-            {/* Draft Deliverables (Pending Review) */}
-            {totalDrafts > 0 && (
-              <div className="bg-white rounded-lg shadow p-6">
-                <h2 className="text-xl font-bold text-gray-900 mb-4">
-                  Deliverables Pending Review ({totalDrafts})
-                </h2>
-                <div className="space-y-4">
-                  {collaboration.draft_deliverables.map((deliverable) => (
-                    <div key={deliverable.id} className="border-2 border-yellow-200 rounded-lg p-4 bg-yellow-50">
-                      <div className="flex items-start justify-between mb-2">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <h4 className="font-medium text-gray-900">{deliverable.title}</h4>
-                            {getDeliverableStatusBadge(deliverable.status)}
-                          </div>
-                          <span className="text-xs text-gray-500">
-                            Submitted {new Date(deliverable.submitted_at).toLocaleDateString()}
-                          </span>
-                        </div>
-                      </div>
-                      {deliverable.description && (
-                        <p className="text-sm text-gray-600 mb-3">{deliverable.description}</p>
-                      )}
-                      {deliverable.revision_notes && (
-                        <div className="bg-orange-100 border border-orange-200 rounded p-3 mb-3">
-                          <p className="text-xs font-medium text-orange-900 mb-1">Revision Requested:</p>
-                          <p className="text-sm text-orange-800">{deliverable.revision_notes}</p>
-                          <p className="text-xs text-orange-600 mt-1">
-                            {new Date(deliverable.revision_requested_at).toLocaleString()}
-                          </p>
-                        </div>
-                      )}
-                      <div className="flex items-center gap-3">
-                        <a
-                          href={deliverable.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-sm text-primary hover:text-primary-dark flex items-center gap-1"
-                        >
-                          View Deliverable
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                          </svg>
-                        </a>
-                        {!isBrand && deliverable.status === 'revision_requested' && collaboration.status === 'in_progress' && (
-                          <button
-                            onClick={() => {
-                              setEditingDeliverable(deliverable);
-                              setDeliverableTitle(deliverable.title);
-                              setDeliverableUrl(deliverable.url);
-                              setDeliverableDescription(deliverable.description || '');
-                              setShowDeliverableModal(true);
-                            }}
-                            className="ml-auto px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white text-sm font-medium rounded-lg transition-colors"
-                          >
-                            Edit & Resubmit
-                          </button>
-                        )}
-                        {isBrand && collaboration.status === 'in_progress' && (
-                          <div className="ml-auto flex gap-2">
-                            <button
-                              onClick={() => handleApproveDeliverable(deliverable.id)}
-                              disabled={approvingDeliverable === deliverable.id}
-                              className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                              {approvingDeliverable === deliverable.id ? 'Approving...' : 'Approve'}
-                            </button>
-                            <button
-                              onClick={() => {
-                                setSelectedDeliverableForRevision(deliverable);
-                                setShowRevisionModal(true);
-                              }}
-                              disabled={approvingDeliverable === deliverable.id}
-                              className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                            >
-                              Request Revision
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* CONTENT REVIEW = YES: Draft Review Workflow */}
+            {/* CONTENT REVIEW = YES: Two-Stage Workflow */}
             {collaboration.requires_content_review && (
-              <div className="bg-white rounded-lg shadow p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h2 className="text-xl font-bold text-gray-900">
-                    Content Review Workflow
-                  </h2>
-                  {!isBrand && collaboration.status === 'in_progress' && totalDrafts === 0 && (
-                    <button
-                      onClick={() => setShowDeliverableModal(true)}
-                      disabled={!canSubmitNewDeliverable}
-                      className="px-4 py-2 bg-primary hover:bg-primary-dark text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                      title={!canSubmitNewDeliverable ? `Maximum ${expectedDeliverablesCount} deliverables allowed for this collaboration` : ''}
-                    >
-                      Submit Draft Content
-                    </button>
-                  )}
-                </div>
-
-                {/* Expected Posts */}
-                <div className="mb-6 bg-gray-50 rounded-lg p-4">
-                  <h3 className="text-sm font-medium text-gray-700 mb-3">Expected Posts:</h3>
+              <div className="space-y-6">
+                {/* Expected Content Section */}
+                <div className="bg-white rounded-lg shadow p-6">
+                  <h2 className="text-xl font-bold text-gray-900 mb-4">Expected Content</h2>
                   <ul className="space-y-2">
                     {collaboration.deliverables?.map((deliverable, idx) => (
                       <li key={idx} className="flex items-start gap-2 text-gray-700">
@@ -628,12 +526,151 @@ const CollaborationDetails = () => {
                   </ul>
                 </div>
 
-                {/* Live Posts (After Approval) */}
-                <div>
-                  <h3 className="text-sm font-medium text-gray-700 mb-3">
-                    Live Posts ({totalApproved}/{totalExpected})
-                  </h3>
-                  {collaboration.submitted_deliverables && collaboration.submitted_deliverables.length > 0 ? (
+                {/* STAGE 1: Content Pending Review */}
+                {totalDrafts > 0 && (
+                  <div className="bg-white rounded-lg shadow p-6">
+                    <h2 className="text-xl font-bold text-gray-900 mb-4">
+                      Content Pending Review ({totalDrafts})
+                    </h2>
+                    <div className="space-y-4">
+                      {collaboration.draft_deliverables.map((deliverable) => (
+                        <div key={deliverable.id} className="border-2 border-yellow-200 rounded-lg p-4 bg-yellow-50">
+                          <div className="flex items-start justify-between mb-2">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <h4 className="font-medium text-gray-900">{deliverable.title}</h4>
+                                {getDeliverableStatusBadge(deliverable.status)}
+                              </div>
+                              <span className="text-xs text-gray-500">
+                                Submitted {new Date(deliverable.submitted_at).toLocaleDateString()}
+                              </span>
+                            </div>
+                          </div>
+                          {deliverable.description && (
+                            <p className="text-sm text-gray-600 mb-3">{deliverable.description}</p>
+                          )}
+                          {deliverable.revision_notes && (
+                            <div className="bg-orange-100 border border-orange-200 rounded p-3 mb-3">
+                              <p className="text-xs font-medium text-orange-900 mb-1">Revision Requested:</p>
+                              <p className="text-sm text-orange-800">{deliverable.revision_notes}</p>
+                              <p className="text-xs text-orange-600 mt-1">
+                                {new Date(deliverable.revision_requested_at).toLocaleString()}
+                              </p>
+                            </div>
+                          )}
+                          <div className="flex items-center gap-3">
+                            <a
+                              href={deliverable.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-sm text-primary hover:text-primary-dark flex items-center gap-1"
+                            >
+                              View Content
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                              </svg>
+                            </a>
+                            {!isBrand && deliverable.status === 'revision_requested' && collaboration.status === 'in_progress' && (
+                              <button
+                                onClick={() => {
+                                  setEditingDeliverable(deliverable);
+                                  setDeliverableTitle(deliverable.title);
+                                  setDeliverableUrl(deliverable.url);
+                                  setDeliverableDescription(deliverable.description || '');
+                                  setShowDeliverableModal(true);
+                                }}
+                                className="ml-auto px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white text-sm font-medium rounded-lg transition-colors"
+                              >
+                                Edit & Resubmit
+                              </button>
+                            )}
+                            {isBrand && collaboration.status === 'in_progress' && (
+                              <div className="ml-auto flex gap-2">
+                                <button
+                                  onClick={() => handleApproveDeliverable(deliverable.id)}
+                                  disabled={approvingDeliverable === deliverable.id}
+                                  className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                  {approvingDeliverable === deliverable.id ? 'Approving...' : 'Approve Content'}
+                                </button>
+                                <button
+                                  onClick={() => {
+                                    setSelectedDeliverableForRevision(deliverable);
+                                    setShowRevisionModal(true);
+                                  }}
+                                  disabled={approvingDeliverable === deliverable.id}
+                                  className="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                  Request Revision
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Creator Submit Button (only when no drafts pending AND can submit more) */}
+                {!isBrand && collaboration.status === 'in_progress' && totalDrafts === 0 && canSubmitNewDeliverable && (
+                  <div className="bg-white rounded-lg shadow p-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="text-lg font-semibold text-gray-900">Ready to Submit Content?</h3>
+                        <p className="text-sm text-gray-600 mt-1">Submit your draft content for brand review</p>
+                      </div>
+                      <button
+                        onClick={() => setShowDeliverableModal(true)}
+                        className="px-6 py-3 bg-primary hover:bg-primary-dark text-white font-medium rounded-lg transition-colors"
+                      >
+                        Submit Content for Review
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* STAGE 2: Live Posts (Only appears when content is approved) */}
+                {collaboration.submitted_deliverables && collaboration.submitted_deliverables.length > 0 && (
+                  <div className="bg-white rounded-lg shadow p-6">
+                    <h2 className="text-xl font-bold text-gray-900 mb-4">
+                      Live Posts ({totalApproved}/{totalExpected})
+                    </h2>
+
+                    {/* Notification for Creator after approval */}
+                    {!isBrand && collaboration.submitted_deliverables.some(d => !d.post_url) && (
+                      <div className="mb-6 bg-green-50 border-2 border-green-300 rounded-lg p-4">
+                        <div className="flex items-start gap-3">
+                          <svg className="w-6 h-6 text-green-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          <div>
+                            <p className="font-semibold text-green-900 mb-1">Your content has been approved!</p>
+                            <p className="text-sm text-green-800">
+                              You can now post it live on your social media platforms and submit your post URL{collaboration.submitted_deliverables.filter(d => !d.post_url).length > 1 ? 's' : ''} here.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Waiting state for Brand after approval */}
+                    {isBrand && collaboration.submitted_deliverables.some(d => !d.post_url) && (
+                      <div className="mb-6 bg-blue-50 border-2 border-blue-200 rounded-lg p-4">
+                        <div className="flex items-start gap-3">
+                          <svg className="w-6 h-6 text-blue-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          <div>
+                            <p className="font-semibold text-blue-900 mb-1">Content approved. Waiting for creator to post live.</p>
+                            <p className="text-sm text-blue-800">
+                              The creator will post the approved content to their social media and submit their URL{collaboration.submitted_deliverables.filter(d => !d.post_url).length > 1 ? 's' : ''} here.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
                     <div className="space-y-3">
                       {collaboration.submitted_deliverables.map((deliverable, idx) => (
                         <div key={idx} className="border-2 border-green-200 rounded-lg p-4 bg-green-50">
@@ -659,7 +696,7 @@ const CollaborationDetails = () => {
                             rel="noopener noreferrer"
                             className="text-sm text-primary hover:text-primary-dark flex items-center gap-1 mb-3"
                           >
-                            View Draft Content
+                            View Approved Content
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                             </svg>
@@ -691,16 +728,21 @@ const CollaborationDetails = () => {
                         </div>
                       ))}
                     </div>
-                  ) : (
+                  </div>
+                )}
+
+                {/* No content submitted yet message */}
+                {totalDrafts === 0 && totalApproved === 0 && (
+                  <div className="bg-white rounded-lg shadow p-6">
                     <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                       <p className="text-sm text-blue-800">
                         {isBrand
                           ? 'Waiting for creator to submit draft content for review.'
-                          : 'Submit your draft content above. Brand will review and approve before you post live.'}
+                          : 'Submit your draft content for brand review above.'}
                       </p>
                     </div>
-                  )}
-                </div>
+                  </div>
+                )}
               </div>
             )}
 

@@ -25,7 +25,7 @@ const DeliverableURLInput = ({
   deliverable,
   onSuccess
 }) => {
-  const [postUrl, setPostUrl] = useState(deliverable?.url || '');
+  const [postUrl, setPostUrl] = useState(deliverable?.post_url || '');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [showInput, setShowInput] = useState(!deliverable?.post_url_validated);
