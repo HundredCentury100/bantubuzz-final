@@ -15,6 +15,7 @@ class PackageDeliverable(db.Model):
     url = db.Column(db.Text, nullable=True)  # Made nullable since URL is submitted later
     description = db.Column(db.Text, nullable=True)
     platform = db.Column(db.String(50), nullable=True)  # For multi-platform packages: Instagram, Facebook, LinkedIn, TikTok, YouTube
+    deliverable_type = db.Column(db.String(20), default='draft')  # draft, live_post - for YES/NO track differentiation
     status = db.Column(db.String(20), default='pending_review')  # pending_review, revision_requested, approved
     submitted_at = db.Column(db.DateTime, default=datetime.utcnow)
     approved_at = db.Column(db.DateTime, nullable=True)
@@ -63,6 +64,7 @@ class PackageDeliverable(db.Model):
             'url': self.url,
             'description': self.description,
             'platform': self.platform,  # Platform for multi-platform packages
+            'deliverable_type': self.deliverable_type,  # draft or live_post
             'status': self.status,
             'submitted_at': self.submitted_at.isoformat() if self.submitted_at else None,
             'approved_at': self.approved_at.isoformat() if self.approved_at else None,
