@@ -896,6 +896,26 @@ def cart_bank_transfer():
         if not package_ids:
             return jsonify({'error': 'No packages provided'}), 400
 
+        # Get collaboration details from request
+        collab_details = data.get('collaboration_details', {})
+        requires_content_review = data.get('requires_content_review', True)
+
+        # Validate required collaboration fields
+        if not collab_details.get('brief'):
+            return jsonify({'error': 'Brief is required - describe what you want the creator to do'}), 400
+        if not collab_details.get('guidelines'):
+            return jsonify({'error': 'Guidelines are required - provide brief & guidelines for the creator'}), 400
+
+        # Prepare collaboration details JSON to store in booking notes
+        import json
+        collaboration_data = {
+            'requires_content_review': requires_content_review,
+            'brief': collab_details.get('brief'),
+            'guidelines': collab_details.get('guidelines'),
+            'rules': collab_details.get('rules'),
+            'additional_notes': collab_details.get('additional_notes')
+        }
+
         # Create all bookings with bank_transfer payment method
         bookings = []
         total = 0.0
@@ -911,7 +931,8 @@ def cart_bank_transfer():
                 amount=package.price,
                 total_price=package.price,
                 payment_method='bank_transfer',
-                payment_status='pending'
+                payment_status='pending',
+                notes=json.dumps(collaboration_data)  # Store collaboration details
             )
             db.session.add(booking)
             db.session.flush()
@@ -972,6 +993,16 @@ def cart_pay_with_wallet():
         if not package_ids:
             return jsonify({'error': 'No packages provided'}), 400
 
+        # Get collaboration details from request
+        collab_details = data.get('collaboration_details', {})
+        requires_content_review = data.get('requires_content_review', True)
+
+        # Validate required collaboration fields
+        if not collab_details.get('brief'):
+            return jsonify({'error': 'Brief is required - describe what you want the creator to do'}), 400
+        if not collab_details.get('guidelines'):
+            return jsonify({'error': 'Guidelines are required - provide brief & guidelines for the creator'}), 400
+
         # Calculate total
         packages = []
         total = 0.0
@@ -990,6 +1021,16 @@ def cart_pay_with_wallet():
                 'available': brand_wallet_service.calculate_brand_wallet_balance(user_id).available_balance
             }), 400
 
+        # Prepare collaboration details JSON to store in booking notes
+        import json
+        collaboration_data = {
+            'requires_content_review': requires_content_review,
+            'brief': collab_details.get('brief'),
+            'guidelines': collab_details.get('guidelines'),
+            'rules': collab_details.get('rules'),
+            'additional_notes': collab_details.get('additional_notes')
+        }
+
         # Create all bookings
         bookings = []
         for package in packages:
@@ -1003,7 +1044,8 @@ def cart_pay_with_wallet():
                 payment_status='paid',
                 escrow_status='escrowed',
                 escrowed_at=datetime.utcnow(),
-                status='accepted'
+                status='accepted',
+                notes=json.dumps(collaboration_data)  # Store collaboration details
             )
             db.session.add(booking)
             db.session.flush()  # Get booking IDs
@@ -1024,6 +1066,13 @@ def cart_pay_with_wallet():
             if package.duration_days:
                 expected_completion = start_date + timedelta(days=package.duration_days)
 
+            # Properly handle requires_content_review boolean
+            # Handle string "false" / "true" that might come from JSON
+            if isinstance(requires_content_review, str):
+                requires_review = requires_content_review.lower() not in ['false', '0', 'no']
+            else:
+                requires_review = bool(requires_content_review)
+
             collaboration = Collaboration(
                 collaboration_type='package',
                 booking_id=booking.id,
@@ -1036,7 +1085,13 @@ def cart_pay_with_wallet():
                 start_date=start_date,
                 expected_completion_date=expected_completion,
                 deliverables=package.deliverables if package.deliverables else [],
-                progress_percentage=0
+                progress_percentage=0,
+                # Add collaboration brief fields
+                requires_content_review=requires_review,
+                brief=collab_details.get('brief'),
+                guidelines=collab_details.get('guidelines'),
+                rules=collab_details.get('rules'),
+                additional_notes=collab_details.get('additional_notes')
             )
             db.session.add(collaboration)
             db.session.flush()
@@ -1607,6 +1662,24 @@ def verify_bank_transfer_payment(booking_id):
                     if package and package.duration_days:
                         expected_completion = start_date + timedelta(days=package.duration_days)
 
+                    # Get collaboration details from booking notes (if provided)
+                    collab_details = {}
+                    if booking.notes:
+                        try:
+                            import json
+                            collab_details = json.loads(booking.notes)
+                        except:
+                            pass
+
+                    # Properly handle requires_content_review boolean
+                    # Default to TRUE if not specified (YES track by default)
+                    requires_review = collab_details.get('requires_content_review', True)
+                    # Handle string "false" / "true" that might come from JSON
+                    if isinstance(requires_review, str):
+                        requires_review = requires_review.lower() not in ['false', '0', 'no']
+                    else:
+                        requires_review = bool(requires_review)
+
                     # Create collaboration
                     collaboration = Collaboration(
                         collaboration_type='package',
@@ -1620,7 +1693,13 @@ def verify_bank_transfer_payment(booking_id):
                         start_date=start_date,
                         expected_completion_date=expected_completion,
                         deliverables=package.deliverables if package and package.deliverables else [],
-                        progress_percentage=0
+                        progress_percentage=0,
+                        # Add collaboration brief fields from booking notes
+                        requires_content_review=requires_review,
+                        brief=collab_details.get('brief'),
+                        guidelines=collab_details.get('guidelines'),
+                        rules=collab_details.get('rules'),
+                        additional_notes=collab_details.get('additional_notes')
                     )
                     db.session.add(collaboration)
                     db.session.flush()
