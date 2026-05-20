@@ -741,6 +741,15 @@ def cart_payment_status():
                         except:
                             pass
 
+                    # Properly handle requires_content_review boolean
+                    # Default to TRUE if not specified (YES track by default)
+                    requires_review = collab_details.get('requires_content_review', True)
+                    # Handle string "false" / "true" that might come from JSON
+                    if isinstance(requires_review, str):
+                        requires_review = requires_review.lower() not in ['false', '0', 'no']
+                    else:
+                        requires_review = bool(requires_review)
+
                     collab = Collaboration(
                         collaboration_type='package',
                         booking_id=booking.id,
@@ -754,8 +763,8 @@ def cart_payment_status():
                         expected_completion_date=expected_completion,
                         deliverables=package.deliverables if package and package.deliverables else [],
                         progress_percentage=0,
-                        # New collaboration details fields - READ FROM TOP LEVEL, NOT collab_details dict
-                        requires_content_review=bool(collab_details.get('requires_content_review', True)),
+                        # Use properly parsed boolean value
+                        requires_content_review=requires_review,
                         brief=collab_details.get('brief'),
                         guidelines=collab_details.get('guidelines'),
                         rules=collab_details.get('rules'),
