@@ -508,43 +508,6 @@ const CollaborationDetails = () => {
               </div>
             )}
 
-            {/* Collaboration Brief (Visible to Both Creator and Brand) */}
-            {(collaboration.brief || collaboration.guidelines || collaboration.rules || collaboration.additional_notes) && (
-              <div className="bg-blue-50 border-2 border-blue-200 rounded-lg shadow p-6">
-                <h2 className="text-xl font-bold text-blue-900 mb-4">
-                  {isBrand ? 'Your Collaboration Brief' : 'Collaboration Brief from Brand'}
-                </h2>
-
-                {collaboration.brief && (
-                  <div className="mb-4">
-                    <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">What to Do</p>
-                    <p className="text-gray-900 whitespace-pre-wrap bg-white p-4 rounded-lg border border-blue-100">{collaboration.brief}</p>
-                  </div>
-                )}
-
-                {collaboration.guidelines && (
-                  <div className="mb-4">
-                    <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">Brief & Guidelines</p>
-                    <p className="text-gray-900 whitespace-pre-wrap bg-white p-4 rounded-lg border border-blue-100">{collaboration.guidelines}</p>
-                  </div>
-                )}
-
-                {collaboration.rules && (
-                  <div className="mb-4">
-                    <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">Rules & Expectations</p>
-                    <p className="text-gray-900 whitespace-pre-wrap bg-white p-4 rounded-lg border border-blue-100">{collaboration.rules}</p>
-                  </div>
-                )}
-
-                {collaboration.additional_notes && (
-                  <div>
-                    <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">Additional Notes</p>
-                    <p className="text-gray-900 whitespace-pre-wrap bg-white p-4 rounded-lg border border-blue-100">{collaboration.additional_notes}</p>
-                  </div>
-                )}
-              </div>
-            )}
-
             {/* CONTENT REVIEW = YES: Two-Stage Workflow */}
             {collaboration.requires_content_review && (
               <div className="space-y-6">
@@ -562,6 +525,43 @@ const CollaborationDetails = () => {
                     ))}
                   </ul>
                 </div>
+
+                {/* Collaboration Brief (Visible to Both Creator and Brand) */}
+                {(collaboration.brief || collaboration.guidelines || collaboration.rules || collaboration.additional_notes) && (
+                  <div className="bg-blue-50 border-2 border-blue-200 rounded-lg shadow p-6">
+                    <h2 className="text-xl font-bold text-blue-900 mb-4">
+                      {isBrand ? 'Your Collaboration Brief' : 'Collaboration Brief from Brand'}
+                    </h2>
+
+                    {collaboration.brief && (
+                      <div className="mb-4">
+                        <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">What to Do</p>
+                        <p className="text-gray-900 whitespace-pre-wrap bg-white p-4 rounded-lg border border-blue-100">{collaboration.brief}</p>
+                      </div>
+                    )}
+
+                    {collaboration.guidelines && (
+                      <div className="mb-4">
+                        <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">Brief & Guidelines</p>
+                        <p className="text-gray-900 whitespace-pre-wrap bg-white p-4 rounded-lg border border-blue-100">{collaboration.guidelines}</p>
+                      </div>
+                    )}
+
+                    {collaboration.rules && (
+                      <div className="mb-4">
+                        <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">Rules & Expectations</p>
+                        <p className="text-gray-900 whitespace-pre-wrap bg-white p-4 rounded-lg border border-blue-100">{collaboration.rules}</p>
+                      </div>
+                    )}
+
+                    {collaboration.additional_notes && (
+                      <div>
+                        <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">Additional Notes</p>
+                        <p className="text-gray-900 whitespace-pre-wrap bg-white p-4 rounded-lg border border-blue-100">{collaboration.additional_notes}</p>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* STAGE 1: Content Pending Review */}
                 {totalDrafts > 0 && (
@@ -785,6 +785,43 @@ const CollaborationDetails = () => {
                         ? '⏳ Waiting for creator to post live and submit their URLs.'
                         : '✍️ Your collaboration is active. Post your content live and submit your post URL below.'}
                     </p>
+                  </div>
+                )}
+
+                {/* Collaboration Brief (Visible to Both Creator and Brand) */}
+                {(collaboration.brief || collaboration.guidelines || collaboration.rules || collaboration.additional_notes) && (
+                  <div className="bg-blue-50 border-2 border-blue-200 rounded-lg shadow p-6 mb-6">
+                    <h2 className="text-xl font-bold text-blue-900 mb-4">
+                      {isBrand ? 'Your Collaboration Brief' : 'Collaboration Brief from Brand'}
+                    </h2>
+
+                    {collaboration.brief && (
+                      <div className="mb-4">
+                        <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">What to Do</p>
+                        <p className="text-gray-900 whitespace-pre-wrap bg-white p-4 rounded-lg border border-blue-100">{collaboration.brief}</p>
+                      </div>
+                    )}
+
+                    {collaboration.guidelines && (
+                      <div className="mb-4">
+                        <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">Brief & Guidelines</p>
+                        <p className="text-gray-900 whitespace-pre-wrap bg-white p-4 rounded-lg border border-blue-100">{collaboration.guidelines}</p>
+                      </div>
+                    )}
+
+                    {collaboration.rules && (
+                      <div className="mb-4">
+                        <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">Rules & Expectations</p>
+                        <p className="text-gray-900 whitespace-pre-wrap bg-white p-4 rounded-lg border border-blue-100">{collaboration.rules}</p>
+                      </div>
+                    )}
+
+                    {collaboration.additional_notes && (
+                      <div>
+                        <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">Additional Notes</p>
+                        <p className="text-gray-900 whitespace-pre-wrap bg-white p-4 rounded-lg border border-blue-100">{collaboration.additional_notes}</p>
+                      </div>
+                    )}
                   </div>
                 )}
 
