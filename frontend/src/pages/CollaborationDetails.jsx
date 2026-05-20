@@ -594,117 +594,220 @@ const CollaborationDetails = () => {
               </div>
             )}
 
-            {/* Approved Deliverables */}
-            <div className="bg-white rounded-lg shadow p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-bold text-gray-900">
-                  Approved Deliverables ({totalApproved}/{totalExpected})
-                </h2>
-                {!isBrand && collaboration.status === 'in_progress' && (
-                  <div>
+            {/* CONTENT REVIEW = YES: Draft Review Workflow */}
+            {collaboration.requires_content_review && (
+              <div className="bg-white rounded-lg shadow p-6">
+                <div className="flex items-center justify-between mb-4">
+                  <h2 className="text-xl font-bold text-gray-900">
+                    Content Review Workflow
+                  </h2>
+                  {!isBrand && collaboration.status === 'in_progress' && totalDrafts === 0 && (
                     <button
                       onClick={() => setShowDeliverableModal(true)}
                       disabled={!canSubmitNewDeliverable}
                       className="px-4 py-2 bg-primary hover:bg-primary-dark text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       title={!canSubmitNewDeliverable ? `Maximum ${expectedDeliverablesCount} deliverables allowed for this collaboration` : ''}
                     >
-                      Submit for Review
+                      Submit Draft Content
                     </button>
-                    {!canSubmitNewDeliverable && (
-                      <p className="text-xs text-gray-500 mt-1">
-                        Maximum of {expectedDeliverablesCount} deliverables reached. You can only edit existing deliverables.
-                      </p>
-                    )}
-                  </div>
-                )}
-              </div>
+                  )}
+                </div>
 
-              {/* Expected Deliverables */}
-              <div className="mb-6">
-                <h3 className="text-sm font-medium text-gray-700 mb-3">Expected:</h3>
-                <ul className="space-y-2">
-                  {collaboration.deliverables?.map((deliverable, idx) => (
-                    <li key={idx} className="flex items-start gap-2 text-gray-700">
-                      <svg className="w-5 h-5 text-gray-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                      <span>{deliverable}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
+                {/* Expected Posts */}
+                <div className="mb-6 bg-gray-50 rounded-lg p-4">
+                  <h3 className="text-sm font-medium text-gray-700 mb-3">Expected Posts:</h3>
+                  <ul className="space-y-2">
+                    {collaboration.deliverables?.map((deliverable, idx) => (
+                      <li key={idx} className="flex items-start gap-2 text-gray-700">
+                        <svg className="w-5 h-5 text-gray-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <span>{deliverable}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
 
-              {/* Submitted Deliverables */}
-              <div>
-                <h3 className="text-sm font-medium text-gray-700 mb-3">
-                  Submitted & Approved:
-                </h3>
-                {collaboration.submitted_deliverables && collaboration.submitted_deliverables.length > 0 ? (
-                  <div className="space-y-3">
-                    {collaboration.submitted_deliverables.map((deliverable, idx) => (
-                      <div key={idx} className="border-2 border-green-200 rounded-lg p-4 bg-green-50">
-                        <div className="flex items-start justify-between mb-2">
-                          <div>
-                            <div className="flex items-center gap-2">
-                              <h4 className="font-medium text-gray-900">{deliverable.title}</h4>
-                              <span className="px-2 py-1 rounded text-xs font-medium bg-green-100 text-green-800">
-                                Approved
+                {/* Live Posts (After Approval) */}
+                <div>
+                  <h3 className="text-sm font-medium text-gray-700 mb-3">
+                    Live Posts ({totalApproved}/{totalExpected})
+                  </h3>
+                  {collaboration.submitted_deliverables && collaboration.submitted_deliverables.length > 0 ? (
+                    <div className="space-y-3">
+                      {collaboration.submitted_deliverables.map((deliverable, idx) => (
+                        <div key={idx} className="border-2 border-green-200 rounded-lg p-4 bg-green-50">
+                          <div className="flex items-start justify-between mb-2">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <h4 className="font-medium text-gray-900">{deliverable.title}</h4>
+                                <span className="px-2 py-1 rounded text-xs font-medium bg-green-100 text-green-800">
+                                  Content Approved
+                                </span>
+                              </div>
+                              <span className="text-xs text-gray-500">
+                                Approved {new Date(deliverable.approved_at || deliverable.submitted_at).toLocaleDateString()}
                               </span>
                             </div>
-                            <span className="text-xs text-gray-500">
-                              {deliverable.approved_at
-                                ? `Approved ${new Date(deliverable.approved_at).toLocaleDateString()}`
-                                : `Submitted ${new Date(deliverable.submitted_at).toLocaleDateString()}`}
-                            </span>
                           </div>
+                          {deliverable.description && (
+                            <p className="text-sm text-gray-600 mb-2">{deliverable.description}</p>
+                          )}
+                          <a
+                            href={deliverable.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-sm text-primary hover:text-primary-dark flex items-center gap-1 mb-3"
+                          >
+                            View Draft Content
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                            </svg>
+                          </a>
+
+                          {/* Post URL Input for Live Post (Creator Only) */}
+                          {!isBrand && (
+                            <DeliverableURLInput
+                              collaborationId={parseInt(id)}
+                              deliverableId={deliverable.id}
+                              deliverable={deliverable}
+                              onSuccess={(updatedDeliverable) => {
+                                fetchCollaboration();
+                              }}
+                            />
+                          )}
+
+                          {/* Post Performance Metrics */}
+                          {deliverable.post_url && deliverable.url_validation_status === 'valid' && (
+                            <PostMetricsDisplay
+                              collaborationId={parseInt(id)}
+                              deliverableId={deliverable.id}
+                              deliverable={deliverable}
+                              milestoneId={null}
+                              isBrand={isBrand}
+                              collaborationAmount={collaboration.amount}
+                            />
+                          )}
                         </div>
-                        {deliverable.description && (
-                          <p className="text-sm text-gray-600 mb-2">{deliverable.description}</p>
-                        )}
-                        <a
-                          href={deliverable.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-sm text-primary hover:text-primary-dark flex items-center gap-1"
-                        >
-                          View Deliverable
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                          </svg>
-                        </a>
-
-                        {/* Post URL Input for Analytics (Creator Only) */}
-                        {!isBrand && (
-                          <DeliverableURLInput
-                            collaborationId={parseInt(id)}
-                            deliverableId={deliverable.id}
-                            deliverable={deliverable}
-                            onSuccess={(updatedDeliverable) => {
-                              // Refresh collaboration data to show updated deliverable
-                              fetchCollaboration();
-                            }}
-                          />
-                        )}
-
-                        {/* Post Performance Metrics (Phase 3 Analytics) */}
-                        {deliverable.post_url && deliverable.url_validation_status === 'valid' && (
-                          <PostMetricsDisplay
-                            collaborationId={parseInt(id)}
-                            deliverableId={deliverable.id}
-                            deliverable={deliverable}
-                            milestoneId={null}
-                            isBrand={isBrand}
-                            collaborationAmount={collaboration.amount}
-                          />
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-gray-500 text-sm">No approved deliverables yet</p>
-                )}
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                      <p className="text-sm text-blue-800">
+                        {isBrand
+                          ? 'Waiting for creator to submit draft content for review.'
+                          : 'Submit your draft content above. Brand will review and approve before you post live.'}
+                      </p>
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
+            )}
+
+            {/* CONTENT REVIEW = NO: Direct Post Workflow */}
+            {!collaboration.requires_content_review && (
+              <div className="bg-white rounded-lg shadow p-6">
+                <h2 className="text-xl font-bold text-gray-900 mb-4">
+                  Live Posts
+                </h2>
+
+                {/* Status Message */}
+                {!collaboration.live_urls_submitted_at && (
+                  <div className={`mb-6 rounded-lg p-4 border-2 ${isBrand ? 'bg-yellow-50 border-yellow-200' : 'bg-blue-50 border-blue-200'}`}>
+                    <p className={`text-sm font-medium ${isBrand ? 'text-yellow-900' : 'text-blue-900'}`}>
+                      {isBrand
+                        ? '⏳ Waiting for creator to post live and submit their URLs.'
+                        : '✍️ Your collaboration is active. Post your content live and submit your post URLs below.'}
+                    </p>
+                  </div>
+                )}
+
+                {/* Expected Posts */}
+                <div className="mb-6 bg-gray-50 rounded-lg p-4">
+                  <h3 className="text-sm font-medium text-gray-700 mb-3">Expected Posts:</h3>
+                  <ul className="space-y-2">
+                    {collaboration.deliverables?.map((deliverable, idx) => (
+                      <li key={idx} className="flex items-start gap-2 text-gray-700">
+                        <svg className="w-5 h-5 text-gray-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <span>{deliverable}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                {/* Live Posts with URL Submission */}
+                <div>
+                  <h3 className="text-sm font-medium text-gray-700 mb-3">
+                    Submit Live Post URLs ({totalApproved}/{totalExpected})
+                  </h3>
+                  {collaboration.submitted_deliverables && collaboration.submitted_deliverables.length > 0 ? (
+                    <div className="space-y-3">
+                      {collaboration.submitted_deliverables.map((deliverable, idx) => (
+                        <div key={idx} className="border-2 border-green-200 rounded-lg p-4 bg-green-50">
+                          <div className="flex items-start justify-between mb-2">
+                            <div className="flex-1">
+                              <h4 className="font-medium text-gray-900">{deliverable.title}</h4>
+                              <span className="text-xs text-gray-500">
+                                Posted {new Date(deliverable.submitted_at).toLocaleDateString()}
+                              </span>
+                            </div>
+                          </div>
+                          {deliverable.description && (
+                            <p className="text-sm text-gray-600 mb-2">{deliverable.description}</p>
+                          )}
+
+                          {/* Post URL Display or Input */}
+                          {deliverable.post_url ? (
+                            <a
+                              href={deliverable.post_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-sm text-primary hover:text-primary-dark flex items-center gap-1 mb-3"
+                            >
+                              View Live Post
+                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                              </svg>
+                            </a>
+                          ) : !isBrand && (
+                            <DeliverableURLInput
+                              collaborationId={parseInt(id)}
+                              deliverableId={deliverable.id}
+                              deliverable={deliverable}
+                              onSuccess={(updatedDeliverable) => {
+                                fetchCollaboration();
+                              }}
+                            />
+                          )}
+
+                          {/* Post Performance Metrics */}
+                          {deliverable.post_url && deliverable.url_validation_status === 'valid' && (
+                            <PostMetricsDisplay
+                              collaborationId={parseInt(id)}
+                              deliverableId={deliverable.id}
+                              deliverable={deliverable}
+                              milestoneId={null}
+                              isBrand={isBrand}
+                              collaborationAmount={collaboration.amount}
+                            />
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                      <p className="text-sm text-gray-600">
+                        {isBrand
+                          ? 'No live posts submitted yet. Waiting for creator.'
+                          : 'Post your content live on your social platforms, then come back here to submit the post URLs.'}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
 
             {/* Revision History */}
             {collaboration.revision_requests && collaboration.revision_requests.length > 0 && (
@@ -742,10 +845,12 @@ const CollaborationDetails = () => {
               />
             )}
 
-            {/* Collaboration Brief (Visible to Creator) */}
-            {!isBrand && (collaboration.brief || collaboration.guidelines || collaboration.rules || collaboration.additional_notes) && (
+            {/* Collaboration Brief (Visible to Both Creator and Brand) */}
+            {(collaboration.brief || collaboration.guidelines || collaboration.rules || collaboration.additional_notes) && (
               <div className="bg-blue-50 border-2 border-blue-200 rounded-lg shadow p-6">
-                <h2 className="text-xl font-bold text-blue-900 mb-4">Collaboration Brief from Brand</h2>
+                <h2 className="text-xl font-bold text-blue-900 mb-4">
+                  {isBrand ? 'Your Collaboration Brief' : 'Collaboration Brief from Brand'}
+                </h2>
 
                 {collaboration.brief && (
                   <div className="mb-4">
