@@ -754,8 +754,8 @@ def cart_payment_status():
                         expected_completion_date=expected_completion,
                         deliverables=package.deliverables if package and package.deliverables else [],
                         progress_percentage=0,
-                        # New collaboration details fields
-                        requires_content_review=collab_details.get('requires_content_review', True),
+                        # New collaboration details fields - READ FROM TOP LEVEL, NOT collab_details dict
+                        requires_content_review=bool(collab_details.get('requires_content_review', True)),
                         brief=collab_details.get('brief'),
                         guidelines=collab_details.get('guidelines'),
                         rules=collab_details.get('rules'),
