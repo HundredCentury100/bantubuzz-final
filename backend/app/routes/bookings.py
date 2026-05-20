@@ -50,6 +50,52 @@ def create_multiplatform_deliverables(collaboration, package):
             db.session.add(platform_deliverable)
 
 
+def create_no_track_deliverables(collaboration):
+    """
+    Auto-create PackageDeliverable records for NO track collaborations.
+
+    For NO track (requires_content_review=FALSE), creators post directly without draft review.
+    We need to create deliverable records upfront so they can submit URLs immediately.
+
+    This function creates one PackageDeliverable record for each expected deliverable
+    with status='approved' (since there's no review needed) and deliverable_type='live_post'.
+    """
+    if collaboration.requires_content_review:
+        # YES track - deliverables created when creator submits drafts
+        return
+
+    if not collaboration.deliverables:
+        # No expected deliverables defined
+        return
+
+    from app.models.package_deliverable import PackageDeliverable
+    from datetime import datetime
+
+    print(f"[NO_TRACK] Creating {len(collaboration.deliverables)} deliverable records for collaboration {collaboration.id}")
+
+    for deliverable_title in collaboration.deliverables:
+        # Check if record already exists
+        existing = PackageDeliverable.query.filter_by(
+            collaboration_id=collaboration.id,
+            title=deliverable_title
+        ).first()
+
+        if not existing:
+            # Create deliverable record for NO track
+            deliverable = PackageDeliverable(
+                collaboration_id=collaboration.id,
+                title=deliverable_title,
+                deliverable_type='live_post',  # NO track = direct live post
+                status='approved',  # No review needed, ready for URL submission
+                submitted_at=datetime.utcnow(),  # Mark as "submitted" since no draft stage
+                description=f"Post live and submit URL for: {deliverable_title}"
+            )
+            db.session.add(deliverable)
+            print(f"[NO_TRACK] Created deliverable: {deliverable_title}")
+        else:
+            print(f"[NO_TRACK] Deliverable already exists: {deliverable_title}")
+
+
 @bp.route('/', methods=['GET'])
 @jwt_required()
 def get_bookings():
@@ -721,6 +767,9 @@ def cart_payment_status():
                     # Auto-create platform-specific deliverables for multi-platform packages
                     create_multiplatform_deliverables(collab, package)
 
+                    # Auto-create deliverable records for NO track collaborations
+                    create_no_track_deliverables(collab)
+
                     # Send email to creator about auto-accepted booking
                     creator = CreatorProfile.query.get(booking.creator_id)
                     if creator:
@@ -985,6 +1034,9 @@ def cart_pay_with_wallet():
 
             # Auto-create platform-specific deliverables
             create_multiplatform_deliverables(collaboration, package)
+
+            # Auto-create deliverable records for NO track collaborations
+            create_no_track_deliverables(collaboration)
 
             # Send email to creator about auto-accepted booking
             creator_user = User.query.get(package.creator.user_id)
@@ -1566,6 +1618,9 @@ def verify_bank_transfer_payment(booking_id):
 
                     # Auto-create platform-specific deliverables
                     create_multiplatform_deliverables(collaboration, package)
+
+                    # Auto-create deliverable records for NO track collaborations
+                    create_no_track_deliverables(collaboration)
 
                     # Send email to creator about auto-accepted booking
                     creator = CreatorProfile.query.get(booking.creator_id)
