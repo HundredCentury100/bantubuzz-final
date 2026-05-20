@@ -508,6 +508,43 @@ const CollaborationDetails = () => {
               </div>
             )}
 
+            {/* Collaboration Brief (Visible to Both Creator and Brand) */}
+            {(collaboration.brief || collaboration.guidelines || collaboration.rules || collaboration.additional_notes) && (
+              <div className="bg-blue-50 border-2 border-blue-200 rounded-lg shadow p-6">
+                <h2 className="text-xl font-bold text-blue-900 mb-4">
+                  {isBrand ? 'Your Collaboration Brief' : 'Collaboration Brief from Brand'}
+                </h2>
+
+                {collaboration.brief && (
+                  <div className="mb-4">
+                    <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">What to Do</p>
+                    <p className="text-gray-900 whitespace-pre-wrap bg-white p-4 rounded-lg border border-blue-100">{collaboration.brief}</p>
+                  </div>
+                )}
+
+                {collaboration.guidelines && (
+                  <div className="mb-4">
+                    <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">Brief & Guidelines</p>
+                    <p className="text-gray-900 whitespace-pre-wrap bg-white p-4 rounded-lg border border-blue-100">{collaboration.guidelines}</p>
+                  </div>
+                )}
+
+                {collaboration.rules && (
+                  <div className="mb-4">
+                    <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">Rules & Expectations</p>
+                    <p className="text-gray-900 whitespace-pre-wrap bg-white p-4 rounded-lg border border-blue-100">{collaboration.rules}</p>
+                  </div>
+                )}
+
+                {collaboration.additional_notes && (
+                  <div>
+                    <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">Additional Notes</p>
+                    <p className="text-gray-900 whitespace-pre-wrap bg-white p-4 rounded-lg border border-blue-100">{collaboration.additional_notes}</p>
+                  </div>
+                )}
+              </div>
+            )}
+
             {/* CONTENT REVIEW = YES: Two-Stage Workflow */}
             {collaboration.requires_content_review && (
               <div className="space-y-6">
@@ -730,23 +767,10 @@ const CollaborationDetails = () => {
                     </div>
                   </div>
                 )}
-
-                {/* No content submitted yet message */}
-                {totalDrafts === 0 && totalApproved === 0 && (
-                  <div className="bg-white rounded-lg shadow p-6">
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                      <p className="text-sm text-blue-800">
-                        {isBrand
-                          ? 'Waiting for creator to submit draft content for review.'
-                          : 'Submit your draft content for brand review above.'}
-                      </p>
-                    </div>
-                  </div>
-                )}
               </div>
             )}
 
-            {/* CONTENT REVIEW = NO: Direct Post Workflow */}
+            {/* CONTENT REVIEW = NO: Direct Post Workflow - No Draft Review */}
             {!collaboration.requires_content_review && (
               <div className="bg-white rounded-lg shadow p-6">
                 <h2 className="text-xl font-bold text-gray-900 mb-4">
@@ -759,94 +783,77 @@ const CollaborationDetails = () => {
                     <p className={`text-sm font-medium ${isBrand ? 'text-yellow-900' : 'text-blue-900'}`}>
                       {isBrand
                         ? '⏳ Waiting for creator to post live and submit their URLs.'
-                        : '✍️ Your collaboration is active. Post your content live and submit your post URLs below.'}
+                        : '✍️ Your collaboration is active. Post your content live and submit your post URL below.'}
                     </p>
                   </div>
                 )}
 
-                {/* Expected Posts */}
-                <div className="mb-6 bg-gray-50 rounded-lg p-4">
-                  <h3 className="text-sm font-medium text-gray-700 mb-3">Expected Posts:</h3>
-                  <ul className="space-y-2">
-                    {collaboration.deliverables?.map((deliverable, idx) => (
-                      <li key={idx} className="flex items-start gap-2 text-gray-700">
-                        <svg className="w-5 h-5 text-gray-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        <span>{deliverable}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+                {/* Expected Posts with Direct URL Submission */}
+                <div className="space-y-4">
+                  {collaboration.deliverables?.map((deliverable, idx) => {
+                    // For NO track, check if URL has been submitted for this expected deliverable
+                    const submittedPost = collaboration.submitted_deliverables?.find(d => d.title === deliverable || idx === collaboration.submitted_deliverables.indexOf(d));
 
-                {/* Live Posts with URL Submission */}
-                <div>
-                  <h3 className="text-sm font-medium text-gray-700 mb-3">
-                    Submit Live Post URLs ({totalApproved}/{totalExpected})
-                  </h3>
-                  {collaboration.submitted_deliverables && collaboration.submitted_deliverables.length > 0 ? (
-                    <div className="space-y-3">
-                      {collaboration.submitted_deliverables.map((deliverable, idx) => (
-                        <div key={idx} className="border-2 border-green-200 rounded-lg p-4 bg-green-50">
-                          <div className="flex items-start justify-between mb-2">
-                            <div className="flex-1">
-                              <h4 className="font-medium text-gray-900">{deliverable.title}</h4>
-                              <span className="text-xs text-gray-500">
-                                Posted {new Date(deliverable.submitted_at).toLocaleDateString()}
-                              </span>
-                            </div>
+                    return (
+                      <div key={idx} className={`rounded-lg p-4 border-2 ${submittedPost?.post_url ? 'border-green-200 bg-green-50' : 'border-gray-200 bg-gray-50'}`}>
+                        <div className="flex items-start gap-3 mb-3">
+                          <svg className={`w-6 h-6 flex-shrink-0 mt-0.5 ${submittedPost?.post_url ? 'text-green-600' : 'text-gray-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          <div className="flex-1">
+                            <h3 className="font-medium text-gray-900 mb-1">{deliverable}</h3>
+                            {submittedPost?.post_url ? (
+                              <span className="text-xs text-green-700">✓ URL Submitted</span>
+                            ) : (
+                              <span className="text-xs text-gray-600">Pending URL submission</span>
+                            )}
                           </div>
-                          {deliverable.description && (
-                            <p className="text-sm text-gray-600 mb-2">{deliverable.description}</p>
-                          )}
+                        </div>
 
-                          {/* Post URL Display or Input */}
-                          {deliverable.post_url ? (
-                            <a
-                              href={deliverable.post_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-sm text-primary hover:text-primary-dark flex items-center gap-1 mb-3"
-                            >
-                              View Live Post
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                              </svg>
-                            </a>
+                        {/* URL Input or Display */}
+                        {submittedPost ? (
+                          submittedPost.post_url ? (
+                            <div>
+                              <a
+                                href={submittedPost.post_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-sm text-primary hover:text-primary-dark flex items-center gap-1 mb-3"
+                              >
+                                View Live Post
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                </svg>
+                              </a>
+
+                              {/* Post Performance Metrics */}
+                              {submittedPost.url_validation_status === 'valid' && (
+                                <PostMetricsDisplay
+                                  collaborationId={parseInt(id)}
+                                  deliverableId={submittedPost.id}
+                                  deliverable={submittedPost}
+                                  milestoneId={null}
+                                  isBrand={isBrand}
+                                  collaborationAmount={collaboration.amount}
+                                />
+                              )}
+                            </div>
                           ) : !isBrand && (
                             <DeliverableURLInput
                               collaborationId={parseInt(id)}
-                              deliverableId={deliverable.id}
-                              deliverable={deliverable}
-                              onSuccess={(updatedDeliverable) => {
-                                fetchCollaboration();
-                              }}
+                              deliverableId={submittedPost.id}
+                              deliverable={submittedPost}
+                              onSuccess={() => fetchCollaboration()}
                             />
-                          )}
-
-                          {/* Post Performance Metrics */}
-                          {deliverable.post_url && deliverable.url_validation_status === 'valid' && (
-                            <PostMetricsDisplay
-                              collaborationId={parseInt(id)}
-                              deliverableId={deliverable.id}
-                              deliverable={deliverable}
-                              milestoneId={null}
-                              isBrand={isBrand}
-                              collaborationAmount={collaboration.amount}
-                            />
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                      <p className="text-sm text-gray-600">
-                        {isBrand
-                          ? 'No live posts submitted yet. Waiting for creator.'
-                          : 'Post your content live on your social platforms, then come back here to submit the post URLs.'}
-                      </p>
-                    </div>
-                  )}
+                          )
+                        ) : !isBrand && (
+                          <div className="text-sm text-gray-600">
+                            Post this content live on your social media, then submit the URL here.
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -885,43 +892,6 @@ const CollaborationDetails = () => {
                 isBrand={isBrand}
                 collaborationAmount={collaboration.amount}
               />
-            )}
-
-            {/* Collaboration Brief (Visible to Both Creator and Brand) */}
-            {(collaboration.brief || collaboration.guidelines || collaboration.rules || collaboration.additional_notes) && (
-              <div className="bg-blue-50 border-2 border-blue-200 rounded-lg shadow p-6">
-                <h2 className="text-xl font-bold text-blue-900 mb-4">
-                  {isBrand ? 'Your Collaboration Brief' : 'Collaboration Brief from Brand'}
-                </h2>
-
-                {collaboration.brief && (
-                  <div className="mb-4">
-                    <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">What to Do</p>
-                    <p className="text-gray-900 whitespace-pre-wrap bg-white p-4 rounded-lg border border-blue-100">{collaboration.brief}</p>
-                  </div>
-                )}
-
-                {collaboration.guidelines && (
-                  <div className="mb-4">
-                    <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">Brief & Guidelines</p>
-                    <p className="text-gray-900 whitespace-pre-wrap bg-white p-4 rounded-lg border border-blue-100">{collaboration.guidelines}</p>
-                  </div>
-                )}
-
-                {collaboration.rules && (
-                  <div className="mb-4">
-                    <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">Rules & Expectations</p>
-                    <p className="text-gray-900 whitespace-pre-wrap bg-white p-4 rounded-lg border border-blue-100">{collaboration.rules}</p>
-                  </div>
-                )}
-
-                {collaboration.additional_notes && (
-                  <div>
-                    <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide mb-2">Additional Notes</p>
-                    <p className="text-gray-900 whitespace-pre-wrap bg-white p-4 rounded-lg border border-blue-100">{collaboration.additional_notes}</p>
-                  </div>
-                )}
-              </div>
             )}
 
             {/* Description */}
