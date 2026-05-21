@@ -218,7 +218,8 @@ const CreatorProfile = () => {
         {/* Hero Images Section - 3 Large Images (Collabstr Style) */}
         {creator.gallery && creator.gallery.length > 0 && (
           <div className="mb-8">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Desktop: Grid */}
+            <div className="hidden md:grid md:grid-cols-3 gap-4">
               {creator.gallery.slice(0, 3).map((imagePath, index) => (
                 <div
                   key={index}
@@ -232,6 +233,25 @@ const CreatorProfile = () => {
                   />
                 </div>
               ))}
+            </div>
+
+            {/* Mobile: Horizontal Scroll */}
+            <div className="md:hidden overflow-x-auto scrollbar-hide -mx-6 px-6">
+              <div className="flex gap-4 pb-2">
+                {creator.gallery.slice(0, 3).map((imagePath, index) => (
+                  <div
+                    key={index}
+                    className="w-[280px] flex-shrink-0 aspect-[4/5] cursor-pointer overflow-hidden rounded-2xl shadow-lg"
+                    onClick={() => setSelectedImage(imagePath)}
+                  >
+                    <img
+                      src={`${BASE_URL}${imagePath}`}
+                      alt={`Featured work ${index + 1}`}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                ))}
+              </div>
             </div>
           </div>
         )}
