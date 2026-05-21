@@ -1193,7 +1193,7 @@ const CollaborationDetails = () => {
               </div>
             )}
 
-            {/* Review Button */}
+            {/* Review Button - Brand */}
             {collaboration.status === 'completed' && isBrand && (
               <div className="bg-white rounded-lg shadow p-6">
                 <h3 className="text-lg font-bold text-gray-900 mb-4">Feedback</h3>
@@ -1203,6 +1203,27 @@ const CollaborationDetails = () => {
                 >
                   Leave a Review
                 </Link>
+              </div>
+            )}
+
+            {/* Add to Success Stories Button - Creator */}
+            {collaboration.status === 'completed' && !isBrand && (
+              <div className="bg-white rounded-lg shadow p-6">
+                <h3 className="text-lg font-bold text-gray-900 mb-4">Success Stories</h3>
+                <button
+                  onClick={() => {
+                    toast.info('Success Stories feature coming soon! You will be able to add completed collaborations to your portfolio with campaign analytics and testimonials.');
+                  }}
+                  className="block w-full px-4 py-3 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors text-center flex items-center justify-center gap-2"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                  Add to Success Stories
+                </button>
+                <p className="text-xs text-gray-500 mt-2 text-center">
+                  Showcase this collaboration on your profile
+                </p>
               </div>
             )}
 

@@ -1022,19 +1022,6 @@ const CreatorProfileEdit = () => {
               </div>
             </div>
 
-            {/* Success Stories (Legacy) */}
-            <div className="card">
-              <h2 className="text-xl font-bold text-dark mb-4">Additional Success Stories (Optional)</h2>
-              <p className="text-sm text-gray-600 mb-4">Any additional collaboration successes in plain text format</p>
-
-              <textarea
-                rows={6}
-                className="input"
-                placeholder="Tell brands about successful campaigns you've run..."
-                {...register('success_stories')}
-              />
-            </div>
-
             {/* Actions */}
             <div className="flex gap-4">
               <button

@@ -215,6 +215,27 @@ const CreatorProfile = () => {
           )}
         </div>
 
+        {/* Hero Images Section - 3 Large Images (Collabstr Style) */}
+        {creator.gallery && creator.gallery.length > 0 && (
+          <div className="mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {creator.gallery.slice(0, 3).map((imagePath, index) => (
+                <div
+                  key={index}
+                  className="aspect-[4/5] cursor-pointer overflow-hidden rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300"
+                  onClick={() => setSelectedImage(imagePath)}
+                >
+                  <img
+                    src={`${BASE_URL}${imagePath}`}
+                    alt={`Featured work ${index + 1}`}
+                    className="w-full h-full object-cover hover:scale-105 transition-transform duration-500"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Creator Header */}
         <div className="card mb-8">
           <div className="flex flex-col md:flex-row gap-6">
@@ -580,9 +601,9 @@ const CreatorProfile = () => {
           )}
         </div>
 
-        {/* Portfolio & Success Stories Section */}
+        {/* Success Stories Section */}
         <div className="mb-8">
-          <h2 className="text-2xl font-bold text-dark mb-6">Portfolio & Success Stories</h2>
+          <h2 className="text-2xl font-bold text-dark mb-6">Success Stories</h2>
           <PortfolioGrid
             creatorId={creator.id}
             showActions={false}
