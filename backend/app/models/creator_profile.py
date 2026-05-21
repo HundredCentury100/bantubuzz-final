@@ -185,6 +185,7 @@ class CreatorProfile(db.Model):
             'country': self.country,
             'languages': self.languages or [],
             'platforms': self.platforms or [],  # Platforms selected by creator
+            'platform_stats': self.get_platform_stats(),  # Connected platforms with follower counts
             'availability_status': self.availability_status,
             'social_links': self.social_links or {},
             'success_stories': self.success_stories,
