@@ -49,6 +49,14 @@ def create_portfolio_item():
         if not data.get('title'):
             return jsonify({'error': 'Title is required'}), 400
 
+        # Parse project_date safely
+        project_date = None
+        if data.get('project_date') and data['project_date'].strip():
+            try:
+                project_date = datetime.fromisoformat(data['project_date'])
+            except (ValueError, AttributeError):
+                project_date = None
+
         # Create portfolio item
         portfolio_item = PortfolioItem(
             creator_profile_id=creator.id,
@@ -69,7 +77,7 @@ def create_portfolio_item():
             reach=data.get('reach'),
             result_description=data.get('result_description'),
             client_testimonial=data.get('client_testimonial'),
-            project_date=datetime.fromisoformat(data['project_date']) if data.get('project_date') else None,
+            project_date=project_date,
             is_featured=data.get('is_featured', False),
             display_order=data.get('display_order', 0),
             is_visible=data.get('is_visible', True)
@@ -147,7 +155,13 @@ def update_portfolio_item(item_id):
         if 'client_testimonial' in data:
             portfolio_item.client_testimonial = data['client_testimonial']
         if 'project_date' in data:
-            portfolio_item.project_date = datetime.fromisoformat(data['project_date']) if data['project_date'] else None
+            if data['project_date'] and data['project_date'].strip():
+                try:
+                    portfolio_item.project_date = datetime.fromisoformat(data['project_date'])
+                except (ValueError, AttributeError):
+                    portfolio_item.project_date = None
+            else:
+                portfolio_item.project_date = None
         if 'is_featured' in data:
             portfolio_item.is_featured = data['is_featured']
         if 'display_order' in data:
