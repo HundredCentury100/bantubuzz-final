@@ -56,15 +56,26 @@ def notify_booking_status(user_id, status, booking_id):
         'accepted': 'Your booking has been accepted',
         'declined': 'Your booking has been declined',
         'completed': 'Your booking has been marked as completed',
-        'cancelled': 'Your booking has been cancelled'
+        'cancelled': 'Your booking has been cancelled',
+        'payment_verified': 'Payment confirmed! Your collaboration is now active'
     }
+
+    # Use collaborations URL for payment_verified status
+    action_url = f'/bookings/{booking_id}'
+    if status == 'payment_verified':
+        # Get user type to determine correct collaboration URL
+        from app.models import User, BrandProfile, CreatorProfile
+        user = User.query.get(user_id)
+        if user:
+            user_type = user.user_type
+            action_url = f'/{user_type}/collaborations'
 
     return create_notification(
         user_id=user_id,
-        notification_type='booking',
-        title='Booking Status Update',
+        notification_type='booking' if status != 'payment_verified' else 'collaboration',
+        title='Payment Confirmed!' if status == 'payment_verified' else 'Booking Status Update',
         message=status_messages.get(status, f'Booking status updated to {status}'),
-        action_url=f'/bookings/{booking_id}'
+        action_url=action_url
     )
 
 

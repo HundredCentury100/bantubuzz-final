@@ -691,21 +691,126 @@ const CollaborationDetails = () => {
                   </div>
                 )}
 
-                {/* Creator Submit Button (only when no drafts pending AND can submit more) */}
-                {!isBrand && collaboration.status === 'in_progress' && totalDrafts === 0 && canSubmitNewDeliverable && (
+                {/* Creator: Expected Content Cards with Individual Submit Buttons */}
+                {!isBrand && collaboration.status === 'in_progress' && (
                   <div className="bg-white rounded-lg shadow p-6">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h3 className="text-lg font-semibold text-gray-900">Ready to Submit Content?</h3>
-                        <p className="text-sm text-gray-600 mt-1">Submit your draft content for brand review</p>
-                      </div>
-                      <button
-                        onClick={() => setShowDeliverableModal(true)}
-                        className="px-6 py-3 bg-primary hover:bg-primary-dark text-white font-medium rounded-lg transition-colors"
-                      >
-                        Submit Content for Review
-                      </button>
+                    <div className="flex items-center justify-between mb-4">
+                      <h2 className="text-xl font-bold text-gray-900">
+                        Your Content Items
+                      </h2>
+                      {/* Submit All Button - Show when multiple items can be submitted */}
+                      {canSubmitNewDeliverable && collaboration.deliverables && collaboration.deliverables.length > 1 && (
+                        <button
+                          onClick={() => {
+                            // Open modal for bulk submission
+                            setDeliverableTitle(collaboration.deliverables.filter(delivName => {
+                              // Check if this deliverable hasn't been submitted yet
+                              const alreadySubmitted = collaboration.draft_deliverables?.some(d => d.title === delivName && d.status !== 'revision_requested') ||
+                                                      collaboration.submitted_deliverables?.some(d => d.title === delivName);
+                              return !alreadySubmitted;
+                            })[0] || '');
+                            setShowDeliverableModal(true);
+                          }}
+                          className="px-6 py-3 bg-primary hover:bg-primary-dark text-white font-medium rounded-lg transition-colors flex items-center gap-2"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          Submit All
+                        </button>
+                      )}
                     </div>
+
+                    <div className="space-y-4">
+                      {collaboration.deliverables?.map((deliverableName, idx) => {
+                        // Check if this deliverable has been submitted (as draft or approved)
+                        const draftVersion = collaboration.draft_deliverables?.find(d => d.title === deliverableName);
+                        const approvedVersion = collaboration.submitted_deliverables?.find(d => d.title === deliverableName);
+                        const isSubmitted = (draftVersion && draftVersion.status !== 'revision_requested') || approvedVersion;
+
+                        return (
+                          <div
+                            key={idx}
+                            className={`border-2 rounded-lg p-4 ${
+                              approvedVersion
+                                ? 'border-green-200 bg-green-50'
+                                : isSubmitted
+                                  ? 'border-yellow-200 bg-yellow-50'
+                                  : 'border-gray-200 bg-gray-50'
+                            }`}
+                          >
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <h4 className="font-medium text-gray-900">{deliverableName}</h4>
+                                  {approvedVersion && (
+                                    <span className="px-2 py-1 rounded text-xs font-medium bg-green-100 text-green-800">
+                                      Approved
+                                    </span>
+                                  )}
+                                  {isSubmitted && !approvedVersion && (
+                                    <span className="px-2 py-1 rounded text-xs font-medium bg-yellow-100 text-yellow-800">
+                                      Pending Review
+                                    </span>
+                                  )}
+                                  {!isSubmitted && !approvedVersion && (
+                                    <span className="px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-600">
+                                      Not Submitted
+                                    </span>
+                                  )}
+                                </div>
+                                {isSubmitted && draftVersion && (
+                                  <span className="text-xs text-gray-500">
+                                    Submitted {new Date(draftVersion.submitted_at).toLocaleDateString()}
+                                  </span>
+                                )}
+                              </div>
+
+                              {/* Individual Submit Button */}
+                              {!isSubmitted && !approvedVersion && (
+                                <button
+                                  onClick={() => {
+                                    setDeliverableTitle(deliverableName);
+                                    setDeliverableUrl('');
+                                    setDeliverableDescription('');
+                                    setEditingDeliverable(null);
+                                    setShowDeliverableModal(true);
+                                  }}
+                                  className="ml-4 px-4 py-2 bg-primary hover:bg-primary-dark text-white text-sm font-medium rounded-lg transition-colors whitespace-nowrap"
+                                >
+                                  Submit Content for Review
+                                </button>
+                              )}
+                            </div>
+
+                            {/* Show draft content URL if submitted */}
+                            {isSubmitted && draftVersion && (
+                              <div className="mt-3">
+                                <a
+                                  href={draftVersion.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="text-sm text-primary hover:text-primary-dark flex items-center gap-1"
+                                >
+                                  View Submitted Content
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                  </svg>
+                                </a>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {totalUniqueDeliverables === 0 && (
+                      <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <p className="text-sm text-blue-900">
+                          <span className="font-semibold">Ready to start?</span> Submit your draft content for each item above for brand review.
+                        </p>
+                      </div>
+                    )}
                   </div>
                 )}
 

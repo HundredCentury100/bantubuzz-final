@@ -326,12 +326,27 @@ const Bookings = () => {
                       // Brand Actions
                       <>
                         {booking.payment_status === 'pending' && booking.status === 'pending' && (
-                          <Link
-                            to={`/bookings/${booking.id}/payment`}
-                            className="px-4 py-2 bg-primary hover:bg-primary-dark text-white text-sm font-medium rounded-lg transition-colors text-center"
-                          >
-                            Complete Payment
-                          </Link>
+                          <>
+                            {booking.proof_of_payment ? (
+                              // Bank transfer proof uploaded - awaiting admin confirmation
+                              <div className="px-4 py-2 bg-yellow-50 border-2 border-yellow-300 text-yellow-800 text-sm font-medium rounded-lg text-center">
+                                <div className="flex items-center gap-2 justify-center">
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                  </svg>
+                                  Awaiting Payment Confirmation
+                                </div>
+                              </div>
+                            ) : (
+                              // Payment not yet initiated
+                              <Link
+                                to={`/bookings/${booking.id}/payment`}
+                                className="px-4 py-2 bg-primary hover:bg-primary-dark text-white text-sm font-medium rounded-lg transition-colors text-center"
+                              >
+                                Complete Payment
+                              </Link>
+                            )}
+                          </>
                         )}
                         {booking.status === 'accepted' && (
                           <Link
