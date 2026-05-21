@@ -204,7 +204,7 @@ const PortfolioFormModal = ({ item = null, onClose, onSuccess }) => {
         {/* Header */}
         <div className="sticky top-0 bg-white border-b border-gray-200 p-6 flex items-center justify-between rounded-t-3xl z-10">
           <h2 className="text-2xl font-bold text-gray-900">
-            {item ? 'Edit Portfolio Item' : 'Add Portfolio Item'}
+            {item ? 'Edit Success Story' : 'Add Success Story'}
           </h2>
           <button
             onClick={onClose}
@@ -563,7 +563,7 @@ const PortfolioFormModal = ({ item = null, onClose, onSuccess }) => {
               disabled={saving || uploading}
               className="flex-1 px-6 py-3 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {saving ? 'Saving...' : item ? 'Update Portfolio Item' : 'Add Portfolio Item'}
+              {saving ? 'Saving...' : item ? 'Update Success Story' : 'Add Success Story'}
             </button>
           </div>
         </form>

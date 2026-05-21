@@ -843,15 +843,56 @@ const CreatorProfileEdit = () => {
                     <p className="text-sm text-dark-light mb-3">
                       Connect your social media platforms to automatically sync your follower counts, engagement rates, and audience demographics. This helps brands see your actual performance metrics!
                     </p>
-                    <Link
-                      to="/creator/platforms"
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        // Auto-save before navigating
+                        const formData = watch();
+                        if (formData.bio && formData.categories?.length > 0 && formData.platforms?.length > 0) {
+                          toast.info('Saving your changes...');
+                          await handleSubmit(async (data) => {
+                            try {
+                              const socialLinks = {
+                                instagram: data.instagram || '',
+                                tiktok: data.tiktok || '',
+                                youtube: data.youtube || '',
+                                twitter: data.twitter || ''
+                              };
+
+                              const payload = {
+                                username: data.username || null,
+                                bio: data.bio,
+                                location: data.location,
+                                city: data.city === 'Other' ? data.custom_city : data.city,
+                                country: data.country,
+                                portfolio_url: data.portfolio_url,
+                                categories: data.categories || [],
+                                languages: data.languages || [],
+                                platforms: data.platforms || [],
+                                availability_status: data.availability_status,
+                                social_links: socialLinks,
+                                success_stories: data.success_stories,
+                                free_revisions: parseInt(data.free_revisions) >= 0 ? parseInt(data.free_revisions) : 2,
+                                revision_fee: parseFloat(data.revision_fee) || 0
+                              };
+
+                              await creatorsAPI.updateProfile(payload);
+                              toast.success('Profile saved!');
+                            } catch (err) {
+                              console.error('Auto-save error:', err);
+                            }
+                          })();
+                        }
+                        // Navigate to platforms page
+                        navigate('/creator/platforms');
+                      }}
                       className="inline-flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary-dark text-dark font-medium rounded-lg transition-colors"
                     >
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
                       </svg>
                       Connect Platforms
-                    </Link>
+                    </button>
                   </div>
                 </div>
               </div>
@@ -936,12 +977,12 @@ const CreatorProfileEdit = () => {
               </div>
             </div>
 
-            {/* Portfolio & Success Stories */}
+            {/* Success Stories */}
             <div className="card">
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <h2 className="text-xl font-bold text-dark">Portfolio & Success Stories</h2>
-                  <p className="text-sm text-gray-600 mt-1">Showcase your best work and collaborations with detailed metrics and results</p>
+                  <h2 className="text-xl font-bold text-dark">Success Stories</h2>
+                  <p className="text-sm text-gray-600 mt-1">Showcase your best collaborations with detailed metrics and results</p>
                 </div>
                 <button
                   type="button"
@@ -951,11 +992,11 @@ const CreatorProfileEdit = () => {
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                   </svg>
-                  Add Portfolio Item
+                  Add Success Story
                 </button>
               </div>
 
-              {/* Portfolio Grid */}
+              {/* Success Stories Grid */}
               <div className="mb-6" key={portfolioRefreshKey}>
                 <PortfolioGrid
                   creatorId={profile?.id}
@@ -972,9 +1013,9 @@ const CreatorProfileEdit = () => {
                     <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
                   </svg>
                   <div>
-                    <p className="text-sm font-medium text-blue-900">Stand Out with Structured Portfolio Items</p>
+                    <p className="text-sm font-medium text-blue-900">Stand Out with Structured Success Stories</p>
                     <p className="text-xs text-blue-700 mt-1">
-                      Instead of plain text, add detailed portfolio items with metrics, images, client testimonials, and campaign results. This helps brands see your proven track record and makes your profile more professional.
+                      Add detailed success stories with metrics, images, client testimonials, and campaign results. This helps brands see your proven track record and makes your profile more professional.
                     </p>
                   </div>
                 </div>
