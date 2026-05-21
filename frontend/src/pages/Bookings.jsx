@@ -247,11 +247,50 @@ const Bookings = () => {
                           </div>
                         </div>
 
-                        {booking.notes && (
-                          <div className="mt-3 text-sm text-gray-600">
-                            <span className="font-medium">Notes:</span> {booking.notes}
-                          </div>
-                        )}
+                        {booking.notes && (() => {
+                          try {
+                            // Try to parse as JSON (collaboration details)
+                            const collabDetails = JSON.parse(booking.notes);
+                            if (collabDetails.brief || collabDetails.guidelines) {
+                              return (
+                                <div className="mt-3 p-3 bg-blue-50 rounded-lg border border-blue-100 space-y-2">
+                                  <h4 className="font-semibold text-sm text-blue-900 mb-2">Collaboration Details</h4>
+                                  {collabDetails.brief && (
+                                    <div className="text-sm">
+                                      <span className="font-medium text-gray-700">Brief:</span>
+                                      <p className="text-gray-600 mt-1">{collabDetails.brief}</p>
+                                    </div>
+                                  )}
+                                  {collabDetails.guidelines && (
+                                    <div className="text-sm">
+                                      <span className="font-medium text-gray-700">Guidelines:</span>
+                                      <p className="text-gray-600 mt-1">{collabDetails.guidelines}</p>
+                                    </div>
+                                  )}
+                                  {collabDetails.rules && (
+                                    <div className="text-sm">
+                                      <span className="font-medium text-gray-700">Rules:</span>
+                                      <p className="text-gray-600 mt-1">{collabDetails.rules}</p>
+                                    </div>
+                                  )}
+                                  {collabDetails.additional_notes && (
+                                    <div className="text-sm">
+                                      <span className="font-medium text-gray-700">Additional Notes:</span>
+                                      <p className="text-gray-600 mt-1">{collabDetails.additional_notes}</p>
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            }
+                          } catch (e) {
+                            // Not JSON, display as regular notes
+                            return (
+                              <div className="mt-3 text-sm text-gray-600">
+                                <span className="font-medium">Notes:</span> {booking.notes}
+                              </div>
+                            );
+                          }
+                        })()}
 
                         {booking.payment_reference && (
                           <div className="mt-2 text-sm text-gray-600">

@@ -24,30 +24,19 @@ def allowed_file(filename):
 
 def create_multiplatform_deliverables(collaboration, package):
     """
-    Auto-create platform-specific deliverables for multi-platform packages.
+    DISABLED - This function was causing deliverable multiplication bug.
 
-    Example: If package has deliverable "Post 30 sec video" and platforms ["Instagram", "Facebook", "TikTok"],
-    this creates 3 deliverables:
-    - "Post 30 sec video on Instagram"
-    - "Post 30 sec video on Facebook"
-    - "Post 30 sec video on TikTok"
+    Bug: Package with 3 deliverables on 3 platforms was creating 18 items (3x3x2) instead of 6.
+    Root cause: Cross-multiplying deliverables against platforms.
+
+    Solution: Deliverables in package.deliverables ALREADY contain platform info in their titles.
+    We should NOT cross-multiply. One entry in package.deliverables = one content item card.
+
+    The collaboration.deliverables list already has the correct deliverables with platform info.
+    No need to create additional PackageDeliverable records here.
     """
-    if not package or not package.is_multi_platform or not package.platforms:
-        return
-
-    from app.models.package_deliverable import PackageDeliverable
-
-    for deliverable_title in (package.deliverables or []):
-        for platform in package.platforms:
-            # Create a deliverable for each platform
-            platform_deliverable = PackageDeliverable(
-                collaboration_id=collaboration.id,
-                title=f"{deliverable_title} on {platform}",
-                platform=platform,
-                status='pending_review',
-                description=f"Submit URL for {deliverable_title} posted on {platform}"
-            )
-            db.session.add(platform_deliverable)
+    # DISABLED - Do nothing
+    return
 
 
 def create_no_track_deliverables(collaboration):
@@ -719,8 +708,6 @@ def cart_payment_status():
                     continue
 
                 booking.payment_status = 'paid'
-                booking.escrow_status = 'escrowed'
-                booking.escrowed_at = datetime.utcnow()
                 booking.status = 'accepted'
 
                 # Create collaboration for each booking
@@ -1042,8 +1029,6 @@ def cart_pay_with_wallet():
                 total_price=package.price,
                 payment_method='wallet',
                 payment_status='paid',
-                escrow_status='escrowed',
-                escrowed_at=datetime.utcnow(),
                 status='accepted',
                 notes=json.dumps(collaboration_data)  # Store collaboration details
             )
@@ -1294,8 +1279,7 @@ def verify_bank_transfer_payment(booking_id):
 
         # Update payment status
         booking.payment_status = 'verified'
-        booking.escrow_status = 'escrowed'
-        booking.escrowed_at = datetime.utcnow()
+        booking.status = 'accepted'
 
         # CREATE PAYMENT RECORD - This is what was missing!
         from app.models import Payment, PaymentVerification
