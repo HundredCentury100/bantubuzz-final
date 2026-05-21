@@ -32,6 +32,7 @@ const CollaborationDetails = () => {
   const [revisionNotes, setRevisionNotes] = useState('');
   const [requestingRevision, setRequestingRevision] = useState(false);
   const [approvingDeliverable, setApprovingDeliverable] = useState(null); // Track which deliverable is being approved
+  const [approvingAll, setApprovingAll] = useState(false); // Track if approving all
 
   // Cancel collaboration state (creator only)
   const [showCancelModal, setShowCancelModal] = useState(false);
@@ -154,6 +155,23 @@ const CollaborationDetails = () => {
       }
     } finally {
       setApprovingDeliverable(null);
+    }
+  };
+
+  const handleApproveAll = async () => {
+    if (approvingAll) return;
+
+    try {
+      setApprovingAll(true);
+      const response = await collaborationsAPI.approveAllDeliverables(id);
+      toast.success(`Successfully approved ${response.data.approved_count} deliverable(s)!`);
+      fetchCollaboration();
+    } catch (error) {
+      console.error('Error approving all deliverables:', error);
+      const errorMessage = error.response?.data?.error || error.message;
+      toast.error(errorMessage || 'Failed to approve all deliverables');
+    } finally {
+      setApprovingAll(false);
     }
   };
 
@@ -566,9 +584,33 @@ const CollaborationDetails = () => {
                 {/* STAGE 1: Content Pending Review */}
                 {totalDrafts > 0 && (
                   <div className="bg-white rounded-lg shadow p-6">
-                    <h2 className="text-xl font-bold text-gray-900 mb-4">
-                      Content Pending Review ({totalDrafts})
-                    </h2>
+                    <div className="flex items-center justify-between mb-4">
+                      <h2 className="text-xl font-bold text-gray-900">
+                        Content Pending Review ({totalDrafts})
+                      </h2>
+                      {/* Approve All Button - Only show for brands when there are multiple pending items */}
+                      {isBrand && collaboration.status === 'in_progress' && collaboration.draft_deliverables.filter(d => d.status === 'pending_review').length > 1 && (
+                        <button
+                          onClick={handleApproveAll}
+                          disabled={approvingAll || approvingDeliverable !== null}
+                          className="px-6 py-3 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                        >
+                          {approvingAll ? (
+                            <>
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                              Approving All...
+                            </>
+                          ) : (
+                            <>
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                              Approve All
+                            </>
+                          )}
+                        </button>
+                      )}
+                    </div>
                     <div className="space-y-4">
                       {collaboration.draft_deliverables.map((deliverable) => (
                         <div key={deliverable.id} className="border-2 border-yellow-200 rounded-lg p-4 bg-yellow-50">

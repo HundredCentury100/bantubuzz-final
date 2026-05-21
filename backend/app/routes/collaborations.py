@@ -397,6 +397,113 @@ def approve_deliverable(collab_id, deliverable_id):
         return jsonify({'error': str(e)}), 500
 
 
+@bp.route('/<int:collab_id>/deliverables/approve-all', methods=['POST'])
+@jwt_required()
+def approve_all_deliverables(collab_id):
+    """Approve all pending deliverables at once (brand only)"""
+    try:
+        user_id = int(get_jwt_identity())
+        brand = BrandProfile.query.filter_by(user_id=user_id).first()
+
+        if not brand:
+            return jsonify({'error': 'Brand profile not found'}), 404
+
+        collaboration = Collaboration.query.get(collab_id)
+        if not collaboration:
+            return jsonify({'error': 'Collaboration not found'}), 404
+
+        if collaboration.brand_id != brand.id:
+            return jsonify({'error': 'Unauthorized'}), 403
+
+        print(f"[APPROVE_ALL] Starting bulk approval for collaboration {collab_id}")
+
+        # Get all deliverables pending review
+        pending_deliverables = PackageDeliverable.query.filter_by(
+            collaboration_id=collab_id,
+            status='pending_review'
+        ).all()
+
+        if not pending_deliverables:
+            return jsonify({'error': 'No deliverables pending review'}), 400
+
+        approved_count = 0
+        approved_titles = []
+
+        # Approve all pending deliverables
+        for deliverable in pending_deliverables:
+            deliverable.status = 'approved'
+            deliverable.approved_at = datetime.utcnow()
+            approved_count += 1
+            approved_titles.append(deliverable.title)
+            print(f"[APPROVE_ALL] Approved deliverable: {deliverable.title}")
+
+        # Auto-calculate progress
+        old_progress = collaboration.progress_percentage
+        collaboration.progress_percentage = collaboration.calculate_progress()
+        print(f"[APPROVE_ALL] Progress updated: {old_progress}% -> {collaboration.progress_percentage}%")
+
+        # Check if all content is now approved
+        if collaboration.progress_percentage >= 100 and collaboration.status == 'in_progress':
+            print(f"[APPROVE_ALL] Progress reached 100% for collaboration {collaboration.id}")
+            collaboration.last_update = "All deliverables approved - Awaiting live post URLs from creator"
+            print(f"[APPROVE_ALL] Awaiting live URLs. 3-day timer will start when URLs submitted.")
+        else:
+            collaboration.last_update = f"Approved {approved_count} deliverable(s)"
+            print(f"[APPROVE_ALL] Approved {approved_count} deliverables (progress at {collaboration.progress_percentage}%)")
+
+        collaboration.last_update_date = datetime.utcnow()
+        collaboration.updated_at = datetime.utcnow()
+
+        db.session.commit()
+        print(f"[APPROVE_ALL] Database commit successful")
+
+        # Send email notification to creator
+        try:
+            from app.tasks.email_tasks import send_deliverable_approval_notification
+            send_deliverable_approval_notification.delay(
+                collaboration_id=collaboration.id,
+                deliverable_description=f"{approved_count} deliverable(s)"
+            )
+        except Exception as email_error:
+            print(f"Failed to queue bulk approval notification: {str(email_error)}")
+
+        # Emit Socket.IO update
+        try:
+            emit_collaboration_update(collaboration.id)
+            print(f"[APPROVE_ALL] Socket.IO update emitted")
+        except Exception as e:
+            print(f"[APPROVE_ALL] WARNING: Failed to emit Socket.IO update: {str(e)}")
+
+        # Notify creator about approval
+        try:
+            creator_user = User.query.get(collaboration.creator.user_id)
+            if creator_user:
+                notify_collaboration_update(
+                    user_id=creator_user.id,
+                    collaboration_title=collaboration.title,
+                    collaboration_id=collaboration.id,
+                    update_message=f"All your deliverables have been approved! ({approved_count} item(s))"
+                )
+                print(f"[APPROVE_ALL] Notification sent to creator")
+        except Exception as e:
+            print(f"[APPROVE_ALL] WARNING: Failed to notify creator: {str(e)}")
+
+        print(f"[APPROVE_ALL] SUCCESS: Approved {approved_count} deliverables")
+        return jsonify({
+            'message': f'Successfully approved {approved_count} deliverable(s)',
+            'approved_count': approved_count,
+            'approved_titles': approved_titles,
+            'collaboration': collaboration.to_dict()
+        }), 200
+
+    except Exception as e:
+        print(f"[APPROVE_ALL] FATAL ERROR: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
 @bp.route('/<int:collab_id>/deliverables/<int:deliverable_id>/request-revision', methods=['POST'])
 @jwt_required()
 def request_revision(collab_id, deliverable_id):

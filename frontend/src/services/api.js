@@ -264,6 +264,7 @@ export const collaborationsAPI = {
   submitDraftDeliverable: (id, data) => api.post(`/collaborations/${id}/deliverables/draft`, data),
   updateDraftDeliverable: (id, deliverableId, data) => api.put(`/collaborations/${id}/deliverables/${deliverableId}`, data),
   approveDeliverable: (id, deliverableId) => api.post(`/collaborations/${id}/deliverables/${deliverableId}/approve`),
+  approveAllDeliverables: (id) => api.post(`/collaborations/${id}/deliverables/approve-all`),
   requestRevision: (id, deliverableId, notes) => api.post(`/collaborations/${id}/deliverables/${deliverableId}/request-revision`, { notes }),
 
   // Milestone Deliverables (for brief/campaign collaborations)
