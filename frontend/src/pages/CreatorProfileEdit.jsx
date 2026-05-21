@@ -5,7 +5,7 @@ import { creatorsAPI, BASE_URL } from '../services/api';
 import { useAuth } from '../hooks/useAuth';
 import Navbar from '../components/Navbar';
 import toast from 'react-hot-toast';
-import { PLATFORMS, ZIMBABWE_LANGUAGES, COUNTRIES } from '../constants/options';
+import { PLATFORMS, ZIMBABWE_LANGUAGES, COUNTRIES, ZIMBABWE_CITIES } from '../constants/options';
 import axios from 'axios';
 import ImageCropModal from '../components/ImageCropModal';
 import ProfilePreviewModal from '../components/ProfilePreviewModal';
@@ -48,6 +48,7 @@ const CreatorProfileEdit = () => {
   const selectedLanguages = watch('languages') || [];
   const selectedPlatforms = watch('platforms') || [];
   const bioText = watch('bio') || '';
+  const selectedCity = watch('city') || '';
 
   useEffect(() => {
     fetchProfile();
@@ -328,7 +329,7 @@ const CreatorProfileEdit = () => {
         username: data.username || null,
         bio: data.bio,
         location: data.location,
-        city: data.city,
+        city: data.city === 'Other' ? data.custom_city : data.city,
         country: data.country,
         portfolio_url: data.portfolio_url,
         categories: data.categories || [],
@@ -632,14 +633,31 @@ const CreatorProfileEdit = () => {
                   <label className="block text-sm font-medium text-dark mb-2">
                     City/Town <span className="text-red-500">*</span>
                   </label>
-                  <input
-                    type="text"
+                  <select
                     className="input"
-                    placeholder="Harare"
                     {...register('city', { required: 'City is required' })}
-                  />
+                  >
+                    <option value="">Select city...</option>
+                    {ZIMBABWE_CITIES.map((city) => (
+                      <option key={city} value={city}>
+                        {city}
+                      </option>
+                    ))}
+                  </select>
                   {errors.city && (
                     <p className="mt-1 text-sm text-error">{errors.city.message}</p>
+                  )}
+
+                  {/* Show custom input if "Other" is selected */}
+                  {selectedCity === 'Other' && (
+                    <input
+                      type="text"
+                      className="input mt-2"
+                      placeholder="Enter your city/town"
+                      {...register('custom_city', {
+                        required: selectedCity === 'Other' ? 'Please enter your city' : false
+                      })}
+                    />
                   )}
                 </div>
 

@@ -30,6 +30,38 @@ export const ZIMBABWE_LANGUAGES = [
   'Xhosa'
 ];
 
+// Zimbabwe cities and towns
+export const ZIMBABWE_CITIES = [
+  'Harare',
+  'Bulawayo',
+  'Chitungwiza',
+  'Mutare',
+  'Gweru',
+  'Kwekwe',
+  'Kadoma',
+  'Masvingo',
+  'Chinhoyi',
+  'Marondera',
+  'Norton',
+  'Chegutu',
+  'Bindura',
+  'Beitbridge',
+  'Redcliff',
+  'Victoria Falls',
+  'Hwange',
+  'Rusape',
+  'Chiredzi',
+  'Kariba',
+  'Karoi',
+  'Zvishavane',
+  'Gokwe',
+  'Shurugwi',
+  'Lupane',
+  'Gutu',
+  'Chipinge',
+  'Other' // Allow custom entry
+];
+
 // Country codes
 export const COUNTRIES = [
   { code: 'ZW', name: 'Zimbabwe' },
