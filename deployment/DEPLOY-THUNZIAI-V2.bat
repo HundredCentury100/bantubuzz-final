@@ -50,14 +50,18 @@ if errorlevel 1 goto fail
 
 echo.
 echo [5/9] Backing up current production files...
-ssh %SERVER_USER%@%SERVER_HOST% "set -e; cd %REMOTE_ROOT%; TS=$(date +%%Y%%m%%d_%%H%%M%%S); echo 'Creating backup at /root/bantubuzz_thunziai_v2_backup_'$TS'.tar.gz'; tar --ignore-failed-read -czf /root/bantubuzz_thunziai_v2_backup_$TS.tar.gz backend/app/config/thunzi_config.py backend/app/models/connected_platform.py backend/app/routes/platforms.py backend/app/services/post_metrics_service.py backend/app/services/thunzi_service.py backend/app/tasks/platform_sync.py backend/migrations/versions/202605271015_add_scopes_to_connected_platforms.py frontend/index.html frontend/assets frontend/favicon.ico frontend/manifest.json; mkdir -p backend/app/config backend/app/models backend/app/routes backend/app/services backend/app/tasks backend/migrations/versions frontend"
+ssh %SERVER_USER%@%SERVER_HOST% "set -e; cd %REMOTE_ROOT%; TS=$(date +%%Y%%m%%d_%%H%%M%%S); echo 'Creating backup at /root/bantubuzz_thunziai_v2_backup_'$TS'.tar.gz'; tar --ignore-failed-read -czf /root/bantubuzz_thunziai_v2_backup_$TS.tar.gz backend/app/config/thunzi_config.py backend/app/models/connected_platform.py backend/app/models/creator_profile.py backend/app/routes/creators.py backend/app/routes/platforms.py backend/app/services/post_metrics_service.py backend/app/services/thunzi_service.py backend/app/tasks/platform_sync.py backend/migrations/versions/202605271015_add_scopes_to_connected_platforms.py frontend/index.html frontend/assets frontend/favicon.ico frontend/manifest.json; mkdir -p backend/app/config backend/app/models backend/app/routes backend/app/services backend/app/tasks backend/migrations/versions frontend"
 if errorlevel 1 goto fail
 
 echo.
 echo [6/9] Uploading backend files one by one...
 scp "%ROOT%\backend\app\models\connected_platform.py" %SERVER_USER%@%SERVER_HOST%:%REMOTE_ROOT%/backend/app/models/connected_platform.py
 if errorlevel 1 goto fail
+scp "%ROOT%\backend\app\models\creator_profile.py" %SERVER_USER%@%SERVER_HOST%:%REMOTE_ROOT%/backend/app/models/creator_profile.py
+if errorlevel 1 goto fail
 scp "%ROOT%\backend\app\config\thunzi_config.py" %SERVER_USER%@%SERVER_HOST%:%REMOTE_ROOT%/backend/app/config/thunzi_config.py
+if errorlevel 1 goto fail
+scp "%ROOT%\backend\app\routes\creators.py" %SERVER_USER%@%SERVER_HOST%:%REMOTE_ROOT%/backend/app/routes/creators.py
 if errorlevel 1 goto fail
 scp "%ROOT%\backend\app\routes\platforms.py" %SERVER_USER%@%SERVER_HOST%:%REMOTE_ROOT%/backend/app/routes/platforms.py
 if errorlevel 1 goto fail
@@ -77,7 +81,7 @@ if errorlevel 1 goto fail
 
 echo.
 echo [8/9] Running backend compile check and database migration...
-ssh %SERVER_USER%@%SERVER_HOST% "set -e; cd %REMOTE_ROOT%/backend; source venv/bin/activate; python -m py_compile app/config/thunzi_config.py app/models/connected_platform.py app/routes/platforms.py app/services/post_metrics_service.py app/services/thunzi_service.py app/tasks/platform_sync.py migrations/versions/202605271015_add_scopes_to_connected_platforms.py; flask db upgrade"
+ssh %SERVER_USER%@%SERVER_HOST% "set -e; cd %REMOTE_ROOT%/backend; source venv/bin/activate; python -m py_compile app/config/thunzi_config.py app/models/connected_platform.py app/models/creator_profile.py app/routes/creators.py app/routes/platforms.py app/services/post_metrics_service.py app/services/thunzi_service.py app/tasks/platform_sync.py migrations/versions/202605271015_add_scopes_to_connected_platforms.py; flask db upgrade"
 if errorlevel 1 goto fail
 
 echo.

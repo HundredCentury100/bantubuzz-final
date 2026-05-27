@@ -92,6 +92,11 @@ def sync_platform(platform_id):
             platform.scopes = updated_platform.get('scopes') or platform.scopes
 
         platform.last_synced_at = datetime.utcnow()
+
+        creator = CreatorProfile.query.filter_by(user_id=platform.user_id).first()
+        if creator:
+            creator.refresh_total_followers()
+
         db.session.commit()
 
         logger.info(f"Successfully synced platform {platform_id}")

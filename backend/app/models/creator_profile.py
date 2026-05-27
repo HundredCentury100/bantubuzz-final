@@ -59,7 +59,12 @@ class CreatorProfile(db.Model):
             ConnectedPlatform.is_connected == True
         ).scalar()
 
-        return int(total) if total else self.follower_count or 0
+        return int(total or 0)
+
+    def refresh_total_followers(self):
+        """Persist follower_count as the sum of connected platform followers."""
+        self.follower_count = self.get_total_followers()
+        return self.follower_count
 
     def get_platform_stats(self):
         """Get detailed stats for each connected platform"""
@@ -168,6 +173,8 @@ class CreatorProfile(db.Model):
             include_user: Include user object
             public_view: If True, exclude private info (email) from user object
         """
+        total_followers = self.get_total_followers()
+
         data = {
             'id': self.id,
             'user_id': self.user_id,
@@ -178,7 +185,8 @@ class CreatorProfile(db.Model):
             'profile_picture_sizes': self.profile_picture_sizes or {},
             'portfolio_url': self.portfolio_url,
             'categories': self.categories or [],
-            'follower_count': self.follower_count,
+            'follower_count': total_followers,
+            'total_followers': total_followers,
             'engagement_rate': self.engagement_rate,
             'location': self.location,
             'city': self.city,

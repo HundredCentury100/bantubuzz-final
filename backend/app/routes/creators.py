@@ -547,17 +547,8 @@ def update_profile():
         if 'categories' in data:
             creator.categories = data['categories']
 
-        # Auto-calculate follower_count from connected platforms
-        # Don't allow manual setting - always compute from ThunziAI data
-        from app.models import ConnectedPlatform
-        connected_platforms = ConnectedPlatform.query.filter_by(
-            user_id=user_id,
-            is_connected=True
-        ).all()
-
-        # Sum followers from all connected platforms
-        total_followers = sum(platform.followers or 0 for platform in connected_platforms)
-        creator.follower_count = total_followers
+        # Always compute followers from connected ThunziAI platforms.
+        creator.refresh_total_followers()
 
         if 'engagement_rate' in data:
             creator.engagement_rate = data['engagement_rate']

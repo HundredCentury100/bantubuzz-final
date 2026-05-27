@@ -361,11 +361,7 @@ def connect_platform():
 
         db.session.add(connected_platform)
 
-        # Update creator profile with follower count if this is their primary platform
-        if connected_platform.followers and connected_platform.followers > 0:
-            # Update if this is their first platform or has more followers
-            if creator.follower_count is None or connected_platform.followers > creator.follower_count:
-                creator.follower_count = connected_platform.followers
+        creator.refresh_total_followers()
 
         db.session.commit()
 
@@ -1019,10 +1015,10 @@ def sync_platform(platform_id):
                     platform.scopes = updated_platform.get('scopes') or platform.scopes
                     platform.last_synced_at = datetime.utcnow()
 
-                    # Update creator profile with latest follower count
+                    # Update creator profile with latest connected-platform follower total
                     creator = CreatorProfile.query.filter_by(user_id=current_user_id).first()
-                    if creator and platform.followers > (creator.follower_count or 0):
-                        creator.follower_count = platform.followers
+                    if creator:
+                        creator.refresh_total_followers()
 
                     db.session.commit()
 
