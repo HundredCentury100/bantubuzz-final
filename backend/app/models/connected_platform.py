@@ -31,6 +31,7 @@ class ConnectedPlatform(db.Model):
     access_token = db.Column(db.Text)  # User's OAuth access token from Facebook/YouTube/Twitter
     refresh_token = db.Column(db.Text)  # OAuth refresh token for token renewal
     token_expiry = db.Column(db.DateTime)  # When the access token expires
+    scopes = db.Column(db.JSON, default=list)  # OAuth scopes granted for this platform
 
     # Timestamps
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -54,6 +55,7 @@ class ConnectedPlatform(db.Model):
             'sync_status': self.sync_status,
             'last_synced_at': self.last_synced_at.isoformat() if self.last_synced_at else None,
             'token_expiry': self.token_expiry.isoformat() if self.token_expiry else None,
+            'scopes': self.scopes or [],
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }

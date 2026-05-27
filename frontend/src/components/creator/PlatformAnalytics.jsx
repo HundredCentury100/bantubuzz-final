@@ -35,6 +35,32 @@ const PlatformAnalytics = ({ creatorId }) => {
     return num.toLocaleString();
   };
 
+  const getPlatformConfig = (platformName) => {
+    const normalized = (platformName || '').toLowerCase();
+    const configKey = Object.keys(PLATFORM_CONFIGS).find(
+      (key) => key.toLowerCase() === normalized
+    );
+    return configKey ? PLATFORM_CONFIGS[configKey] : null;
+  };
+
+  const renderPlatformIcon = (platformName) => {
+    const platformConfig = getPlatformConfig(platformName);
+
+    if (!platformConfig?.icon) {
+      return <ChartBarIcon className="w-5 h-5 text-primary" />;
+    }
+
+    return (
+      <svg
+        className={`w-5 h-5 ${platformConfig.color || 'text-primary'}`}
+        viewBox="0 0 24 24"
+        fill="currentColor"
+      >
+        {platformConfig.icon}
+      </svg>
+    );
+  };
+
   // Calculate overall stats from all platforms (Conditional Aggregation)
   // Only aggregates non-null metrics based on platform availability
   const getOverallStats = () => {
@@ -154,36 +180,36 @@ const PlatformAnalytics = ({ creatorId }) => {
       </div>
 
       {/* Overall Summary Card (Conditional Display) */}
-      <div className="card mb-6 bg-gradient-to-br from-primary/5 to-primary/10">
+      <div className="bg-white rounded-3xl shadow-sm hover:shadow-md p-6 mb-6">
         <h3 className="text-lg font-semibold text-dark mb-4">Overall Summary</h3>
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-          <div className="text-center">
+          <div className="text-center bg-primary/10 rounded-2xl p-4">
             <p className="text-3xl font-bold text-primary">{formatNumber(overallStats.totalFollowers)}</p>
             <p className="text-sm text-gray-600 mt-1">Total Followers</p>
           </div>
           {overallStats.hasViews && (
-            <div className="text-center">
+            <div className="text-center bg-primary/10 rounded-2xl p-4">
               <p className="text-3xl font-bold text-primary">{formatNumber(overallStats.avgViews)}</p>
               <p className="text-sm text-gray-600 mt-1">Avg Views</p>
             </div>
           )}
           {overallStats.hasReach && (
-            <div className="text-center">
+            <div className="text-center bg-primary/10 rounded-2xl p-4">
               <p className="text-3xl font-bold text-primary">{formatNumber(overallStats.totalReach)}</p>
               <p className="text-sm text-gray-600 mt-1">Total Reach</p>
             </div>
           )}
-          <div className="text-center">
+          <div className="text-center bg-primary/10 rounded-2xl p-4">
             <p className="text-3xl font-bold text-primary">{formatNumber(overallStats.totalLikes)}</p>
             <p className="text-sm text-gray-600 mt-1">Total Likes</p>
           </div>
           {overallStats.hasEngagementRate && (
-            <div className="text-center">
+            <div className="text-center bg-primary/10 rounded-2xl p-4">
               <p className="text-3xl font-bold text-primary">{overallStats.avgEngagementRate}%</p>
               <p className="text-sm text-gray-600 mt-1">Avg Engagement</p>
             </div>
           )}
-          <div className="text-center">
+          <div className="text-center bg-primary/10 rounded-2xl p-4">
             <p className="text-3xl font-bold text-primary">{overallStats.platformCount}</p>
             <p className="text-sm text-gray-600 mt-1">Platforms</p>
           </div>
@@ -193,8 +219,6 @@ const PlatformAnalytics = ({ creatorId }) => {
       {/* Platform Cards Grid - Compact Like Packages */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {analytics.platforms.map((platform, index) => {
-          const platformConfig = PLATFORM_CONFIGS[platform.platform] || {};
-          const PlatformIcon = platformConfig.icon;
           // Use unique key: platform + account_name + index to handle duplicate platform types
           const platformKey = `${platform.platform}_${platform.account_name}_${index}`;
           const isExpanded = expandedPlatform === platformKey;
@@ -202,16 +226,14 @@ const PlatformAnalytics = ({ creatorId }) => {
           return (
             <div
               key={platformKey}
-              className="card cursor-pointer hover:shadow-lg transition-all"
+              className="bg-white rounded-3xl shadow-sm hover:shadow-md p-6 cursor-pointer transition-shadow"
               onClick={() => setExpandedPlatform(isExpanded ? null : platformKey)}
             >
               {/* Platform Header */}
               <div className="flex items-center gap-3 mb-3">
-                {PlatformIcon && (
-                  <div className={`w-10 h-10 rounded-lg ${platformConfig.gradient} flex items-center justify-center flex-shrink-0`}>
-                    <PlatformIcon className="w-6 h-6 text-white" />
-                  </div>
-                )}
+                <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                  {renderPlatformIcon(platform.platform)}
+                </div>
                 <div className="flex-1 min-w-0">
                   <h3 className="text-sm font-semibold text-dark capitalize truncate">
                     {platform.platform}

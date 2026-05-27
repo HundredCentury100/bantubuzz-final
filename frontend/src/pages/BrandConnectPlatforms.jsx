@@ -24,7 +24,7 @@ const ConnectPlatforms = () => {
     {
       id: 'instagram',
       name: 'Instagram',
-      color: 'from-pink-600 to-purple-600',
+      color: 'bg-pink-600',
       iconColor: 'text-pink-600',
       requiresToken: false,
       requiresOAuth: true,
@@ -38,7 +38,7 @@ const ConnectPlatforms = () => {
     {
       id: 'tiktok',
       name: 'TikTok',
-      color: 'from-gray-900 to-black',
+      color: 'bg-gray-900',
       iconColor: 'text-gray-900',
       requiresToken: false,
       icon: (
@@ -50,7 +50,7 @@ const ConnectPlatforms = () => {
     {
       id: 'youtube',
       name: 'YouTube',
-      color: 'from-red-600 to-red-700',
+      color: 'bg-red-600',
       iconColor: 'text-red-600',
       requiresToken: false,
       icon: (
@@ -62,7 +62,7 @@ const ConnectPlatforms = () => {
     {
       id: 'facebook',
       name: 'Facebook',
-      color: 'from-blue-600 to-blue-700',
+      color: 'bg-blue-600',
       iconColor: 'text-blue-600',
       requiresToken: false,
       requiresOAuth: true,
@@ -76,7 +76,7 @@ const ConnectPlatforms = () => {
     {
       id: 'twitter',
       name: 'X (Twitter)',
-      color: 'from-gray-900 to-black',
+      color: 'bg-gray-900',
       iconColor: 'text-gray-900',
       requiresToken: false,
       icon: (
@@ -248,7 +248,7 @@ const ConnectPlatforms = () => {
                 const platformData = availablePlatforms.find(p => p.id === platform.platform);
                 return (
                   <div key={platform.id} className="card hover:shadow-lg transition-shadow overflow-hidden">
-                    <div className={`w-full h-2 bg-gradient-to-r ${platformData?.color || 'from-gray-400 to-gray-600'}`}></div>
+                    <div className={`w-full h-2 ${platformData?.color || 'bg-gray-400'}`}></div>
                     <div className="p-4 md:p-6">
                       <div className="flex items-start justify-between mb-4 gap-2">
                         <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1">
@@ -330,7 +330,7 @@ const ConnectPlatforms = () => {
                   key={platform.id}
                   className={`card hover:shadow-lg transition-shadow overflow-hidden ${connected ? 'opacity-50' : ''}`}
                 >
-                  <div className={`w-full h-2 bg-gradient-to-r ${platform.color}`}></div>
+                  <div className={`w-full h-2 ${platform.color}`}></div>
                   <div className="p-4 md:p-6">
                     <div className="flex items-center gap-2 md:gap-3 mb-4">
                       <div className={`${platform.iconColor} flex-shrink-0`}>

@@ -124,7 +124,7 @@ const DeliverableURLInput = ({
   // If URL already validated and submitted, show success state
   if (!showInput && deliverable?.post_url_validated) {
     return (
-      <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+      <div className="mt-3 p-4 bg-green-50 border border-green-200 rounded-2xl">
         <div className="flex items-center gap-2 mb-2">
           <CheckCircle size={20} className="text-green-600" />
           <span className="font-medium text-green-900">Post URL Submitted</span>
@@ -150,7 +150,7 @@ const DeliverableURLInput = ({
         </div>
         <button
           onClick={() => setShowInput(true)}
-          className="mt-2 text-xs text-green-700 hover:text-green-900 underline"
+          className="mt-3 px-4 py-2 bg-white text-green-800 border border-green-200 rounded-full text-xs font-medium hover:bg-green-100 transition-colors"
         >
           Update URL
         </button>
@@ -160,12 +160,12 @@ const DeliverableURLInput = ({
 
   // Show input form
   return (
-    <div className="mt-3 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+    <div className="mt-3 p-4 bg-primary/10 border border-primary/30 rounded-2xl">
       <div className="flex items-start gap-2 mb-3">
-        <Link2 size={20} className="text-blue-600 flex-shrink-0 mt-0.5" />
+        <Link2 size={20} className="text-primary flex-shrink-0 mt-0.5" />
         <div className="flex-1">
-          <h4 className="font-medium text-blue-900">Submit Post URL</h4>
-          <p className="text-xs text-blue-700 mt-1">
+          <h4 className="font-medium text-dark">Submit Post URL</h4>
+          <p className="text-xs text-gray-700 mt-1">
             Paste the URL of your published social media post for analytics tracking
           </p>
         </div>
@@ -181,7 +181,7 @@ const DeliverableURLInput = ({
               setError('');
             }}
             placeholder="https://instagram.com/p/ABC123/ or https://youtube.com/watch?v=..."
-            className={`w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent ${
+            className={`w-full px-4 py-3 text-sm border rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent ${
               error ? 'border-red-300 bg-red-50' : 'border-gray-300'
             }`}
             disabled={submitting}
@@ -199,7 +199,7 @@ const DeliverableURLInput = ({
           <button
             type="submit"
             disabled={submitting || !postUrl}
-            className="flex-1 px-4 py-2 bg-primary hover:bg-primary-dark text-white text-sm font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            className="flex-1 px-4 py-2 bg-primary hover:bg-primary/90 text-dark text-sm font-medium rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             {submitting && <Loader2 size={16} className="animate-spin" />}
             {submitting ? 'Submitting...' : 'Submit URL'}
@@ -209,7 +209,7 @@ const DeliverableURLInput = ({
               type="button"
               onClick={() => setShowInput(false)}
               disabled={submitting}
-              className="px-4 py-2 border border-gray-300 text-gray-700 text-sm rounded-lg hover:bg-gray-50 transition-colors"
+              className="px-4 py-2 border border-gray-300 text-gray-700 text-sm rounded-full hover:bg-gray-50 transition-colors"
             >
               Cancel
             </button>
@@ -217,11 +217,11 @@ const DeliverableURLInput = ({
         </div>
       </form>
 
-      <div className="mt-3 pt-3 border-t border-blue-200">
-        <p className="text-xs text-blue-600 font-medium mb-1">Supported Platforms:</p>
+      <div className="mt-3 pt-3 border-t border-primary/20">
+        <p className="text-xs text-gray-700 font-medium mb-1">Supported Platforms:</p>
         <div className="flex flex-wrap gap-2">
           {['Instagram', 'Facebook', 'YouTube', 'TikTok', 'Twitter/X'].map((platform) => (
-            <span key={platform} className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+            <span key={platform} className="text-xs bg-white text-dark px-2 py-1 rounded-full">
               {platform}
             </span>
           ))}

@@ -15,6 +15,16 @@ import os
 platforms_bp = Blueprint('platforms', __name__)
 
 
+def _parse_thunzi_datetime(value):
+    if not value or str(value).lower() == 'never':
+        return None
+
+    try:
+        return datetime.fromisoformat(str(value).replace('Z', '+00:00')).replace(tzinfo=None)
+    except (TypeError, ValueError):
+        return None
+
+
 @platforms_bp.route('/api/creator/platforms', methods=['GET'])
 @jwt_required()
 def get_connected_platforms():
@@ -64,11 +74,12 @@ def get_connected_platforms():
                         profile_url=thunzi_platform.get('profileUrl'),
                         access_token=thunzi_platform.get('accessToken'),
                         refresh_token=thunzi_platform.get('refreshToken'),
+                        scopes=thunzi_platform.get('scopes') or [],
                         followers=thunzi_platform.get('followers', 0),
                         posts=thunzi_platform.get('posts', 0),
                         is_connected=True,
                         sync_status=thunzi_platform.get('syncStatus', 'pending'),
-                        last_synced_at=datetime.utcnow() if thunzi_platform.get('lastSyncedAt') else None
+                        last_synced_at=_parse_thunzi_datetime(thunzi_platform.get('lastSyncedAt'))
                     )
                     db.session.add(new_platform)
 
@@ -269,11 +280,12 @@ def connect_platform():
             access_token=access_token,  # Store OAuth access token
             refresh_token=refresh_token,  # Store OAuth refresh token
             token_expiry=parsed_token_expiry,  # Store token expiry
+            scopes=thunzi_platform.get('scopes') or [],
             followers=thunzi_platform.get('followers', 0),
             posts=thunzi_platform.get('posts', 0),
             is_connected=True,  # Always True when successfully added
             sync_status=thunzi_platform.get('syncStatus', 'pending'),
-            last_synced_at=datetime.utcnow() if thunzi_platform.get('lastSyncedAt') else None
+            last_synced_at=_parse_thunzi_datetime(thunzi_platform.get('lastSyncedAt'))
         )
 
         db.session.add(connected_platform)
@@ -1005,13 +1017,13 @@ def sync_platform(platform_id):
             db.session.commit()
             return jsonify({'error': 'Failed to authenticate with ThunziAI'}), 401
 
-        # Trigger sync in ThunziAI (pass all required fields per API docs)
-        success = thunzi_service.sync_platform(
+        # Trigger sync in ThunziAI using async endpoint with legacy fallback
+        sync_result = thunzi_service.sync_platform_and_poll(
             platform_id=platform.thunzi_platform_id,
-            account_id=platform.account_id,
-            company_id=thunzi_account.thunzi_company_id,
-            platform=platform.platform
+            timeout_seconds=120,
+            poll_interval_seconds=5
         )
+        success = sync_result.get('success')
 
         if success:
             # Fetch updated data
@@ -1029,6 +1041,7 @@ def sync_platform(platform_id):
                     platform.followers = updated_platform.get('followers', platform.followers)
                     platform.posts = updated_platform.get('posts', platform.posts)
                     platform.sync_status = updated_platform.get('syncStatus', 'success')
+                    platform.scopes = updated_platform.get('scopes') or platform.scopes
                     platform.last_synced_at = datetime.utcnow()
 
                     # Update creator profile with latest follower count
@@ -1044,7 +1057,7 @@ def sync_platform(platform_id):
                 'platform': platform.to_dict()
             }), 200
         else:
-            platform.sync_status = 'failure'
+            platform.sync_status = sync_result.get('status', 'failed')
             db.session.commit()
             return jsonify({'error': 'Sync failed'}), 500
 
@@ -1224,22 +1237,21 @@ def connect_brand_platform():
             account_name=account_name, account_id=thunzi_platform.get('accountId'),
             account_id_secondary=thunzi_platform.get('accountIdSecondary'), profile_url=thunzi_platform.get('profileUrl'),
             access_token=access_token, refresh_token=refresh_token, token_expiry=parsed_token_expiry,
+            scopes=thunzi_platform.get('scopes') or [],
             followers=thunzi_platform.get('followers', 0), posts=thunzi_platform.get('posts', 0),
             is_connected=thunzi_platform.get('isConnected', True), sync_status=thunzi_platform.get('syncStatus', 'pending'),
-            last_synced_at=datetime.utcnow() if thunzi_platform.get('lastSyncedAt') else None
+            last_synced_at=_parse_thunzi_datetime(thunzi_platform.get('lastSyncedAt'))
         )
 
         db.session.add(connected_platform)
         db.session.commit()
 
-        # Trigger initial sync (pass all required fields)
+        # Trigger initial async sync without blocking the platform connection response.
         if connected_platform.thunzi_platform_id:
-            thunzi_service.sync_platform(
-                platform_id=connected_platform.thunzi_platform_id,
-                account_id=connected_platform.account_id,
-                company_id=thunzi_account.thunzi_company_id,
-                platform=platform
-            )
+            sync_started = thunzi_service.start_async_platform_sync(connected_platform.thunzi_platform_id)
+            if sync_started:
+                connected_platform.sync_status = sync_started.get('status', connected_platform.sync_status)
+                db.session.commit()
 
         return jsonify({'success': True, 'message': f'{platform.title()} connected successfully', 'platform': connected_platform.to_dict()}), 201
 
@@ -1271,12 +1283,12 @@ def sync_brand_platform(platform_id):
 
         # Trigger sync with all required fields
         thunzi_account = ThunziAccount.query.filter_by(user_id=current_user_id).first()
-        success = thunzi_service.sync_platform(
+        sync_result = thunzi_service.sync_platform_and_poll(
             platform_id=platform.thunzi_platform_id,
-            account_id=platform.account_id,
-            company_id=thunzi_account.thunzi_company_id if thunzi_account else None,
-            platform=platform.platform
+            timeout_seconds=120,
+            poll_interval_seconds=5
         )
+        success = sync_result.get('success')
 
         if success:
             thunzi_account = ThunziAccount.query.filter_by(user_id=current_user_id).first()
@@ -1288,12 +1300,13 @@ def sync_brand_platform(platform_id):
                     platform.followers = updated_platform.get('followers', platform.followers)
                     platform.posts = updated_platform.get('posts', platform.posts)
                     platform.sync_status = updated_platform.get('syncStatus', 'success')
+                    platform.scopes = updated_platform.get('scopes') or platform.scopes
                     platform.last_synced_at = datetime.utcnow()
                     db.session.commit()
 
             return jsonify({'success': True, 'message': 'Sync completed', 'platform': platform.to_dict()}), 200
         else:
-            platform.sync_status = 'failure'
+            platform.sync_status = sync_result.get('status', 'failed')
             db.session.commit()
             return jsonify({'error': 'Sync failed'}), 500
 

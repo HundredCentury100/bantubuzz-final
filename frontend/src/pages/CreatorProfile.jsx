@@ -759,7 +759,7 @@ const CreatorProfile = () => {
           <div className="mb-8">
             <button
               onClick={() => setShowDemographics(!showDemographics)}
-              className="w-full flex items-center justify-between p-4 bg-white rounded-2xl shadow-md hover:shadow-lg transition-shadow mb-4"
+              className="w-full flex items-center justify-between p-4 bg-white rounded-3xl shadow-sm hover:shadow-md transition-shadow mb-4"
             >
               <div className="flex items-center gap-3">
                 <svg className="w-6 h-6 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -796,7 +796,7 @@ const CreatorProfile = () => {
         <div className="mb-8">
           <button
             onClick={() => setShowAnalytics(!showAnalytics)}
-            className="w-full flex items-center justify-between p-4 bg-white rounded-2xl shadow-md hover:shadow-lg transition-shadow mb-4"
+            className="w-full flex items-center justify-between p-4 bg-white rounded-3xl shadow-sm hover:shadow-md transition-shadow mb-4"
           >
             <div className="flex items-center gap-3">
               <svg className="w-6 h-6 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -955,12 +955,12 @@ const CreatorProfile = () => {
                       {/* Platform Badge(s) */}
                       {pkg.is_multi_platform && pkg.platforms && pkg.platforms.length > 0 ? (
                         <div className="mb-3">
-                          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gradient-to-r from-purple-50 to-blue-50 border border-purple-200">
-                            <svg className="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 border border-primary/30">
+                            <svg className="w-4 h-4 text-primary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 5a1 1 0 011-1h4a1 1 0 011 1v7a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM14 5a1 1 0 011-1h4a1 1 0 011 1v7a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 16a1 1 0 011-1h4a1 1 0 011 1v3a1 1 0 01-1 1H5a1 1 0 01-1-1v-3zM14 16a1 1 0 011-1h4a1 1 0 011 1v3a1 1 0 01-1 1h-4a1 1 0 01-1-1v-3z" />
                             </svg>
-                            <span className="text-sm font-semibold text-purple-700">Multi-Platform</span>
-                            <span className="text-xs text-purple-600">({pkg.platforms.length} platforms)</span>
+                            <span className="text-sm font-semibold text-dark">Multi-Platform</span>
+                            <span className="text-xs text-gray-600">({pkg.platforms.length} platforms)</span>
                           </div>
                           <div className="flex flex-wrap gap-2 mt-2">
                             {pkg.platforms.map(platform => PLATFORM_CONFIGS[platform] && (

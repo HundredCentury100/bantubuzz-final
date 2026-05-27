@@ -144,65 +144,71 @@ class PostMetricsService:
                     'error': f'{deliverable.post_platform} not connected'
                 }
 
-            # Use ThunziAI creator posts API with date range
+            # Prefer ThunziAI's direct URL lookup when available.
+            # This is especially important for Facebook, where public URLs often expose
+            # alphanumeric IDs while Graph/Thunzi use numeric IDs internally.
+            matching_post = thunzi_service.find_post_by_url(
+                deliverable.url,
+                thunzi_account.thunzi_company_id
+            )
+            connected_platform = connected_platforms[0] if connected_platforms else None
+
+            # Use ThunziAI creator posts API with date range as fallback.
             # Get posts from past 90 days
             end_date = datetime.utcnow()
             start_date = end_date - timedelta(days=90)
 
-            current_app.logger.info(
-                f"Fetching posts for ThunziAI company {thunzi_account.thunzi_company_id} "
-                f"from {start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')}"
-            )
+            if matching_post:
+                current_app.logger.info(
+                    f"Found post via ThunziAI find-by-url for deliverable {deliverable_id}"
+                )
+            else:
+                current_app.logger.info(
+                    f"Fetching posts for ThunziAI company {thunzi_account.thunzi_company_id} "
+                    f"from {start_date.strftime('%Y-%m-%d')} to {end_date.strftime('%Y-%m-%d')}"
+                )
 
-            # Use company ID endpoint instead of bantubuzz_id
-            # The creator-specific endpoint returns empty results, but company endpoint works
-            thunzi_posts = thunzi_service.get_posts_by_company_id(
-                thunzi_account.thunzi_company_id,
-                start_date.strftime('%Y-%m-%d'),
-                end_date.strftime('%Y-%m-%d')
-            )
+                # Use company ID endpoint instead of bantubuzz_id
+                # The creator-specific endpoint returns empty results, but company endpoint works
+                thunzi_posts = thunzi_service.get_posts_by_company_id(
+                    thunzi_account.thunzi_company_id,
+                    start_date.strftime('%Y-%m-%d'),
+                    end_date.strftime('%Y-%m-%d')
+                )
 
-            if not thunzi_posts:
-                return {
-                    'success': False,
-                    'message': 'No posts found for this creator in ThunziAI. Make sure platforms are syncing.',
-                    'metrics': None,
-                    'error': 'No posts found in date range'
-                }
+                if not thunzi_posts:
+                    return {
+                        'success': False,
+                        'message': 'No posts found for this creator in ThunziAI. Make sure platforms are syncing.',
+                        'metrics': None,
+                        'error': 'No posts found in date range'
+                    }
 
-            # Find matching post by originalId and platform
-            matching_post = None
-            connected_platform = None
+                current_app.logger.info(
+                    f"Searching {len(thunzi_posts)} posts for post_id={deliverable.post_id} "
+                    f"on platform={deliverable.post_platform}"
+                )
 
-            current_app.logger.info(
-                f"Searching {len(thunzi_posts)} posts for post_id={deliverable.post_id} "
-                f"on platform={deliverable.post_platform}"
-            )
+                for post in thunzi_posts:
+                    # Match by originalId/originalPostId and platform type.
+                    original_id = post.get('originalId') or post.get('originalPostId') or ''
+                    post_platform = post.get('platform', '').lower()
 
-            for post in thunzi_posts:
-                # Match by originalId (format: "accountId_postId") and platform type
-                # Extract post ID from the originalId field
-                original_id = post.get('originalId', '')
-                post_platform = post.get('platform', '').lower()
+                    # originalId is often formatted as "accountId_postId", so extract postId.
+                    if '_' in original_id:
+                        extracted_post_id = original_id.split('_', 1)[1]
+                    else:
+                        extracted_post_id = original_id
 
-                # originalId is formatted as "accountId_postId", we need to extract the postId part
-                if '_' in original_id:
-                    extracted_post_id = original_id.split('_', 1)[1]  # Get everything after first underscore
-                else:
-                    extracted_post_id = original_id
+                    if (str(extracted_post_id) == str(deliverable.post_id) and
+                        post_platform == deliverable.post_platform.lower()):
+                        matching_post = post
+                        connected_platform = connected_platforms[0] if connected_platforms else None
 
-                if (str(extracted_post_id) == str(deliverable.post_id) and
-                    post_platform == deliverable.post_platform.lower()):
-                    matching_post = post
-                    # Find the connected platform for this post
-                    for platform in connected_platforms:
-                        connected_platform = platform
+                        current_app.logger.info(
+                            f"Found matching post: originalId={original_id}, extracted_post_id={extracted_post_id}, platform={post_platform}"
+                        )
                         break
-
-                    current_app.logger.info(
-                        f"Found matching post: originalId={original_id}, extracted_post_id={extracted_post_id}, platform={post_platform}"
-                    )
-                    break
 
             if not matching_post:
                 current_app.logger.warning(
@@ -218,7 +224,11 @@ class PostMetricsService:
 
             # Get detailed insights using NEW endpoint (Mar 2026) - uses originalId instead of ThunziAI post ID
             # This is more efficient as it directly queries by the original post ID
-            original_post_id = matching_post.get('originalId')
+            original_post_id = (
+                matching_post.get('originalId') or
+                matching_post.get('originalPostId') or
+                deliverable.post_id
+            )
             insights = thunzi_service.get_post_insights_by_original_id(original_post_id)
 
             if not insights:

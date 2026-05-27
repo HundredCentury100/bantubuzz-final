@@ -60,22 +60,37 @@ def sync_platform(platform_id):
             logger.error(f"Failed to login to ThunziAI for platform {platform_id}")
             return {'status': 'error', 'message': 'ThunziAI login failed'}
 
-        # Sync platform using ThunziAI's sync endpoint
-        # For Meta platforms (Facebook/Instagram), don't send account_id
-        account_id = None if platform.platform in ['facebook', 'instagram'] else platform.account_id
-
-        result = thunzi_service.sync_platform(
+        # Sync platform using ThunziAI's async endpoint. The service falls back
+        # to the legacy endpoint if the async endpoint is unavailable.
+        result = thunzi_service.sync_platform_and_poll(
             platform_id=platform.thunzi_platform_id,
-            account_id=account_id,
-            company_id=thunzi_account.thunzi_company_id,
-            platform=platform.platform
+            timeout_seconds=120,
+            poll_interval_seconds=5
         )
 
-        if not result:
+        if not result.get('success'):
             logger.error(f"Sync failed for platform {platform_id}")
+            platform.sync_status = result.get('status', 'failed')
+            db.session.commit()
             return {'status': 'error', 'message': 'Platform sync failed'}
 
-        # Update last synced timestamp
+        # Fetch latest platform data from ThunziAI and update local cache.
+        platforms_data = thunzi_service.get_platforms(thunzi_account.thunzi_company_id)
+        updated_platform = next(
+            (p for p in platforms_data if p.get('id') == platform.thunzi_platform_id),
+            None
+        )
+
+        if updated_platform:
+            platform.account_name = updated_platform.get('accountName') or platform.account_name
+            platform.account_id = updated_platform.get('accountId') or platform.account_id
+            platform.account_id_secondary = updated_platform.get('accountIdSecondary') or platform.account_id_secondary
+            platform.profile_url = updated_platform.get('profileUrl') or platform.profile_url
+            platform.followers = updated_platform.get('followers', platform.followers)
+            platform.posts = updated_platform.get('posts', platform.posts)
+            platform.sync_status = updated_platform.get('syncStatus') or result.get('status', 'success')
+            platform.scopes = updated_platform.get('scopes') or platform.scopes
+
         platform.last_synced_at = datetime.utcnow()
         db.session.commit()
 
@@ -84,7 +99,7 @@ def sync_platform(platform_id):
             'status': 'success',
             'platform_id': platform_id,
             'platform': platform.platform,
-            'synced_at': platform.last_synced.isoformat(),
+            'synced_at': platform.last_synced_at.isoformat(),
             'result': result
         }
 

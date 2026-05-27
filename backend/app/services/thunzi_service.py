@@ -3,6 +3,7 @@ ThunziAI Service
 Handles all interactions with ThunziAI API for social media analytics
 """
 import os
+import time
 import requests
 from typing import Dict, List, Optional
 from datetime import datetime
@@ -19,7 +20,43 @@ class ThunziAIService:
         self.password = os.getenv('THUNZI_PASSWORD', 'your-thunzi-password')  # TODO: Update this
         self.company_id = os.getenv('THUNZI_COMPANY_ID', None)  # TODO: Add your ThunziAI company ID
         self.session = requests.Session()
+        self.session.headers.update({
+            'x-api-key': self.api_key
+        })
         self.is_authenticated = False
+
+    def _log_response_body(self, response):
+        """Return a safe response body for logging."""
+        try:
+            return response.json()
+        except Exception:
+            return response.text[:500] if response.text else ''
+
+    def _normalize_sync_status(self, status: Optional[str]) -> Optional[str]:
+        """Normalize ThunziAI status drift."""
+        if not status:
+            return status
+        normalized = status.lower()
+        if normalized == 'failure':
+            return 'failed'
+        return normalized
+
+    def _normalize_platform(self, platform: Dict) -> Dict:
+        """Normalize common ThunziAI platform response field drift."""
+        if not platform:
+            return platform
+
+        normalized = dict(platform)
+        normalized['syncStatus'] = self._normalize_sync_status(
+            normalized.get('syncStatus')
+        )
+        normalized['lastSyncedAt'] = (
+            normalized.get('lastSyncedAt') or
+            normalized.get('lastSynced') or
+            normalized.get('lastSyncAt')
+        )
+        normalized.setdefault('scopes', platform.get('scopes') or [])
+        return normalized
 
     def login(self, email: str = None, password: str = None) -> bool:
         """
@@ -528,7 +565,7 @@ class ThunziAIService:
 
             if response.status_code in [200, 201]:
                 result = response.json()
-                return result
+                return self._normalize_platform(result)
 
             log_error('ThunziAI.add_platform', f"Failed with status {response.status_code}: {response.text}")
             return None
@@ -546,7 +583,7 @@ class ThunziAIService:
             )
 
             if response.status_code == 200:
-                return response.json()
+                return self._normalize_platform(response.json())
 
             print(f"ThunziAI connect platform failed: {response.status_code}")
             return None
@@ -565,7 +602,7 @@ class ThunziAIService:
             )
 
             if response.status_code == 200:
-                return response.json()
+                return [self._normalize_platform(platform) for platform in response.json()]
 
             print(f"ThunziAI get platforms failed: {response.status_code}")
             return []
@@ -629,6 +666,121 @@ class ThunziAIService:
         except Exception as e:
             log_error('ThunziAI.sync_platform', e)
             return False
+
+    def start_async_platform_sync(self, platform_id: int) -> Optional[Dict]:
+        """
+        Start asynchronous platform sync using the updated ThunziAI endpoint.
+
+        Returns a dict like:
+        {
+            "status": "in_progress",
+            "pollUrl": "https://app.thunzi.co/api/platforms/559/status"
+        }
+        """
+        self._ensure_authenticated()
+
+        try:
+            url = f"{self.BASE_URL}/api/platforms/sync"
+            payload = {"platformId": platform_id}
+
+            log_external_api_call(
+                service='ThunziAI',
+                method='POST',
+                url=url,
+                payload=payload
+            )
+
+            response = self.session.post(url, json=payload, timeout=30)
+            response_body = self._log_response_body(response)
+
+            log_external_api_response(
+                service='ThunziAI',
+                method='POST',
+                url=url,
+                status_code=response.status_code,
+                response_body=response_body
+            )
+
+            if response.status_code in [200, 201, 202]:
+                data = response.json()
+                if data.get('status'):
+                    data['status'] = self._normalize_sync_status(data.get('status'))
+                return data
+
+            log_error('ThunziAI.start_async_platform_sync',
+                     f"Failed with status {response.status_code}: {response.text[:200]}")
+            return None
+        except Exception as e:
+            log_error('ThunziAI.start_async_platform_sync', e)
+            return None
+
+    def get_platform_sync_status(self, platform_id: int) -> Optional[str]:
+        """Poll async platform sync status."""
+        self._ensure_authenticated()
+
+        try:
+            url = f"{self.BASE_URL}/api/platforms/{platform_id}/status"
+
+            log_external_api_call(
+                service='ThunziAI',
+                method='GET',
+                url=url,
+                payload={'platform_id': platform_id}
+            )
+
+            response = self.session.get(url, timeout=30)
+            response_body = self._log_response_body(response)
+
+            log_external_api_response(
+                service='ThunziAI',
+                method='GET',
+                url=url,
+                status_code=response.status_code,
+                response_body=response_body
+            )
+
+            if response.status_code == 200:
+                return self._normalize_sync_status(response.json().get('status'))
+
+            log_error('ThunziAI.get_platform_sync_status',
+                     f"Failed with status {response.status_code}: {response.text[:200]}")
+            return None
+        except Exception as e:
+            log_error('ThunziAI.get_platform_sync_status', e)
+            return None
+
+    def sync_platform_and_poll(self, platform_id: int, timeout_seconds: int = 120,
+                               poll_interval_seconds: int = 5) -> Dict:
+        """
+        Start async platform sync and poll until it completes, fails, or times out.
+        Falls back to the legacy sync endpoint if the async endpoint is unavailable.
+        """
+        started = self.start_async_platform_sync(platform_id)
+
+        if not started:
+            legacy_success = self.sync_platform(platform_id=platform_id)
+            return {
+                'success': legacy_success,
+                'status': 'success' if legacy_success else 'failed',
+                'mode': 'legacy'
+            }
+
+        status = self._normalize_sync_status(started.get('status')) or 'pending'
+        terminal_statuses = {'success', 'failed'}
+        deadline = time.time() + timeout_seconds
+
+        while status not in terminal_statuses and time.time() < deadline:
+            time.sleep(poll_interval_seconds)
+            polled_status = self.get_platform_sync_status(platform_id)
+            if polled_status:
+                status = polled_status
+
+        return {
+            'success': status == 'success',
+            'status': status if status in terminal_statuses else 'timeout',
+            'mode': 'async',
+            'pollUrl': started.get('pollUrl')
+        }
 
     def update_platform(self, platform_id: int, updates: Dict) -> Optional[Dict]:
         """Update platform details"""
@@ -843,6 +995,57 @@ class ThunziAIService:
         except Exception as e:
             print(f"ThunziAI get posts by company ID error: {str(e)}")
             return []
+
+    def find_post_by_url(self, url: str, company_id: int) -> Optional[Dict]:
+        """
+        Find a post by its public URL using ThunziAI's updated endpoint.
+
+        Args:
+            url: Public social media post URL
+            company_id: ThunziAI company ID
+
+        Returns:
+            Post data with metrics or None if not found.
+        """
+        self._ensure_authenticated()
+
+        try:
+            endpoint = f"{self.BASE_URL}/api/posts/find-by-url"
+            payload = {
+                "url": url,
+                "companyId": str(company_id)
+            }
+
+            log_external_api_call(
+                service='ThunziAI',
+                method='POST',
+                url=endpoint,
+                payload=payload
+            )
+
+            response = self.session.post(endpoint, json=payload, timeout=30)
+            response_body = self._log_response_body(response)
+
+            log_external_api_response(
+                service='ThunziAI',
+                method='POST',
+                url=endpoint,
+                status_code=response.status_code,
+                response_body=response_body
+            )
+
+            if response.status_code == 200:
+                return response.json()
+
+            if response.status_code == 404:
+                return None
+
+            log_error('ThunziAI.find_post_by_url',
+                     f"Failed with status {response.status_code}: {response.text[:200]}")
+            return None
+        except Exception as e:
+            log_error('ThunziAI.find_post_by_url', e)
+            return None
 
     def get_post_by_id(self, post_id: int) -> Optional[Dict]:
         """
