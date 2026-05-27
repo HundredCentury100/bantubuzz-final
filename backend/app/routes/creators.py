@@ -11,6 +11,42 @@ from sqlalchemy import or_, and_, func
 
 bp = Blueprint('creators', __name__)
 
+RESERVED_PUBLIC_USERNAMES = {
+    'about', 'admin', 'api', 'blocked-users', 'bookings', 'brand', 'briefs',
+    'browse', 'cart', 'checkout', 'contact', 'creator', 'creators', 'disputes',
+    'forgot-password', 'help-center', 'how-it-works', 'login', 'messages',
+    'my-tickets', 'notifications', 'packages', 'payment', 'pricing', 'privacy',
+    'register', 'reset-password', 'saved-creators', 'subscription', 'success-stories',
+    'support', 'terms', 'tickets', 'verify-otp', 'wallet', 'youtube'
+}
+
+
+def _public_creator_payload(creator):
+    creator_data = creator.to_dict(include_user=True, public_view=True)
+
+    from app.models import Collaboration, BrandProfile
+
+    collaborations = Collaboration.query.filter(
+        Collaboration.creator_id == creator.id,
+        Collaboration.status.in_(['in_progress', 'completed'])
+    ).all()
+
+    brands_by_id = {}
+    for collaboration in collaborations:
+        brand = collaboration.brand or BrandProfile.query.get(collaboration.brand_id)
+        if not brand or brand.id in brands_by_id:
+            continue
+
+        brands_by_id[brand.id] = {
+            'id': brand.id,
+            'name': brand.company_name,
+            'logo': brand.logo,
+            'logo_sizes': brand.logo_sizes or {}
+        }
+
+    creator_data['brands_worked_with'] = list(brands_by_id.values())
+    return creator_data
+
 
 @bp.route('/featured', methods=['GET'])
 def get_featured_creators():
@@ -445,31 +481,28 @@ def get_creator(creator_id):
         if not creator:
             return jsonify({'error': 'Creator not found'}), 404
 
-        creator_data = creator.to_dict(include_user=True, public_view=True)
+        return jsonify(_public_creator_payload(creator)), 200
 
-        from app.models import Collaboration, BrandProfile
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
-        collaborations = Collaboration.query.filter(
-            Collaboration.creator_id == creator.id,
-            Collaboration.status.in_(['in_progress', 'completed'])
-        ).all()
 
-        brands_by_id = {}
-        for collaboration in collaborations:
-            brand = collaboration.brand or BrandProfile.query.get(collaboration.brand_id)
-            if not brand or brand.id in brands_by_id:
-                continue
+@bp.route('/by-username/<username>', methods=['GET'])
+def get_creator_by_username(username):
+    """Get a public creator profile by unique username."""
+    try:
+        normalized_username = (username or '').strip()
+        if not normalized_username:
+            return jsonify({'error': 'Creator not found'}), 404
 
-            brands_by_id[brand.id] = {
-                'id': brand.id,
-                'name': brand.company_name,
-                'logo': brand.logo,
-                'logo_sizes': brand.logo_sizes or {}
-            }
+        creator = CreatorProfile.query.filter(
+            func.lower(CreatorProfile.username) == normalized_username.lower()
+        ).first()
 
-        creator_data['brands_worked_with'] = list(brands_by_id.values())
+        if not creator:
+            return jsonify({'error': 'Creator not found'}), 404
 
-        return jsonify(creator_data), 200
+        return jsonify(_public_creator_payload(creator)), 200
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -522,9 +555,12 @@ def update_profile():
                 if not re.match(r'^[a-zA-Z0-9_]{3,20}$', username):
                     return jsonify({'error': 'Username must be 3-20 characters and contain only letters, numbers, and underscores'}), 400
 
+                if username.lower() in RESERVED_PUBLIC_USERNAMES:
+                    return jsonify({'error': 'This username is reserved. Please choose another one.'}), 400
+
                 # Check if username is already taken by another creator
                 existing = CreatorProfile.query.filter(
-                    CreatorProfile.username == username,
+                    func.lower(CreatorProfile.username) == username.lower(),
                     CreatorProfile.id != creator.id
                 ).first()
                 if existing:

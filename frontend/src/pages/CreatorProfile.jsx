@@ -15,9 +15,10 @@ import SEO from '../components/SEO';
 import toast from 'react-hot-toast';
 import { PLATFORM_CONFIGS, PACKAGE_TYPES } from '../constants/platformConfig';
 import PortfolioGrid from '../components/PortfolioGrid';
+import { Copy, MessageCircle } from 'lucide-react';
 
 const CreatorProfile = () => {
-  const { id } = useParams();
+  const { id, username } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
   const { addToCart } = useCart();
@@ -37,9 +38,12 @@ const CreatorProfile = () => {
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [showDemographics, setShowDemographics] = useState(false);
   const [showShareMenu, setShowShareMenu] = useState(false);
+  const profileLookup = id || username;
+  const isUsernameProfile = Boolean(username && !id);
 
   const getProfileShareData = () => {
-    const profileUrl = `${window.location.origin}/creators/${creator.id}`;
+    const profilePath = creator?.username ? `/${creator.username}` : `/creators/${creator.id}`;
+    const profileUrl = `${window.location.origin}${profilePath}`;
     const creatorName = creator.display_name || creator.username || 'this creator';
     const text = `Check out ${creatorName}'s profile on BantuBuzz`;
 
@@ -57,26 +61,78 @@ const CreatorProfile = () => {
     }
   };
 
+  const getPlatformConfig = (platformName) => {
+    const normalized = (platformName || '').toLowerCase();
+    const configKey = Object.keys(PLATFORM_CONFIGS).find(
+      (key) => key.toLowerCase() === normalized
+    );
+    return configKey ? PLATFORM_CONFIGS[configKey] : null;
+  };
+
+  const renderShareIcon = (platformName) => {
+    if (platformName === 'whatsapp') {
+      return <MessageCircle className="w-4 h-4 text-green-700" />;
+    }
+
+    if (platformName === 'copy') {
+      return <Copy className="w-4 h-4 text-gray-700" />;
+    }
+
+    const platformConfig = getPlatformConfig(platformName);
+    if (!platformConfig?.icon) {
+      return <span className="text-xs font-bold text-primary">{platformName?.slice(0, 2).toUpperCase()}</span>;
+    }
+
+    return (
+      <svg className={`w-4 h-4 ${platformConfig.color}`} viewBox="0 0 24 24" fill="currentColor">
+        {platformConfig.icon}
+      </svg>
+    );
+  };
+
+  const getShareOptions = () => {
+    const platformOptions = (creator?.platform_stats || []).map((platform) => ({
+      key: `${platform.platform}-${platform.id || platform.account_name}`,
+      platform: platform.platform,
+      label: platform.platform === 'twitter' ? 'X/Twitter' : platform.platform.charAt(0).toUpperCase() + platform.platform.slice(1),
+      profileUrl: platform.profile_url
+    }));
+
+    return [
+      { key: 'whatsapp', platform: 'whatsapp', label: 'WhatsApp' },
+      ...platformOptions,
+      { key: 'copy', platform: 'copy', label: 'Copy link' }
+    ];
+  };
+
   const handleShareOption = async (platform) => {
     const { profileUrl, text } = getProfileShareData();
     const encodedUrl = encodeURIComponent(profileUrl);
     const encodedText = encodeURIComponent(`${text}: ${profileUrl}`);
+    const platformName = typeof platform === 'string' ? platform : platform.platform;
 
     setShowShareMenu(false);
 
-    if (platform === 'whatsapp') {
+    if (platformName === 'whatsapp') {
       window.open(`https://wa.me/?text=${encodedText}`, '_blank', 'noopener,noreferrer');
       return;
     }
 
-    if (platform === 'linkedin') {
-      window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${encodedUrl}`, '_blank', 'noopener,noreferrer');
+    if (platformName === 'facebook') {
+      window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodedUrl}`, '_blank', 'noopener,noreferrer');
       return;
     }
 
-    if (platform === 'instagram') {
+    if (platformName === 'twitter') {
+      window.open(`https://twitter.com/intent/tweet?text=${encodedText}`, '_blank', 'noopener,noreferrer');
+      return;
+    }
+
+    if (platformName !== 'copy') {
       await copyProfileLink();
-      window.open('https://www.instagram.com/', '_blank', 'noopener,noreferrer');
+      if (platform.profileUrl) {
+        window.open(platform.profileUrl, '_blank', 'noopener,noreferrer');
+      }
       return;
     }
 
@@ -88,18 +144,34 @@ const CreatorProfile = () => {
     return path.startsWith('http') ? path : `${BASE_URL}${path}`;
   };
 
+  const promptBrandAuth = (action) => {
+    toast.error(`Please sign in or sign up as a brand to ${action}.`);
+    navigate('/login');
+  };
+
   useEffect(() => {
     fetchCreatorData();
-    fetchReviews();
-    fetchCreatorAudience();
-  }, [id]);
+  }, [profileLookup]);
+
+  useEffect(() => {
+    if (creator?.id) {
+      fetchReviews(creator.id);
+      fetchCreatorAudience(creator.id);
+    }
+  }, [creator?.id]);
 
   const fetchCreatorData = async () => {
     try {
       setLoading(true);
+      setCreator(null);
+      setPackages([]);
+      setReviews([]);
+      setAudienceData(null);
 
       // Fetch creator profile
-      const creatorResponse = await creatorsAPI.getCreator(id);
+      const creatorResponse = isUsernameProfile
+        ? await creatorsAPI.getCreatorByUsername(username)
+        : await creatorsAPI.getCreator(id);
       const creatorData = creatorResponse.data;
 
       // Keep gallery_images in its native format (objects with type field for videos/images)
@@ -120,14 +192,14 @@ const CreatorProfile = () => {
       setCreator(creatorData);
 
       // Fetch creator's packages
-      const packagesResponse = await packagesAPI.getPackages({ creator_id: id });
+      const packagesResponse = await packagesAPI.getPackages({ creator_id: creatorData.id });
       setPackages(packagesResponse.data.packages || []);
 
       // Check if creator is saved (for brands only)
       if (user?.user_type === 'brand') {
         const savedResponse = await brandsAPI.getSavedCreators();
         const savedCreators = savedResponse.data.creators || [];
-        setIsSaved(savedCreators.some(c => c.id === parseInt(id)));
+        setIsSaved(savedCreators.some(c => c.id === parseInt(creatorData.id)));
       }
     } catch (error) {
       console.error('Error fetching creator data:', error);
@@ -137,10 +209,10 @@ const CreatorProfile = () => {
     }
   };
 
-  const fetchReviews = async () => {
+  const fetchReviews = async (resolvedCreatorId) => {
     try {
       setReviewsLoading(true);
-      const response = await reviewsAPI.getCreatorReviews(id, { per_page: 10 });
+      const response = await reviewsAPI.getCreatorReviews(resolvedCreatorId, { per_page: 10 });
       setReviews(response.data.reviews || []);
       setReviewsStats(response.data.average_ratings || null);
     } catch (error) {
@@ -150,10 +222,10 @@ const CreatorProfile = () => {
     }
   };
 
-  const fetchCreatorAudience = async () => {
+  const fetchCreatorAudience = async (resolvedCreatorId) => {
     try {
       setAudienceLoading(true);
-      const response = await analyticsAPI.getCreatorAudience(id);
+      const response = await analyticsAPI.getCreatorAudience(resolvedCreatorId);
       setAudienceData(response.data);
     } catch (error) {
       console.error('Error fetching audience data:', error);
@@ -167,18 +239,17 @@ const CreatorProfile = () => {
   const handleSaveCreator = async () => {
     // If user is not logged in or not a brand, redirect to signup
     if (!user || user?.user_type !== 'brand') {
-      toast.error('Please sign in as a brand to save creators');
-      navigate('/login');
+      promptBrandAuth('save creators');
       return;
     }
 
     try {
       if (isSaved) {
-        await brandsAPI.unsaveCreator(id);
+        await brandsAPI.unsaveCreator(creator.id);
         setIsSaved(false);
         toast.success('Creator removed from saved');
       } else {
-        await brandsAPI.saveCreator(id);
+        await brandsAPI.saveCreator(creator.id);
         setIsSaved(true);
         toast.success('Creator saved successfully');
       }
@@ -201,6 +272,11 @@ const CreatorProfile = () => {
   };
 
   const handleAddToCart = (pkg) => {
+    if (!user || user?.user_type !== 'brand') {
+      promptBrandAuth('book this creator');
+      return;
+    }
+
     addToCart({
       package_id: pkg.id,
       creator_id: creator.id,
@@ -459,38 +535,18 @@ const CreatorProfile = () => {
 
                     {showShareMenu && (
                       <div className="absolute left-0 right-0 md:left-auto md:right-0 mt-2 bg-white border border-gray-200 rounded-2xl shadow-lg p-2 z-20 min-w-[220px]">
-                        <button
-                          onClick={() => handleShareOption('whatsapp')}
-                          className="w-full px-4 py-3 rounded-xl text-left text-sm font-medium text-gray-700 hover:bg-primary/10 hover:text-dark transition-colors flex items-center gap-3"
-                        >
-                          <span className="w-8 h-8 rounded-full bg-green-100 text-green-700 flex items-center justify-center font-bold text-xs">WA</span>
-                          WhatsApp
-                        </button>
-                        <button
-                          onClick={() => handleShareOption('instagram')}
-                          className="w-full px-4 py-3 rounded-xl text-left text-sm font-medium text-gray-700 hover:bg-primary/10 hover:text-dark transition-colors flex items-center gap-3"
-                        >
-                          <span className="w-8 h-8 rounded-full bg-pink-100 text-pink-700 flex items-center justify-center font-bold text-xs">IG</span>
-                          Instagram
-                        </button>
-                        <button
-                          onClick={() => handleShareOption('linkedin')}
-                          className="w-full px-4 py-3 rounded-xl text-left text-sm font-medium text-gray-700 hover:bg-primary/10 hover:text-dark transition-colors flex items-center gap-3"
-                        >
-                          <span className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs">in</span>
-                          LinkedIn
-                        </button>
-                        <button
-                          onClick={() => handleShareOption('copy')}
-                          className="w-full px-4 py-3 rounded-xl text-left text-sm font-medium text-gray-700 hover:bg-primary/10 hover:text-dark transition-colors flex items-center gap-3"
-                        >
-                          <span className="w-8 h-8 rounded-full bg-gray-100 text-gray-700 flex items-center justify-center">
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16h8M8 12h8m-6 8h6a2 2 0 002-2V7.828a2 2 0 00-.586-1.414l-2.828-2.828A2 2 0 0013.172 3H8a2 2 0 00-2 2v13a2 2 0 002 2z" />
-                            </svg>
-                          </span>
-                          Copy link
-                        </button>
+                        {getShareOptions().map((option) => (
+                          <button
+                            key={option.key}
+                            onClick={() => handleShareOption(option)}
+                            className="w-full px-4 py-3 rounded-xl text-left text-sm font-medium text-gray-700 hover:bg-primary/10 hover:text-dark transition-colors flex items-center gap-3"
+                          >
+                            <span className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
+                              {renderShareIcon(option.platform)}
+                            </span>
+                            <span className="truncate">{option.label}</span>
+                          </button>
+                        ))}
                       </div>
                     )}
                   </div>

@@ -900,6 +900,9 @@ function App() {
         }
       />
 
+      {/* Public creator username URLs, e.g. /creatorusername */}
+      <Route path="/:username" element={<CreatorProfile />} />
+
       {/* 404 */}
       <Route path="*" element={<NotFound />} />
     </Routes>
