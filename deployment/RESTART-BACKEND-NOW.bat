@@ -18,7 +18,9 @@ pause >nul
 
 echo.
 echo Restarting backend...
-ssh %SERVER_USER%@%SERVER_HOST% "set -e; cd %REMOTE_BACKEND%; source venv/bin/activate; PIDS_FILE=/tmp/bantubuzz_gunicorn_pids; pgrep -f '[g]unicorn.*0.0.0.0:8002' > $PIDS_FILE || true; if [ -s $PIDS_FILE ]; then echo 'Stopping Gunicorn PIDs:'; cat $PIDS_FILE; xargs -r kill < $PIDS_FILE; sleep 3; fi; pgrep -f '[g]unicorn.*0.0.0.0:8002' > $PIDS_FILE || true; if [ -s $PIDS_FILE ]; then echo 'Force stopping Gunicorn PIDs:'; cat $PIDS_FILE; xargs -r kill -9 < $PIDS_FILE; sleep 1; fi; rm -f $PIDS_FILE; venv/bin/gunicorn -w 4 -b 0.0.0.0:8002 --timeout 120 --error-logfile gunicorn_error.log --access-logfile gunicorn_access.log 'app:create_app()' --daemon; systemctl restart apache2; echo 'Waiting for backend health...'; HEALTH_OK=0; for i in 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20; do if curl -fsS http://localhost:8002/api/health; then HEALTH_OK=1; break; fi; sleep 2; done; echo; echo 'Gunicorn processes:'; ps aux | grep '[g]unicorn' || true; echo 'Port 8002:'; netstat -tlnp | grep 8002 || ss -tlnp | grep 8002 || true; if [ $HEALTH_OK != 1 ]; then echo 'Backend health failed. Recent gunicorn errors:'; tail -80 gunicorn_error.log || true; exit 1; fi; echo 'Apache status:'; systemctl is-active apache2; echo 'Public health:'; curl -L -f -s -i https://bantubuzz.com/api/health"
+scp "%~dp0restart-backend-remote.sh" %SERVER_USER%@%SERVER_HOST%:/tmp/bantubuzz_restart_backend.sh
+if errorlevel 1 goto fail
+ssh %SERVER_USER%@%SERVER_HOST% "chmod +x /tmp/bantubuzz_restart_backend.sh && REMOTE_BACKEND='%REMOTE_BACKEND%' PORT=8002 /tmp/bantubuzz_restart_backend.sh"
 if errorlevel 1 goto fail
 
 echo.
