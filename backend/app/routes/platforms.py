@@ -9,6 +9,8 @@ from app.models import User, CreatorProfile, BrandProfile, ThunziAccount, Connec
 from app.services.thunzi_service import thunzi_service
 from app.utils.logger import log_incoming_request, log_response, log_error
 from datetime import datetime
+from urllib.parse import urlencode
+import json
 import requests
 import os
 
@@ -23,6 +25,71 @@ def _parse_thunzi_datetime(value):
         return datetime.fromisoformat(str(value).replace('Z', '+00:00')).replace(tzinfo=None)
     except (TypeError, ValueError):
         return None
+
+
+def _oauth_callback_url(provider, code=None, state=None, error=None, error_description=None):
+    frontend_url = os.getenv('FRONTEND_URL', 'https://bantubuzz.com').rstrip('/')
+    params = {'oauth_provider': provider}
+
+    if code:
+        params['code'] = code
+    if state:
+        params['state'] = state
+    if error:
+        params['error'] = error
+    if error_description:
+        params['error_description'] = error_description
+
+    return f"{frontend_url}/creator/platforms?{urlencode(params)}"
+
+
+def _oauth_callback_html(provider, message, post_message_type, code=None, error=None, error_description=None, state=None):
+    frontend_url = os.getenv('FRONTEND_URL', 'https://bantubuzz.com').rstrip('/')
+    fallback_url = _oauth_callback_url(
+        provider=provider,
+        code=code,
+        state=state,
+        error=error,
+        error_description=error_description
+    )
+    payload = {
+        'type': post_message_type,
+        'code': code,
+        'error': error,
+        'errorDescription': error_description or '',
+        'state': state
+    }
+
+    return f"""
+    <html>
+    <body>
+    <div style="display: flex; align-items: center; justify-content: center; height: 100vh; font-family: sans-serif;">
+        <div style="text-align: center;">
+            <div style="border: 4px solid #f3f3f3; border-top: 4px solid #ccdb53; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto 20px;"></div>
+            <p>{message}</p>
+        </div>
+    </div>
+    <style>
+        @keyframes spin {{
+            0% {{ transform: rotate(0deg); }}
+            100% {{ transform: rotate(360deg); }}
+        }}
+    </style>
+    <script>
+        const payload = {json.dumps(payload)};
+        const frontendOrigin = {json.dumps(frontend_url)};
+        const fallbackUrl = {json.dumps(fallback_url)};
+
+        if (window.opener) {{
+            window.opener.postMessage(payload, frontendOrigin);
+            setTimeout(() => window.close(), 500);
+        }} else {{
+            window.location.replace(fallbackUrl);
+        }}
+    </script>
+    </body>
+    </html>
+    """
 
 
 @platforms_bp.route('/api/creator/platforms', methods=['GET'])
@@ -358,8 +425,11 @@ def connect_platform():
         # Trigger initial sync via Celery background task
         # NOTE: thunzi_service singleton is already authenticated from ensure_user_registered() above
         if connected_platform.thunzi_platform_id:
-            from app.tasks.platform_sync import sync_platform as sync_platform_task
-            sync_platform_task.delay(connected_platform.id)
+            try:
+                from app.tasks.platform_sync import sync_platform as sync_platform_task
+                sync_platform_task.delay(connected_platform.id)
+            except Exception as e:
+                log_error('connect_platform.initial_sync_enqueue', e)
 
         response_data = {
             'success': True,
@@ -446,60 +516,27 @@ def youtube_oauth_callback():
     # Just redirect to frontend callback page with the code
     code = request.args.get('code')
     error = request.args.get('error')
+    state = request.args.get('state')
 
     frontend_url = os.getenv('FRONTEND_URL', 'https://bantubuzz.com')
 
     if error:
-        return f"""
-        <html>
-        <body>
-        <script>
-            window.opener.postMessage({{
-                type: 'youtube-oauth-error',
-                error: '{error}'
-            }}, '{frontend_url}');
-            window.close();
-        </script>
-        </body>
-        </html>
-        """
+        return _oauth_callback_html(
+            provider='youtube',
+            message='Completing YouTube authentication...',
+            post_message_type='youtube-oauth-error',
+            error=error,
+            state=state
+        )
 
     if code:
-        # Send code back to parent window immediately via postMessage
-        # Parent window will exchange the code for tokens using its JWT token
-        return f"""
-        <html>
-        <body>
-        <div style="display: flex; align-items: center; justify-content: center; height: 100vh; font-family: sans-serif;">
-            <div style="text-align: center;">
-                <div style="border: 4px solid #f3f3f3; border-top: 4px solid #FFDD00; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto 20px;"></div>
-                <p>Completing authentication...</p>
-            </div>
-        </div>
-        <style>
-            @keyframes spin {{
-                0% {{ transform: rotate(0deg); }}
-                100% {{ transform: rotate(360deg); }}
-            }}
-        </style>
-        <script>
-            console.log('[Backend Callback] Received code, sending to parent');
-            // Send code to parent window immediately
-            if (window.opener) {{
-                console.log('[Backend Callback] window.opener exists, sending postMessage');
-                window.opener.postMessage({{
-                    type: 'youtube-oauth-code',
-                    code: '{code}'
-                }}, '{frontend_url}');
-                setTimeout(() => window.close(), 500);
-            }} else {{
-                console.error('[Backend Callback] No window.opener!');
-                document.body.innerHTML = '<div style="text-align: center; padding: 50px;"><h2>Error</h2><p>Please close this window and try again.</p></div>';
-            }}
-        </script>
-        </body>
-        </html>
-        """
+        return _oauth_callback_html(
+            provider='youtube',
+            message='Completing YouTube authentication...',
+            post_message_type='youtube-oauth-code',
+            code=code,
+            state=state
+        )
 
     return jsonify({'error': 'No code or error received'}), 400
 
@@ -677,59 +714,26 @@ def tiktok_oauth_callback():
     code = request.args.get('code')
     error = request.args.get('error')
     error_description = request.args.get('error_description')
-
-    frontend_url = os.getenv('FRONTEND_URL', 'https://bantubuzz.com')
+    state = request.args.get('state')
 
     if error:
-        return f"""
-        <html>
-        <body>
-        <script>
-            window.opener.postMessage({{
-                type: 'tiktok-oauth-error',
-                error: '{error}',
-                errorDescription: '{error_description or ""}'
-            }}, '{frontend_url}');
-            window.close();
-        </script>
-        </body>
-        </html>
-        """
+        return _oauth_callback_html(
+            provider='tiktok',
+            message='Completing TikTok authentication...',
+            post_message_type='tiktok-oauth-error',
+            error=error,
+            error_description=error_description,
+            state=state
+        )
 
     if code:
-        # Send code back to parent window immediately via postMessage
-        return f"""
-        <html>
-        <body>
-        <div style="display: flex; align-items: center; justify-content: center; height: 100vh; font-family: sans-serif;">
-            <div style="text-align: center;">
-                <div style="border: 4px solid #f3f3f3; border-top: 4px solid #00F7EF; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto 20px;"></div>
-                <p>Completing TikTok authentication...</p>
-            </div>
-        </div>
-        <style>
-            @keyframes spin {{
-                0% {{ transform: rotate(0deg); }}
-                100% {{ transform: rotate(360deg); }}
-            }}
-        </style>
-        <script>
-            console.log('[TikTok Callback] Received code, sending to parent');
-            if (window.opener) {{
-                console.log('[TikTok Callback] window.opener exists, sending postMessage');
-                window.opener.postMessage({{
-                    type: 'tiktok-oauth-code',
-                    code: '{code}'
-                }}, '{frontend_url}');
-                setTimeout(() => window.close(), 500);
-            }} else {{
-                console.error('[TikTok Callback] No window.opener!');
-                document.body.innerHTML = '<div style="text-align: center; padding: 50px;"><h2>Error</h2><p>Please close this window and try again.</p></div>';
-            }}
-        </script>
-        </body>
-        </html>
-        """
+        return _oauth_callback_html(
+            provider='tiktok',
+            message='Completing TikTok authentication...',
+            post_message_type='tiktok-oauth-code',
+            code=code,
+            state=state
+        )
 
     return jsonify({'error': 'No code or error received'}), 400
 
@@ -920,59 +924,26 @@ def instagram_oauth_callback():
     code = request.args.get('code')
     error = request.args.get('error')
     error_description = request.args.get('error_description')
-
-    frontend_url = os.getenv('FRONTEND_URL', 'https://bantubuzz.com')
+    state = request.args.get('state')
 
     if error:
-        return f"""
-        <html>
-        <body>
-        <script>
-            window.opener.postMessage({{
-                type: 'instagram-oauth-error',
-                error: '{error}',
-                errorDescription: '{error_description or ""}'
-            }}, '{frontend_url}');
-            window.close();
-        </script>
-        </body>
-        </html>
-        """
+        return _oauth_callback_html(
+            provider='instagram',
+            message='Completing Instagram authentication...',
+            post_message_type='instagram-oauth-error',
+            error=error,
+            error_description=error_description,
+            state=state
+        )
 
     if code:
-        # Send code back to parent window immediately via postMessage
-        return f"""
-        <html>
-        <body>
-        <div style="display: flex; align-items: center; justify-content: center; height: 100vh; font-family: sans-serif;">
-            <div style="text-align: center;">
-                <div style="border: 4px solid #f3f3f3; border-top: 4px solid #E4405F; border-radius: 50%; width: 40px; height: 40px; animation: spin 1s linear infinite; margin: 0 auto 20px;"></div>
-                <p>Completing Instagram authentication...</p>
-            </div>
-        </div>
-        <style>
-            @keyframes spin {{
-                0% {{ transform: rotate(0deg); }}
-                100% {{ transform: rotate(360deg); }}
-            }}
-        </style>
-        <script>
-            console.log('[Instagram Callback] Received code, sending to parent');
-            if (window.opener) {{
-                console.log('[Instagram Callback] window.opener exists, sending postMessage');
-                window.opener.postMessage({{
-                    type: 'instagram-oauth-code',
-                    code: '{code}'
-                }}, '{frontend_url}');
-                setTimeout(() => window.close(), 500);
-            }} else {{
-                console.error('[Instagram Callback] No window.opener!');
-                document.body.innerHTML = '<div style="text-align: center; padding: 50px;"><h2>Error</h2><p>Please close this window and try again.</p></div>';
-            }}
-        </script>
-        </body>
-        </html>
-        """
+        return _oauth_callback_html(
+            provider='instagram',
+            message='Completing Instagram authentication...',
+            post_message_type='instagram-oauth-code',
+            code=code,
+            state=state
+        )
 
     return jsonify({'error': 'No code or error received'}), 400
 

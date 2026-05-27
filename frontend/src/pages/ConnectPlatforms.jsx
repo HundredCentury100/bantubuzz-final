@@ -275,18 +275,16 @@ const ConnectPlatforms = () => {
           timestamp: Date.now()
         }));
 
-        // Modify the authUrl to include our state parameter
-        const authUrl = response.data.authUrl.includes('?')
-          ? `${response.data.authUrl}&state=${state}`
-          : `${response.data.authUrl}?state=${state}`;
+        const authUrl = new URL(response.data.authUrl);
+        authUrl.searchParams.set('state', state);
 
-        console.log('[ConnectPlatforms] Redirecting to TikTok OAuth:', authUrl);
+        console.log('[ConnectPlatforms] Redirecting to TikTok OAuth:', authUrl.toString());
 
         // Save connecting state to session storage (will survive page reload)
         sessionStorage.setItem('oauth_connecting', 'tiktok');
 
         // Full page redirect (works on all devices including iOS)
-        window.location.href = authUrl;
+        window.location.href = authUrl.toString();
       }
     } catch (error) {
       console.error('TikTok OAuth error:', error);
@@ -338,18 +336,16 @@ const ConnectPlatforms = () => {
           timestamp: Date.now()
         }));
 
-        // Modify the authUrl to include our state parameter
-        const authUrl = response.data.authUrl.includes('?')
-          ? `${response.data.authUrl}&state=${state}`
-          : `${response.data.authUrl}?state=${state}`;
+        const authUrl = new URL(response.data.authUrl);
+        authUrl.searchParams.set('state', state);
 
-        console.log('[ConnectPlatforms] Redirecting to Instagram OAuth:', authUrl);
+        console.log('[ConnectPlatforms] Redirecting to Instagram OAuth:', authUrl.toString());
 
         // Save connecting state to session storage (will survive page reload)
         sessionStorage.setItem('oauth_connecting', 'instagram');
 
         // Full page redirect (works on all devices including iOS)
-        window.location.href = authUrl;
+        window.location.href = authUrl.toString();
       }
     } catch (error) {
       console.error('Instagram OAuth error:', error);
