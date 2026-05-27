@@ -5,103 +5,82 @@ set "ROOT=D:\Bantubuzz Platform"
 set "SERVER_USER=root"
 set "SERVER_HOST=173.212.245.22"
 set "REMOTE_ROOT=/var/www/bantubuzz"
-set "BUILD_DIR=%ROOT%\deployment\thunziai-v2"
-set "FRONTEND_TAR=%BUILD_DIR%\bantubuzz_frontend_dist.tar.gz"
+set "BUILD_DIR=%ROOT%\deployment\public-profile-release"
+set "FRONTEND_TAR=%BUILD_DIR%\bantubuzz_frontend_public_profiles.tar.gz"
 
 cls
 echo ========================================
-echo   BantuBuzz ThunziAI V2 Deployment
+echo   BantuBuzz Public Profile Deployment
 echo ========================================
 echo.
 echo Server: %SERVER_USER%@%SERVER_HOST%
 echo Remote: %REMOTE_ROOT%
 echo.
-echo This deploys:
+echo This deploys only the current public creator profile release:
 echo   - frontend build files into /var/www/bantubuzz/frontend
-echo   - ThunziAI backend service, routes, tasks, model, and migration files
-echo   - database migration for connected platform scopes
-echo   - backend restart and health check
+echo   - backend/app/routes/creators.py
+echo   - backend compile check
+echo   - backend and Apache restart
+echo   - local and public health checks
+echo.
+echo No database migration or Thunzi backfill will run.
 echo.
 echo You will be asked for the SSH password on each ssh/scp step.
 echo Press Ctrl+C to cancel, or any key to continue.
 pause >nul
 
 echo.
-echo [1/9] Preparing local package folder...
+echo [1/8] Preparing local package folder...
 if not exist "%BUILD_DIR%" mkdir "%BUILD_DIR%"
 if errorlevel 1 goto fail
 if exist "%FRONTEND_TAR%" del "%FRONTEND_TAR%"
 
 echo.
-echo [2/9] Building frontend...
+echo [2/8] Building frontend...
 cd /d "%ROOT%\frontend"
 call npm run build
 if errorlevel 1 goto fail
 
 echo.
-echo [3/9] Creating frontend tarball from dist contents...
+echo [3/8] Creating frontend tarball from dist contents...
 tar -czf "%FRONTEND_TAR%" -C "%ROOT%\frontend\dist" .
 if errorlevel 1 goto fail
 
 echo.
-echo [4/9] Uploading frontend tarball...
-scp "%FRONTEND_TAR%" %SERVER_USER%@%SERVER_HOST%:/tmp/bantubuzz_frontend_dist.tar.gz
+echo [4/8] Uploading frontend tarball...
+scp "%FRONTEND_TAR%" %SERVER_USER%@%SERVER_HOST%:/tmp/bantubuzz_frontend_public_profiles.tar.gz
 if errorlevel 1 goto fail
 
 echo.
-echo [5/9] Backing up current production files...
-ssh %SERVER_USER%@%SERVER_HOST% "set -e; cd %REMOTE_ROOT%; TS=$(date +%%Y%%m%%d_%%H%%M%%S); echo 'Creating backup at /root/bantubuzz_thunziai_v2_backup_'$TS'.tar.gz'; tar --ignore-failed-read -czf /root/bantubuzz_thunziai_v2_backup_$TS.tar.gz backend/app/config/thunzi_config.py backend/app/models/connected_platform.py backend/app/models/creator_profile.py backend/app/routes/creators.py backend/app/routes/platforms.py backend/app/services/post_metrics_service.py backend/app/services/thunzi_service.py backend/app/tasks/platform_sync.py backend/migrations/versions/202605271015_add_scopes_to_connected_platforms.py frontend/index.html frontend/assets frontend/favicon.ico frontend/manifest.json; mkdir -p backend/app/config backend/app/models backend/app/routes backend/app/services backend/app/tasks backend/migrations/versions frontend"
+echo [5/8] Backing up current production frontend and creator route...
+ssh %SERVER_USER%@%SERVER_HOST% "set -e; cd %REMOTE_ROOT%; TS=$(date +%%Y%%m%%d_%%H%%M%%S); echo 'Creating backup at /root/bantubuzz_public_profiles_backup_'$TS'.tar.gz'; tar --ignore-failed-read -czf /root/bantubuzz_public_profiles_backup_$TS.tar.gz backend/app/routes/creators.py frontend/index.html frontend/assets frontend/favicon.ico frontend/manifest.json; mkdir -p backend/app/routes frontend"
 if errorlevel 1 goto fail
 
 echo.
-echo [6/9] Uploading backend files one by one...
-scp "%ROOT%\backend\app\models\connected_platform.py" %SERVER_USER%@%SERVER_HOST%:%REMOTE_ROOT%/backend/app/models/connected_platform.py
-if errorlevel 1 goto fail
-scp "%ROOT%\backend\app\models\creator_profile.py" %SERVER_USER%@%SERVER_HOST%:%REMOTE_ROOT%/backend/app/models/creator_profile.py
-if errorlevel 1 goto fail
-scp "%ROOT%\backend\app\config\thunzi_config.py" %SERVER_USER%@%SERVER_HOST%:%REMOTE_ROOT%/backend/app/config/thunzi_config.py
-if errorlevel 1 goto fail
+echo [6/8] Uploading backend creator route...
 scp "%ROOT%\backend\app\routes\creators.py" %SERVER_USER%@%SERVER_HOST%:%REMOTE_ROOT%/backend/app/routes/creators.py
 if errorlevel 1 goto fail
-scp "%ROOT%\backend\app\routes\platforms.py" %SERVER_USER%@%SERVER_HOST%:%REMOTE_ROOT%/backend/app/routes/platforms.py
-if errorlevel 1 goto fail
-scp "%ROOT%\backend\app\services\post_metrics_service.py" %SERVER_USER%@%SERVER_HOST%:%REMOTE_ROOT%/backend/app/services/post_metrics_service.py
-if errorlevel 1 goto fail
-scp "%ROOT%\backend\app\services\thunzi_service.py" %SERVER_USER%@%SERVER_HOST%:%REMOTE_ROOT%/backend/app/services/thunzi_service.py
-if errorlevel 1 goto fail
-scp "%ROOT%\backend\app\tasks\platform_sync.py" %SERVER_USER%@%SERVER_HOST%:%REMOTE_ROOT%/backend/app/tasks/platform_sync.py
-if errorlevel 1 goto fail
-scp "%ROOT%\backend\migrations\versions\202605271015_add_scopes_to_connected_platforms.py" %SERVER_USER%@%SERVER_HOST%:%REMOTE_ROOT%/backend/migrations/versions/202605271015_add_scopes_to_connected_platforms.py
+
+echo.
+echo [7/8] Extracting frontend build and checking backend compile...
+ssh %SERVER_USER%@%SERVER_HOST% "set -e; cd %REMOTE_ROOT%; rm -rf frontend/assets frontend/index.html frontend/favicon.ico frontend/manifest.json; tar -xzf /tmp/bantubuzz_frontend_public_profiles.tar.gz -C frontend; rm -f /tmp/bantubuzz_frontend_public_profiles.tar.gz; cd %REMOTE_ROOT%/backend; source venv/bin/activate; python -m py_compile app/routes/creators.py"
 if errorlevel 1 goto fail
 
 echo.
-echo [7/9] Extracting frontend build...
-ssh %SERVER_USER%@%SERVER_HOST% "set -e; cd %REMOTE_ROOT%; rm -rf frontend/assets frontend/index.html frontend/favicon.ico frontend/manifest.json; tar -xzf /tmp/bantubuzz_frontend_dist.tar.gz -C frontend; rm -f /tmp/bantubuzz_frontend_dist.tar.gz"
-if errorlevel 1 goto fail
-
-echo.
-echo [8/9] Running backend compile check and database migration...
-ssh %SERVER_USER%@%SERVER_HOST% "set -e; cd %REMOTE_ROOT%/backend; source venv/bin/activate; python -m py_compile app/config/thunzi_config.py app/models/connected_platform.py app/models/creator_profile.py app/routes/creators.py app/routes/platforms.py app/services/post_metrics_service.py app/services/thunzi_service.py app/tasks/platform_sync.py migrations/versions/202605271015_add_scopes_to_connected_platforms.py; flask db upgrade"
-if errorlevel 1 goto fail
-
-echo.
-echo [9/9] Restarting backend, Apache, and checking health...
+echo [8/8] Restarting backend, Apache, and checking health...
 ssh %SERVER_USER%@%SERVER_HOST% "set -e; cd %REMOTE_ROOT%/backend; source venv/bin/activate; pkill gunicorn || true; sleep 2; venv/bin/gunicorn -w 4 -b 0.0.0.0:8002 --timeout 120 --error-logfile gunicorn_error.log --access-logfile gunicorn_access.log 'app:create_app()' --daemon; systemctl restart apache2; sleep 3; ps aux | grep '[g]unicorn'; echo 'Server-side health:'; curl -s -i http://localhost:8002/api/health; echo; echo 'Public health:'; curl -L -s -i https://bantubuzz.com/api/health"
 if errorlevel 1 goto fail
 
 echo.
 echo ========================================
-echo   ThunziAI V2 deployment finished
+echo   Public profile deployment finished
 echo ========================================
 echo.
-echo Local packages are in:
-echo   %BUILD_DIR%
+echo Manual checks:
+echo   - https://bantubuzz.com/creatorusername opens without login
+echo   - Share Profile uses the clean username URL
+echo   - Save/book actions ask public users to sign in or sign up as a brand
 echo.
-echo Next manual checks:
-echo   - Creator platform connections
-echo   - Creator profile platform analytics
-echo   - Deliverable URL submission and metrics sync
-echo   - Brand analytics collaboration view
 pause
 exit /b 0
 
