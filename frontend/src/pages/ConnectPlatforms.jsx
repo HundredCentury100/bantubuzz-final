@@ -199,7 +199,12 @@ const ConnectPlatforms = () => {
               }
             } catch (error) {
               console.error('[ConnectPlatforms] YouTube error:', error);
-              toast.error(error.response?.data?.error || 'Failed to connect YouTube');
+              console.error('[ConnectPlatforms] YouTube error response:', error.response?.data);
+              const details = error.response?.data?.details;
+              const detailMessage = typeof details?.body === 'string'
+                ? details.body
+                : details?.body?.message || details?.body?.error || details?.message;
+              toast.error(detailMessage || error.response?.data?.error || 'Failed to connect YouTube');
             }
             window.removeEventListener('message', handleMessage);
             setConnecting(null);

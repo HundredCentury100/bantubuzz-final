@@ -82,7 +82,7 @@ GOOGLE_OAUTH_CONFIG = {
     'redirect_uri': 'https://bantubuzz.com/api/creator/platforms/youtube/callback',
     'scopes': [
         'https://www.googleapis.com/auth/yt-analytics.readonly',
-        # 'https://www.googleapis.com/auth/youtube.readonly'  # More reliable but not verified - shows unsafe warning
+        'https://www.googleapis.com/auth/youtube.readonly'
     ]
 }
 

@@ -24,6 +24,7 @@ class ThunziAIService:
             'x-api-key': self.api_key
         })
         self.is_authenticated = False
+        self.last_error = None
 
     def _log_response_body(self, response):
         """Return a safe response body for logging."""
@@ -31,6 +32,15 @@ class ThunziAIService:
             return response.json()
         except Exception:
             return response.text[:500] if response.text else ''
+
+    def _set_last_error(self, context: str, response=None, message: str = None):
+        self.last_error = {
+            'context': context,
+            'message': message,
+            'status_code': getattr(response, 'status_code', None),
+            'body': self._log_response_body(response) if response is not None else None
+        }
+        return self.last_error
 
     def _normalize_sync_status(self, status: Optional[str]) -> Optional[str]:
         """Normalize ThunziAI status drift."""
@@ -505,6 +515,7 @@ class ThunziAIService:
         self._ensure_authenticated()
 
         try:
+            self.last_error = None
             payload = {
                 "companyId": company_id,
                 "platform": platform.lower(),
@@ -567,9 +578,11 @@ class ThunziAIService:
                 result = response.json()
                 return self._normalize_platform(result)
 
+            self._set_last_error('ThunziAI.add_platform', response=response)
             log_error('ThunziAI.add_platform', f"Failed with status {response.status_code}: {response.text}")
             return None
         except Exception as e:
+            self._set_last_error('ThunziAI.add_platform', message=str(e))
             log_error('ThunziAI.add_platform', e)
             return None
 

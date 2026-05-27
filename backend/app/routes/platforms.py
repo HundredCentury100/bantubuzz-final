@@ -319,7 +319,11 @@ def connect_platform():
         )
 
         if not thunzi_platform:
-            return jsonify({'error': 'Failed to connect platform to ThunziAI'}), 500
+            thunzi_error = getattr(thunzi_service, 'last_error', None)
+            return jsonify({
+                'error': 'Failed to connect platform to ThunziAI',
+                'details': thunzi_error
+            }), 400
 
         # NOTE: As per new ThunziAI API, POST /api/platforms automatically attempts connection
         # No need for separate connect_platform() call
