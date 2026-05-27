@@ -2,7 +2,7 @@ from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from datetime import datetime, timezone
 from app import db
-from app.models import CreatorProfile, User, Review, Package
+from app.models import CreatorProfile, User, Package
 from app.utils import save_profile_picture, delete_profile_picture
 from app.utils.file_upload import save_and_compress_image
 from app.utils.image_compression import delete_image_variants
@@ -132,19 +132,11 @@ def get_featured_creators():
         for creator in featured:
             creator_dict = creator.to_dict(include_user=True, public_view=True)
 
-            # Get review stats
-            reviews = Review.query.filter_by(creator_id=creator.id).all()
-            if reviews:
-                avg_rating = sum(r.rating for r in reviews) / len(reviews)
-                creator_dict['review_stats'] = {
-                    'average_rating': round(avg_rating, 1),
-                    'total_reviews': len(reviews)
-                }
-            else:
-                creator_dict['review_stats'] = {
-                    'average_rating': 0,
-                    'total_reviews': 0
-                }
+            review_stats = creator.get_review_stats()
+            creator_dict['review_stats'] = {
+                'average_rating': round(review_stats['average_rating'], 1) if review_stats['average_rating'] is not None else None,
+                'total_reviews': review_stats['total_reviews']
+            }
 
             # Get cheapest package price
             packages = Package.query.filter_by(creator_id=creator.id, is_active=True).all()
@@ -321,19 +313,11 @@ def get_creators():
 
             creator_dict = creator.to_dict(include_user=True, public_view=True)
 
-            # Get review stats
-            reviews = Review.query.filter_by(creator_id=creator.id).all()
-            if reviews:
-                avg_rating = sum(r.rating for r in reviews) / len(reviews)
-                creator_dict['review_stats'] = {
-                    'average_rating': round(avg_rating, 1),
-                    'total_reviews': len(reviews)
-                }
-            else:
-                creator_dict['review_stats'] = {
-                    'average_rating': 0,
-                    'total_reviews': 0
-                }
+            review_stats = creator.get_review_stats()
+            creator_dict['review_stats'] = {
+                'average_rating': round(review_stats['average_rating'], 1) if review_stats['average_rating'] is not None else None,
+                'total_reviews': review_stats['total_reviews']
+            }
 
             # Get cheapest package price (we already know packages exist)
             prices = [p.price for p in packages]
@@ -346,7 +330,7 @@ def get_creators():
         if min_rating:
             creators_with_stats = [
                 c for c in creators_with_stats
-                if c['review_stats']['average_rating'] >= min_rating
+                if c['review_stats']['average_rating'] is not None and c['review_stats']['average_rating'] >= min_rating
             ]
 
         # Apply min/max price filters (all creators have packages now)
@@ -409,7 +393,7 @@ def get_creators():
                 key=lambda x: (
                     not x.get('is_featured', False),  # Featured first (False < True, so not featured = False sorts first)
                     -x['review_stats']['total_reviews'],  # Then by reviews descending
-                    -x['review_stats']['average_rating']  # Then by rating descending
+                    -(x['review_stats']['average_rating'] or 0)  # Then by rating descending
                 )
             )
         elif sort_by == 'followers_desc':
@@ -423,7 +407,7 @@ def get_creators():
             # Sort by price, but put None values at the end
             creators_with_stats.sort(key=lambda x: (x['cheapest_package_price'] is None, x['cheapest_package_price'] or float('inf')), reverse=False)
         elif sort_by == 'rating_desc':
-            creators_with_stats.sort(key=lambda x: x['review_stats']['average_rating'], reverse=True)
+            creators_with_stats.sort(key=lambda x: x['review_stats']['average_rating'] or 0, reverse=True)
         elif sort_by == 'newest':
             # Sort by created_at if available, otherwise use id as proxy
             creators_with_stats.sort(key=lambda x: x.get('created_at', ''), reverse=True)

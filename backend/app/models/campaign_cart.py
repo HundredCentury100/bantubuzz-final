@@ -92,7 +92,7 @@ class CampaignCartItem(db.Model):
                     'profile_picture': self.creator.profile_picture,
                     'follower_count': self.creator.follower_count,
                     'engagement_rate': getattr(self.creator, 'engagement_rate', None),
-                    'rating': self.creator.get_effective_rating() if hasattr(self.creator, 'get_effective_rating') else (self.creator.rating or 5.0),
+                    'rating': self.creator.get_effective_rating() if hasattr(self.creator, 'get_effective_rating') else None,
                 }
 
             # Include package details if applicable

@@ -15,8 +15,6 @@ const ReviewForm = () => {
   const [submitting, setSubmitting] = useState(false);
 
   // Form state
-  const [rating, setRating] = useState(0);
-  const [hoverRating, setHoverRating] = useState(0);
   const [title, setTitle] = useState('');
   const [comment, setComment] = useState('');
   const [communicationRating, setCommunicationRating] = useState(0);
@@ -26,6 +24,16 @@ const ReviewForm = () => {
   const [wouldRecommend, setWouldRecommend] = useState(true);
 
   const isBrand = user?.user_type === 'brand';
+  const detailedRatings = [
+    communicationRating,
+    qualityRating,
+    professionalismRating,
+    timelinessRating
+  ];
+  const allDetailedRatingsSelected = detailedRatings.every((value) => value > 0);
+  const calculatedOverallRating = allDetailedRatingsSelected
+    ? detailedRatings.reduce((sum, value) => sum + value, 0) / detailedRatings.length
+    : null;
 
   useEffect(() => {
     fetchCollaboration();
@@ -61,8 +69,8 @@ const ReviewForm = () => {
     e.preventDefault();
 
     // Validation
-    if (rating === 0) {
-      toast.error('Please select an overall rating');
+    if (!allDetailedRatingsSelected) {
+      toast.error('Please rate communication, quality, professionalism, and timeliness');
       return;
     }
 
@@ -76,13 +84,12 @@ const ReviewForm = () => {
 
       const reviewData = {
         collaboration_id: parseInt(id),
-        rating,
         title,
         comment,
-        communication_rating: communicationRating || null,
-        quality_rating: qualityRating || null,
-        professionalism_rating: professionalismRating || null,
-        timeliness_rating: timelinessRating || null,
+        communication_rating: communicationRating,
+        quality_rating: qualityRating,
+        professionalism_rating: professionalismRating,
+        timeliness_rating: timelinessRating,
         would_recommend: wouldRecommend
       };
 
@@ -204,15 +211,6 @@ const ReviewForm = () => {
 
         {/* Review Form */}
         <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow p-6 space-y-6">
-          {/* Overall Rating */}
-          <StarRating
-            value={rating}
-            onChange={setRating}
-            hover={hoverRating}
-            onHover={setHoverRating}
-            label="Overall Rating"
-          />
-
           {/* Title */}
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -245,34 +243,38 @@ const ReviewForm = () => {
 
           {/* Detailed Ratings */}
           <div className="border-t pt-6">
-            <h3 className="text-lg font-bold text-gray-900 mb-4">Detailed Ratings (Optional)</h3>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+              <div>
+                <h3 className="text-lg font-bold text-gray-900">Detailed Ratings</h3>
+                <p className="text-sm text-gray-600">The overall rating is calculated from these four scores.</p>
+              </div>
+              <div className="px-4 py-2 bg-light rounded-full text-sm font-semibold text-dark">
+                Overall: {calculatedOverallRating ? calculatedOverallRating.toFixed(2) : '--'} / 5
+              </div>
+            </div>
 
             <StarRating
               value={communicationRating}
               onChange={setCommunicationRating}
               label="Communication"
-              optional
             />
 
             <StarRating
               value={qualityRating}
               onChange={setQualityRating}
               label="Quality of Work"
-              optional
             />
 
             <StarRating
               value={professionalismRating}
               onChange={setProfessionalismRating}
               label="Professionalism"
-              optional
             />
 
             <StarRating
               value={timelinessRating}
               onChange={setTimelinessRating}
               label="Timeliness"
-              optional
             />
           </div>
 

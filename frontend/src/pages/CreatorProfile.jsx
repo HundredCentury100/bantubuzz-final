@@ -263,7 +263,7 @@ const CreatorProfile = () => {
     try {
       await reviewsAPI.addCreatorResponse(reviewId, response);
       toast.success('Response added successfully');
-      fetchReviews(); // Refresh reviews
+      fetchReviews(creator.id); // Refresh reviews
     } catch (error) {
       console.error('Error adding response:', error);
       toast.error('Failed to add response');
@@ -314,6 +314,10 @@ const CreatorProfile = () => {
       </div>
     );
   }
+
+  const reviewCount = reviewsStats?.total_reviews ?? creator.review_stats?.total_reviews ?? reviews.length;
+  const profileRating = reviewsStats?.overall ?? creator.effective_rating ?? creator.review_stats?.average_rating ?? null;
+  const hasReviews = reviewCount > 0 && profileRating !== null && profileRating !== undefined;
 
   return (
     <div className="min-h-screen bg-light">
@@ -622,13 +626,13 @@ const CreatorProfile = () => {
                       <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
                     </svg>
                     <p className="text-2xl font-bold text-dark">
-                      {creator.effective_rating !== undefined ? creator.effective_rating.toFixed(1) : (reviewsStats?.overall || creator.rating || 5.0)}
+                      {hasReviews ? Number(profileRating).toFixed(1) : '--'}
                     </p>
                   </div>
                   <p className="text-sm text-gray-600">
-                    {reviews.length} {reviews.length === 1 ? 'Review' : 'Reviews'}
+                    {reviewCount} {reviewCount === 1 ? 'Review' : 'Reviews'}
                   </p>
-                  {creator.rating_penalty > 0 && (
+                  {hasReviews && creator.rating_penalty > 0 && (
                     <p className="text-xs text-red-600 mt-1">
                       -{creator.rating_penalty.toFixed(2)} penalty
                     </p>
@@ -1254,7 +1258,7 @@ const CreatorProfile = () => {
                         ))}
                       </div>
                       <p className="text-sm text-gray-600">
-                        Based on {reviews.length} {reviews.length === 1 ? 'review' : 'reviews'}
+                        Based on {reviewCount} {reviewCount === 1 ? 'review' : 'reviews'}
                       </p>
                     </div>
 

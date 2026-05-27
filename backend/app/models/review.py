@@ -15,7 +15,8 @@ class Review(db.Model):
     creator_id = db.Column(db.Integer, db.ForeignKey('creator_profiles.id'), nullable=False)
     collaboration_id = db.Column(db.Integer, db.ForeignKey('collaborations.id'), nullable=False)
 
-    # Rating (1-5 stars)
+    # Rating (1-5 stars). Stored as an integer for legacy compatibility;
+    # API responses calculate the displayed score from the detailed ratings.
     rating = db.Column(db.Integer, nullable=False)  # 1-5
 
     # Review content
@@ -44,14 +45,30 @@ class Review(db.Model):
     creator = db.relationship('CreatorProfile', backref=db.backref('reviews_received', lazy='dynamic'))
     collaboration = db.relationship('Collaboration', backref=db.backref('review', uselist=False))
 
+    def get_calculated_rating(self):
+        """Return the overall rating as the average of the detailed ratings."""
+        detailed_ratings = [
+            self.communication_rating,
+            self.quality_rating,
+            self.professionalism_rating,
+            self.timeliness_rating
+        ]
+        valid_ratings = [rating for rating in detailed_ratings if rating is not None]
+
+        if valid_ratings:
+            return round(sum(valid_ratings) / len(valid_ratings), 2)
+
+        return float(self.rating) if self.rating is not None else None
+
     def to_dict(self, include_relations=False):
         """Convert review to dictionary"""
+        calculated_rating = self.get_calculated_rating()
         data = {
             'id': self.id,
             'brand_id': self.brand_id,
             'creator_id': self.creator_id,
             'collaboration_id': self.collaboration_id,
-            'rating': self.rating,
+            'rating': calculated_rating,
             'title': self.title,
             'comment': self.comment,
             'communication_rating': self.communication_rating,

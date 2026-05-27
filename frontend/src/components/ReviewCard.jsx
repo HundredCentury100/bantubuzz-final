@@ -23,13 +23,14 @@ const ReviewCard = ({ review, onResponseSubmit, canRespond = false }) => {
   };
 
   const renderStars = (rating) => {
+    const numericRating = Number(rating || 0);
     return (
       <div className="flex gap-1">
         {[1, 2, 3, 4, 5].map((star) => (
           <svg
             key={star}
             className={`w-5 h-5 ${
-              star <= rating ? 'text-primary-dark fill-current' : 'text-gray-300'
+              star <= Math.round(numericRating) ? 'text-primary-dark fill-current' : 'text-gray-300'
             }`}
             fill="none"
             stroke="currentColor"
@@ -77,7 +78,7 @@ const ReviewCard = ({ review, onResponseSubmit, canRespond = false }) => {
             <div className="flex items-center gap-2">
               {renderStars(review.rating)}
               <span className="text-sm font-medium text-gray-700">
-                {review.rating}.0
+                {Number(review.rating || 0).toFixed(2)}
               </span>
             </div>
           </div>

@@ -91,6 +91,23 @@ class CreatorProfile(db.Model):
         """Calculate average engagement rate (currently from profile, can be enhanced)"""
         return float(self.engagement_rate) if self.engagement_rate else 0.0
 
+    def get_review_stats(self):
+        """Calculate creator review stats from brand reviews."""
+        from app.models import Review
+
+        reviews = Review.query.filter_by(creator_id=self.id).all()
+        if not reviews:
+            return {
+                'average_rating': None,
+                'total_reviews': 0
+            }
+
+        ratings = [review.get_calculated_rating() for review in reviews]
+        return {
+            'average_rating': round(sum(ratings) / len(ratings), 2),
+            'total_reviews': len(reviews)
+        }
+
     def get_badges(self):
         """
         Calculate creator badges based on verification and performance
@@ -174,6 +191,7 @@ class CreatorProfile(db.Model):
             public_view: If True, exclude private info (email) from user object
         """
         total_followers = self.get_total_followers()
+        review_stats = self.get_review_stats()
 
         data = {
             'id': self.id,
@@ -206,6 +224,7 @@ class CreatorProfile(db.Model):
             'rating_penalty': float(getattr(self, 'rating_penalty', 0.0) or 0.0),
             'cancelled_collaborations_count': getattr(self, 'cancelled_collaborations_count', 0) or 0,
             'effective_rating': self.get_effective_rating(),
+            'review_stats': review_stats,
             'created_at': self.created_at.isoformat(),
             'updated_at': self.updated_at.isoformat()
         }
@@ -219,8 +238,12 @@ class CreatorProfile(db.Model):
         return data
 
     def get_effective_rating(self):
-        """Calculate rating with penalty applied"""
-        base_rating = getattr(self, 'rating', 5.0) or 5.0
+        """Calculate review rating with cancellation penalty applied."""
+        review_stats = self.get_review_stats()
+        base_rating = review_stats['average_rating']
+        if base_rating is None:
+            return None
+
         penalty = getattr(self, 'rating_penalty', 0.0) or 0.0
         return max(0.0, float(base_rating) - float(penalty))
 

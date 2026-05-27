@@ -255,6 +255,35 @@ Relevant files:
 - `frontend/src/pages/CreatorProfile.jsx`
 - `backend/app/routes/creators.py`
 
+## Reviews And Creator Ratings
+
+Creator ratings must only come from real brand reviews after completed collaborations.
+
+Important rules:
+
+- New creators should have `total_reviews: 0` and no displayed rating (`null`/`--`), never a default 5-star score.
+- Brands can review only completed collaborations.
+- A collaboration can have only one review.
+- Review submission requires the four detailed ratings:
+  - communication
+  - quality
+  - professionalism
+  - timeliness
+- The displayed overall rating is the average of those four detailed ratings.
+- `Review.rating` is still an integer legacy database field, but API responses expose the calculated detailed-rating average.
+- Creator profile/listing ratings should use review stats and show “No reviews” when total reviews is zero.
+
+Relevant files:
+
+- `backend/app/models/review.py`
+- `backend/app/models/creator_profile.py`
+- `backend/app/routes/reviews.py`
+- `backend/app/routes/creators.py`
+- `frontend/src/pages/ReviewForm.jsx`
+- `frontend/src/pages/CreatorProfile.jsx`
+- `frontend/src/pages/Creators.jsx`
+- `frontend/src/components/ReviewCard.jsx`
+
 ## Known Deployment Gotchas
 
 - Do not assume `/var/www/bantubuzz/frontend/dist` exists.

@@ -8,6 +8,28 @@ from app.utils.notifications import notify_new_review, notify_review_response
 bp = Blueprint('reviews', __name__)
 
 
+def _average(values):
+    valid_values = [value for value in values if value is not None]
+    if not valid_values:
+        return None
+    return sum(valid_values) / len(valid_values)
+
+
+def _parse_required_rating(value, field_name):
+    if value is None:
+        raise ValueError(f'{field_name} is required')
+
+    try:
+        rating = int(value)
+    except (TypeError, ValueError):
+        raise ValueError(f'{field_name} must be a number between 1 and 5')
+
+    if not 1 <= rating <= 5:
+        raise ValueError(f'{field_name} must be between 1 and 5')
+
+    return rating
+
+
 @bp.route('/', methods=['POST'])
 @jwt_required()
 def create_review():
@@ -43,22 +65,34 @@ def create_review():
         if existing_review:
             return jsonify({'error': 'Review already exists for this collaboration'}), 400
 
-        # Auto-calculate overall rating from sub-ratings if provided
-        sub_ratings = [r for r in [
-            data.get('communication_rating'),
-            data.get('quality_rating'),
-            data.get('professionalism_rating'),
-            data.get('timeliness_rating')
-        ] if r is not None]
+        try:
+            communication_rating = _parse_required_rating(
+                data.get('communication_rating'),
+                'Communication rating'
+            )
+            quality_rating = _parse_required_rating(
+                data.get('quality_rating'),
+                'Quality rating'
+            )
+            professionalism_rating = _parse_required_rating(
+                data.get('professionalism_rating'),
+                'Professionalism rating'
+            )
+            timeliness_rating = _parse_required_rating(
+                data.get('timeliness_rating'),
+                'Timeliness rating'
+            )
+        except ValueError as exc:
+            return jsonify({'error': str(exc)}), 400
 
-        if sub_ratings:
-            rating = round(sum(int(r) for r in sub_ratings) / len(sub_ratings))
-        else:
-            # Fall back to explicit rating if no sub-ratings
-            rating = int(data.get('rating', 3))
-
-        if not 1 <= rating <= 5:
-            return jsonify({'error': 'Rating must be between 1 and 5'}), 400
+        sub_ratings = [
+            communication_rating,
+            quality_rating,
+            professionalism_rating,
+            timeliness_rating
+        ]
+        average_rating = sum(sub_ratings) / len(sub_ratings)
+        rating = int(average_rating + 0.5)
 
         # Create review
         review = Review(
@@ -68,10 +102,10 @@ def create_review():
             rating=rating,
             title=data.get('title', ''),
             comment=data['comment'],
-            communication_rating=data.get('communication_rating'),
-            quality_rating=data.get('quality_rating'),
-            professionalism_rating=data.get('professionalism_rating'),
-            timeliness_rating=data.get('timeliness_rating'),
+            communication_rating=communication_rating,
+            quality_rating=quality_rating,
+            professionalism_rating=professionalism_rating,
+            timeliness_rating=timeliness_rating,
             would_recommend=data.get('would_recommend', True)
         )
 
@@ -117,13 +151,13 @@ def get_creator_reviews(creator_id):
         # Calculate average ratings
         all_reviews = Review.query.filter_by(creator_id=creator_id).all()
         if all_reviews:
-            avg_rating = sum(r.rating for r in all_reviews) / len(all_reviews)
-            avg_communication = sum(r.communication_rating for r in all_reviews if r.communication_rating) / len([r for r in all_reviews if r.communication_rating]) if any(r.communication_rating for r in all_reviews) else None
-            avg_quality = sum(r.quality_rating for r in all_reviews if r.quality_rating) / len([r for r in all_reviews if r.quality_rating]) if any(r.quality_rating for r in all_reviews) else None
-            avg_professionalism = sum(r.professionalism_rating for r in all_reviews if r.professionalism_rating) / len([r for r in all_reviews if r.professionalism_rating]) if any(r.professionalism_rating for r in all_reviews) else None
-            avg_timeliness = sum(r.timeliness_rating for r in all_reviews if r.timeliness_rating) / len([r for r in all_reviews if r.timeliness_rating]) if any(r.timeliness_rating for r in all_reviews) else None
+            avg_rating = sum(r.get_calculated_rating() for r in all_reviews) / len(all_reviews)
+            avg_communication = _average(r.communication_rating for r in all_reviews)
+            avg_quality = _average(r.quality_rating for r in all_reviews)
+            avg_professionalism = _average(r.professionalism_rating for r in all_reviews)
+            avg_timeliness = _average(r.timeliness_rating for r in all_reviews)
         else:
-            avg_rating = 0
+            avg_rating = None
             avg_communication = None
             avg_quality = None
             avg_professionalism = None
@@ -135,11 +169,12 @@ def get_creator_reviews(creator_id):
             'pages': pagination.pages,
             'current_page': page,
             'average_ratings': {
-                'overall': round(avg_rating, 2) if avg_rating else 0,
-                'communication': round(avg_communication, 2) if avg_communication else None,
-                'quality': round(avg_quality, 2) if avg_quality else None,
-                'professionalism': round(avg_professionalism, 2) if avg_professionalism else None,
-                'timeliness': round(avg_timeliness, 2) if avg_timeliness else None
+                'overall': round(avg_rating, 2) if avg_rating is not None else None,
+                'communication': round(avg_communication, 2) if avg_communication is not None else None,
+                'quality': round(avg_quality, 2) if avg_quality is not None else None,
+                'professionalism': round(avg_professionalism, 2) if avg_professionalism is not None else None,
+                'timeliness': round(avg_timeliness, 2) if avg_timeliness is not None else None,
+                'total_reviews': len(all_reviews)
             }
         }), 200
 
