@@ -5,20 +5,21 @@ set "ROOT=D:\Bantubuzz Platform"
 set "SERVER_USER=root"
 set "SERVER_HOST=173.212.245.22"
 set "REMOTE_ROOT=/var/www/bantubuzz"
-set "BUILD_DIR=%ROOT%\deployment\public-profile-release"
-set "FRONTEND_TAR=%BUILD_DIR%\bantubuzz_frontend_public_profiles.tar.gz"
+set "BUILD_DIR=%ROOT%\deployment\review-rating-release"
+set "FRONTEND_TAR=%BUILD_DIR%\bantubuzz_frontend_review_ratings.tar.gz"
 
 cls
 echo ========================================
-echo   BantuBuzz Public Profile Deployment
+echo   BantuBuzz Review Rating Deployment
 echo ========================================
 echo.
 echo Server: %SERVER_USER%@%SERVER_HOST%
 echo Remote: %REMOTE_ROOT%
 echo.
-echo This deploys only the current public creator profile release:
+echo This deploys the current review-rating and audience compatibility release:
 echo   - frontend build files into /var/www/bantubuzz/frontend
-echo   - backend/app/routes/creators.py
+echo   - backend review and creator rating files
+echo   - ThunziAI audience parser and audience routes
 echo   - backend compile check
 echo   - backend and Apache restart
 echo   - local and public health checks
@@ -48,22 +49,36 @@ if errorlevel 1 goto fail
 
 echo.
 echo [4/8] Uploading frontend tarball...
-scp "%FRONTEND_TAR%" %SERVER_USER%@%SERVER_HOST%:/tmp/bantubuzz_frontend_public_profiles.tar.gz
+scp "%FRONTEND_TAR%" %SERVER_USER%@%SERVER_HOST%:/tmp/bantubuzz_frontend_review_ratings.tar.gz
 if errorlevel 1 goto fail
 
 echo.
-echo [5/8] Backing up current production frontend and creator route...
-ssh %SERVER_USER%@%SERVER_HOST% "set -e; cd %REMOTE_ROOT%; TS=$(date +%%Y%%m%%d_%%H%%M%%S); echo 'Creating backup at /root/bantubuzz_public_profiles_backup_'$TS'.tar.gz'; tar --ignore-failed-read -czf /root/bantubuzz_public_profiles_backup_$TS.tar.gz backend/app/routes/creators.py frontend/index.html frontend/assets frontend/favicon.ico frontend/manifest.json; mkdir -p backend/app/routes frontend"
+echo [5/8] Backing up current production frontend, review files, and audience files...
+ssh %SERVER_USER%@%SERVER_HOST% "set -e; cd %REMOTE_ROOT%; TS=$(date +%%Y%%m%%d_%%H%%M%%S); echo 'Creating backup at /root/bantubuzz_review_ratings_backup_'$TS'.tar.gz'; tar --ignore-failed-read -czf /root/bantubuzz_review_ratings_backup_$TS.tar.gz backend/app/models/campaign_cart.py backend/app/models/creator_profile.py backend/app/models/review.py backend/app/routes/brands.py backend/app/routes/collaborations.py backend/app/routes/creators.py backend/app/routes/reviews.py backend/app/services/thunzi_service.py frontend/index.html frontend/assets frontend/favicon.ico frontend/manifest.json; mkdir -p backend/app/models backend/app/routes backend/app/services frontend"
 if errorlevel 1 goto fail
 
 echo.
-echo [6/8] Uploading backend creator route...
+echo [6/8] Uploading backend review, creator, and audience files...
+scp "%ROOT%\backend\app\models\campaign_cart.py" %SERVER_USER%@%SERVER_HOST%:%REMOTE_ROOT%/backend/app/models/campaign_cart.py
+if errorlevel 1 goto fail
+scp "%ROOT%\backend\app\models\creator_profile.py" %SERVER_USER%@%SERVER_HOST%:%REMOTE_ROOT%/backend/app/models/creator_profile.py
+if errorlevel 1 goto fail
+scp "%ROOT%\backend\app\models\review.py" %SERVER_USER%@%SERVER_HOST%:%REMOTE_ROOT%/backend/app/models/review.py
+if errorlevel 1 goto fail
+scp "%ROOT%\backend\app\routes\brands.py" %SERVER_USER%@%SERVER_HOST%:%REMOTE_ROOT%/backend/app/routes/brands.py
+if errorlevel 1 goto fail
+scp "%ROOT%\backend\app\routes\collaborations.py" %SERVER_USER%@%SERVER_HOST%:%REMOTE_ROOT%/backend/app/routes/collaborations.py
+if errorlevel 1 goto fail
 scp "%ROOT%\backend\app\routes\creators.py" %SERVER_USER%@%SERVER_HOST%:%REMOTE_ROOT%/backend/app/routes/creators.py
+if errorlevel 1 goto fail
+scp "%ROOT%\backend\app\routes\reviews.py" %SERVER_USER%@%SERVER_HOST%:%REMOTE_ROOT%/backend/app/routes/reviews.py
+if errorlevel 1 goto fail
+scp "%ROOT%\backend\app\services\thunzi_service.py" %SERVER_USER%@%SERVER_HOST%:%REMOTE_ROOT%/backend/app/services/thunzi_service.py
 if errorlevel 1 goto fail
 
 echo.
 echo [7/8] Extracting frontend build and checking backend compile...
-ssh %SERVER_USER%@%SERVER_HOST% "set -e; cd %REMOTE_ROOT%; rm -rf frontend/assets frontend/index.html frontend/favicon.ico frontend/manifest.json; tar -xzf /tmp/bantubuzz_frontend_public_profiles.tar.gz -C frontend; rm -f /tmp/bantubuzz_frontend_public_profiles.tar.gz; cd %REMOTE_ROOT%/backend; source venv/bin/activate; python -m py_compile app/routes/creators.py"
+ssh %SERVER_USER%@%SERVER_HOST% "set -e; cd %REMOTE_ROOT%; rm -rf frontend/assets frontend/index.html frontend/favicon.ico frontend/manifest.json; tar -xzf /tmp/bantubuzz_frontend_review_ratings.tar.gz -C frontend; rm -f /tmp/bantubuzz_frontend_review_ratings.tar.gz; cd %REMOTE_ROOT%/backend; source venv/bin/activate; python -m py_compile app/models/campaign_cart.py app/models/creator_profile.py app/models/review.py app/routes/brands.py app/routes/collaborations.py app/routes/creators.py app/routes/reviews.py app/services/thunzi_service.py"
 if errorlevel 1 goto fail
 
 echo.
@@ -73,13 +88,15 @@ if errorlevel 1 goto fail
 
 echo.
 echo ========================================
-echo   Public profile deployment finished
+echo   Review rating deployment finished
 echo ========================================
 echo.
 echo Manual checks:
-echo   - https://bantubuzz.com/creatorusername opens without login
-echo   - Share Profile uses the clean username URL
-echo   - Save/book actions ask public users to sign in or sign up as a brand
+echo   - New creator profiles show no rating / no reviews, not 5 stars
+echo   - Brand review form requires all four detailed ratings
+echo   - Overall review score is the average of detailed ratings
+echo   - Creator listings show No reviews when total reviews is zero
+echo   - Audience demographics load from connected ThunziAI platforms when available
 echo.
 pause
 exit /b 0

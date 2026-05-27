@@ -1059,10 +1059,12 @@ def get_creator_audience(creator_id):
         if not platforms:
             return jsonify({'error': 'No platforms found'}), 404
 
-        # Filter for Instagram platforms only (only Instagram has audience data currently)
-        instagram_platform_ids = [p['id'] for p in platforms if p.get('isConnected') and p.get('platform') == 'instagram']
+        connected_platform_ids = [
+            p['id'] for p in platforms
+            if p.get('isConnected') and p.get('id')
+        ]
 
-        if not instagram_platform_ids:
+        if not connected_platform_ids:
             # Return empty data with 200 status instead of 404
             # This allows frontend to show helpful message
             return jsonify({
@@ -1071,11 +1073,10 @@ def get_creator_audience(creator_id):
                 'countries': [],
                 'cities': [],
                 'totalPlatforms': 0,
-                'message': 'Audience demographics are currently only available for Instagram platforms with 100+ followers.'
+                'message': 'Audience demographics will appear after a connected platform has synced audience data from ThunziAI.'
             }), 200
 
-        # Get aggregated audience data from Instagram platforms only
-        audience_data = thunzi_service.get_aggregated_audience(instagram_platform_ids)
+        audience_data = thunzi_service.get_aggregated_audience(connected_platform_ids)
 
         if not audience_data or not any([
             audience_data.get('age'),
@@ -1083,25 +1084,24 @@ def get_creator_audience(creator_id):
             audience_data.get('countries'),
             audience_data.get('cities')
         ]):
-            # Get follower count from connected Instagram platforms
-            instagram_followers = sum(
+            connected_followers = sum(
                 p.get('followers', 0) for p in platforms
-                if p.get('platform') == 'instagram' and p.get('isConnected')
+                if p.get('isConnected')
             )
 
             # Return empty data with 200 status instead of 404
-            if instagram_followers < 100:
-                message = f'Instagram account connected ({instagram_followers} followers) but audience demographics require 100+ followers.'
+            if connected_followers < 100:
+                message = f'Connected platforms have {connected_followers} total followers. Audience demographics may require more audience data before ThunziAI can return insights.'
             else:
-                message = 'Instagram account connected with 100+ followers. Audience data will be available once synced from Instagram.'
+                message = 'Connected platforms found. Audience data will be available once ThunziAI syncs demographic insights.'
 
             return jsonify({
                 'age': [],
                 'gender': [],
                 'countries': [],
                 'cities': [],
-                'totalPlatforms': len(instagram_platform_ids),
-                'followers': instagram_followers,
+                'totalPlatforms': len(connected_platform_ids),
+                'followers': connected_followers,
                 'message': message
             }), 200
 

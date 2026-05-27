@@ -2299,22 +2299,23 @@ def get_collaboration_audience(collaboration_id):
         if not platforms:
             return jsonify({'error': 'No platforms found'}), 404
 
-        # Filter for Instagram platforms only (only Instagram has audience data currently)
-        instagram_platform_ids = [p['id'] for p in platforms if p.get('isConnected') and p.get('platform') == 'instagram']
+        connected_platform_ids = [
+            p['id'] for p in platforms
+            if p.get('isConnected') and p.get('id')
+        ]
 
-        if not instagram_platform_ids:
+        if not connected_platform_ids:
             return jsonify({
                 'error': 'No audience data available',
-                'message': 'Audience demographics are currently only available for Instagram platforms. Please ensure the creator has a connected Instagram account with synced data.'
+                'message': 'Audience demographics will appear after the creator has connected platforms with synced ThunziAI audience data.'
             }), 404
 
-        # Get aggregated audience data from Instagram platforms only
-        audience_data = thunzi_service.get_aggregated_audience(instagram_platform_ids)
+        audience_data = thunzi_service.get_aggregated_audience(connected_platform_ids)
 
         if not audience_data:
             return jsonify({
                 'error': 'No audience data available',
-                'message': 'Instagram platform found but no audience data available yet. Data may need to be synced in ThunziAI.'
+                'message': 'Connected platforms found but no audience data is available yet. Data may need to be synced in ThunziAI.'
             }), 404
 
         return jsonify(audience_data), 200

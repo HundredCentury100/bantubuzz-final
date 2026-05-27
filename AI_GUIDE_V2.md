@@ -454,13 +454,14 @@ GET /api/platforms/<platformId>/audience
 
 Current implementation:
 
-- Mostly useful for Instagram.
-- Public creator audience endpoint returns empty arrays with helpful messages instead of hard failure when no demographic data exists.
-- Brand and collaboration audience endpoints aggregate Instagram platform IDs from relevant creators.
+- ThunziAI documents audience demographics as platform-generic: `GET /api/platforms/<platformId>/audience`.
+- Public creator audience endpoint aggregates all connected ThunziAI platform IDs and returns empty arrays with helpful messages instead of hard failure when no demographic data exists.
+- Brand and collaboration audience endpoints also aggregate all connected platform IDs from relevant creators.
+- In practice, some platforms may still return no audience data; the service skips empty responses and uses whichever platform demographics ThunziAI returns.
 - Thunzi response has known typos/inconsistencies:
   - `platormConnectionId` typo.
   - Docs mention `ageGender`; current service reads `age`.
-  - Nested arrays need flattening.
+  - Audience arrays may arrive either as direct arrays (`[{breakdown, value}]`) or nested arrays (`[[{breakdown, value}]]`); parser must accept both.
 
 ### Known Thunzi Gotchas
 

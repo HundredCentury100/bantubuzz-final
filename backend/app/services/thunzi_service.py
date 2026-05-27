@@ -1481,12 +1481,22 @@ class ThunziAIService:
         Flatten nested audience data arrays
 
         Input: [[{"breakdown": "18-24", "value": 28}], [{"breakdown": "25-34", "value": 48}]]
+        Also accepts the current ThunziAI shape:
+        [{"breakdown": "18-24", "value": 28}, {"breakdown": "25-34", "value": 48}]
         Output: [{"breakdown": "18-24", "value": 28}, {"breakdown": "25-34", "value": 48}]
         """
         flattened = []
-        for item_array in nested_data:
-            if item_array and len(item_array) > 0:
-                flattened.append(item_array[0])
+        if not isinstance(nested_data, list):
+            return flattened
+
+        for item in nested_data:
+            if isinstance(item, dict):
+                flattened.append(item)
+            elif isinstance(item, list) and item:
+                first_item = item[0]
+                if isinstance(first_item, dict):
+                    flattened.append(first_item)
+
         return flattened
 
     def get_aggregated_audience(self, platform_ids: List[int]) -> Optional[Dict]:

@@ -270,8 +270,7 @@ def get_brand_audience():
         if not collaborations:
             return jsonify({'error': 'No collaborations found'}), 404
 
-        # Get Instagram platform IDs only (only Instagram has audience data currently)
-        instagram_platform_ids = []
+        connected_platform_ids = []
 
         for collab in collaborations:
             thunzi_account = ThunziAccount.query.filter_by(
@@ -284,23 +283,24 @@ def get_brand_audience():
                 # get_creator_platforms accepts bantubuzz_id directly
                 platforms = thunzi_service.get_creator_platforms(thunzi_account.bantubuzz_id)
                 if platforms:
-                    # Filter for Instagram platforms only
-                    ig_platforms = [p['id'] for p in platforms if p.get('isConnected') and p.get('platform') == 'instagram']
-                    instagram_platform_ids.extend(ig_platforms)
+                    platform_ids = [
+                        p['id'] for p in platforms
+                        if p.get('isConnected') and p.get('id')
+                    ]
+                    connected_platform_ids.extend(platform_ids)
 
-        if not instagram_platform_ids:
+        if not connected_platform_ids:
             return jsonify({
                 'error': 'No audience data available',
-                'message': 'Audience demographics are currently only available for Instagram platforms. Please ensure creators have connected Instagram accounts with synced data.'
+                'message': 'Audience demographics will appear after creators have connected platforms with synced ThunziAI audience data.'
             }), 404
 
-        # Get aggregated audience data from Instagram platforms only
-        audience_data = thunzi_service.get_aggregated_audience(instagram_platform_ids)
+        audience_data = thunzi_service.get_aggregated_audience(connected_platform_ids)
 
         if not audience_data:
             return jsonify({
                 'error': 'No audience data available',
-                'message': 'Instagram platforms found but no audience data available yet. Data may need to be synced in ThunziAI.'
+                'message': 'Connected platforms found but no audience data is available yet. Data may need to be synced in ThunziAI.'
             }), 404
 
         # Add additional context
