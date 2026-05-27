@@ -1628,92 +1628,91 @@ def verify_bank_transfer_payment(booking_id):
         else:
             # For regular package bookings (direct bookings)
             # Auto-accept booking and create collaboration when payment is verified
-            if booking.status == 'pending':
-                booking.status = 'accepted'
+            booking.status = 'accepted'
 
-                # Check if collaboration already exists for this booking
-                existing_collaboration = Collaboration.query.filter_by(booking_id=booking.id).first()
+            # Check if collaboration already exists for this booking
+            existing_collaboration = Collaboration.query.filter_by(booking_id=booking.id).first()
 
-                if not existing_collaboration:
-                    # Load package
-                    # Package already imported at top
-                    package = Package.query.get(booking.package_id)
+            if not existing_collaboration:
+                # Load package
+                # Package already imported at top
+                package = Package.query.get(booking.package_id)
 
-                    # Calculate expected completion date based on package duration
-                    from datetime import timedelta
-                    start_date = datetime.utcnow()
-                    expected_completion = None
-                    if package and package.duration_days:
-                        expected_completion = start_date + timedelta(days=package.duration_days)
+                # Calculate expected completion date based on package duration
+                from datetime import timedelta
+                start_date = datetime.utcnow()
+                expected_completion = None
+                if package and package.duration_days:
+                    expected_completion = start_date + timedelta(days=package.duration_days)
 
-                    # Get collaboration details from booking notes (if provided)
-                    collab_details = {}
-                    if booking.notes:
+                # Get collaboration details from booking notes (if provided)
+                collab_details = {}
+                if booking.notes:
+                    try:
+                        import json
+                        collab_details = json.loads(booking.notes)
+                    except:
+                        pass
+
+                # Properly handle requires_content_review boolean
+                # Default to TRUE if not specified (YES track by default)
+                requires_review = collab_details.get('requires_content_review', True)
+                # Handle string "false" / "true" that might come from JSON
+                if isinstance(requires_review, str):
+                    requires_review = requires_review.lower() not in ['false', '0', 'no']
+                else:
+                    requires_review = bool(requires_review)
+
+                # Create collaboration
+                collaboration = Collaboration(
+                    collaboration_type='package',
+                    booking_id=booking.id,
+                    creator_id=booking.creator_id,
+                    brand_id=booking.brand_id,
+                    title=f"Collaboration for {package.title if package else 'Package'}",
+                    description=package.description if package else '',
+                    amount=booking.amount,
+                    status='in_progress',
+                    start_date=start_date,
+                    expected_completion_date=expected_completion,
+                    deliverables=package.deliverables if package and package.deliverables else [],
+                    progress_percentage=0,
+                    # Add collaboration brief fields from booking notes
+                    requires_content_review=requires_review,
+                    brief=collab_details.get('brief'),
+                    guidelines=collab_details.get('guidelines'),
+                    rules=collab_details.get('rules'),
+                    additional_notes=collab_details.get('additional_notes')
+                )
+                db.session.add(collaboration)
+                db.session.flush()
+
+                # Auto-create platform-specific deliverables
+                create_multiplatform_deliverables(collaboration, package)
+
+                # Auto-create deliverable records for NO track collaborations
+                create_no_track_deliverables(collaboration)
+
+                # Send email to creator about auto-accepted booking
+                creator = CreatorProfile.query.get(booking.creator_id)
+                if creator:
+                    creator_user = User.query.get(creator.user_id)
+                    brand = BrandProfile.query.get(booking.brand_id)
+                    if creator_user and brand:
                         try:
-                            import json
-                            collab_details = json.loads(booking.notes)
-                        except:
-                            pass
-
-                    # Properly handle requires_content_review boolean
-                    # Default to TRUE if not specified (YES track by default)
-                    requires_review = collab_details.get('requires_content_review', True)
-                    # Handle string "false" / "true" that might come from JSON
-                    if isinstance(requires_review, str):
-                        requires_review = requires_review.lower() not in ['false', '0', 'no']
-                    else:
-                        requires_review = bool(requires_review)
-
-                    # Create collaboration
-                    collaboration = Collaboration(
-                        collaboration_type='package',
-                        booking_id=booking.id,
-                        creator_id=booking.creator_id,
-                        brand_id=booking.brand_id,
-                        title=f"Collaboration for {package.title if package else 'Package'}",
-                        description=package.description if package else '',
-                        amount=booking.amount,
-                        status='in_progress',
-                        start_date=start_date,
-                        expected_completion_date=expected_completion,
-                        deliverables=package.deliverables if package and package.deliverables else [],
-                        progress_percentage=0,
-                        # Add collaboration brief fields from booking notes
-                        requires_content_review=requires_review,
-                        brief=collab_details.get('brief'),
-                        guidelines=collab_details.get('guidelines'),
-                        rules=collab_details.get('rules'),
-                        additional_notes=collab_details.get('additional_notes')
-                    )
-                    db.session.add(collaboration)
-                    db.session.flush()
-
-                    # Auto-create platform-specific deliverables
-                    create_multiplatform_deliverables(collaboration, package)
-
-                    # Auto-create deliverable records for NO track collaborations
-                    create_no_track_deliverables(collaboration)
-
-                    # Send email to creator about auto-accepted booking
-                    creator = CreatorProfile.query.get(booking.creator_id)
-                    if creator:
-                        creator_user = User.query.get(creator.user_id)
-                        brand = BrandProfile.query.get(booking.brand_id)
-                        if creator_user and brand:
-                            try:
-                                from app.services.email_service import EmailService
-                                EmailService.send_booking_auto_accepted_email(
-                                    creator_email=creator_user.email,
-                                    creator_name=creator.username,
-                                    brand_name=brand.company_name,
-                                    package_title=package.title if package else 'Package',
-                                    amount=float(booking.amount),
-                                    deliverables=package.deliverables if package and package.deliverables else [],
-                                    expected_days=package.duration_days if package else None,
-                                    collaboration_id=collaboration.id
-                                )
-                            except Exception as email_error:
-                                print(f"Failed to send booking auto-accepted email: {email_error}")
+                            from app.services.email_service import EmailService
+                            EmailService.send_booking_auto_accepted_email(
+                                creator_email=creator_user.email,
+                                creator_name=creator.username,
+                                brand_name=brand.company_name,
+                                package_title=package.title if package else 'Package',
+                                amount=float(booking.amount),
+                                deliverables=package.deliverables if package and package.deliverables else [],
+                                expected_days=package.duration_days if package else None,
+                                collaboration_id=collaboration.id
+                            )
+                        except Exception as email_error:
+                            print(f"Failed to send booking auto-accepted email: {email_error}")
 
         db.session.commit()
 

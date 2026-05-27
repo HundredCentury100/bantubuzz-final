@@ -88,8 +88,7 @@ const MarkCompleteButton = ({
                   <li className="flex items-start gap-2">
                     <span className="text-blue-600 mt-0.5">•</span>
                     <span>
-                      <strong>${parseFloat(amount).toFixed(2)}</strong> will be released from escrow to{' '}
-                      <strong>{creatorName}'s</strong> wallet immediately
+                      Funds will be released to the creator
                     </span>
                   </li>
                   <li className="flex items-start gap-2">

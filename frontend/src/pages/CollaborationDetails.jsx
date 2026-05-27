@@ -10,6 +10,7 @@ import DeliverableURLInput from '../components/DeliverableURLInput';
 import PostMetricsDisplay from '../components/PostMetricsDisplay';
 import CollaborationAnalytics from '../components/CollaborationAnalytics';
 import MarkCompleteButton from '../components/MarkCompleteButton';
+import PortfolioFormModal from '../components/PortfolioFormModal';
 import toast from 'react-hot-toast';
 
 const CollaborationDetails = () => {
@@ -39,9 +40,12 @@ const CollaborationDetails = () => {
   const [cancelReason, setCancelReason] = useState('');
   const [cancelling, setCancelling] = useState(false);
 
+  // Success Story modal state
+  const [showSuccessStoryModal, setShowSuccessStoryModal] = useState(false);
+
   const { socket } = useMessaging();
   const [editingDeliverable, setEditingDeliverable] = useState(null);
-  
+
   const isBrand = user?.user_type === 'brand';
 
   useEffect(() => {
@@ -503,12 +507,16 @@ const CollaborationDetails = () => {
               </div>
 
               {/* Latest Update */}
-              {collaboration.last_update && (
+              {collaboration.last_update && collaboration.last_update_date && (
                 <div className="bg-light rounded-lg p-4">
                   <p className="text-sm font-medium text-gray-700 mb-2">Latest Update:</p>
                   <p className="text-gray-700">{collaboration.last_update}</p>
                   <p className="text-xs text-gray-500 mt-2">
-                    {new Date(collaboration.last_update_date).toLocaleString()}
+                    {new Date(collaboration.last_update_date).toLocaleString('en-ZA', {
+                      timeZone: 'Africa/Johannesburg',
+                      dateStyle: 'medium',
+                      timeStyle: 'short'
+                    })}
                   </p>
                 </div>
               )}
@@ -776,9 +784,10 @@ const CollaborationDetails = () => {
                                     setEditingDeliverable(null);
                                     setShowDeliverableModal(true);
                                   }}
-                                  className="ml-4 px-4 py-2 bg-primary hover:bg-primary-dark text-white text-sm font-medium rounded-lg transition-colors whitespace-nowrap"
+                                  className="ml-4 px-3 py-2 bg-primary hover:bg-primary-dark text-white text-sm font-medium rounded-lg transition-colors flex-shrink-0"
                                 >
-                                  Submit Content for Review
+                                  <span className="hidden sm:inline">Submit Content for Review</span>
+                                  <span className="inline sm:hidden">Submit</span>
                                 </button>
                               )}
                             </div>
@@ -1211,9 +1220,7 @@ const CollaborationDetails = () => {
               <div className="bg-white rounded-lg shadow p-6">
                 <h3 className="text-lg font-bold text-gray-900 mb-4">Success Stories</h3>
                 <button
-                  onClick={() => {
-                    toast.info('Success Stories feature coming soon! You will be able to add completed collaborations to your portfolio with campaign analytics and testimonials.');
-                  }}
+                  onClick={() => setShowSuccessStoryModal(true)}
                   className="block w-full px-4 py-3 bg-green-600 hover:bg-green-700 text-white font-medium rounded-lg transition-colors text-center flex items-center justify-center gap-2"
                 >
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1457,6 +1464,30 @@ const CollaborationDetails = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Success Story Modal */}
+      {showSuccessStoryModal && (
+        <PortfolioFormModal
+          item={null}
+          collaborationData={{
+            collaboration_id: collaboration.id,
+            title: collaboration.title,
+            description: collaboration.description,
+            brand_name: collaboration.brand?.business_name || collaboration.brand?.company_name,
+            platform: collaboration.booking?.package?.platform_type,
+            collaboration_type: collaboration.booking?.package?.content_type,
+            campaign_objective: collaboration.booking?.package?.campaign_objective,
+            project_date: collaboration.actual_completion_date
+          }}
+          onClose={() => setShowSuccessStoryModal(false)}
+          onSuccess={(portfolioItem) => {
+            setShowSuccessStoryModal(false);
+            toast.success('Successfully added to your Success Stories!');
+            // Optionally navigate to creator profile
+            // navigate('/creator/profile');
+          }}
+        />
       )}
     </div>
   );

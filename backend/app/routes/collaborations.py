@@ -1038,7 +1038,7 @@ def complete_collaboration(collab_id):
 
             # Update escrow status
             collaboration.escrow_status = 'released'
-            collaboration.last_update = "Collaboration completed - Funds released to creator wallet"
+            collaboration.last_update = "Your collaboration is complete"
             db.session.commit()
 
             print(f"Escrow released to wallet for collaboration {collaboration.id}. Fee: {platform_fee}%. Transaction ID: {transaction.id}")
@@ -1051,7 +1051,7 @@ def complete_collaboration(collab_id):
 
             # Mark escrow as failed
             collaboration.escrow_status = 'failed'
-            collaboration.last_update = f"Collaboration completed - ESCROW RELEASE FAILED: {escrow_error[:200]}"
+            collaboration.last_update = "Your collaboration is complete"
 
             # Store error details for admin
             error_note = f"\n\n[AUTO-ESCROW FAILURE - {datetime.utcnow().isoformat()}]\n"
@@ -1146,7 +1146,8 @@ def mark_collaboration_complete(collab_id):
         collaboration.actual_completion_date = datetime.utcnow()
         collaboration.progress_percentage = 100
         collaboration.auto_complete_eligible_at = None  # Clear timer since manually completing
-        collaboration.last_update = "Collaboration marked complete by brand - Funds released to creator"
+        collaboration.last_update = "Your collaboration is complete"
+        collaboration.last_update_date = datetime.utcnow()
         collaboration.updated_at = datetime.utcnow()
 
         # Mark escrow status
@@ -1180,7 +1181,7 @@ def mark_collaboration_complete(collab_id):
 
             # Update escrow status
             collaboration.escrow_status = 'released'
-            collaboration.last_update = "Collaboration completed - Funds released to creator wallet"
+            collaboration.last_update = "Your collaboration is complete"
             db.session.commit()
 
             print(f"[MARK_COMPLETE] SUCCESS: Escrow released. Transaction ID: {transaction.id}")
@@ -1193,7 +1194,7 @@ def mark_collaboration_complete(collab_id):
 
             # Mark escrow as failed
             collaboration.escrow_status = 'failed'
-            collaboration.last_update = f"Collaboration completed - ESCROW RELEASE FAILED: {escrow_error[:200]}"
+            collaboration.last_update = "Your collaboration is complete"
 
             # Store error details for admin
             error_note = f"\n\n[MANUAL-COMPLETE ESCROW FAILURE - {datetime.utcnow().isoformat()}]\n"

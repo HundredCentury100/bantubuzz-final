@@ -625,6 +625,66 @@ const Navbar = () => {
           </div>
         </div>
       </div>
+
+      {/* Mobile Bottom Navigation - Only show when authenticated */}
+      {isAuthenticated && (
+        <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50">
+          <div className="flex justify-around items-center h-16">
+            {/* Collaborations - FIRST ITEM */}
+            <Link
+              to={`/${user?.user_type}/collaborations`}
+              className={`flex flex-col items-center justify-center flex-1 h-full ${
+                isActive(`/${user?.user_type}/collaborations`) ? 'text-primary' : 'text-gray-600'
+              }`}
+            >
+              <svg className="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+              <span className="text-xs font-medium">Collaborations</span>
+            </Link>
+
+            {/* Dashboard */}
+            <Link
+              to={`/${user?.user_type}/dashboard`}
+              className={`flex flex-col items-center justify-center flex-1 h-full ${
+                isActive(`/${user?.user_type}/dashboard`) ? 'text-primary' : 'text-gray-600'
+              }`}
+            >
+              <svg className="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+              </svg>
+              <span className="text-xs font-medium">Dashboard</span>
+            </Link>
+
+            {/* Messages */}
+            <Link
+              to="/messages"
+              className={`flex flex-col items-center justify-center flex-1 h-full relative ${
+                isActive('/messages') ? 'text-primary' : 'text-gray-600'
+              }`}
+            >
+              <ChatBubbleLeftRightIcon className="w-6 h-6 mb-1" />
+              {unreadMessageCount > 0 && (
+                <span className="absolute top-1 right-1/4 inline-flex items-center justify-center w-4 h-4 text-xs font-bold text-white bg-primary rounded-full">
+                  {unreadMessageCount > 9 ? '9+' : unreadMessageCount}
+                </span>
+              )}
+              <span className="text-xs font-medium">Messages</span>
+            </Link>
+
+            {/* Profile */}
+            <Link
+              to={user?.user_type === 'creator' ? '/creator/profile' : '/brand/profile/edit'}
+              className={`flex flex-col items-center justify-center flex-1 h-full ${
+                isActive(user?.user_type === 'creator' ? '/creator/profile' : '/brand/profile') ? 'text-primary' : 'text-gray-600'
+              }`}
+            >
+              <UserCircleIcon className="w-6 h-6 mb-1" />
+              <span className="text-xs font-medium">Profile</span>
+            </Link>
+          </div>
+        </div>
+      )}
     </nav>
   );
 };

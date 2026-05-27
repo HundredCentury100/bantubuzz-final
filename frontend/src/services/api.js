@@ -110,6 +110,13 @@ export const creatorsAPI = {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
   },
+  uploadGalleryVideo: (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.post('/creators/profile/gallery-video', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
   deleteGalleryImage: (index) => api.delete(`/creators/profile/gallery/${index}`),
 };
 

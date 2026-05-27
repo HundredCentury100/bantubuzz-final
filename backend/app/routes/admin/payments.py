@@ -6,10 +6,71 @@ Handles verification, viewing, and management of all payments and bookings
 from flask import jsonify, request
 from datetime import datetime, timedelta
 from app import db
-from app.models import Payment, Booking, User, BrandProfile, CreatorProfile, PaymentVerification, CreatorSubscription, CreatorSubscriptionPlan
+from app.models import Payment, Booking, User, BrandProfile, CreatorProfile, PaymentVerification, CreatorSubscription, CreatorSubscriptionPlan, Collaboration, Package
 from app.decorators.admin import admin_required
 from flask_jwt_extended import get_jwt_identity
 from . import bp
+
+
+def ensure_direct_booking_collaboration(booking):
+    """Create the package collaboration that starts after a direct booking is paid."""
+    if not booking or booking.booking_type not in [None, 'direct']:
+        return None
+
+    existing_collaboration = Collaboration.query.filter_by(booking_id=booking.id).first()
+    if existing_collaboration:
+        return existing_collaboration
+
+    package = Package.query.get(booking.package_id)
+
+    start_date = datetime.utcnow()
+    expected_completion = None
+    if package and package.duration_days:
+        expected_completion = start_date + timedelta(days=package.duration_days)
+
+    collab_details = {}
+    if booking.notes:
+        try:
+            import json
+            collab_details = json.loads(booking.notes)
+        except Exception:
+            collab_details = {}
+
+    requires_review = collab_details.get('requires_content_review', True)
+    if isinstance(requires_review, str):
+        requires_review = requires_review.lower() not in ['false', '0', 'no']
+    else:
+        requires_review = bool(requires_review)
+
+    collaboration = Collaboration(
+        collaboration_type='package',
+        booking_id=booking.id,
+        creator_id=booking.creator_id,
+        brand_id=booking.brand_id,
+        title=f"Collaboration for {package.title if package else 'Package'}",
+        description=package.description if package else '',
+        amount=booking.amount,
+        status='in_progress',
+        start_date=start_date,
+        expected_completion_date=expected_completion,
+        deliverables=package.deliverables if package and package.deliverables else [],
+        progress_percentage=0,
+        requires_content_review=requires_review,
+        brief=collab_details.get('brief'),
+        guidelines=collab_details.get('guidelines'),
+        rules=collab_details.get('rules'),
+        additional_notes=collab_details.get('additional_notes')
+    )
+    db.session.add(collaboration)
+    db.session.flush()
+
+    try:
+        from app.routes.bookings import create_no_track_deliverables
+        create_no_track_deliverables(collaboration)
+    except Exception as error:
+        print(f"Failed to create NO-track deliverables for collaboration {collaboration.id}: {error}")
+
+    return collaboration
 
 
 @bp.route('/payments', methods=['GET'])
@@ -298,6 +359,8 @@ def verify_payment(payment_id):
         # If payment has a booking, update booking status
         if payment.booking:
             payment.booking.payment_status = 'verified'
+            payment.booking.status = 'accepted'
+            ensure_direct_booking_collaboration(payment.booking)
 
         db.session.add(verification)
         db.session.commit()
@@ -432,6 +495,8 @@ def add_manual_payment():
         # Update booking payment status
         booking.payment_status = 'verified'
         booking.payment_method = payment.payment_method
+        booking.status = 'accepted'
+        ensure_direct_booking_collaboration(booking)
 
         db.session.add(payment)
         db.session.add(verification)

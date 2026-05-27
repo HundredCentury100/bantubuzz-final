@@ -36,6 +36,57 @@ const CreatorProfile = () => {
   const [audienceLoading, setAudienceLoading] = useState(true);
   const [showAnalytics, setShowAnalytics] = useState(false);
   const [showDemographics, setShowDemographics] = useState(false);
+  const [showShareMenu, setShowShareMenu] = useState(false);
+
+  const getProfileShareData = () => {
+    const profileUrl = `${window.location.origin}/creators/${creator.id}`;
+    const creatorName = creator.display_name || creator.username || 'this creator';
+    const text = `Check out ${creatorName}'s profile on BantuBuzz`;
+
+    return { profileUrl, creatorName, text };
+  };
+
+  const copyProfileLink = async () => {
+    const { profileUrl } = getProfileShareData();
+
+    try {
+      await navigator.clipboard.writeText(profileUrl);
+      toast.success('Profile link copied to clipboard!');
+    } catch {
+      toast.error('Failed to copy profile link');
+    }
+  };
+
+  const handleShareOption = async (platform) => {
+    const { profileUrl, text } = getProfileShareData();
+    const encodedUrl = encodeURIComponent(profileUrl);
+    const encodedText = encodeURIComponent(`${text}: ${profileUrl}`);
+
+    setShowShareMenu(false);
+
+    if (platform === 'whatsapp') {
+      window.open(`https://wa.me/?text=${encodedText}`, '_blank', 'noopener,noreferrer');
+      return;
+    }
+
+    if (platform === 'linkedin') {
+      window.open(`https://www.linkedin.com/sharing/share-offsite/?url=${encodedUrl}`, '_blank', 'noopener,noreferrer');
+      return;
+    }
+
+    if (platform === 'instagram') {
+      await copyProfileLink();
+      window.open('https://www.instagram.com/', '_blank', 'noopener,noreferrer');
+      return;
+    }
+
+    await copyProfileLink();
+  };
+
+  const getAssetUrl = (path) => {
+    if (!path) return '';
+    return path.startsWith('http') ? path : `${BASE_URL}${path}`;
+  };
 
   useEffect(() => {
     fetchCreatorData();
@@ -51,15 +102,19 @@ const CreatorProfile = () => {
       const creatorResponse = await creatorsAPI.getCreator(id);
       const creatorData = creatorResponse.data;
 
-      // Handle both old (array of strings) and new (array of objects) gallery formats
-      if (creatorData.gallery_images && Array.isArray(creatorData.gallery_images)) {
-        // Convert new format to displayable paths
+      // Keep gallery_images in its native format (objects with type field for videos/images)
+      // gallery_images is now the source of truth - contains type, url, mime_type for videos
+      if (!creatorData.gallery_images || !Array.isArray(creatorData.gallery_images)) {
+        creatorData.gallery_images = [];
+      }
+
+      // For backward compatibility with old gallery grid
+      if (!creatorData.gallery || creatorData.gallery.length === 0) {
+        // Extract simple paths from gallery_images for legacy gallery grid display
         const galleryPaths = creatorData.gallery_images.map(item =>
-          typeof item === 'string' ? item : item.medium || item.large || item.thumbnail
+          typeof item === 'string' ? item : (item.url || item.medium || item.large || item.thumbnail)
         );
         creatorData.gallery = galleryPaths;
-      } else if (!creatorData.gallery) {
-        creatorData.gallery = [];
       }
 
       setCreator(creatorData);
@@ -215,42 +270,91 @@ const CreatorProfile = () => {
           )}
         </div>
 
-        {/* Hero Images Section - 3 Large Images (Collabstr Style) */}
-        {creator.gallery && creator.gallery.length > 0 && (
+        {/* Hero Gallery Section - Videos + Images */}
+        {((creator.gallery_images && creator.gallery_images.length > 0) || (creator.gallery && creator.gallery.length > 0)) && (
           <div className="mb-8">
             {/* Desktop: Grid */}
             <div className="hidden md:grid md:grid-cols-3 gap-4">
-              {creator.gallery.slice(0, 3).map((imagePath, index) => (
-                <div
-                  key={index}
-                  className="aspect-[4/5] cursor-pointer overflow-hidden rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300"
-                  onClick={() => setSelectedImage(imagePath)}
-                >
-                  <img
-                    src={`${BASE_URL}${imagePath}`}
-                    alt={`Featured work ${index + 1}`}
-                    className="w-full h-full object-cover hover:scale-105 transition-transform duration-500"
-                  />
-                </div>
-              ))}
+              {(creator.gallery_images || creator.gallery).slice(0, 3).map((item, index) => {
+                const isNewFormat = typeof item === 'object';
+                const isVideo = isNewFormat && item.type === 'video';
+                const itemUrl = isNewFormat ? (item.url || item.medium) : item;
+
+                return (
+                  <div
+                    key={index}
+                    className="aspect-[4/5] cursor-pointer overflow-hidden rounded-2xl shadow-lg hover:shadow-xl transition-all duration-300 relative"
+                    onClick={() => !isVideo && setSelectedImage(itemUrl)}
+                  >
+                    {isVideo ? (
+                      <>
+                        <video
+                          autoPlay
+                          muted
+                          loop
+                          playsInline
+                          className="w-full h-full object-cover"
+                        >
+                          <source src={`${BASE_URL}${itemUrl}`} type={item.mime_type || 'video/mp4'} />
+                        </video>
+                        <div className="absolute top-3 left-3 bg-black/60 text-white px-2 py-1 rounded-lg text-xs flex items-center gap-1">
+                          <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M2 6a2 2 0 012-2h6a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V6zM14.553 7.106A1 1 0 0014 8v4a1 1 0 00.553.894l2 1A1 1 0 0018 13V7a1 1 0 00-1.447-.894l-2 1z" />
+                          </svg>
+                          Video
+                        </div>
+                      </>
+                    ) : (
+                      <img
+                        src={`${BASE_URL}${itemUrl}`}
+                        alt={`Featured work ${index + 1}`}
+                        className="w-full h-full object-cover hover:scale-105 transition-transform duration-500"
+                      />
+                    )}
+                  </div>
+                );
+              })}
             </div>
 
             {/* Mobile: Horizontal Scroll */}
             <div className="md:hidden overflow-x-auto scrollbar-hide -mx-6 px-6">
               <div className="flex gap-4 pb-2">
-                {creator.gallery.slice(0, 3).map((imagePath, index) => (
-                  <div
-                    key={index}
-                    className="w-[280px] flex-shrink-0 aspect-[4/5] cursor-pointer overflow-hidden rounded-2xl shadow-lg"
-                    onClick={() => setSelectedImage(imagePath)}
-                  >
-                    <img
-                      src={`${BASE_URL}${imagePath}`}
-                      alt={`Featured work ${index + 1}`}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                ))}
+                {(creator.gallery_images || creator.gallery).slice(0, 3).map((item, index) => {
+                  const isNewFormat = typeof item === 'object';
+                  const isVideo = isNewFormat && item.type === 'video';
+                  const itemUrl = isNewFormat ? (item.url || item.medium) : item;
+
+                  return (
+                    <div
+                      key={index}
+                      className="w-[280px] flex-shrink-0 aspect-[4/5] cursor-pointer overflow-hidden rounded-2xl shadow-lg relative"
+                      onClick={() => !isVideo && setSelectedImage(itemUrl)}
+                    >
+                      {isVideo ? (
+                        <>
+                          <video
+                            autoPlay
+                            muted
+                            loop
+                            playsInline
+                            className="w-full h-full object-cover"
+                          >
+                            <source src={`${BASE_URL}${itemUrl}`} type={item.mime_type || 'video/mp4'} />
+                          </video>
+                          <div className="absolute top-3 left-3 bg-black/60 text-white px-2 py-1 rounded-lg text-xs">
+                            Video
+                          </div>
+                        </>
+                      ) : (
+                        <img
+                          src={`${BASE_URL}${itemUrl}`}
+                          alt={`Featured work ${index + 1}`}
+                          className="w-full h-full object-cover"
+                        />
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </div>
@@ -340,9 +444,60 @@ const CreatorProfile = () => {
                 </div>
 
                 {/* Actions - Desktop: Side by side on right, Mobile: Stacked below badges */}
-                {/* Show message button for brands OR creators viewing other creators (not themselves) */}
-                {(user?.user_type === 'brand' || (user?.user_type === 'creator' && user?.id !== creator.user_id)) && (
-                  <div className="flex flex-col gap-3 w-full md:w-auto md:flex-row md:gap-2 md:flex-shrink-0">
+                <div className="flex flex-col gap-3 w-full md:w-auto md:flex-row md:gap-2 md:flex-shrink-0">
+                  {/* Share Profile Button - Always visible */}
+                  <div className="relative w-full md:w-auto">
+                    <button
+                      onClick={() => setShowShareMenu((value) => !value)}
+                      className="px-6 py-3 rounded-full border border-gray-300 bg-white text-gray-700 hover:border-primary hover:text-primary transition-colors flex items-center justify-center gap-2 whitespace-nowrap font-medium w-full md:w-auto"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                      </svg>
+                      Share Profile
+                    </button>
+
+                    {showShareMenu && (
+                      <div className="absolute left-0 right-0 md:left-auto md:right-0 mt-2 bg-white border border-gray-200 rounded-2xl shadow-lg p-2 z-20 min-w-[220px]">
+                        <button
+                          onClick={() => handleShareOption('whatsapp')}
+                          className="w-full px-4 py-3 rounded-xl text-left text-sm font-medium text-gray-700 hover:bg-primary/10 hover:text-dark transition-colors flex items-center gap-3"
+                        >
+                          <span className="w-8 h-8 rounded-full bg-green-100 text-green-700 flex items-center justify-center font-bold text-xs">WA</span>
+                          WhatsApp
+                        </button>
+                        <button
+                          onClick={() => handleShareOption('instagram')}
+                          className="w-full px-4 py-3 rounded-xl text-left text-sm font-medium text-gray-700 hover:bg-primary/10 hover:text-dark transition-colors flex items-center gap-3"
+                        >
+                          <span className="w-8 h-8 rounded-full bg-pink-100 text-pink-700 flex items-center justify-center font-bold text-xs">IG</span>
+                          Instagram
+                        </button>
+                        <button
+                          onClick={() => handleShareOption('linkedin')}
+                          className="w-full px-4 py-3 rounded-xl text-left text-sm font-medium text-gray-700 hover:bg-primary/10 hover:text-dark transition-colors flex items-center gap-3"
+                        >
+                          <span className="w-8 h-8 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-bold text-xs">in</span>
+                          LinkedIn
+                        </button>
+                        <button
+                          onClick={() => handleShareOption('copy')}
+                          className="w-full px-4 py-3 rounded-xl text-left text-sm font-medium text-gray-700 hover:bg-primary/10 hover:text-dark transition-colors flex items-center gap-3"
+                        >
+                          <span className="w-8 h-8 rounded-full bg-gray-100 text-gray-700 flex items-center justify-center">
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 16h8M8 12h8m-6 8h6a2 2 0 002-2V7.828a2 2 0 00-.586-1.414l-2.828-2.828A2 2 0 0013.172 3H8a2 2 0 00-2 2v13a2 2 0 002 2z" />
+                            </svg>
+                          </span>
+                          Copy link
+                        </button>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Show message button for brands OR creators viewing other creators (not themselves) */}
+                  {(user?.user_type === 'brand' || (user?.user_type === 'creator' && user?.id !== creator.user_id)) && (
+                    <>
                     <Link
                       to="/messages"
                       state={{ startConversationWith: {
@@ -386,8 +541,9 @@ const CreatorProfile = () => {
                         </button>
                       </>
                     )}
-                  </div>
-                )}
+                    </>
+                  )}
+                </div>
               </div>
 
               {/* Stats */}
@@ -668,6 +824,39 @@ const CreatorProfile = () => {
           )}
         </div>
 
+        {/* Brands Worked With */}
+        {creator.brands_worked_with && creator.brands_worked_with.length > 0 && (
+          <div className="mb-8">
+            <h2 className="text-2xl font-bold text-dark mb-6">Brands I've Worked With</h2>
+            <div className="bg-white rounded-3xl shadow-sm p-6">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                {creator.brands_worked_with.map((brand) => {
+                  const logo = brand.logo_sizes?.thumbnail || brand.logo_sizes?.medium || brand.logo;
+
+                  return (
+                    <div key={brand.id} className="flex flex-col items-center text-center gap-3">
+                      <div className="w-20 h-20 rounded-2xl bg-light border border-gray-100 flex items-center justify-center overflow-hidden">
+                        {logo ? (
+                          <img
+                            src={getAssetUrl(logo)}
+                            alt={brand.name}
+                            className="w-full h-full object-contain p-2"
+                          />
+                        ) : (
+                          <span className="text-xl font-bold text-primary-dark">
+                            {(brand.name || 'B').charAt(0).toUpperCase()}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-sm font-medium text-gray-700 line-clamp-2">{brand.name}</p>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Success Stories Section */}
         <div className="mb-8">
           <h2 className="text-2xl font-bold text-dark mb-6">Success Stories</h2>
@@ -891,24 +1080,50 @@ const CreatorProfile = () => {
           )}
         </div>
 
-        {/* Gallery Section */}
-        {creator.gallery && creator.gallery.length > 0 && (
+        {/* Gallery Section - All Portfolio Items */}
+        {((creator.gallery_images && creator.gallery_images.length > 0) || (creator.gallery && creator.gallery.length > 0)) && (
           <div className="mb-8">
             <h2 className="text-2xl font-bold text-dark mb-6">Portfolio Gallery</h2>
             <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {creator.gallery.map((imagePath, index) => (
-                <div
-                  key={index}
-                  className="aspect-square cursor-pointer overflow-hidden rounded-lg shadow-md hover:shadow-lg transition-shadow"
-                  onClick={() => setSelectedImage(imagePath)}
-                >
-                  <img
-                    src={`${BASE_URL}${imagePath}`}
-                    alt={`Gallery ${index + 1}`}
-                    className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
-                  />
-                </div>
-              ))}
+              {(creator.gallery_images || creator.gallery).map((item, index) => {
+                const isNewFormat = typeof item === 'object';
+                const isVideo = isNewFormat && item.type === 'video';
+                const itemUrl = isNewFormat ? (item.url || item.medium) : item;
+
+                return (
+                  <div
+                    key={index}
+                    className="aspect-square cursor-pointer overflow-hidden rounded-lg shadow-md hover:shadow-lg transition-shadow relative"
+                    onClick={() => !isVideo && setSelectedImage(itemUrl)}
+                  >
+                    {isVideo ? (
+                      <>
+                        <video
+                          src={`${BASE_URL}${itemUrl}`}
+                          className="w-full h-full object-cover"
+                          autoPlay
+                          muted
+                          loop
+                          playsInline
+                        />
+                        {/* Video Badge */}
+                        <div className="absolute top-2 left-2 bg-black/70 text-white px-2 py-1 rounded text-xs flex items-center gap-1">
+                          <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                            <path d="M2 6a2 2 0 012-2h6a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V6zM14.553 7.106A1 1 0 0014 8v4a1 1 0 00.553.894l2 1A1 1 0 0018 13V7a1 1 0 00-1.447-.894l-2 1z" />
+                          </svg>
+                          Video
+                        </div>
+                      </>
+                    ) : (
+                      <img
+                        src={`${BASE_URL}${itemUrl}`}
+                        alt={`Gallery ${index + 1}`}
+                        className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
+                      />
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}

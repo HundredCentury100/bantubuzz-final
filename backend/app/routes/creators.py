@@ -445,7 +445,31 @@ def get_creator(creator_id):
         if not creator:
             return jsonify({'error': 'Creator not found'}), 404
 
-        return jsonify(creator.to_dict(include_user=True, public_view=True)), 200
+        creator_data = creator.to_dict(include_user=True, public_view=True)
+
+        from app.models import Collaboration, BrandProfile
+
+        collaborations = Collaboration.query.filter(
+            Collaboration.creator_id == creator.id,
+            Collaboration.status.in_(['in_progress', 'completed'])
+        ).all()
+
+        brands_by_id = {}
+        for collaboration in collaborations:
+            brand = collaboration.brand or BrandProfile.query.get(collaboration.brand_id)
+            if not brand or brand.id in brands_by_id:
+                continue
+
+            brands_by_id[brand.id] = {
+                'id': brand.id,
+                'name': brand.company_name,
+                'logo': brand.logo,
+                'logo_sizes': brand.logo_sizes or {}
+            }
+
+        creator_data['brands_worked_with'] = list(brands_by_id.values())
+
+        return jsonify(creator_data), 200
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -686,12 +710,15 @@ def upload_gallery_image():
             # Create gallery item with multi-size support
             gallery_item = {
                 'id': str(uuid.uuid4()),
+                'type': 'image',
+                'url': image_data['medium'],  # Primary URL for mixed gallery
                 'thumbnail': image_data['thumbnail'],
                 'medium': image_data['medium'],
                 'large': image_data['large'],
                 'uploaded_at': datetime.now(timezone.utc).isoformat(),
                 'original_size_kb': image_data.get('original_size_kb', 0),
-                'compressed_size_kb': image_data.get('compressed_size_kb', 0)
+                'compressed_size_kb': image_data.get('compressed_size_kb', 0),
+                'display_order': len(creator.gallery_images)
             }
 
             # Add to new gallery structure
@@ -723,10 +750,116 @@ def upload_gallery_image():
         return jsonify({'error': str(e)}), 500
 
 
+@bp.route('/profile/gallery-video', methods=['POST'])
+@jwt_required()
+def upload_gallery_video():
+    """Upload video to creator's gallery with validation"""
+    try:
+        user_id = int(get_jwt_identity())
+        user = User.query.get(user_id)
+
+        if not user or user.user_type != 'creator':
+            return jsonify({'error': 'Not authorized'}), 403
+
+        creator = user.creator_profile
+        if not creator:
+            return jsonify({'error': 'Creator profile not found'}), 404
+
+        # Check if file is in request
+        if 'file' not in request.files:
+            return jsonify({'error': 'No file provided'}), 400
+
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({'error': 'No file selected'}), 400
+
+        # Validate file type
+        allowed_video_types = ['video/mp4', 'video/webm', 'video/quicktime', 'video/x-m4v']
+        if file.content_type not in allowed_video_types:
+            return jsonify({'error': 'Invalid file type. Only MP4, WebM, and MOV videos are allowed'}), 400
+
+        # Validate file size (10MB limit)
+        file.seek(0, 2)  # Seek to end
+        file_size = file.tell()
+        file.seek(0)  # Reset to beginning
+
+        MAX_VIDEO_SIZE = 10 * 1024 * 1024  # 10MB
+        if file_size > MAX_VIDEO_SIZE:
+            size_mb = file_size / (1024 * 1024)
+            return jsonify({'error': f'Video too large ({size_mb:.1f}MB). Maximum size is 10MB'}), 400
+
+        # Initialize gallery_images if None
+        if creator.gallery_images is None:
+            creator.gallery_images = []
+
+        # Count existing videos
+        video_count = sum(1 for item in creator.gallery_images if item.get('type') == 'video')
+        if video_count >= 2:
+            return jsonify({'error': 'Maximum 2 videos allowed in gallery'}), 400
+
+        # Save video file
+        import uuid
+        import os
+        from werkzeug.utils import secure_filename
+
+        # Create upload folder if it doesn't exist (match Apache uploads alias)
+        upload_folder = os.path.join('uploads', 'gallery_videos')
+        os.makedirs(upload_folder, exist_ok=True)
+
+        # Generate unique filename
+        file_extension = os.path.splitext(secure_filename(file.filename))[1]
+        unique_filename = f"creator_{creator.id}_video_{uuid.uuid4().hex}{file_extension}"
+        file_path = os.path.join(upload_folder, unique_filename)
+
+        # Save the video
+        file.save(file_path)
+
+        # Create relative path for database (served by Apache /uploads alias)
+        relative_path = f"/uploads/gallery_videos/{unique_filename}"
+
+        # Create gallery item
+        gallery_item = {
+            'id': str(uuid.uuid4()),
+            'url': relative_path,
+            'type': 'video',
+            'mime_type': file.content_type,
+            'size_bytes': file_size,
+            'uploaded_at': datetime.now(timezone.utc).isoformat(),
+            'display_order': len(creator.gallery_images)
+        }
+
+        # Add to gallery
+        gallery_images = list(creator.gallery_images)
+        gallery_images.append(gallery_item)
+        creator.gallery_images = gallery_images
+
+        # Backward compatibility: also add to old gallery
+        if creator.gallery is None:
+            creator.gallery = []
+        gallery = list(creator.gallery)
+        gallery.append(relative_path)
+        creator.gallery = gallery
+
+        creator.updated_at = datetime.now(timezone.utc)
+        db.session.commit()
+
+        return jsonify({
+            'message': 'Portfolio video added successfully',
+            'gallery_item': gallery_item,
+            'gallery_images': creator.gallery_images
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
 @bp.route('/profile/gallery/<int:index>', methods=['DELETE'])
 @jwt_required()
 def delete_gallery_image(index):
-    """Delete image from creator's gallery (supports both old and new format)"""
+    """Delete image or video from creator's gallery (supports both old and new format)"""
     try:
         user_id = int(get_jwt_identity())
         user = User.query.get(user_id)
@@ -742,12 +875,24 @@ def delete_gallery_image(index):
         if creator.gallery_images and len(creator.gallery_images) > index >= 0:
             gallery_item = creator.gallery_images[index]
 
-            # Delete all size variants
-            delete_image_variants({
-                'thumbnail': gallery_item.get('thumbnail'),
-                'medium': gallery_item.get('medium'),
-                'large': gallery_item.get('large')
-            })
+            # Delete file(s) based on type
+            if gallery_item.get('type') == 'video':
+                # Delete video file
+                import os
+                video_url = gallery_item.get('url')
+                if video_url:
+                    # Remove /uploads prefix from URL to get file path
+                    video_path = video_url.lstrip('/').replace('uploads/', '')
+                    video_path = os.path.join('uploads', video_path.replace('gallery_videos/', 'gallery_videos/'))
+                    if os.path.exists(video_path):
+                        os.remove(video_path)
+            else:
+                # Delete all image size variants
+                delete_image_variants({
+                    'thumbnail': gallery_item.get('thumbnail'),
+                    'medium': gallery_item.get('medium'),
+                    'large': gallery_item.get('large')
+                })
 
             # Remove from gallery_images array
             gallery_images = list(creator.gallery_images)
@@ -775,9 +920,53 @@ def delete_gallery_image(index):
         db.session.commit()
 
         return jsonify({
-            'message': 'Portfolio image removed successfully',
+            'message': 'Gallery item removed successfully',
             'gallery': creator.gallery or [],
             'gallery_images': creator.gallery_images or []
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@bp.route('/profile/gallery/reorder', methods=['PUT'])
+@jwt_required()
+def reorder_gallery():
+    """Reorder gallery items"""
+    try:
+        user_id = int(get_jwt_identity())
+        user = User.query.get(user_id)
+
+        if not user or user.user_type != 'creator':
+            return jsonify({'error': 'Not authorized'}), 403
+
+        creator = user.creator_profile
+        if not creator:
+            return jsonify({'error': 'Creator profile not found'}), 404
+
+        data = request.get_json()
+        new_order = data.get('gallery_images')
+
+        if not new_order or not isinstance(new_order, list):
+            return jsonify({'error': 'Invalid gallery order'}), 400
+
+        # Update display_order for each item
+        for index, item in enumerate(new_order):
+            item['display_order'] = index
+
+        # Update gallery_images
+        creator.gallery_images = new_order
+
+        # Update old gallery format for backward compatibility
+        creator.gallery = [item.get('url') or item.get('medium') for item in new_order]
+
+        creator.updated_at = datetime.now(timezone.utc)
+        db.session.commit()
+
+        return jsonify({
+            'message': 'Gallery reordered successfully',
+            'gallery_images': creator.gallery_images
         }), 200
 
     except Exception as e:

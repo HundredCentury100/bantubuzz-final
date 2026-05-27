@@ -216,6 +216,96 @@ def delete_portfolio_item(item_id):
         return jsonify({'error': str(e)}), 500
 
 
+@bp.route('/creator/portfolio/from-collaboration/<int:collaboration_id>', methods=['POST'])
+@jwt_required()
+def create_portfolio_from_collaboration(collaboration_id):
+    """
+    Create a portfolio item from a completed collaboration.
+    Pre-populates data from the collaboration for easy success story creation.
+    """
+    try:
+        from app.models.collaboration import Collaboration
+        from app.models.brand_profile import BrandProfile
+
+        user_id = int(get_jwt_identity())
+        creator = CreatorProfile.query.filter_by(user_id=user_id).first()
+
+        if not creator:
+            return jsonify({'error': 'Creator profile not found'}), 404
+
+        # Get the collaboration
+        collaboration = Collaboration.query.get(collaboration_id)
+        if not collaboration:
+            return jsonify({'error': 'Collaboration not found'}), 404
+
+        # Verify creator owns this collaboration
+        if collaboration.creator_id != creator.id:
+            return jsonify({'error': 'Unauthorized'}), 403
+
+        # Verify collaboration is completed
+        if collaboration.status != 'completed':
+            return jsonify({'error': 'Only completed collaborations can be added to portfolio'}), 400
+
+        # Get brand info
+        brand = BrandProfile.query.get(collaboration.brand_id)
+        brand_name = brand.business_name if brand else 'Unknown Brand'
+
+        # Get platform info from booking if available
+        platform = None
+        collaboration_type_label = 'Collaboration'
+        if collaboration.booking and collaboration.booking.package:
+            package = collaboration.booking.package
+            if package.is_multi_platform and package.platforms:
+                platform = package.platforms[0] if package.platforms else None
+            else:
+                platform = package.platform_type
+            collaboration_type_label = package.content_type or 'Collaboration'
+
+        data = request.get_json() or {}
+
+        # Create portfolio item with pre-populated data from collaboration
+        portfolio_item = PortfolioItem(
+            creator_profile_id=creator.id,
+            title=data.get('title', collaboration.title),
+            description=data.get('description', collaboration.description),
+            brand_name=data.get('brand_name', brand_name),
+            platform=data.get('platform', platform),
+            collaboration_type=data.get('collaboration_type', collaboration_type_label),
+            campaign_objective=data.get('campaign_objective'),
+            image_url=data.get('image_url'),
+            media_urls=data.get('media_urls', []),
+            post_url=data.get('post_url'),
+            views=data.get('views'),
+            likes=data.get('likes'),
+            comments=data.get('comments'),
+            shares=data.get('shares'),
+            engagement_rate=data.get('engagement_rate'),
+            reach=data.get('reach'),
+            result_description=data.get('result_description'),
+            client_testimonial=data.get('client_testimonial'),
+            project_date=collaboration.actual_completion_date or datetime.utcnow().date(),
+            is_featured=data.get('is_featured', False),
+            display_order=data.get('display_order', 0),
+            is_visible=data.get('is_visible', True)
+        )
+
+        db.session.add(portfolio_item)
+        db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'message': 'Success story created from collaboration',
+            'portfolio_item': portfolio_item.to_dict()
+        }), 201
+
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error creating portfolio from collaboration: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
 @bp.route('/creators/<int:creator_id>/portfolio', methods=['GET'])
 def get_creator_portfolio(creator_id):
     """Get a creator's public portfolio items (visible only)"""

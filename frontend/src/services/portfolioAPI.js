@@ -79,6 +79,17 @@ export const portfolioAPI = {
     }
 
     return response;
+  },
+
+  /**
+   * Create portfolio item from a completed collaboration
+   * Pre-populates data from the collaboration
+   * @param {number} collaborationId - Collaboration ID
+   * @param {Object} additionalData - Additional portfolio data (optional)
+   * @returns {Promise} Created portfolio item
+   */
+  createFromCollaboration: (collaborationId, additionalData = {}) => {
+    return api.post(`/creator/portfolio/from-collaboration/${collaborationId}`, additionalData);
   }
 };
 

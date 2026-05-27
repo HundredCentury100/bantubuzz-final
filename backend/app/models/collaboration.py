@@ -78,7 +78,16 @@ class Collaboration(db.Model):
     booking = db.relationship('Booking', backref=db.backref('collaboration', uselist=False))
 
     def calculate_progress(self):
-        """Calculate progress based on approved deliverables vs expected deliverables"""
+        """
+        Calculate progress based on approved deliverables vs expected deliverables.
+
+        For YES track (requires_content_review=True):
+        - All content approved: 80%
+        - All live URLs submitted: 100%
+
+        For NO track (requires_content_review=False):
+        - All content approved: 100%
+        """
         if not self.deliverables or len(self.deliverables) == 0:
             return 0
 
@@ -91,11 +100,38 @@ class Collaboration(db.Model):
                 collaboration_id=self.id,
                 status='approved'
             ).count()
+
+            # Count how many deliverables have live URLs
+            deliverables_with_urls = PackageDeliverable.query.filter_by(
+                collaboration_id=self.id,
+                status='approved'
+            ).filter(
+                PackageDeliverable.live_post_url.isnot(None),
+                PackageDeliverable.live_post_url != ''
+            ).count()
         else:
             # For legacy or campaign collaborations, use JSON
             total_approved = len(self.submitted_deliverables or [])
+            deliverables_with_urls = sum(1 for d in (self.submitted_deliverables or []) if d.get('live_post_url'))
 
-        return int((total_approved / total_expected) * 100)
+        # Calculate base progress from approved deliverables
+        if total_approved == 0:
+            return 0
+
+        # YES track: Cap at 80% until all live URLs submitted
+        if self.requires_content_review:
+            if deliverables_with_urls >= total_expected:
+                # All live URLs submitted
+                return 100
+            elif total_approved >= total_expected:
+                # All content approved but not all live URLs yet
+                return 80
+            else:
+                # Content still being approved (0-80% range)
+                return int((total_approved / total_expected) * 80)
+        else:
+            # NO track: Standard calculation
+            return int((total_approved / total_expected) * 100)
 
     def to_dict(self, include_relations=False):
         """Convert collaboration to dictionary"""

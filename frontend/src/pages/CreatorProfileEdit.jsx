@@ -24,8 +24,9 @@ const CreatorProfileEdit = () => {
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [uploadingPicture, setUploadingPicture] = useState(false);
   const [profilePicture, setProfilePicture] = useState(null);
-  const [gallery, setGallery] = useState([]);
+  const [gallery, setGallery] = useState([]); // Store full gallery_images objects (with type, url, etc.)
   const [uploadingGallery, setUploadingGallery] = useState(false);
+  const [uploadingVideo, setUploadingVideo] = useState(false);
   const [deletingGalleryIndex, setDeletingGalleryIndex] = useState(null);
   const [categories, setCategories] = useState([]);
   const [showCropModal, setShowCropModal] = useState(false);
@@ -75,12 +76,23 @@ const CreatorProfileEdit = () => {
       setProfile(data);
       setProfilePicture(data.profile_picture);
 
-      // Handle both old (array of strings) and new (array of objects) gallery formats
+      // Store the full gallery_images structure (objects with type, url, etc.)
+      // This allows us to differentiate between images and videos
       const galleryData = data.gallery_images || data.gallery || [];
-      const galleryPaths = galleryData.map(item =>
-        typeof item === 'string' ? item : item.medium || item.large || item.thumbnail
-      );
-      setGallery(galleryPaths);
+      // Convert old string format to new object format if needed
+      const galleryItems = galleryData.map(item => {
+        if (typeof item === 'string') {
+          // Old format: just a path string
+          return {
+            type: 'image',
+            url: item,
+            medium: item
+          };
+        }
+        // New format: already an object with type field
+        return item;
+      });
+      setGallery(galleryItems);
 
       // Set form values
       setValue('username', data.username || '');
@@ -226,13 +238,9 @@ const CreatorProfileEdit = () => {
     try {
       const response = await creatorsAPI.uploadGalleryImage(file);
 
-      // Backend returns gallery_images (new format) with objects containing sizes
-      // Extract the medium size for display compatibility
+      // Backend returns gallery_images (new format) with full objects
       const galleryImages = response.data.gallery_images || [];
-      const galleryPaths = galleryImages.map(item =>
-        typeof item === 'string' ? item : item.medium || item.large || item.thumbnail
-      );
-      setGallery(galleryPaths);
+      setGallery(galleryImages);
 
       toast.success('Portfolio image added successfully!');
     } catch (err) {
@@ -244,22 +252,61 @@ const CreatorProfileEdit = () => {
     }
   };
 
+  const handleVideoUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    if (!file.type.startsWith('video/')) {
+      toast.error('Please select a video file (MP4, WebM, or MOV)');
+      return;
+    }
+
+    // Validate file size (max 10MB)
+    const MAX_VIDEO_SIZE = 10 * 1024 * 1024; // 10MB
+    if (file.size > MAX_VIDEO_SIZE) {
+      const sizeMB = (file.size / (1024 * 1024)).toFixed(1);
+      toast.error(`Video too large (${sizeMB}MB). Maximum size is 10MB`);
+      return;
+    }
+
+    // Count existing videos
+    const videoCount = gallery.filter(item => item.type === 'video').length;
+    if (videoCount >= 2) {
+      toast.error('Maximum 2 videos allowed in gallery');
+      return;
+    }
+
+    setUploadingVideo(true);
+    try {
+      const response = await creatorsAPI.uploadGalleryVideo(file);
+
+      // Backend returns updated gallery_images
+      const galleryImages = response.data.gallery_images || [];
+      setGallery(galleryImages);
+
+      toast.success('Portfolio video added successfully!');
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to upload portfolio video');
+    } finally {
+      setUploadingVideo(false);
+      // Reset the file input
+      e.target.value = '';
+    }
+  };
+
   const handleDeleteGalleryImage = async (index) => {
     setDeletingGalleryIndex(index);
     try {
       const response = await creatorsAPI.deleteGalleryImage(index);
 
-      // Backend returns both gallery and gallery_images
-      // Convert gallery_images to paths for display
-      const galleryImages = response.data.gallery_images || response.data.gallery || [];
-      const galleryPaths = galleryImages.map(item =>
-        typeof item === 'string' ? item : item.medium || item.large || item.thumbnail
-      );
-      setGallery(galleryPaths);
+      // Backend returns updated gallery_images
+      const galleryImages = response.data.gallery_images || [];
+      setGallery(galleryImages);
 
-      toast.success('Portfolio image removed successfully!');
+      toast.success('Gallery item removed successfully!');
     } catch (err) {
-      toast.error(err.response?.data?.error || 'Failed to remove portfolio image');
+      toast.error(err.response?.data?.error || 'Failed to remove gallery item');
     } finally {
       setDeletingGalleryIndex(null);
     }
@@ -487,37 +534,80 @@ const CreatorProfileEdit = () => {
 
             {/* Gallery */}
             <div className="card">
-              <h2 className="text-xl font-bold text-dark mb-4">Portfolio Gallery</h2>
-              <p className="text-sm text-gray-600 mb-4">Upload images to showcase your work (max 10 images)</p>
+              <div className="flex items-start justify-between mb-4">
+                <div className="flex-1">
+                  <h2 className="text-xl font-bold text-dark mb-1">Portfolio Gallery</h2>
+                  <p className="text-sm text-gray-600">Upload images and videos to showcase your work</p>
+                  <p className="text-xs text-gray-500 mt-1">Max 10 items • Max 2 videos • Videos: 10MB limit</p>
+                </div>
+              </div>
+
+              {/* Info Box - Gallery Ordering */}
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                <div className="flex items-start gap-3">
+                  <svg className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+                  </svg>
+                  <div className="flex-1">
+                    <h3 className="text-sm font-semibold text-blue-900 mb-1">Featured Gallery Display</h3>
+                    <p className="text-xs text-blue-800">
+                      The <strong>first 3 items</strong> in your gallery will appear at the top of your profile in a large featured hero section that visitors see immediately.
+                      Put your best work first! Videos will autoplay (muted) to grab attention.
+                    </p>
+                  </div>
+                </div>
+              </div>
 
               {/* Gallery Grid */}
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 mb-4">
-                {gallery.map((imagePath, index) => (
-                  <div key={index} className="relative group aspect-square">
-                    <img
-                      src={`${BASE_URL}${imagePath}`}
-                      alt={`Gallery ${index + 1}`}
-                      className="w-full h-full object-cover rounded-lg"
-                    />
-                    {/* Delete Button */}
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteGalleryImage(index)}
-                      disabled={deletingGalleryIndex === index}
-                      className="absolute top-2 right-2 p-1.5 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
-                    >
-                      {deletingGalleryIndex === index ? (
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                      ) : (
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      )}
-                    </button>
-                  </div>
-                ))}
+                {gallery.map((item, index) => {
+                  const isVideo = item.type === 'video';
+                  const itemUrl = item.url || item.medium || item.large;
 
-                {/* Upload Button */}
+                  return (
+                    <div key={index} className="relative group aspect-square">
+                      {isVideo ? (
+                        <>
+                          <video
+                            src={`${BASE_URL}${itemUrl}`}
+                            className="w-full h-full object-cover rounded-lg"
+                            muted
+                          />
+                          {/* Video Badge */}
+                          <div className="absolute top-2 left-2 bg-black/70 text-white px-2 py-1 rounded text-xs flex items-center gap-1">
+                            <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
+                              <path d="M2 6a2 2 0 012-2h6a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V6zM14.553 7.106A1 1 0 0014 8v4a1 1 0 00.553.894l2 1A1 1 0 0018 13V7a1 1 0 00-1.447-.894l-2 1z" />
+                            </svg>
+                            Video
+                          </div>
+                        </>
+                      ) : (
+                        <img
+                          src={`${BASE_URL}${itemUrl}`}
+                          alt={`Gallery ${index + 1}`}
+                          className="w-full h-full object-cover rounded-lg"
+                        />
+                      )}
+                      {/* Delete Button */}
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteGalleryImage(index)}
+                        disabled={deletingGalleryIndex === index}
+                        className="absolute top-2 right-2 p-1.5 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-600"
+                      >
+                        {deletingGalleryIndex === index ? (
+                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                        ) : (
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        )}
+                      </button>
+                    </div>
+                  );
+                })}
+
+                {/* Upload Image Button */}
                 {gallery.length < 10 && (
                   <label className="cursor-pointer aspect-square border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center hover:border-primary transition-colors">
                     <input
@@ -532,9 +622,33 @@ const CreatorProfileEdit = () => {
                     ) : (
                       <>
                         <svg className="w-8 h-8 text-gray-400 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                         </svg>
-                        <span className="text-sm text-gray-500">Add Image</span>
+                        <span className="text-xs text-gray-500 font-medium">Add Image</span>
+                      </>
+                    )}
+                  </label>
+                )}
+
+                {/* Upload Video Button */}
+                {gallery.length < 10 && gallery.filter(item => item.type === 'video').length < 2 && (
+                  <label className="cursor-pointer aspect-square border-2 border-dashed border-blue-300 rounded-lg flex flex-col items-center justify-center hover:border-blue-500 transition-colors bg-blue-50/50">
+                    <input
+                      type="file"
+                      accept="video/mp4,video/webm,video/quicktime"
+                      onChange={handleVideoUpload}
+                      className="hidden"
+                      disabled={uploadingVideo}
+                    />
+                    {uploadingVideo ? (
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                    ) : (
+                      <>
+                        <svg className="w-8 h-8 text-blue-500 mb-2" fill="currentColor" viewBox="0 0 20 20">
+                          <path d="M2 6a2 2 0 012-2h6a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V6zM14.553 7.106A1 1 0 0014 8v4a1 1 0 00.553.894l2 1A1 1 0 0018 13V7a1 1 0 00-1.447-.894l-2 1z" />
+                        </svg>
+                        <span className="text-xs text-blue-600 font-medium">Add Video</span>
+                        <span className="text-[10px] text-blue-500 mt-0.5">Max 10MB</span>
                       </>
                     )}
                   </label>
@@ -542,7 +656,7 @@ const CreatorProfileEdit = () => {
               </div>
 
               {gallery.length === 0 && (
-                <p className="text-center text-gray-500 py-4">No gallery images yet. Upload some to showcase your work!</p>
+                <p className="text-center text-gray-500 py-4">No gallery items yet. Upload images and videos to showcase your work!</p>
               )}
             </div>
 

@@ -17,7 +17,7 @@ const COLLABORATION_TYPES = [
   'Other'
 ];
 
-const PortfolioFormModal = ({ item = null, onClose, onSuccess }) => {
+const PortfolioFormModal = ({ item = null, collaborationData = null, onClose, onSuccess }) => {
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -43,6 +43,7 @@ const PortfolioFormModal = ({ item = null, onClose, onSuccess }) => {
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [mediaFiles, setMediaFiles] = useState([]);
+  const [isFromCollaboration, setIsFromCollaboration] = useState(false);
 
   useEffect(() => {
     if (item) {
@@ -68,8 +69,32 @@ const PortfolioFormModal = ({ item = null, onClose, onSuccess }) => {
         project_date: item.project_date || '',
         is_visible: item.is_visible !== undefined ? item.is_visible : true
       });
+    } else if (collaborationData) {
+      // Pre-fill form with collaboration data
+      setIsFromCollaboration(true);
+      setFormData({
+        title: collaborationData.title || '',
+        description: collaborationData.description || '',
+        brand_name: collaborationData.brand_name || '',
+        platform: collaborationData.platform ? collaborationData.platform.toLowerCase() : '',
+        collaboration_type: collaborationData.collaboration_type || '',
+        campaign_objective: collaborationData.campaign_objective || '',
+        image_url: '',
+        media_urls: [],
+        post_url: '',
+        views: '',
+        likes: '',
+        comments: '',
+        shares: '',
+        engagement_rate: '',
+        reach: '',
+        result_description: '',
+        client_testimonial: '',
+        project_date: collaborationData.project_date || '',
+        is_visible: true
+      });
     }
-  }, [item]);
+  }, [item, collaborationData]);
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
@@ -180,10 +205,17 @@ const PortfolioFormModal = ({ item = null, onClose, onSuccess }) => {
       let response;
       if (item) {
         response = await portfolioAPI.updatePortfolioItem(item.id, submitData);
-        toast.success('Portfolio item updated successfully');
+        toast.success('Success Story updated successfully');
+      } else if (isFromCollaboration && collaborationData?.collaboration_id) {
+        // Create from collaboration using special endpoint
+        response = await portfolioAPI.createFromCollaboration(
+          collaborationData.collaboration_id,
+          submitData
+        );
+        toast.success('Success Story created from collaboration!');
       } else {
         response = await portfolioAPI.createPortfolioItem(submitData);
-        toast.success('Portfolio item created successfully');
+        toast.success('Success Story created successfully');
       }
 
       onSuccess(response.data.portfolio_item);
