@@ -218,6 +218,45 @@ ensure_direct_booking_collaboration(booking)
 
 This creates the collaboration for verified direct bookings when missing.
 
+## Collaboration Post URL Analytics
+
+When creators paste post URLs inside collaborations, BantuBuzz should use ThunziAI to turn those URLs into cached `PostMetrics` rows.
+
+Relevant backend files:
+
+- `backend/app/routes/collaborations.py`
+- `backend/app/services/post_metrics_service.py`
+- `backend/app/services/analytics_service.py`
+- `backend/app/services/thunzi_service.py`
+- `backend/app/models/post_metrics.py`
+- `backend/app/models/package_deliverable.py`
+- `backend/app/models/milestone_deliverable.py`
+
+Important behavior:
+
+- Package URL submit route: `PUT /api/collaborations/<collab_id>/deliverables/<deliverable_id>/submit-url`
+- Milestone URL submit route: `PUT /api/collaborations/<collab_id>/milestones/<milestone_id>/deliverables/<deliverable_id>/submit-url`
+- Both routes parse the social URL into `post_platform` and `post_id`.
+- Both routes now attempt a best-effort Thunzi metrics sync immediately after successful URL validation.
+- Manual sync still exists:
+  - `POST /api/collaborations/<collab_id>/deliverables/<deliverable_id>/sync-metrics`
+  - `POST /api/collaborations/<collab_id>/milestones/<milestone_id>/deliverables/<deliverable_id>/sync-metrics`
+  - `POST /api/collaborations/<collab_id>/sync-all-metrics`
+
+ThunziAI URL lookup:
+
+- Prefer `POST https://app.thunzi.co/api/posts/find-by-url` with `{ "url": "...", "companyId": "..." }`.
+- This matters especially for Facebook because public URLs may not expose the same numeric IDs used internally.
+- If direct URL lookup fails, fall back to fetching recent company posts and matching by parsed platform/post ID.
+
+Analytics response shape:
+
+- `GET /api/collaborations/<collab_id>/analytics` must support two frontend consumers:
+  - The collaboration detail analytics widget expects top-level totals like `total_reach`, `total_engagement`, `platforms`, `posts`, and `metrics_availability`.
+  - The brand analytics page expects richer fields like `raw_data`, `insights`, `sentiment`, `mentions`, `deliverables`, and `creator`.
+- Keep the endpoint backward-compatible by returning both shapes in the same `analytics` object.
+- Overall brand analytics summary is `GET /api/collaborations/analytics/summary` and should include both package and milestone deliverable metrics.
+
 Backfill script:
 
 ```text

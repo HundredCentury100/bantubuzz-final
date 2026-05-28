@@ -1780,6 +1780,18 @@ def submit_package_deliverable_url(collab_id, deliverable_id):
 
             db.session.commit()
 
+            metrics_sync = None
+            try:
+                from app.services.post_metrics_service import PostMetricsService
+                metrics_sync = PostMetricsService.sync_deliverable_metrics(
+                    deliverable.id,
+                    deliverable_type='package'
+                )
+            except Exception as sync_error:
+                current_app.logger.warning(
+                    f"Failed to auto-sync package deliverable metrics after URL submit: {str(sync_error)}"
+                )
+
             current_app.logger.info(
                 f"Package deliverable URL submitted: CollabID={collab_id}, DeliverableID={deliverable_id}, "
                 f"Platform={deliverable.post_platform}, PostID={deliverable.post_id}"
@@ -1793,7 +1805,8 @@ def submit_package_deliverable_url(collab_id, deliverable_id):
                     'platform': deliverable.post_platform,
                     'post_id': deliverable.post_id,
                     'validated': deliverable.post_url_validated
-                }
+                },
+                'metrics_sync': metrics_sync
             }), 200
         else:
             current_app.logger.warning(
@@ -1864,6 +1877,18 @@ def submit_deliverable_url(collab_id, milestone_id, deliverable_id):
         if deliverable.parse_and_validate_url():
             db.session.commit()
 
+            metrics_sync = None
+            try:
+                from app.services.post_metrics_service import PostMetricsService
+                metrics_sync = PostMetricsService.sync_deliverable_metrics(
+                    deliverable.id,
+                    deliverable_type='milestone'
+                )
+            except Exception as sync_error:
+                current_app.logger.warning(
+                    f"Failed to auto-sync milestone deliverable metrics after URL submit: {str(sync_error)}"
+                )
+
             current_app.logger.info(
                 f"Deliverable URL submitted: ID={deliverable_id}, "
                 f"Platform={deliverable.post_platform}, PostID={deliverable.post_id}"
@@ -1877,7 +1902,8 @@ def submit_deliverable_url(collab_id, milestone_id, deliverable_id):
                     'platform': deliverable.post_platform,
                     'post_id': deliverable.post_id,
                     'validated': deliverable.post_url_validated
-                }
+                },
+                'metrics_sync': metrics_sync
             }), 200
         else:
             current_app.logger.warning(
@@ -2162,7 +2188,7 @@ def get_collaboration_analytics(collab_id):
     """
     try:
         from flask import current_app
-        from app.services.post_metrics_service import PostMetricsService
+        from app.services.analytics_service import AnalyticsService
         import traceback
 
         user_id = int(get_jwt_identity())
@@ -2182,8 +2208,8 @@ def get_collaboration_analytics(collab_id):
             if collaboration.brand_id != brand.id:
                 return jsonify({'error': 'Unauthorized'}), 403
 
-        # Get aggregated analytics using PostMetricsService
-        analytics = PostMetricsService.get_collaboration_analytics(collab_id)
+        # Get rich analytics while preserving the legacy top-level metrics keys
+        analytics = AnalyticsService.get_collaboration_analytics(collab_id)
 
         if not analytics:
             return jsonify({

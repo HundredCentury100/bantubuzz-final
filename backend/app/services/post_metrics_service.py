@@ -426,21 +426,17 @@ class PostMetricsService:
             # Get all deliverables with submitted URLs
             deliverables = []
 
-            # For milestone-based collaborations
-            if collaboration.collaboration_type == 'campaign' and collaboration.milestones:
-                for milestone in collaboration.milestones:
-                    for deliverable in milestone.deliverables:
-                        if deliverable.post_url_validated:
-                            deliverables.append(('milestone', deliverable))
-
-            # For package-based collaborations
-            elif collaboration.collaboration_type == 'package':
-                package_deliverables = PackageDeliverable.query.filter_by(
-                    collaboration_id=collaboration_id
-                ).all()
-                for deliverable in package_deliverables:
+            for milestone in collaboration.milestones:
+                for deliverable in milestone.deliverables:
                     if deliverable.post_url_validated:
-                        deliverables.append(('package', deliverable))
+                        deliverables.append(('milestone', deliverable))
+
+            package_deliverables = PackageDeliverable.query.filter_by(
+                collaboration_id=collaboration_id
+            ).all()
+            for deliverable in package_deliverables:
+                if deliverable.post_url_validated:
+                    deliverables.append(('package', deliverable))
 
             if not deliverables:
                 return {

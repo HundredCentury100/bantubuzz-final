@@ -23,13 +23,13 @@ class AnalyticsService:
     """Service for calculating brand analytics"""
 
     @staticmethod
-    def get_collaboration_analytics(collaboration_id: int, brand_id: int) -> Optional[Dict]:
+    def get_collaboration_analytics(collaboration_id: int, brand_id: int = None) -> Optional[Dict]:
         """
         Get comprehensive analytics for a single collaboration/campaign
 
         Args:
             collaboration_id: ID of the collaboration
-            brand_id: ID of the brand (for authorization)
+            brand_id: ID of the brand user (optional, for authorization)
 
         Returns:
             Dict with comprehensive analytics or None if not found
@@ -40,20 +40,16 @@ class AnalyticsService:
             if not collaboration:
                 return None
 
-            # Verify brand owns this collaboration
-            brand_profile = BrandProfile.query.filter_by(user_id=brand_id).first()
-            if not brand_profile or collaboration.brand_id != brand_profile.id:
-                return None
+            if brand_id is not None:
+                brand_profile = BrandProfile.query.filter_by(user_id=brand_id).first()
+                if not brand_profile or collaboration.brand_id != brand_profile.id:
+                    return None
 
-            # Get all deliverables with metrics
-            deliverables = PackageDeliverable.query.filter_by(
-                collaboration_id=collaboration_id
-            ).all()
+            deliverables = AnalyticsService._get_collaboration_deliverables(collaboration)
 
             # Get all post metrics for this collaboration
             metrics_records = PostMetrics.query.filter_by(
-                collaboration_id=collaboration_id,
-                deliverable_type='package'
+                collaboration_id=collaboration_id
             ).all()
 
             # Calculate raw performance data
@@ -76,23 +72,29 @@ class AnalyticsService:
 
             # Get deliverable details
             deliverable_details = []
-            for deliverable in deliverables:
+            for deliverable_type, deliverable in deliverables:
                 metrics = next(
-                    (m for m in metrics_records if m.deliverable_id == deliverable.id),
+                    (m for m in metrics_records
+                     if m.deliverable_id == deliverable.id and m.deliverable_type == deliverable_type),
                     None
                 )
                 deliverable_details.append({
                     'id': deliverable.id,
+                    'deliverable_type': deliverable_type,
                     'title': deliverable.title,
-                    'platform': deliverable.post_platform,
+                    'platform': deliverable.post_platform or getattr(deliverable, 'platform', None),
                     'url': deliverable.url,
                     'status': deliverable.status,
                     'submitted_at': deliverable.submitted_at.isoformat() if deliverable.submitted_at else None,
+                    'url_submitted_at': deliverable.url_submitted_at.isoformat() if deliverable.url_submitted_at else None,
                     'has_metrics': metrics is not None,
                     'metrics': metrics.to_dict() if metrics else None
                 })
 
+            simple_analytics = AnalyticsService._calculate_collaboration_totals(metrics_records)
+
             return {
+                **simple_analytics,
                 'collaboration': {
                     'id': collaboration.id,
                     'status': collaboration.status,
@@ -118,6 +120,109 @@ class AnalyticsService:
                 f"Error calculating collaboration analytics: {str(e)}"
             )
             return None
+
+    @staticmethod
+    def _get_collaboration_deliverables(collaboration: Collaboration) -> List:
+        """Return all package and milestone deliverables for a collaboration."""
+        deliverables = []
+
+        package_deliverables = PackageDeliverable.query.filter_by(
+            collaboration_id=collaboration.id
+        ).all()
+        deliverables.extend(('package', deliverable) for deliverable in package_deliverables)
+
+        for milestone in collaboration.milestones:
+            deliverables.extend(
+                ('milestone', deliverable)
+                for deliverable in milestone.deliverables.all()
+            )
+
+        return deliverables
+
+    @staticmethod
+    def _calculate_collaboration_totals(metrics_records: List[PostMetrics]) -> Dict:
+        """Calculate backward-compatible top-level collaboration analytics totals."""
+        analytics = {
+            'total_posts': len(metrics_records),
+            'total_reach': 0,
+            'total_likes': 0,
+            'total_comments': 0,
+            'total_shares': 0,
+            'total_saves': 0,
+            'total_video_views': 0,
+            'total_engagement': 0,
+            'avg_engagement_rate': 0,
+            'platforms': {},
+            'posts': [],
+            'metrics_availability': {
+                'reach_available': False,
+                'reach_post_count': 0,
+                'engagement_rate_available': False,
+                'engagement_rate_post_count': 0
+            },
+            'sentiment_breakdown': {
+                'positive': 0,
+                'negative': 0,
+                'neutral': 0,
+                'critical': 0
+            }
+        }
+
+        engagement_rate_sum = 0
+        engagement_rate_count = 0
+        reach_count = 0
+
+        for metrics in metrics_records:
+            platform = metrics.post_platform
+            analytics['platforms'][platform] = analytics['platforms'].get(platform, 0) + 1
+
+            if metrics.reach is not None:
+                analytics['total_reach'] += metrics.reach
+                reach_count += 1
+            analytics['total_likes'] += metrics.likes or 0
+            analytics['total_comments'] += metrics.comments or 0
+            analytics['total_shares'] += metrics.shares or 0
+            analytics['total_saves'] += metrics.saves or 0
+            analytics['total_video_views'] += metrics.video_views or 0
+            analytics['total_engagement'] += metrics.total_engagement or 0
+
+            if metrics.engagement_rate is not None and metrics.engagement_rate > 0:
+                engagement_rate_sum += metrics.engagement_rate
+                engagement_rate_count += 1
+
+            analytics['sentiment_breakdown']['positive'] += metrics.positive_comments or 0
+            analytics['sentiment_breakdown']['negative'] += metrics.negative_comments or 0
+            analytics['sentiment_breakdown']['neutral'] += metrics.neutral_comments or 0
+            analytics['sentiment_breakdown']['critical'] += metrics.critical_comments or 0
+
+            analytics['posts'].append({
+                'deliverable_id': metrics.deliverable_id,
+                'deliverable_type': metrics.deliverable_type,
+                'platform': metrics.post_platform,
+                'post_url': metrics.post_url,
+                'reach': metrics.reach,
+                'likes': metrics.likes,
+                'comments': metrics.comments,
+                'shares': metrics.shares,
+                'saves': metrics.saves,
+                'video_views': metrics.video_views,
+                'total_engagement': metrics.total_engagement,
+                'engagement_rate': float(metrics.engagement_rate) if metrics.engagement_rate else 0,
+                'published_at': metrics.published_at.isoformat() if metrics.published_at else None,
+                'last_synced_at': metrics.last_synced_at.isoformat() if metrics.last_synced_at else None
+            })
+
+        if engagement_rate_count > 0:
+            analytics['avg_engagement_rate'] = round(engagement_rate_sum / engagement_rate_count, 2)
+
+        analytics['metrics_availability'] = {
+            'reach_available': reach_count > 0,
+            'reach_post_count': reach_count,
+            'engagement_rate_available': engagement_rate_count > 0,
+            'engagement_rate_post_count': engagement_rate_count
+        }
+
+        return analytics
 
     @staticmethod
     def _calculate_raw_data(metrics_records: List[PostMetrics]) -> Dict:
@@ -352,8 +457,7 @@ class AnalyticsService:
             # Get all metrics for these collaborations
             collaboration_ids = [c.id for c in collaborations]
             all_metrics = PostMetrics.query.filter(
-                PostMetrics.collaboration_id.in_(collaboration_ids),
-                PostMetrics.deliverable_type == 'package'
+                PostMetrics.collaboration_id.in_(collaboration_ids)
             ).all()
 
             # Calculate totals and aggregate metrics
