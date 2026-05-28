@@ -16,6 +16,7 @@ import toast from 'react-hot-toast';
 import { PLATFORM_CONFIGS, PACKAGE_TYPES } from '../constants/platformConfig';
 import PortfolioGrid from '../components/PortfolioGrid';
 import { Copy, MessageCircle } from 'lucide-react';
+import GalleryVideo from '../components/GalleryVideo';
 
 const CreatorProfile = () => {
   const { id, username } = useParams();
@@ -367,23 +368,11 @@ const CreatorProfile = () => {
                     onClick={() => !isVideo && setSelectedImage(itemUrl)}
                   >
                     {isVideo ? (
-                      <>
-                        <video
-                          autoPlay
-                          muted
-                          loop
-                          playsInline
-                          className="w-full h-full object-cover"
-                        >
-                          <source src={`${BASE_URL}${itemUrl}`} type={item.mime_type || 'video/mp4'} />
-                        </video>
-                        <div className="absolute top-3 left-3 bg-black/60 text-white px-2 py-1 rounded-lg text-xs flex items-center gap-1">
-                          <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                            <path d="M2 6a2 2 0 012-2h6a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V6zM14.553 7.106A1 1 0 0014 8v4a1 1 0 00.553.894l2 1A1 1 0 0018 13V7a1 1 0 00-1.447-.894l-2 1z" />
-                          </svg>
-                          Video
-                        </div>
-                      </>
+                      <GalleryVideo
+                        src={`${BASE_URL}${itemUrl}`}
+                        type={item.mime_type || 'video/mp4'}
+                        className="w-full h-full object-cover"
+                      />
                     ) : (
                       <img
                         src={`${BASE_URL}${itemUrl}`}
@@ -411,20 +400,12 @@ const CreatorProfile = () => {
                       onClick={() => !isVideo && setSelectedImage(itemUrl)}
                     >
                       {isVideo ? (
-                        <>
-                          <video
-                            autoPlay
-                            muted
-                            loop
-                            playsInline
-                            className="w-full h-full object-cover"
-                          >
-                            <source src={`${BASE_URL}${itemUrl}`} type={item.mime_type || 'video/mp4'} />
-                          </video>
-                          <div className="absolute top-3 left-3 bg-black/60 text-white px-2 py-1 rounded-lg text-xs">
-                            Video
-                          </div>
-                        </>
+                        <GalleryVideo
+                          src={`${BASE_URL}${itemUrl}`}
+                          type={item.mime_type || 'video/mp4'}
+                          className="w-full h-full object-cover"
+                          badgeClassName="absolute top-3 left-3 bg-black/60 text-white px-2 py-1 rounded-lg text-xs flex items-center gap-1"
+                        />
                       ) : (
                         <img
                           src={`${BASE_URL}${itemUrl}`}
@@ -1157,23 +1138,13 @@ const CreatorProfile = () => {
                     onClick={() => !isVideo && setSelectedImage(itemUrl)}
                   >
                     {isVideo ? (
-                      <>
-                        <video
-                          src={`${BASE_URL}${itemUrl}`}
-                          className="w-full h-full object-cover"
-                          autoPlay
-                          muted
-                          loop
-                          playsInline
-                        />
-                        {/* Video Badge */}
-                        <div className="absolute top-2 left-2 bg-black/70 text-white px-2 py-1 rounded text-xs flex items-center gap-1">
-                          <svg className="w-3 h-3" fill="currentColor" viewBox="0 0 20 20">
-                            <path d="M2 6a2 2 0 012-2h6a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V6zM14.553 7.106A1 1 0 0014 8v4a1 1 0 00.553.894l2 1A1 1 0 0018 13V7a1 1 0 00-1.447-.894l-2 1z" />
-                          </svg>
-                          Video
-                        </div>
-                      </>
+                      <GalleryVideo
+                        src={`${BASE_URL}${itemUrl}`}
+                        type={item.mime_type || 'video/mp4'}
+                        className="w-full h-full object-cover"
+                        badgeClassName="absolute top-2 left-2 bg-black/70 text-white px-2 py-1 rounded text-xs flex items-center gap-1"
+                        soundButtonClassName="absolute bottom-2 right-2 w-9 h-9 rounded-full bg-black/70 text-white flex items-center justify-center hover:bg-black/85 transition-colors"
+                      />
                     ) : (
                       <img
                         src={`${BASE_URL}${itemUrl}`}
