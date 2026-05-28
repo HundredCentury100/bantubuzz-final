@@ -230,6 +230,10 @@ function App() {
         }
       />
       <Route
+        path="/creator/profile"
+        element={<Navigate to="/creator/profile/edit" replace />}
+      />
+      <Route
         path="/creator/profile/edit"
         element={
           <ProtectedRoute requiredType="creator">
@@ -410,6 +414,10 @@ function App() {
             <BrandDashboard />
           </ProtectedRoute>
         }
+      />
+      <Route
+        path="/brand/profile"
+        element={<Navigate to="/brand/profile/edit" replace />}
       />
       <Route
         path="/brand/profile/edit"
