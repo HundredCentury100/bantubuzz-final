@@ -3,6 +3,7 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 from datetime import datetime
 from app import db
 from app.models import PortfolioItem, CreatorProfile, User
+from app.utils.file_upload import save_and_compress_image
 
 bp = Blueprint('portfolio', __name__)
 
@@ -95,6 +96,45 @@ def create_portfolio_item():
     except Exception as e:
         db.session.rollback()
         print(f"Error creating portfolio item: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@bp.route('/creator/portfolio/upload-image', methods=['POST'])
+@jwt_required()
+def upload_portfolio_image():
+    """Upload an image for a success story without adding it to the profile gallery"""
+    try:
+        user_id = int(get_jwt_identity())
+        creator = CreatorProfile.query.filter_by(user_id=user_id).first()
+
+        if not creator:
+            return jsonify({'error': 'Creator profile not found'}), 404
+
+        if 'file' not in request.files:
+            return jsonify({'error': 'No file provided'}), 400
+
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({'error': 'No file selected'}), 400
+
+        try:
+            image_data = save_and_compress_image(file, folder='profiles/creators/portfolio')
+        except ValueError as e:
+            return jsonify({'error': str(e)}), 400
+
+        return jsonify({
+            'success': True,
+            'message': 'Success story image uploaded successfully',
+            'file_path': image_data['medium'],
+            'image_sizes': {
+                'thumbnail': image_data['thumbnail'],
+                'medium': image_data['medium'],
+                'large': image_data['large']
+            }
+        }), 200
+
+    except Exception as e:
+        print(f"Error uploading portfolio image: {e}")
         return jsonify({'error': str(e)}), 500
 
 

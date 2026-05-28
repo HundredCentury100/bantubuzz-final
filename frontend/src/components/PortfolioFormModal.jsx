@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { portfolioAPI } from '../services/portfolioAPI';
+import { BASE_URL } from '../services/api';
 import toast from 'react-hot-toast';
 
 const COLLABORATION_TYPES = [
@@ -44,6 +45,11 @@ const PortfolioFormModal = ({ item = null, collaborationData = null, onClose, on
   const [saving, setSaving] = useState(false);
   const [mediaFiles, setMediaFiles] = useState([]);
   const [isFromCollaboration, setIsFromCollaboration] = useState(false);
+
+  const getMediaUrl = (url) => {
+    if (!url) return '';
+    return url.startsWith('http') ? url : `${BASE_URL}${url}`;
+  };
 
   useEffect(() => {
     if (item) {
@@ -136,6 +142,7 @@ const PortfolioFormModal = ({ item = null, collaborationData = null, onClose, on
       toast.error('Failed to upload image');
     } finally {
       setUploading(false);
+      e.target.value = '';
     }
   };
 
@@ -169,6 +176,7 @@ const PortfolioFormModal = ({ item = null, collaborationData = null, onClose, on
       toast.error('Failed to upload media files');
     } finally {
       setUploading(false);
+      e.target.value = '';
     }
   };
 
@@ -374,7 +382,9 @@ const PortfolioFormModal = ({ item = null, collaborationData = null, onClose, on
                   />
                   <label
                     htmlFor="featured-image-upload"
-                    className="px-4 py-2 bg-primary text-white rounded-lg cursor-pointer hover:bg-primary-dark transition-colors disabled:opacity-50"
+                    className={`px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors ${
+                      uploading ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'
+                    }`}
                   >
                     {uploading ? 'Uploading...' : 'Upload Image'}
                   </label>
@@ -382,6 +392,11 @@ const PortfolioFormModal = ({ item = null, collaborationData = null, onClose, on
                     <span className="text-sm text-green-600">✓ Image uploaded</span>
                   )}
                 </div>
+                {formData.image_url && (
+                  <div className="mt-3 h-32 w-48 overflow-hidden rounded-lg bg-gray-100">
+                    <img src={getMediaUrl(formData.image_url)} alt="Featured success story" className="h-full w-full object-cover" />
+                  </div>
+                )}
               </div>
 
               <div>
@@ -415,7 +430,7 @@ const PortfolioFormModal = ({ item = null, collaborationData = null, onClose, on
                     {formData.media_urls.map((url, index) => (
                       <div key={index} className="relative">
                         <div className="w-20 h-20 bg-gray-100 rounded-lg overflow-hidden">
-                          <img src={url} alt={`Media ${index + 1}`} className="w-full h-full object-cover" />
+                          <img src={getMediaUrl(url)} alt={`Media ${index + 1}`} className="w-full h-full object-cover" />
                         </div>
                         <button
                           type="button"

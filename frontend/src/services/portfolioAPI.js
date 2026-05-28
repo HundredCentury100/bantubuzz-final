@@ -52,7 +52,7 @@ export const portfolioAPI = {
   },
 
   /**
-   * Upload portfolio image using existing gallery endpoint
+   * Upload portfolio image for a success story featured/additional media slot
    * @param {File} file - Image file
    * @returns {Promise} Upload response with image URL
    */
@@ -60,23 +60,11 @@ export const portfolioAPI = {
     const formData = new FormData();
     formData.append('file', file);
 
-    // Use the existing gallery upload endpoint
-    const response = await api.post('/creator/profile/gallery', formData, {
+    const response = await api.post('/creator/portfolio/upload-image', formData, {
       headers: {
         'Content-Type': 'multipart/form-data'
       }
     });
-
-    // Transform response to match expected format
-    // Gallery endpoint returns gallery_item with medium/large/thumbnail
-    if (response.data.gallery_item) {
-      return {
-        data: {
-          success: true,
-          file_path: response.data.gallery_item.medium // Use medium size for portfolio
-        }
-      };
-    }
 
     return response;
   },

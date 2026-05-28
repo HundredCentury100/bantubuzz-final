@@ -108,12 +108,6 @@ const CreatorProfileEdit = () => {
       setValue('availability_status', data.availability_status || 'available');
       setValue('success_stories', data.success_stories || '');
 
-      // Social links
-      setValue('instagram', data.social_links?.instagram || '');
-      setValue('tiktok', data.social_links?.tiktok || '');
-      setValue('youtube', data.social_links?.youtube || '');
-      setValue('twitter', data.social_links?.twitter || '');
-
       // Revision settings
       setValue('free_revisions', data.free_revisions !== undefined ? data.free_revisions : 2);
       setValue('revision_fee', data.revision_fee || 0);
@@ -364,14 +358,6 @@ const CreatorProfileEdit = () => {
         return;
       }
 
-      // Build social links object
-      const socialLinks = {
-        instagram: data.instagram || '',
-        tiktok: data.tiktok || '',
-        youtube: data.youtube || '',
-        twitter: data.twitter || ''
-      };
-
       // Build update payload
       const payload = {
         username: data.username || null,
@@ -384,7 +370,6 @@ const CreatorProfileEdit = () => {
         languages: data.languages || [],
         platforms: data.platforms || [],
         availability_status: data.availability_status,
-        social_links: socialLinks,
         success_stories: data.success_stories,
         free_revisions: parseInt(data.free_revisions) >= 0 ? parseInt(data.free_revisions) : 2,
         revision_fee: parseFloat(data.revision_fee) || 0
@@ -868,142 +853,33 @@ const CreatorProfileEdit = () => {
               </div>
             </div>
 
-            {/* Social Links */}
+            {/* Connected Platforms */}
             <div className="card">
-              <h2 className="text-xl font-bold text-dark mb-4">Social Media Links</h2>
-
-              <div className="space-y-4">
-                {/* Instagram */}
+              <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                 <div>
-                  <label className="block text-sm font-medium text-dark mb-2">
-                    Instagram
-                  </label>
-                  <div className="flex">
-                    <span className="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-gray-300 bg-gray-50 text-gray-500 text-sm">
-                      @
-                    </span>
-                    <input
-                      type="text"
-                      className="input rounded-l-none"
-                      placeholder="username"
-                      {...register('instagram')}
-                    />
-                  </div>
+                  <h2 className="text-xl font-bold text-dark mb-2">Connect Platforms</h2>
+                  <p className="text-sm text-gray-600">
+                    Connect Instagram, TikTok, YouTube and Facebook directly to BantuBuzz so brands see verified follower counts, engagement and audience analytics.
+                  </p>
                 </div>
-
-                {/* TikTok */}
-                <div>
-                  <label className="block text-sm font-medium text-dark mb-2">
-                    TikTok
-                  </label>
-                  <div className="flex">
-                    <span className="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-gray-300 bg-gray-50 text-gray-500 text-sm">
-                      @
-                    </span>
-                    <input
-                      type="text"
-                      className="input rounded-l-none"
-                      placeholder="username"
-                      {...register('tiktok')}
-                    />
-                  </div>
-                </div>
-
-                {/* YouTube */}
-                <div>
-                  <label className="block text-sm font-medium text-dark mb-2">
-                    YouTube
-                  </label>
-                  <input
-                    type="text"
-                    className="input"
-                    placeholder="Channel URL"
-                    {...register('youtube')}
-                  />
-                </div>
-
-                {/* Twitter */}
-                <div>
-                  <label className="block text-sm font-medium text-dark mb-2">
-                    Twitter/X
-                  </label>
-                  <div className="flex">
-                    <span className="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-gray-300 bg-gray-50 text-gray-500 text-sm">
-                      @
-                    </span>
-                    <input
-                      type="text"
-                      className="input rounded-l-none"
-                      placeholder="username"
-                      {...register('twitter')}
-                    />
-                  </div>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => navigate('/creator/platforms')}
+                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2 font-medium text-dark transition-colors hover:bg-primary-dark"
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+                  </svg>
+                  Connect Platforms
+                </button>
               </div>
 
-              {/* Connect Platforms Button */}
-              <div className="mt-6 p-4 bg-primary-light border border-primary/30 rounded-lg">
-                <div className="flex items-start gap-3">
-                  <svg className="w-6 h-6 text-primary-dark mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                  </svg>
-                  <div className="flex-1">
-                    <h3 className="text-sm font-semibold text-dark mb-1">Get Real-Time Analytics</h3>
-                    <p className="text-sm text-dark-light mb-3">
-                      Connect your social media platforms to automatically sync your follower counts, engagement rates, and audience demographics. This helps brands see your actual performance metrics!
-                    </p>
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        // Auto-save before navigating
-                        const formData = watch();
-                        if (formData.bio && formData.categories?.length > 0 && formData.platforms?.length > 0) {
-                          toast.info('Saving your changes...');
-                          await handleSubmit(async (data) => {
-                            try {
-                              const socialLinks = {
-                                instagram: data.instagram || '',
-                                tiktok: data.tiktok || '',
-                                youtube: data.youtube || '',
-                                twitter: data.twitter || ''
-                              };
-
-                              const payload = {
-                                username: data.username || null,
-                                bio: data.bio,
-                                location: data.location,
-                                city: data.city === 'Other' ? data.custom_city : data.city,
-                                country: data.country,
-                                portfolio_url: data.portfolio_url,
-                                categories: data.categories || [],
-                                languages: data.languages || [],
-                                platforms: data.platforms || [],
-                                availability_status: data.availability_status,
-                                social_links: socialLinks,
-                                success_stories: data.success_stories,
-                                free_revisions: parseInt(data.free_revisions) >= 0 ? parseInt(data.free_revisions) : 2,
-                                revision_fee: parseFloat(data.revision_fee) || 0
-                              };
-
-                              await creatorsAPI.updateProfile(payload);
-                              toast.success('Profile saved!');
-                            } catch (err) {
-                              console.error('Auto-save error:', err);
-                            }
-                          })();
-                        }
-                        // Navigate to platforms page
-                        navigate('/creator/platforms');
-                      }}
-                      className="inline-flex items-center gap-2 px-4 py-2 bg-primary hover:bg-primary-dark text-dark font-medium rounded-lg transition-colors"
-                    >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                      </svg>
-                      Connect Platforms
-                    </button>
+              <div className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-4">
+                {['Instagram', 'TikTok', 'YouTube', 'Facebook'].map((platform) => (
+                  <div key={platform} className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-center text-sm font-medium text-gray-700">
+                    {platform}
                   </div>
-                </div>
+                ))}
               </div>
             </div>
 
@@ -1187,12 +1063,6 @@ const CreatorProfileEdit = () => {
             languages: watch('languages') || profile?.languages || [],
             platforms: watch('platforms') || profile?.platforms || [],
             availability_status: watch('availability_status') || profile?.availability_status,
-            social_links: {
-              instagram: watch('instagram') || profile?.social_links?.instagram,
-              tiktok: watch('tiktok') || profile?.social_links?.tiktok,
-              youtube: watch('youtube') || profile?.social_links?.youtube,
-              twitter: watch('twitter') || profile?.social_links?.twitter
-            },
             is_verified: profile?.is_verified || false
           }}
           onClose={() => setShowPreviewModal(false)}

@@ -111,13 +111,23 @@ const PortfolioCard = ({ item, onClick, showActions = false, onEdit, onDelete })
         {showActions ? (
           <div className="flex gap-2">
             <button
-              onClick={() => onEdit(item)}
+              type="button"
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                onEdit(item);
+              }}
               className="flex-1 py-2 px-4 bg-primary hover:bg-primary-dark text-dark rounded-full font-medium transition-colors text-sm"
             >
               Edit
             </button>
             <button
-              onClick={() => onDelete(item)}
+              type="button"
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                onDelete(item);
+              }}
               className="py-2 px-4 bg-red-100 hover:bg-red-200 text-red-600 rounded-full font-medium transition-colors text-sm"
             >
               Delete
