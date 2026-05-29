@@ -211,7 +211,7 @@ const Messages = () => {
     setBlockStatus(null);
   };
 
-  const handleSendMessage = (e) => {
+  const handleSendMessage = async (e) => {
     e.preventDefault();
 
     if (!messageText.trim() || !selectedConversation) {
@@ -231,7 +231,7 @@ const Messages = () => {
     }
 
     // Send message if no safety issues
-    const success = sendMessage(selectedConversation.id, messageText.trim());
+    const success = await sendMessage(selectedConversation.id, messageText.trim());
 
     if (success) {
       setMessageText('');
@@ -239,9 +239,9 @@ const Messages = () => {
     }
   };
 
-  const handleSendAnywayAfterWarning = () => {
+  const handleSendAnywayAfterWarning = async () => {
     // User chose to send message despite warning
-    const success = sendMessage(selectedConversation.id, safetyWarningData.message);
+    const success = await sendMessage(selectedConversation.id, safetyWarningData.message);
 
     if (success) {
       setMessageText('');
@@ -755,7 +755,7 @@ const Messages = () => {
                       }}
                       className="flex-shrink-0 p-2.5 text-primary hover:bg-primary/10 rounded-full transition-all group relative"
                       title={user?.user_type === 'brand' ? 'Request Custom Package' : 'Send Custom Offer'}
-                      disabled={!isConnected}
+                      disabled={false}
                     >
                       {/* Package Icon */}
                       <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -775,7 +775,7 @@ const Messages = () => {
                         onChange={handleTyping}
                         placeholder="Type a message..."
                         className="w-full px-4 py-3 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-primary text-base"
-                        disabled={!isConnected}
+                        disabled={false}
                         inputMode="text"
                         autoComplete="off"
                         autoCorrect="on"
@@ -785,7 +785,7 @@ const Messages = () => {
                     </div>
                     <button
                       type="submit"
-                      disabled={!messageText.trim() || !isConnected}
+                      disabled={!messageText.trim()}
                       className="bg-primary hover:bg-primary-dark text-white rounded-full disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center flex-shrink-0 w-12 h-12 min-w-[48px] min-h-[48px] shadow-lg active:scale-95"
                       title="Send message"
                       aria-label="Send message"

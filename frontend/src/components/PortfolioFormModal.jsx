@@ -43,6 +43,7 @@ const PortfolioFormModal = ({ item = null, collaborationData = null, onClose, on
 
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [syncingStats, setSyncingStats] = useState(false);
   const [mediaFiles, setMediaFiles] = useState([]);
   const [isFromCollaboration, setIsFromCollaboration] = useState(false);
 
@@ -185,6 +186,41 @@ const PortfolioFormModal = ({ item = null, collaborationData = null, onClose, on
       ...prev,
       media_urls: prev.media_urls.filter((_, i) => i !== index)
     }));
+  };
+
+  const handleSyncStats = async () => {
+    if (!formData.post_url?.trim()) {
+      toast.error('Paste a post URL first');
+      return;
+    }
+
+    try {
+      setSyncingStats(true);
+      const response = await portfolioAPI.syncPostUrlMetrics(formData.post_url.trim());
+      const metrics = response.data.metrics || {};
+
+      setFormData(prev => ({
+        ...prev,
+        platform: metrics.platform || prev.platform,
+        post_url: metrics.post_url || prev.post_url,
+        views: metrics.views ?? prev.views,
+        likes: metrics.likes ?? prev.likes,
+        comments: metrics.comments ?? prev.comments,
+        shares: metrics.shares ?? prev.shares,
+        reach: metrics.reach ?? prev.reach,
+        engagement_rate: metrics.engagement_rate !== null && metrics.engagement_rate !== undefined
+          ? (Number(metrics.engagement_rate) * 100).toFixed(2)
+          : prev.engagement_rate,
+        result_description: metrics.result_description || prev.result_description
+      }));
+
+      toast.success('Stats fetched from ThunziAI');
+    } catch (error) {
+      console.error('Error fetching Thunzi stats:', error);
+      toast.error(error.response?.data?.error || 'Unable to fetch stats from ThunziAI');
+    } finally {
+      setSyncingStats(false);
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -449,102 +485,52 @@ const PortfolioFormModal = ({ item = null, collaborationData = null, onClose, on
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Post URL</label>
-                <input
-                  type="url"
-                  name="post_url"
-                  value={formData.post_url}
-                  onChange={handleChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                  placeholder="https://..."
-                />
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  <input
+                    type="url"
+                    name="post_url"
+                    value={formData.post_url}
+                    onChange={handleChange}
+                    onBlur={() => {
+                      if (formData.post_url?.trim() && !formData.views && !formData.likes && !formData.reach) {
+                        handleSyncStats();
+                      }
+                    }}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                    placeholder="https://..."
+                  />
+                  <button
+                    type="button"
+                    onClick={handleSyncStats}
+                    disabled={syncingStats || !formData.post_url?.trim()}
+                    className="whitespace-nowrap rounded-lg bg-primary px-4 py-2 font-medium text-dark transition-colors hover:bg-primary-dark disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {syncingStats ? 'Fetching...' : 'Fetch Stats'}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
 
           {/* Performance Metrics */}
           <div className="mb-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Performance Metrics</h3>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Performance Metrics</h3>
+            <p className="text-sm text-gray-500 mb-4">Stats are pulled from ThunziAI after you paste a post URL.</p>
 
-            <div className="grid md:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Views</label>
-                <input
-                  type="number"
-                  name="views"
-                  value={formData.views}
-                  onChange={handleChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                  placeholder="0"
-                  min="0"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Likes</label>
-                <input
-                  type="number"
-                  name="likes"
-                  value={formData.likes}
-                  onChange={handleChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                  placeholder="0"
-                  min="0"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Comments</label>
-                <input
-                  type="number"
-                  name="comments"
-                  value={formData.comments}
-                  onChange={handleChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                  placeholder="0"
-                  min="0"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Shares</label>
-                <input
-                  type="number"
-                  name="shares"
-                  value={formData.shares}
-                  onChange={handleChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                  placeholder="0"
-                  min="0"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Engagement Rate (%)</label>
-                <input
-                  type="number"
-                  name="engagement_rate"
-                  value={formData.engagement_rate}
-                  onChange={handleChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                  placeholder="0.00"
-                  min="0"
-                  max="100"
-                  step="0.01"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Reach</label>
-                <input
-                  type="number"
-                  name="reach"
-                  value={formData.reach}
-                  onChange={handleChange}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                  placeholder="0"
-                  min="0"
-                />
-              </div>
+            <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
+              {[
+                ['Views', formData.views],
+                ['Likes', formData.likes],
+                ['Comments', formData.comments],
+                ['Shares', formData.shares],
+                ['Reach', formData.reach],
+                ['Engagement Rate', formData.engagement_rate ? `${formData.engagement_rate}%` : 'Not available']
+              ].map(([label, value]) => (
+                <div key={label} className="rounded-lg border border-gray-200 bg-gray-50 px-4 py-3">
+                  <div className="text-xs font-medium uppercase tracking-wide text-gray-500">{label}</div>
+                  <div className="mt-1 text-lg font-bold text-gray-900">{value || 'Not available'}</div>
+                </div>
+              ))}
             </div>
           </div>
 
@@ -554,14 +540,14 @@ const PortfolioFormModal = ({ item = null, collaborationData = null, onClose, on
 
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Result Description</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Key Result</label>
                 <textarea
                   name="result_description"
                   value={formData.result_description}
                   onChange={handleChange}
                   rows={3}
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                  placeholder="Describe the campaign results and impact..."
+                  placeholder="The headline result brands should notice first..."
                 />
               </div>
 

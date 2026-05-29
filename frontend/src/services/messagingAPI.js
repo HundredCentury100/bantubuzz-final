@@ -109,6 +109,14 @@ export const messagingService = {
   getConversation: (userId, params = {}) =>
     messagingAPI.get(`/conversations/${userId}`, { params }),
 
+  // Send message through Flask fallback API when Socket.IO is unavailable
+  sendMessage: (receiverId, content, bookingId = null) =>
+    mainAPI.post('/messages/', {
+      receiver_id: receiverId,
+      content,
+      booking_id: bookingId
+    }),
+
   // Mark messages as read
   markAsRead: (messageIds) =>
     messagingAPI.post('/messages/read', { messageIds }),

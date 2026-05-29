@@ -2,10 +2,86 @@ from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from datetime import datetime
 from app import db
-from app.models import PortfolioItem, CreatorProfile, User
+from app.models import PortfolioItem, CreatorProfile, User, ThunziAccount
+from app.services.thunzi_service import thunzi_service
 from app.utils.file_upload import save_and_compress_image
 
 bp = Blueprint('portfolio', __name__)
+
+
+def _normalize_engagement_rate(value):
+    if value is None:
+        return None
+    try:
+        rate = float(value)
+    except (TypeError, ValueError):
+        return None
+    return rate / 100 if rate > 1 else rate
+
+
+def _build_key_result(metrics):
+    if metrics.get('reach'):
+        return f"{metrics['reach']:,} reach"
+    if metrics.get('views'):
+        return f"{metrics['views']:,} views"
+    if metrics.get('likes'):
+        return f"{metrics['likes']:,} likes"
+    if metrics.get('comments'):
+        return f"{metrics['comments']:,} comments"
+    return None
+
+
+def _fetch_thunzi_metrics_for_url(creator, post_url):
+    if not post_url:
+        return None, 'Post URL is required'
+
+    thunzi_account = ThunziAccount.query.filter_by(user_id=creator.user_id).first()
+    if not thunzi_account or not thunzi_account.thunzi_company_id or not thunzi_account.thunzi_email:
+        return None, 'Connect your platforms before fetching post stats'
+
+    login_success = thunzi_service.login(
+        email=thunzi_account.thunzi_email,
+        password=thunzi_account.thunzi_email
+    )
+    if not login_success:
+        return None, 'Unable to authenticate with ThunziAI'
+
+    post = thunzi_service.find_post_by_url(post_url, thunzi_account.thunzi_company_id)
+    if not post:
+        return None, 'Post not found in ThunziAI. Sync your connected platform and try again.'
+
+    original_post_id = post.get('originalId') or post.get('originalPostId') or post.get('id')
+    insights = thunzi_service.get_post_insights_by_original_id(original_post_id) if original_post_id else None
+    post_data = (insights or {}).get('post') or post
+
+    views = post_data.get('videoViews')
+    if views is None:
+        views = post_data.get('views') or post_data.get('averageViews') or post_data.get('totalViews')
+
+    metrics = {
+        'platform': post_data.get('platform') or post.get('platform'),
+        'views': views,
+        'likes': post_data.get('likes'),
+        'comments': post_data.get('comments'),
+        'shares': post_data.get('shares'),
+        'reach': post_data.get('reach'),
+        'engagement_rate': _normalize_engagement_rate(post_data.get('engagementRate')),
+        'post_url': post_data.get('postUrl') or post.get('postUrl') or post_url,
+        'result_description': None
+    }
+    metrics['result_description'] = _build_key_result(metrics)
+
+    return metrics, None
+
+
+def _apply_thunzi_metrics(portfolio_item, metrics):
+    if not metrics:
+        return
+    for field in ['platform', 'post_url', 'views', 'likes', 'comments', 'shares', 'reach', 'engagement_rate']:
+        if metrics.get(field) is not None:
+            setattr(portfolio_item, field, metrics[field])
+    if metrics.get('result_description') and not portfolio_item.result_description:
+        portfolio_item.result_description = metrics['result_description']
 
 
 @bp.route('/creator/portfolio', methods=['GET'])
@@ -58,6 +134,12 @@ def create_portfolio_item():
             except (ValueError, AttributeError):
                 project_date = None
 
+        metrics = None
+        if data.get('post_url'):
+            metrics, metrics_error = _fetch_thunzi_metrics_for_url(creator, data.get('post_url'))
+            if metrics_error:
+                return jsonify({'error': metrics_error}), 400
+
         # Create portfolio item
         portfolio_item = PortfolioItem(
             creator_profile_id=creator.id,
@@ -70,12 +152,12 @@ def create_portfolio_item():
             image_url=data.get('image_url'),
             media_urls=data.get('media_urls', []),
             post_url=data.get('post_url'),
-            views=data.get('views'),
-            likes=data.get('likes'),
-            comments=data.get('comments'),
-            shares=data.get('shares'),
-            engagement_rate=data.get('engagement_rate'),
-            reach=data.get('reach'),
+            views=None,
+            likes=None,
+            comments=None,
+            shares=None,
+            engagement_rate=None,
+            reach=None,
             result_description=data.get('result_description'),
             client_testimonial=data.get('client_testimonial'),
             project_date=project_date,
@@ -83,6 +165,7 @@ def create_portfolio_item():
             display_order=data.get('display_order', 0),
             is_visible=data.get('is_visible', True)
         )
+        _apply_thunzi_metrics(portfolio_item, metrics)
 
         db.session.add(portfolio_item)
         db.session.commit()
@@ -96,6 +179,33 @@ def create_portfolio_item():
     except Exception as e:
         db.session.rollback()
         print(f"Error creating portfolio item: {e}")
+        return jsonify({'error': str(e)}), 500
+
+
+@bp.route('/creator/portfolio/sync-url', methods=['POST'])
+@jwt_required()
+def sync_portfolio_url_metrics():
+    """Fetch ThunziAI metrics for a pasted success story post URL"""
+    try:
+        user_id = int(get_jwt_identity())
+        creator = CreatorProfile.query.filter_by(user_id=user_id).first()
+
+        if not creator:
+            return jsonify({'error': 'Creator profile not found'}), 404
+
+        data = request.get_json() or {}
+        metrics, error = _fetch_thunzi_metrics_for_url(creator, data.get('post_url'))
+        if error:
+            return jsonify({'success': False, 'error': error}), 400
+
+        return jsonify({
+            'success': True,
+            'message': 'Post stats fetched from ThunziAI',
+            'metrics': metrics
+        }), 200
+
+    except Exception as e:
+        print(f"Error syncing portfolio URL metrics: {e}")
         return jsonify({'error': str(e)}), 500
 
 
@@ -178,18 +288,6 @@ def update_portfolio_item(item_id):
             portfolio_item.media_urls = data['media_urls']
         if 'post_url' in data:
             portfolio_item.post_url = data['post_url']
-        if 'views' in data:
-            portfolio_item.views = data['views']
-        if 'likes' in data:
-            portfolio_item.likes = data['likes']
-        if 'comments' in data:
-            portfolio_item.comments = data['comments']
-        if 'shares' in data:
-            portfolio_item.shares = data['shares']
-        if 'engagement_rate' in data:
-            portfolio_item.engagement_rate = data['engagement_rate']
-        if 'reach' in data:
-            portfolio_item.reach = data['reach']
         if 'result_description' in data:
             portfolio_item.result_description = data['result_description']
         if 'client_testimonial' in data:
@@ -208,6 +306,12 @@ def update_portfolio_item(item_id):
             portfolio_item.display_order = data['display_order']
         if 'is_visible' in data:
             portfolio_item.is_visible = data['is_visible']
+
+        if data.get('post_url'):
+            metrics, metrics_error = _fetch_thunzi_metrics_for_url(creator, data.get('post_url'))
+            if metrics_error:
+                return jsonify({'error': metrics_error}), 400
+            _apply_thunzi_metrics(portfolio_item, metrics)
 
         db.session.commit()
 
@@ -303,6 +407,12 @@ def create_portfolio_from_collaboration(collaboration_id):
 
         data = request.get_json() or {}
 
+        metrics = None
+        if data.get('post_url'):
+            metrics, metrics_error = _fetch_thunzi_metrics_for_url(creator, data.get('post_url'))
+            if metrics_error:
+                return jsonify({'error': metrics_error}), 400
+
         # Create portfolio item with pre-populated data from collaboration
         portfolio_item = PortfolioItem(
             creator_profile_id=creator.id,
@@ -315,12 +425,12 @@ def create_portfolio_from_collaboration(collaboration_id):
             image_url=data.get('image_url'),
             media_urls=data.get('media_urls', []),
             post_url=data.get('post_url'),
-            views=data.get('views'),
-            likes=data.get('likes'),
-            comments=data.get('comments'),
-            shares=data.get('shares'),
-            engagement_rate=data.get('engagement_rate'),
-            reach=data.get('reach'),
+            views=None,
+            likes=None,
+            comments=None,
+            shares=None,
+            engagement_rate=None,
+            reach=None,
             result_description=data.get('result_description'),
             client_testimonial=data.get('client_testimonial'),
             project_date=collaboration.actual_completion_date or datetime.utcnow().date(),
@@ -328,6 +438,7 @@ def create_portfolio_from_collaboration(collaboration_id):
             display_order=data.get('display_order', 0),
             is_visible=data.get('is_visible', True)
         )
+        _apply_thunzi_metrics(portfolio_item, metrics)
 
         db.session.add(portfolio_item)
         db.session.commit()

@@ -57,6 +57,12 @@ def send_message():
         db.session.add(message)
         db.session.commit()
 
+        try:
+            from app.utils.websocket_helper import emit_message_to_websocket
+            emit_message_to_websocket(message, db.session)
+        except Exception as websocket_error:
+            print(f"Failed to broadcast message via websocket helper: {str(websocket_error)}")
+
         # Send email notification to recipient asynchronously
         import logging
         logger = logging.getLogger(__name__)

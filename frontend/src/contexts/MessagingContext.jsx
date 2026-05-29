@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { io } from 'socket.io-client';
 import toast from 'react-hot-toast';
+import messagingService from '../services/messagingAPI';
 
 const MESSAGING_SOCKET_URL = import.meta.env.VITE_MESSAGING_SOCKET_URL || 'http://localhost:3001';
 
@@ -253,10 +254,24 @@ export const MessagingProvider = ({ children }) => {
   }, []);
 
   // Send a message
-  const sendMessage = useCallback((receiverId, content, bookingId = null) => {
+  const sendMessage = useCallback(async (receiverId, content, bookingId = null) => {
     if (!socketRef.current || !isConnected) {
-      toast.error('Unable to send message. Please check your connection.');
-      return false;
+      try {
+        const response = await messagingService.sendMessage(receiverId, content, bookingId);
+        const message = response.data.data;
+
+        setMessages(prev => ({
+          ...prev,
+          [receiverId]: [...(prev[receiverId] || []), message]
+        }));
+
+        window.dispatchEvent(new CustomEvent('message_sent', { detail: message }));
+        return true;
+      } catch (error) {
+        console.error('REST message fallback failed:', error);
+        toast.error(error.response?.data?.error || 'Unable to send message. Please check your connection.');
+        return false;
+      }
     }
 
     socketRef.current.emit('send_message', {

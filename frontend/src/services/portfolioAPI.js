@@ -43,6 +43,15 @@ export const portfolioAPI = {
   },
 
   /**
+   * Fetch success story post stats from ThunziAI using a pasted public URL
+   * @param {string} postUrl - Public social post URL
+   * @returns {Promise} Thunzi metrics response
+   */
+  syncPostUrlMetrics: (postUrl) => {
+    return api.post('/creator/portfolio/sync-url', { post_url: postUrl });
+  },
+
+  /**
    * Delete portfolio item
    * @param {number} itemId - Portfolio item ID
    * @returns {Promise} Delete confirmation

@@ -20,6 +20,12 @@ const PortfolioCard = ({ item, onClick, showActions = false, onEdit, onDelete })
   };
 
   const platformColor = platformColors[item.platform?.toLowerCase()] || { bg: 'bg-gray-100', text: 'text-gray-600' };
+  const keyResult = item.result_description || (
+    item.reach ? `${formatNumber(item.reach)} reach` :
+    item.views ? `${formatNumber(item.views)} views` :
+    item.likes ? `${formatNumber(item.likes)} likes` :
+    null
+  );
 
   return (
     <div className="bg-white rounded-2xl shadow-md hover:shadow-xl transition-all duration-300 overflow-hidden group">
@@ -56,12 +62,18 @@ const PortfolioCard = ({ item, onClick, showActions = false, onEdit, onDelete })
       )}
 
       <div className="p-5">
-        {/* Platform Badge */}
-        {item.platform && (
-          <div className="mb-3">
+        {(item.platform || keyResult) && (
+          <div className="mb-3 flex items-center justify-between gap-2">
+            {item.platform ? (
             <span className={`px-3 py-1 rounded-full text-xs font-semibold ${platformColor.bg} ${platformColor.text} capitalize`}>
               {item.platform}
             </span>
+            ) : <span />}
+            {keyResult && (
+              <span className="max-w-[55%] truncate rounded-full bg-primary px-3 py-1 text-xs font-bold text-dark shadow-sm" title={keyResult}>
+                {keyResult}
+              </span>
+            )}
           </div>
         )}
 
