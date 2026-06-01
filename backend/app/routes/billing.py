@@ -37,15 +37,25 @@ def _creator_name(creator):
     return getattr(creator, 'display_name', None) or getattr(creator, 'username', None) or 'Creator'
 
 
-def _booking_invoice(booking, viewer_type):
-    title = 'Package collaboration'
-    if booking.package:
-        title = booking.package.title
-    elif booking.brief:
-        title = booking.brief.title
-    elif booking.campaign:
-        title = booking.campaign.title
+def _booking_title(booking):
+    package = getattr(booking, 'package', None)
+    brief = getattr(booking, 'brief', None)
+    campaign = getattr(booking, 'campaign', None)
 
+    if package:
+        return package.title
+    if brief:
+        return brief.title
+    if campaign:
+        return campaign.title
+    if getattr(booking, 'campaign_id', None):
+        return 'Campaign collaboration'
+    if getattr(booking, 'brief_id', None):
+        return 'Brief collaboration'
+    return 'Package collaboration'
+
+
+def _booking_invoice(booking, viewer_type):
     is_paid = booking.payment_status in ['paid', 'verified']
     source_type = 'collaboration'
     if booking.campaign_id or booking.booking_type in ['campaign_application', 'campaign_package']:
@@ -56,8 +66,8 @@ def _booking_invoice(booking, viewer_type):
         'invoice_number': _invoice_number('INV-BKG', booking.id),
         'source_type': source_type,
         'source_id': booking.id,
-        'title': title,
-        'description': f'{_brand_name(booking.brand)} and {_creator_name(booking.creator)}',
+        'title': _booking_title(booking),
+        'description': f'{_brand_name(getattr(booking, "brand", None))} and {_creator_name(getattr(booking, "creator", None))}',
         'amount': _money(booking.total_price or booking.amount),
         'currency': 'USD',
         'status': 'paid' if is_paid else 'upcoming',
@@ -94,8 +104,9 @@ def _campaign_payment_invoice(payment):
 
 def _subscription_invoice(subscription):
     plan_name = subscription.plan.name if subscription.plan else 'Subscription'
-    price = subscription.plan.price_monthly if subscription.plan and subscription.billing_cycle == 'monthly' else None
-    if subscription.plan and subscription.billing_cycle == 'yearly':
+    billing_cycle = subscription.billing_cycle or 'monthly'
+    price = subscription.plan.price_monthly if subscription.plan and billing_cycle == 'monthly' else None
+    if subscription.plan and billing_cycle == 'yearly':
         price = subscription.plan.price_yearly
 
     return {
@@ -104,7 +115,7 @@ def _subscription_invoice(subscription):
         'source_type': 'subscription',
         'source_id': subscription.id,
         'title': plan_name,
-        'description': f'{subscription.billing_cycle.title()} subscription',
+        'description': f'{billing_cycle.title()} subscription',
         'amount': _money(price or subscription.last_payment_amount),
         'currency': 'USD',
         'status': 'upcoming',
