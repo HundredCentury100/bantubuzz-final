@@ -77,12 +77,12 @@ const PortfolioGrid = ({ creatorId, showActions = false, onEdit, onDelete, onRef
           />
         </svg>
         <h3 className="text-lg font-semibold text-gray-900 mb-2">
-          {showActions ? 'No Portfolio Items Yet' : 'No Portfolio Available'}
+          {showActions ? 'No Success Stories Yet' : 'No success stories yet'}
         </h3>
         <p className="text-gray-600 max-w-md mx-auto">
           {showActions
-            ? 'Start building your portfolio by adding your best collaborations and success stories.'
-            : 'This creator hasn\'t added any portfolio items yet.'}
+            ? 'Start building your profile by adding your best collaborations and success stories.'
+            : 'This creator hasn\'t added any success stories yet.'}
         </p>
       </div>
     );

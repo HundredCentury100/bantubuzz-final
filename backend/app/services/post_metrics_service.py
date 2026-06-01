@@ -144,13 +144,22 @@ class PostMetricsService:
                     'error': f'{deliverable.post_platform} not connected'
                 }
 
-            # Prefer ThunziAI's direct URL lookup when available.
-            # This is especially important for Facebook, where public URLs often expose
-            # alphanumeric IDs while Graph/Thunzi use numeric IDs internally.
-            matching_post = thunzi_service.find_post_by_url(
-                deliverable.url,
-                thunzi_account.thunzi_company_id
-            )
+            post_reference = (deliverable.url or '').strip()
+            looks_like_url = post_reference.startswith(('http://', 'https://')) or '.' in post_reference
+
+            # Prefer ThunziAI's direct URL lookup when available. Facebook can also
+            # be submitted as a numeric/original Post ID because public Facebook URLs
+            # often expose alphanumeric IDs while Graph/Thunzi use numeric IDs.
+            if looks_like_url:
+                matching_post = thunzi_service.find_post_by_url(
+                    post_reference,
+                    thunzi_account.thunzi_company_id
+                )
+            else:
+                matching_post = thunzi_service.get_post_by_original_id(post_reference)
+                if (matching_post and matching_post.get('companyId') and
+                    str(matching_post.get('companyId')) != str(thunzi_account.thunzi_company_id)):
+                    matching_post = None
             connected_platform = connected_platforms[0] if connected_platforms else None
 
             # Use ThunziAI creator posts API with date range as fallback.

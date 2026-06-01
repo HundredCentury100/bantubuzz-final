@@ -1,0 +1,268 @@
+from datetime import datetime
+from html import escape
+
+from flask import Blueprint, Response, jsonify
+from flask_jwt_extended import get_jwt_identity, jwt_required
+
+from app.models import (
+    Booking,
+    BrandProfile,
+    CampaignPayment,
+    CreatorProfile,
+    CreatorSubscription,
+    Subscription,
+    User,
+)
+
+bp = Blueprint('billing', __name__)
+
+
+def _money(value):
+    return float(value or 0)
+
+
+def _date(value):
+    return value.isoformat() if value else None
+
+
+def _invoice_number(prefix, source_id):
+    return f'{prefix}-{int(source_id):06d}'
+
+
+def _brand_name(brand):
+    return getattr(brand, 'company_name', None) or getattr(brand, 'business_name', None) or 'Brand'
+
+
+def _creator_name(creator):
+    return getattr(creator, 'display_name', None) or getattr(creator, 'username', None) or 'Creator'
+
+
+def _booking_invoice(booking, viewer_type):
+    title = 'Package collaboration'
+    if booking.package:
+        title = booking.package.title
+    elif booking.brief:
+        title = booking.brief.title
+    elif booking.campaign:
+        title = booking.campaign.title
+
+    is_paid = booking.payment_status in ['paid', 'verified']
+    source_type = 'collaboration'
+    if booking.campaign_id or booking.booking_type in ['campaign_application', 'campaign_package']:
+        source_type = 'campaign'
+
+    return {
+        'id': f'booking-{booking.id}',
+        'invoice_number': _invoice_number('INV-BKG', booking.id),
+        'source_type': source_type,
+        'source_id': booking.id,
+        'title': title,
+        'description': f'{_brand_name(booking.brand)} and {_creator_name(booking.creator)}',
+        'amount': _money(booking.total_price or booking.amount),
+        'currency': 'USD',
+        'status': 'paid' if is_paid else 'upcoming',
+        'payment_status': booking.payment_status,
+        'payment_method': booking.payment_method,
+        'issued_at': _date(booking.created_at),
+        'paid_at': _date(booking.completion_date if is_paid else None),
+        'due_at': _date(booking.created_at),
+        'direction': 'paid' if viewer_type == 'brand' else 'received',
+        'download_url': f'/api/billing/invoices/booking/{booking.id}/download',
+    }
+
+
+def _campaign_payment_invoice(payment):
+    return {
+        'id': f'campaign-payment-{payment.id}',
+        'invoice_number': _invoice_number('INV-CMP', payment.id),
+        'source_type': 'campaign',
+        'source_id': payment.id,
+        'title': payment.campaign.title if payment.campaign else 'Campaign payment',
+        'description': f'{payment.items.count()} campaign collaboration item(s)',
+        'amount': _money(payment.total_amount),
+        'currency': 'USD',
+        'status': 'paid' if payment.status == 'completed' else 'upcoming',
+        'payment_status': payment.status,
+        'payment_method': payment.payment_method,
+        'issued_at': _date(payment.initiated_at),
+        'paid_at': _date(payment.completed_at),
+        'due_at': _date(payment.initiated_at),
+        'direction': 'paid',
+        'download_url': f'/api/billing/invoices/campaign-payment/{payment.id}/download',
+    }
+
+
+def _subscription_invoice(subscription):
+    plan_name = subscription.plan.name if subscription.plan else 'Subscription'
+    price = subscription.plan.price_monthly if subscription.plan and subscription.billing_cycle == 'monthly' else None
+    if subscription.plan and subscription.billing_cycle == 'yearly':
+        price = subscription.plan.price_yearly
+
+    return {
+        'id': f'subscription-{subscription.id}',
+        'invoice_number': _invoice_number('INV-SUB', subscription.id),
+        'source_type': 'subscription',
+        'source_id': subscription.id,
+        'title': plan_name,
+        'description': f'{subscription.billing_cycle.title()} subscription',
+        'amount': _money(price or subscription.last_payment_amount),
+        'currency': 'USD',
+        'status': 'upcoming',
+        'payment_status': subscription.status,
+        'payment_method': subscription.payment_method,
+        'issued_at': _date(subscription.created_at),
+        'paid_at': _date(subscription.last_payment_date),
+        'due_at': _date(subscription.next_payment_date or subscription.current_period_end),
+        'direction': 'paid',
+        'download_url': None,
+    }
+
+
+def _creator_subscription_invoice(subscription):
+    plan = subscription.plan
+    return {
+        'id': f'creator-subscription-{subscription.id}',
+        'invoice_number': _invoice_number('INV-CRS', subscription.id),
+        'source_type': 'subscription',
+        'source_id': subscription.id,
+        'title': plan.name if plan else 'Creator subscription',
+        'description': plan.description if plan else 'Creator subscription',
+        'amount': _money(plan.price if plan else 0),
+        'currency': 'USD',
+        'status': 'paid' if subscription.payment_verified else 'upcoming',
+        'payment_status': subscription.payment_status or subscription.status,
+        'payment_method': subscription.payment_method,
+        'issued_at': _date(subscription.created_at),
+        'paid_at': _date(subscription.start_date if subscription.payment_verified else None),
+        'due_at': _date(subscription.end_date),
+        'direction': 'paid',
+        'download_url': None,
+    }
+
+
+def _get_user_invoices(user):
+    invoices = []
+
+    if user.user_type == 'brand':
+        brand = BrandProfile.query.filter_by(user_id=user.id).first()
+        if brand:
+            bookings = Booking.query.filter_by(brand_id=brand.id).order_by(Booking.created_at.desc()).all()
+            invoices.extend(_booking_invoice(booking, 'brand') for booking in bookings)
+
+            campaign_payments = CampaignPayment.query.filter_by(brand_user_id=user.id).order_by(CampaignPayment.initiated_at.desc()).all()
+            invoices.extend(_campaign_payment_invoice(payment) for payment in campaign_payments)
+
+        subscriptions = Subscription.query.filter_by(user_id=user.id).order_by(Subscription.created_at.desc()).all()
+        invoices.extend(_subscription_invoice(subscription) for subscription in subscriptions)
+
+    elif user.user_type == 'creator':
+        creator = CreatorProfile.query.filter_by(user_id=user.id).first()
+        if creator:
+            bookings = Booking.query.filter_by(creator_id=creator.id).order_by(Booking.created_at.desc()).all()
+            invoices.extend(
+                _booking_invoice(booking, 'creator')
+                for booking in bookings
+                if booking.payment_status in ['paid', 'verified']
+            )
+
+            creator_subscriptions = CreatorSubscription.query.filter_by(creator_id=creator.id).order_by(CreatorSubscription.created_at.desc()).all()
+            invoices.extend(_creator_subscription_invoice(subscription) for subscription in creator_subscriptions)
+
+    invoices.sort(key=lambda item: item.get('issued_at') or '', reverse=True)
+    return invoices
+
+
+@bp.route('/invoices', methods=['GET'])
+@jwt_required()
+def get_invoices():
+    user = User.query.get(int(get_jwt_identity()))
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+
+    invoices = _get_user_invoices(user)
+    return jsonify({
+        'past_invoices': [item for item in invoices if item['status'] == 'paid'],
+        'upcoming_invoices': [item for item in invoices if item['status'] != 'paid'],
+    }), 200
+
+
+def _render_invoice_html(invoice, user):
+    title = escape(invoice['title'])
+    description = escape(invoice.get('description') or '')
+    amount = f"${invoice['amount']:.2f}"
+    status = escape(invoice['payment_status'] or invoice['status'])
+    issued = escape(invoice.get('issued_at') or 'Not available')
+    paid = escape(invoice.get('paid_at') or 'Not paid yet')
+    user_label = escape(user.email)
+
+    html = f"""<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>{escape(invoice['invoice_number'])}</title>
+  <style>
+    body {{ font-family: Arial, sans-serif; color: #1F2937; margin: 40px; }}
+    .header {{ display: flex; justify-content: space-between; border-bottom: 4px solid #ccdb53; padding-bottom: 20px; }}
+    h1 {{ margin: 0; }}
+    .muted {{ color: #6B7280; }}
+    .card {{ border: 1px solid #E5E7EB; border-radius: 16px; padding: 20px; margin-top: 24px; }}
+    table {{ width: 100%; border-collapse: collapse; margin-top: 24px; }}
+    th, td {{ text-align: left; padding: 12px; border-bottom: 1px solid #E5E7EB; }}
+    .total {{ font-size: 24px; font-weight: bold; }}
+    .print {{ margin-top: 24px; }}
+    @media print {{ .print {{ display: none; }} body {{ margin: 20px; }} }}
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div>
+      <h1>BantuBuzz</h1>
+      <p class="muted">Creator-brand collaboration invoice</p>
+    </div>
+    <div>
+      <h2>{escape(invoice['invoice_number'])}</h2>
+      <p class="muted">{status}</p>
+    </div>
+  </div>
+  <div class="card">
+    <p><strong>Billed account:</strong> {user_label}</p>
+    <p><strong>Issued:</strong> {issued}</p>
+    <p><strong>Paid:</strong> {paid}</p>
+  </div>
+  <table>
+    <thead>
+      <tr><th>Description</th><th>Type</th><th>Amount</th></tr>
+    </thead>
+    <tbody>
+      <tr><td>{title}<br><span class="muted">{description}</span></td><td>{escape(invoice['source_type'])}</td><td>{amount}</td></tr>
+    </tbody>
+  </table>
+  <p class="total">Total: {amount}</p>
+  <button class="print" onclick="window.print()">Print or Save as PDF</button>
+</body>
+</html>"""
+    return html
+
+
+@bp.route('/invoices/<source_type>/<int:source_id>/download', methods=['GET'])
+@jwt_required()
+def download_invoice(source_type, source_id):
+    user = User.query.get(int(get_jwt_identity()))
+    if not user:
+        return jsonify({'error': 'User not found'}), 404
+
+    invoice = next(
+        (
+            item for item in _get_user_invoices(user)
+            if item['source_type'] in ['collaboration', 'campaign'] and item['download_url'] and item['download_url'].endswith(f'/{source_type}/{source_id}/download')
+        ),
+        None
+    )
+    if not invoice:
+        return jsonify({'error': 'Invoice not found'}), 404
+
+    return Response(
+        _render_invoice_html(invoice, user),
+        mimetype='text/html',
+        headers={'Content-Disposition': f'inline; filename={invoice["invoice_number"]}.html'}
+    )

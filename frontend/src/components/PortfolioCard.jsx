@@ -62,18 +62,11 @@ const PortfolioCard = ({ item, onClick, showActions = false, onEdit, onDelete })
       )}
 
       <div className="p-5">
-        {(item.platform || keyResult) && (
-          <div className="mb-3 flex items-center justify-between gap-2">
-            {item.platform ? (
+        {item.platform && (
+          <div className="mb-3 flex items-center gap-2">
             <span className={`px-3 py-1 rounded-full text-xs font-semibold ${platformColor.bg} ${platformColor.text} capitalize`}>
               {item.platform}
             </span>
-            ) : <span />}
-            {keyResult && (
-              <span className="max-w-[55%] truncate rounded-full bg-primary px-3 py-1 text-xs font-bold text-dark shadow-sm" title={keyResult}>
-                {keyResult}
-              </span>
-            )}
           </div>
         )}
 
@@ -86,6 +79,12 @@ const PortfolioCard = ({ item, onClick, showActions = false, onEdit, onDelete })
         {/* Description */}
         {item.description && (
           <p className="text-sm text-gray-700 mb-4 line-clamp-2">{item.description}</p>
+        )}
+
+        {keyResult && (
+          <div className="mb-4 inline-flex max-w-full rounded-full bg-primary px-3 py-1 text-xs font-bold text-dark shadow-sm" title={keyResult}>
+            <span className="truncate">{keyResult}</span>
+          </div>
         )}
 
         {/* Key Metrics */}

@@ -87,6 +87,7 @@ import AdminModeration from './pages/AdminModeration';
 import Wallet from './pages/Wallet';
 import CashoutRequest from './pages/CashoutRequest';
 import BrandWallet from './pages/BrandWallet';
+import Billing from './pages/Billing';
 
 // Brief Pages
 import BrowseBriefs from './pages/BrowseBriefs';
@@ -366,6 +367,14 @@ function App() {
         }
       />
       <Route
+        path="/billing"
+        element={
+          <ProtectedRoute requiredType="creator">
+            <Billing />
+          </ProtectedRoute>
+        }
+      />
+      <Route
         path="/creator/subscriptions"
         element={
           <ProtectedRoute requiredType="creator">
@@ -554,6 +563,14 @@ function App() {
         element={
           <ProtectedRoute requiredType="brand">
             <BrandWallet />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/brand/billing"
+        element={
+          <ProtectedRoute requiredType="brand">
+            <Billing />
           </ProtectedRoute>
         }
       />

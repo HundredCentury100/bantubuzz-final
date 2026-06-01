@@ -9,7 +9,8 @@ from app.models import (
     Proposal, CollaborationMilestone, Subscription, SubscriptionPlan, Brief
 )
 from app.services.payment_service import initiate_payment, check_payment_status, process_payment_webhook
-from app.utils.notifications import notify_new_booking, notify_booking_status
+from app.utils.notifications import notify_booking_status
+from app.services.product_notifications import notify_collaboration_active, notify_creator_new_booking
 
 bp = Blueprint('bookings', __name__)
 
@@ -203,14 +204,7 @@ def create_booking():
         # Refresh booking to load relationships
         db.session.refresh(booking)
 
-        # Notify creator of new booking
-        creator_user = User.query.get(package.creator.user_id)
-        if creator_user:
-            notify_new_booking(
-                creator_id=creator_user.id,
-                brand_name=brand.company_name or user.email,
-                booking_id=booking.id
-            )
+        notify_creator_new_booking(booking)
 
         # Don't initiate payment here - let the user choose payment method on payment page
         # Payment method and initiation will happen when user visits /bookings/{id}/payment page
@@ -354,6 +348,9 @@ def pay_with_wallet(booking_id):
         result = process_payment_with_wallet(booking, user_id, payment_source)
 
         if result['success']:
+            active_collaboration = Collaboration.query.filter_by(booking_id=booking.id).first()
+            if active_collaboration:
+                notify_collaboration_active(active_collaboration)
             return jsonify(result), 200
         else:
             return jsonify(result), 400
@@ -555,13 +552,7 @@ def cart_checkout():
         # Notify creators
         for booking, package in bookings:
             db.session.refresh(booking)
-            creator_user = User.query.get(package.creator.user_id)
-            if creator_user:
-                notify_new_booking(
-                    creator_id=creator_user.id,
-                    brand_name=brand.company_name or user.email,
-                    booking_id=booking.id
-                )
+            notify_creator_new_booking(booking)
 
         # --- 2. Initiate ONE combined Paynow payment ---
         import os
@@ -702,6 +693,7 @@ def cart_payment_status():
 
         if paynow_paid:
             # Mark all bookings paid and create collaborations
+            activated_collaboration_ids = []
             for bid in booking_ids:
                 booking = Booking.query.get(bid)
                 if not booking or booking.payment_status == 'paid':
@@ -759,6 +751,7 @@ def cart_payment_status():
                     )
                     db.session.add(collab)
                     db.session.flush()  # Get collaboration ID
+                    activated_collaboration_ids.append(collab.id)
 
                     # Auto-create platform-specific deliverables for multi-platform packages
                     create_multiplatform_deliverables(collab, package)
@@ -766,28 +759,11 @@ def cart_payment_status():
                     # Auto-create deliverable records for NO track collaborations
                     create_no_track_deliverables(collab)
 
-                    # Send email to creator about auto-accepted booking
-                    creator = CreatorProfile.query.get(booking.creator_id)
-                    if creator:
-                        creator_user = User.query.get(creator.user_id)
-                        brand = BrandProfile.query.get(booking.brand_id)
-                        if creator_user and brand:
-                            try:
-                                from app.services.email_service import EmailService
-                                EmailService.send_booking_auto_accepted_email(
-                                    creator_email=creator_user.email,
-                                    creator_name=creator.username,
-                                    brand_name=brand.company_name,
-                                    package_title=package.title if package else 'Package',
-                                    amount=float(booking.amount),
-                                    deliverables=package.deliverables if package and package.deliverables else [],
-                                    expected_days=package.duration_days if package else None,
-                                    collaboration_id=collab.id
-                                )
-                            except Exception as email_error:
-                                print(f"Failed to send booking auto-accepted email: {email_error}")
-
             db.session.commit()
+            for collab_id in activated_collaboration_ids:
+                collab = Collaboration.query.get(collab_id)
+                if collab:
+                    notify_collaboration_active(collab)
             return jsonify({'paid': True, 'status': 'paid'}), 200
 
         return jsonify({'paid': False, 'status': paynow_status}), 200
@@ -930,13 +906,7 @@ def cart_bank_transfer():
 
         # Notify creators
         for booking, package in bookings:
-            creator_user = User.query.get(package.creator.user_id)
-            if creator_user:
-                notify_new_booking(
-                    creator_id=creator_user.id,
-                    brand_name=brand.company_name or user.email,
-                    booking_id=booking.id
-                )
+            notify_creator_new_booking(booking)
 
         booking_ids = [b.id for b, _ in bookings]
         cart_ref = f"CART-{'_'.join(str(i) for i in booking_ids)}"
@@ -1045,6 +1015,7 @@ def cart_pay_with_wallet():
         )
 
         # Create collaborations for each booking
+        activated_collaboration_ids = []
         for booking, package in bookings:
             start_date = datetime.utcnow()
             expected_completion = None
@@ -1080,6 +1051,7 @@ def cart_pay_with_wallet():
             )
             db.session.add(collaboration)
             db.session.flush()
+            activated_collaboration_ids.append(collaboration.id)
 
             # Auto-create platform-specific deliverables
             create_multiplatform_deliverables(collaboration, package)
@@ -1087,32 +1059,13 @@ def cart_pay_with_wallet():
             # Auto-create deliverable records for NO track collaborations
             create_no_track_deliverables(collaboration)
 
-            # Send email to creator about auto-accepted booking
-            creator_user = User.query.get(package.creator.user_id)
-            if creator_user:
-                try:
-                    from app.services.email_service import EmailService
-                    EmailService.send_booking_auto_accepted_email(
-                        creator_email=creator_user.email,
-                        creator_name=package.creator.username,
-                        brand_name=brand.company_name,
-                        package_title=package.title,
-                        amount=float(booking.amount),
-                        deliverables=package.deliverables if package.deliverables else [],
-                        expected_days=package.duration_days if package else None,
-                        collaboration_id=collaboration.id
-                    )
-                except Exception as email_error:
-                    print(f"Failed to send booking auto-accepted email: {email_error}")
-
-                # Also notify via in-app notification
-                notify_new_booking(
-                    creator_id=creator_user.id,
-                    brand_name=brand.company_name or user.email,
-                    booking_id=booking.id
-                )
+            notify_creator_new_booking(booking)
 
         db.session.commit()
+        for collab_id in activated_collaboration_ids:
+            collab = Collaboration.query.get(collab_id)
+            if collab:
+                notify_collaboration_active(collab)
 
         booking_ids = [b.id for b, _ in bookings]
 
@@ -1693,38 +1646,11 @@ def verify_bank_transfer_payment(booking_id):
                 # Auto-create deliverable records for NO track collaborations
                 create_no_track_deliverables(collaboration)
 
-                # Send email to creator about auto-accepted booking
-                creator = CreatorProfile.query.get(booking.creator_id)
-                if creator:
-                    creator_user = User.query.get(creator.user_id)
-                    brand = BrandProfile.query.get(booking.brand_id)
-                    if creator_user and brand:
-                        try:
-                            from app.services.email_service import EmailService
-                            EmailService.send_booking_auto_accepted_email(
-                                creator_email=creator_user.email,
-                                creator_name=creator.username,
-                                brand_name=brand.company_name,
-                                package_title=package.title if package else 'Package',
-                                amount=float(booking.amount),
-                                deliverables=package.deliverables if package and package.deliverables else [],
-                                expected_days=package.duration_days if package else None,
-                                collaboration_id=collaboration.id
-                            )
-                        except Exception as email_error:
-                            print(f"Failed to send booking auto-accepted email: {email_error}")
-
         db.session.commit()
 
-        # Notify brand
-        brand_user = User.query.get(booking.brand.user_id)
-        if brand_user:
-            notify_booking_status(brand_user.id, 'payment_verified', booking.id)
-
-        # Notify creator
-        creator_user = User.query.get(booking.creator.user_id)
-        if creator_user:
-            notify_booking_status(creator_user.id, 'payment_verified', booking.id)
+        active_collaboration = Collaboration.query.filter_by(booking_id=booking.id).first()
+        if active_collaboration:
+            notify_collaboration_active(active_collaboration)
 
         return jsonify({
             'message': 'Payment verified successfully. Collaboration created.',

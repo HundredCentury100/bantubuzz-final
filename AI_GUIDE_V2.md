@@ -517,6 +517,46 @@ Current implementation:
 
 ## How Future AI Sessions Should Work
 
+## Product Notifications Learned
+
+Notification product events now live in `backend/app/services/product_notifications.py`.
+
+Rules:
+
+- Product notifications must create both an in-app notification and an email.
+- Use the product helper instead of pairing an old generic `notify_collaboration_update`/Celery email task with a new email, otherwise users receive duplicates.
+- New booking received uses `notify_creator_new_booking(booking)` after the booking commit.
+- Payment confirmed uses `notify_collaboration_active(collaboration)` only after a collaboration exists and payment is confirmed.
+- Content review events use:
+  - `notify_brand_content_submitted(collaboration, deliverable_title)`
+  - `notify_creator_content_approved(collaboration, deliverable_title)`
+  - `notify_creator_revision_requested(collaboration, deliverable_title, revision_notes)`
+- Live post submissions use `notify_brand_live_urls_submitted(collaboration)` from the actual URL/ID submission routes, not from the delayed auto-complete date task, to avoid duplicate brand notifications.
+- Complete events use `notify_collaboration_completed(collaboration, auto_completed=False)` for manual completion and `auto_completed=True` from the Celery auto-complete task.
+- Message notifications have two paths:
+  - Flask REST `/api/messages` calls `notify_message_received(message)`.
+  - Node Socket.IO messaging calls Flask `/api/internal/trigger-email-notification`, which now creates both the notification and email through `notify_message_received_for_user(...)`.
+
+Deployment note:
+
+- Notification deploys must include `backend/app/services/product_notifications.py`, `backend/app/routes/internal.py`, `backend/app/routes/bookings.py`, `backend/app/routes/collaborations.py`, `backend/app/routes/messages.py`, `backend/app/services/payment_service.py`, `backend/app/tasks/collaboration_tasks.py`, and `messaging-service/server.js`.
+- Restart both Gunicorn and the PM2 messaging service when `messaging-service/server.js` changes.
+
+## Billing And Delivery Autosync Learned
+
+- The manual delivery metrics Sync button should stay hidden from Collaboration Delivery. Metrics are expected to refresh automatically.
+- Platform sync now runs every 4 hours from `backend/app/celery_app.py` through `app.tasks.platform_sync.sync_all_platforms`.
+- Submitted collaboration post metrics also autosync every 4 hours through `app.tasks.collaboration_tasks.sync_submitted_post_metrics`.
+- When deploying autosync schedule changes, restart Celery worker/beat if configured, not only Gunicorn.
+- Package deliverables do not have `live_post_url`; they store submitted live post references in `PackageDeliverable.url`, with compatibility fields exposed as `post_url` in `to_dict()`.
+- Billing endpoints live at `backend/app/routes/billing.py`.
+  - `GET /api/billing/invoices` returns `past_invoices` and `upcoming_invoices`.
+  - `GET /api/billing/invoices/<source_type>/<id>/download` returns printable invoice HTML.
+- The frontend billing page is `frontend/src/pages/Billing.jsx`.
+  - Creator route: `/billing`
+  - Brand route: `/brand/billing`
+  - Download/open invoice uses authenticated axios, because direct anchor navigation would not include the JWT header.
+
 1. Read this file first.
 2. Then read `AI_GUIDE.md` for the larger historical context.
 3. Check `git status --short`.

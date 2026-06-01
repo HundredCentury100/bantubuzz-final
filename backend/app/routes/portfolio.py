@@ -31,9 +31,15 @@ def _build_key_result(metrics):
     return None
 
 
+def _looks_like_url(value):
+    return value.startswith(('http://', 'https://')) or '.' in value
+
+
 def _fetch_thunzi_metrics_for_url(creator, post_url):
     if not post_url:
-        return None, 'Post URL is required'
+        return None, 'Post URL or Facebook Post ID is required'
+
+    post_ref = post_url.strip()
 
     thunzi_account = ThunziAccount.query.filter_by(user_id=creator.user_id).first()
     if not thunzi_account or not thunzi_account.thunzi_company_id or not thunzi_account.thunzi_email:
@@ -46,11 +52,17 @@ def _fetch_thunzi_metrics_for_url(creator, post_url):
     if not login_success:
         return None, 'Unable to authenticate with ThunziAI'
 
-    post = thunzi_service.find_post_by_url(post_url, thunzi_account.thunzi_company_id)
-    if not post:
-        return None, 'Post not found in ThunziAI. Sync your connected platform and try again.'
+    if _looks_like_url(post_ref):
+        post = thunzi_service.find_post_by_url(post_ref, thunzi_account.thunzi_company_id)
+    else:
+        post = thunzi_service.get_post_by_original_id(post_ref)
+        if post and post.get('companyId') and str(post.get('companyId')) != str(thunzi_account.thunzi_company_id):
+            return None, 'That post ID does not belong to your connected ThunziAI account'
 
-    original_post_id = post.get('originalId') or post.get('originalPostId') or post.get('id')
+    if not post:
+        return None, 'Post not found in ThunziAI. For Facebook, paste the numeric/original Post ID if the public URL cannot be matched.'
+
+    original_post_id = post.get('originalId') or post.get('originalPostId') or post_ref
     insights = thunzi_service.get_post_insights_by_original_id(original_post_id) if original_post_id else None
     post_data = (insights or {}).get('post') or post
 
@@ -66,7 +78,7 @@ def _fetch_thunzi_metrics_for_url(creator, post_url):
         'shares': post_data.get('shares'),
         'reach': post_data.get('reach'),
         'engagement_rate': _normalize_engagement_rate(post_data.get('engagementRate')),
-        'post_url': post_data.get('postUrl') or post.get('postUrl') or post_url,
+        'post_url': post_data.get('postUrl') or post.get('postUrl') or post_ref,
         'result_description': None
     }
     metrics['result_description'] = _build_key_result(metrics)

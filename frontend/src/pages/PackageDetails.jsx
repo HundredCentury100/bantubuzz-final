@@ -1,13 +1,15 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
-import { packagesAPI, bookingsAPI } from '../services/api';
+import { packagesAPI } from '../services/api';
 import { toast } from 'react-hot-toast';
 import { useAuth } from '../hooks/useAuth';
+import { useCart } from '../contexts/CartContext';
 
 const PackageDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { addToCart } = useCart();
   const [pkg, setPkg] = useState(null);
   const [loading, setLoading] = useState(true);
   const [bookingLoading, setBookingLoading] = useState(false);
@@ -41,40 +43,29 @@ const PackageDetails = () => {
       return;
     }
 
-    try {
-      setBookingLoading(true);
-      const response = await bookingsAPI.createBooking({
-        package_id: pkg.id,
-        message: '' // Optional message
-      });
+    setBookingLoading(true);
+    addToCart({
+      package_id: pkg.id,
+      creator_id: pkg.creator_id,
+      creator_name: pkg.creator?.display_name || pkg.creator?.username || pkg.creator?.user?.email?.split('@')[0] || 'Creator',
+      title: pkg.title,
+      description: pkg.description,
+      price: pkg.price,
+      deliverables: pkg.deliverables || [],
+      duration_days: pkg.duration_days,
+      platform_type: pkg.platform_type,
+      content_type: pkg.content_type
+    });
+    navigate('/checkout');
+    setBookingLoading(false);
+  };
 
-      console.log('Booking response:', response.data); // Debug log
+  const formatCreatorLocation = (creator) => {
+    if (!creator) return 'Location not specified';
+    if (creator.location) return creator.location;
 
-      // Store payment data and booking ID in localStorage for the payment page
-      const bookingId = response.data.booking.id;
-
-      if (response.data.payment) {
-        localStorage.setItem(
-          `payment_${bookingId}`,
-          JSON.stringify(response.data.payment)
-        );
-      }
-
-      // Store the booking ID for the payment return page
-      localStorage.setItem('lastBookingId', bookingId.toString());
-
-      toast.success('Booking created! Redirecting to payment...');
-
-      // Redirect to payment page (you'll implement Paynow integration here)
-      setTimeout(() => {
-        navigate(`/bookings/${bookingId}/payment`);
-      }, 1000);
-    } catch (error) {
-      console.error('Error creating booking:', error);
-      toast.error(error.response?.data?.error || 'Failed to create booking');
-    } finally {
-      setBookingLoading(false);
-    }
+    const parts = [creator.city, creator.country].filter(Boolean);
+    return parts.length > 0 ? parts.join(', ') : 'Location not specified';
   };
 
   if (loading) {
@@ -163,7 +154,7 @@ const PackageDetails = () => {
                       {pkg.creator.user?.email?.split('@')[0] || 'Creator'}
                     </p>
                     <p className="text-sm text-gray-500">
-                      {pkg.creator.location || 'Location not specified'}
+                      {formatCreatorLocation(pkg.creator)}
                     </p>
                   </div>
                 </div>

@@ -5,6 +5,13 @@ from app import db, socketio
 from app.models import Collaboration, BrandProfile, CreatorProfile, User, CollaborationMilestone, MilestoneDeliverable, PackageDeliverable
 from app.models.dispute import Dispute
 from app.utils.notifications import notify_collaboration_status, notify_collaboration_update
+from app.services.product_notifications import (
+    notify_brand_content_submitted,
+    notify_brand_live_urls_submitted,
+    notify_collaboration_completed,
+    notify_creator_content_approved,
+    notify_creator_revision_requested,
+)
 
 bp = Blueprint('collaborations', __name__)
 
@@ -18,6 +25,36 @@ def emit_collaboration_update(collaboration_id):
         }, namespace='/')
     except Exception as e:
         print(f"Socket.IO emit error: {e}")
+
+
+def _looks_like_post_url(value):
+    return value.startswith(('http://', 'https://')) or '.' in value
+
+
+def _apply_deliverable_post_reference(deliverable, post_reference, selected_platform=None):
+    post_reference = (post_reference or '').strip()
+    selected_platform = (selected_platform or '').strip().lower()
+
+    if not post_reference:
+        return False, 'Post URL or Facebook Post ID is required'
+
+    deliverable.url = post_reference
+
+    if _looks_like_post_url(post_reference):
+        if not deliverable.parse_and_validate_url():
+            return False, 'Please enter a valid URL from Instagram, Facebook, YouTube, TikTok, or Twitter/X'
+        if selected_platform and deliverable.post_platform and selected_platform != deliverable.post_platform.lower():
+            return False, f'This looks like a {deliverable.post_platform.title()} URL, but {selected_platform.title()} was selected'
+        return True, None
+
+    if selected_platform != 'facebook':
+        return False, 'Only Facebook supports pasting a raw Post ID. For other platforms, paste the public post URL.'
+
+    deliverable.post_platform = 'facebook'
+    deliverable.post_id = post_reference
+    deliverable.post_url_validated = True
+    deliverable.url_submitted_at = datetime.utcnow()
+    return True, None
 
 
 @bp.route('/', methods=['GET'])
@@ -238,28 +275,10 @@ def submit_draft_deliverable(collab_id):
 
         db.session.commit()
 
-        # Send email notification to brand asynchronously
-        try:
-            from app.tasks.email_tasks import send_deliverable_submission_notification
-            send_deliverable_submission_notification.delay(
-                collaboration_id=collaboration.id,
-                deliverable_description=data['title']
-            )
-        except Exception as email_error:
-            print(f"Failed to queue deliverable submission notification: {str(email_error)}")
-
         # Emit Socket.IO update
         emit_collaboration_update(collaboration.id)
 
-        # Notify brand about new deliverable for review
-        brand_user = User.query.get(collaboration.brand.user_id)
-        if brand_user:
-            notify_collaboration_update(
-                user_id=brand_user.id,
-                collaboration_title=collaboration.title,
-                collaboration_id=collaboration.id,
-                update_message=f"New deliverable submitted for review: {data['title']}"
-            )
+        notify_brand_content_submitted(collaboration, data['title'])
 
         return jsonify({
             'message': 'Deliverable submitted for review',
@@ -349,16 +368,6 @@ def approve_deliverable(collab_id, deliverable_id):
         db.session.commit()
         print(f"[APPROVE_DELIVERABLE] Database commit successful")
 
-        # Send email notification to creator asynchronously
-        try:
-            from app.tasks.email_tasks import send_deliverable_approval_notification
-            send_deliverable_approval_notification.delay(
-                collaboration_id=collaboration.id,
-                deliverable_description=deliverable_to_approve.title
-            )
-        except Exception as email_error:
-            print(f"Failed to queue deliverable approval notification: {str(email_error)}")
-
         # Verify the state after commit
         print(f"[APPROVE_DELIVERABLE] Final state - Drafts: {len(collaboration.draft_deliverables or [])}, Submitted: {len(collaboration.submitted_deliverables or [])}, Progress: {collaboration.progress_percentage}%")
 
@@ -369,19 +378,7 @@ def approve_deliverable(collab_id, deliverable_id):
         except Exception as e:
             print(f"[APPROVE_DELIVERABLE] WARNING: Failed to emit Socket.IO update: {str(e)}")
 
-        # Notify creator about approval
-        try:
-            creator_user = User.query.get(collaboration.creator.user_id)
-            if creator_user:
-                notify_collaboration_update(
-                    user_id=creator_user.id,
-                    collaboration_title=collaboration.title,
-                    collaboration_id=collaboration.id,
-                    update_message=f"Your deliverable '{deliverable_to_approve['title']}' has been approved!"
-                )
-                print(f"[APPROVE_DELIVERABLE] Approval notification sent to creator")
-        except Exception as e:
-            print(f"[APPROVE_DELIVERABLE] WARNING: Failed to notify creator: {str(e)}")
+        notify_creator_content_approved(collaboration, deliverable_to_approve.title)
 
         print(f"[APPROVE_DELIVERABLE] SUCCESS: Returning response to client")
         return jsonify({
@@ -457,16 +454,6 @@ def approve_all_deliverables(collab_id):
         db.session.commit()
         print(f"[APPROVE_ALL] Database commit successful")
 
-        # Send email notification to creator
-        try:
-            from app.tasks.email_tasks import send_deliverable_approval_notification
-            send_deliverable_approval_notification.delay(
-                collaboration_id=collaboration.id,
-                deliverable_description=f"{approved_count} deliverable(s)"
-            )
-        except Exception as email_error:
-            print(f"Failed to queue bulk approval notification: {str(email_error)}")
-
         # Emit Socket.IO update
         try:
             emit_collaboration_update(collaboration.id)
@@ -474,19 +461,7 @@ def approve_all_deliverables(collab_id):
         except Exception as e:
             print(f"[APPROVE_ALL] WARNING: Failed to emit Socket.IO update: {str(e)}")
 
-        # Notify creator about approval
-        try:
-            creator_user = User.query.get(collaboration.creator.user_id)
-            if creator_user:
-                notify_collaboration_update(
-                    user_id=creator_user.id,
-                    collaboration_title=collaboration.title,
-                    collaboration_id=collaboration.id,
-                    update_message=f"All your deliverables have been approved! ({approved_count} item(s))"
-                )
-                print(f"[APPROVE_ALL] Notification sent to creator")
-        except Exception as e:
-            print(f"[APPROVE_ALL] WARNING: Failed to notify creator: {str(e)}")
+        notify_creator_content_approved(collaboration, f"{approved_count} deliverable(s)")
 
         print(f"[APPROVE_ALL] SUCCESS: Approved {approved_count} deliverables")
         return jsonify({
@@ -576,15 +551,7 @@ def request_revision(collab_id, deliverable_id):
         # Emit Socket.IO update
         emit_collaboration_update(collaboration.id)
 
-        # Notify creator about revision request
-        creator_user = User.query.get(collaboration.creator.user_id)
-        if creator_user:
-            notify_collaboration_update(
-                user_id=creator_user.id,
-                collaboration_title=collaboration.title,
-                collaboration_id=collaboration.id,
-                update_message=f"Revision requested for '{deliverable_title}'"
-            )
+        notify_creator_revision_requested(collaboration, deliverable_title, revision_notes)
 
         return jsonify({
             'message': 'Revision requested successfully',
@@ -763,15 +730,7 @@ def complete_revision_payment(collab_id):
         # Emit Socket.IO update
         emit_collaboration_update(collaboration.id)
 
-        # Notify creator about revision request
-        creator_user = User.query.get(collaboration.creator.user_id)
-        if creator_user:
-            notify_collaboration_update(
-                user_id=creator_user.id,
-                collaboration_title=collaboration.title,
-                collaboration_id=collaboration.id,
-                update_message=f"Paid revision requested for '{deliverable_title}'"
-            )
+        notify_creator_revision_requested(collaboration, deliverable_title, revision_notes)
 
         return jsonify({
             'message': 'Revision requested successfully after payment',
@@ -918,6 +877,7 @@ def submit_deliverable(collab_id):
         flag_modified(collaboration, 'submitted_deliverables')
 
         db.session.commit()
+        notify_brand_content_submitted(collaboration, data['title'])
 
         return jsonify({
             'message': 'Deliverable submitted successfully',
@@ -1061,25 +1021,17 @@ def complete_collaboration(collab_id):
 
             db.session.commit()
 
-        # Notify creator - customize based on escrow status
+        notify_collaboration_completed(collaboration, auto_completed=False)
+
+        # If escrow failed, add a separate operational note for the creator.
         creator_user = User.query.get(collaboration.creator.user_id)
-        if creator_user:
-            if escrow_released:
-                notify_collaboration_status(
-                    user_id=creator_user.id,
-                    status='completed',
-                    collaboration_title=collaboration.title,
-                    collaboration_id=collaboration.id,
-                    user_type='creator'
-                )
-            else:
-                # Escrow failed - notify about delay
-                notify_collaboration_update(
-                    user_id=creator_user.id,
-                    collaboration_title=collaboration.title,
-                    collaboration_id=collaboration.id,
-                    update_message="Collaboration completed! Payment processing encountered an issue. Our team has been notified and will process your payment manually within 24 hours."
-                )
+        if creator_user and not escrow_released:
+            notify_collaboration_update(
+                user_id=creator_user.id,
+                collaboration_title=collaboration.title,
+                collaboration_id=collaboration.id,
+                update_message="Collaboration completed! Payment processing encountered an issue. Our team has been notified and will process your payment manually within 24 hours."
+            )
 
         # Alert admin if escrow failed
         if not escrow_released and escrow_error:
@@ -1249,6 +1201,8 @@ def mark_collaboration_complete(collab_id):
 
         except Exception as e:
             print(f"[MARK_COMPLETE] WARNING: Failed to send notifications: {str(e)}")
+
+        notify_collaboration_completed(collaboration, auto_completed=False)
 
         return jsonify({
             'success': True,
@@ -1565,15 +1519,7 @@ def submit_milestone_deliverable(collab_id, milestone_id):
         collaboration.last_update_date = datetime.utcnow()
         db.session.commit()
 
-        # Notify brand
-        brand_user = User.query.get(collaboration.brand.user_id)
-        if brand_user:
-            notify_collaboration_update(
-                user_id=brand_user.id,
-                collaboration_title=collaboration.title,
-                collaboration_id=collaboration.id,
-                update_message=f"New deliverable submitted for milestone: {milestone.title}"
-            )
+        notify_brand_content_submitted(collaboration, deliverable.title)
 
         return jsonify({
             'message': 'Deliverable submitted successfully',
@@ -1620,6 +1566,8 @@ def approve_milestone_deliverable(collab_id, milestone_id, deliverable_id):
         deliverable.approved_at = datetime.utcnow()
         db.session.commit()
 
+        completed_all_milestones = False
+
         # Check if milestone is now complete (all deliverables approved)
         if milestone.is_complete():
             milestone.status = 'completed'
@@ -1651,38 +1599,13 @@ def approve_milestone_deliverable(collab_id, milestone_id, deliverable_id):
                 collaboration.status = 'completed'
                 collaboration.actual_completion_date = datetime.utcnow()
                 collaboration.progress_percentage = 100
-                
-                # Notify both parties
-                creator_user = User.query.get(collaboration.creator.user_id)
-                if creator_user:
-                    notify_collaboration_status(
-                        user_id=creator_user.id,
-                        status='completed',
-                        collaboration_title=collaboration.title,
-                        collaboration_id=collaboration.id,
-                        user_type='creator'
-                    )
-                
-                if brand.user_id:
-                    notify_collaboration_status(
-                        user_id=brand.user_id,
-                        status='completed',
-                        collaboration_title=collaboration.title,
-                        collaboration_id=collaboration.id,
-                        user_type='brand'
-                    )
+                completed_all_milestones = True
 
         db.session.commit()
 
-        # Notify creator about approval
-        creator_user = User.query.get(collaboration.creator.user_id)
-        if creator_user:
-            notify_collaboration_update(
-                user_id=creator_user.id,
-                collaboration_title=collaboration.title,
-                collaboration_id=collaboration.id,
-                update_message=f"Deliverable approved for {milestone.title}"
-            )
+        notify_creator_content_approved(collaboration, deliverable.title)
+        if completed_all_milestones:
+            notify_collaboration_completed(collaboration, auto_completed=False)
 
         return jsonify({
             'message': 'Deliverable approved successfully',
@@ -1729,20 +1652,23 @@ def submit_package_deliverable_url(collab_id, deliverable_id):
 
         data = request.get_json()
         post_url = data.get('post_url')
+        post_platform = data.get('post_platform')
 
         if not post_url:
-            return jsonify({'error': 'Post URL is required'}), 400
+            return jsonify({'error': 'Post URL or Facebook Post ID is required'}), 400
 
         # Get deliverable from database (NOT JSON)
         deliverable = PackageDeliverable.query.get(deliverable_id)
         if not deliverable or deliverable.collaboration_id != collab_id:
             return jsonify({'error': 'Deliverable not found'}), 404
 
-        # Update URL
-        deliverable.url = post_url
+        reference_valid, reference_error = _apply_deliverable_post_reference(
+            deliverable,
+            post_url,
+            post_platform
+        )
 
-        # Parse and validate URL
-        if deliverable.parse_and_validate_url():
+        if reference_valid:
             # Mark deliverable type as live_post (not draft)
             deliverable.deliverable_type = 'live_post'
 
@@ -1779,6 +1705,7 @@ def submit_package_deliverable_url(collab_id, deliverable_id):
                 collaboration.updated_at = datetime.utcnow()
 
             db.session.commit()
+            notify_brand_live_urls_submitted(collaboration)
 
             metrics_sync = None
             try:
@@ -1799,7 +1726,7 @@ def submit_package_deliverable_url(collab_id, deliverable_id):
 
             return jsonify({
                 'success': True,
-                'message': 'Post URL submitted and validated successfully',
+                'message': 'Post reference submitted and validated successfully',
                 'deliverable': deliverable.to_dict(),
                 'parsed': {
                     'platform': deliverable.post_platform,
@@ -1815,8 +1742,8 @@ def submit_package_deliverable_url(collab_id, deliverable_id):
 
             return jsonify({
                 'success': False,
-                'error': 'Invalid social media URL',
-                'message': 'Please enter a valid URL from Instagram, Facebook, YouTube, TikTok, or Twitter/X'
+                'error': 'Invalid post reference',
+                'message': reference_error or 'Please enter a valid URL from Instagram, YouTube, TikTok, or Twitter/X. For Facebook, paste the numeric/original Post ID.'
             }), 400
 
     except Exception as e:
@@ -1866,16 +1793,20 @@ def submit_deliverable_url(collab_id, milestone_id, deliverable_id):
 
         data = request.get_json()
         post_url = data.get('post_url')
+        post_platform = data.get('post_platform')
 
         if not post_url:
-            return jsonify({'error': 'Post URL is required'}), 400
+            return jsonify({'error': 'Post URL or Facebook Post ID is required'}), 400
 
-        # Update deliverable URL
-        deliverable.url = post_url
+        reference_valid, reference_error = _apply_deliverable_post_reference(
+            deliverable,
+            post_url,
+            post_platform
+        )
 
-        # Parse and validate URL
-        if deliverable.parse_and_validate_url():
+        if reference_valid:
             db.session.commit()
+            notify_brand_live_urls_submitted(collaboration)
 
             metrics_sync = None
             try:
@@ -1896,7 +1827,7 @@ def submit_deliverable_url(collab_id, milestone_id, deliverable_id):
 
             return jsonify({
                 'success': True,
-                'message': 'Post URL submitted and validated successfully',
+                'message': 'Post reference submitted and validated successfully',
                 'deliverable': deliverable.to_dict(),
                 'parsed': {
                     'platform': deliverable.post_platform,
@@ -1912,8 +1843,8 @@ def submit_deliverable_url(collab_id, milestone_id, deliverable_id):
 
             return jsonify({
                 'success': False,
-                'error': 'Invalid social media URL',
-                'message': 'Please enter a valid URL from Instagram, Facebook, YouTube, TikTok, or Twitter/X'
+                'error': 'Invalid post reference',
+                'message': reference_error or 'Please enter a valid URL from Instagram, YouTube, TikTok, or Twitter/X. For Facebook, paste the numeric/original Post ID.'
             }), 400
 
     except Exception as e:

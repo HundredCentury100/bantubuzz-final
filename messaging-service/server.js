@@ -163,6 +163,29 @@ io.on('connection', (socket) => {
         io.to(receiverSocketId).emit('new_message', messageData);
       }
 
+      try {
+        const flaskBackendUrl = process.env.FLASK_BACKEND_URL || 'http://localhost:8002';
+        const response = await fetch(`${flaskBackendUrl}/api/internal/trigger-email-notification`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Internal-Service': process.env.INTERNAL_SERVICE_SECRET || 'messaging-service-secret'
+          },
+          body: JSON.stringify({
+            recipient_user_id: receiverId,
+            sender_name: message.sender_name || 'A user',
+            sender_type: message.sender_type,
+            message_preview: content
+          })
+        });
+
+        if (!response.ok) {
+          console.error(`Failed to trigger message notification: ${response.status}`);
+        }
+      } catch (notificationError) {
+        console.error(`Failed to trigger message notification: ${notificationError.message}`);
+      }
+
       console.log(`Message ${messageId} sent from ${socket.userId} to ${receiverId}`);
     } catch (error) {
       console.error('Error in send_message:', error);

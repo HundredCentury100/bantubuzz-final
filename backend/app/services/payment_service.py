@@ -658,6 +658,12 @@ def check_payment_status(booking):
                 # Do NOT change collaboration.status - brand controls workflow
 
             db.session.commit()
+            if collaboration:
+                try:
+                    from app.services.product_notifications import notify_collaboration_active
+                    notify_collaboration_active(collaboration)
+                except Exception as notification_error:
+                    print(f"Failed to send payment confirmation notification: {notification_error}")
 
             return {
                 'status': 'paid',
@@ -734,6 +740,8 @@ def process_payment_webhook(data):
             payment_record.escrow_status = 'escrowed'
             payment_record.held_amount = payment_record.amount
 
+            collaboration = None
+
             # Update booking
             booking = Booking.query.get(payment_record.booking_id)
             if booking:
@@ -749,6 +757,12 @@ def process_payment_webhook(data):
                     # Do NOT change collaboration.status - brand controls workflow
 
             db.session.commit()
+            if booking and collaboration:
+                try:
+                    from app.services.product_notifications import notify_collaboration_active
+                    notify_collaboration_active(collaboration)
+                except Exception as notification_error:
+                    print(f"Failed to send payment confirmation notification: {notification_error}")
             return True
         else:
             # Update status but don't mark as paid

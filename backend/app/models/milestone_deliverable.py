@@ -66,7 +66,10 @@ class MilestoneDeliverable(db.Model):
             'post_id': self.post_id,
             'thunzi_post_id': self.thunzi_post_id,
             'post_url_validated': self.post_url_validated,
-            'url_submitted_at': self.url_submitted_at.isoformat() if self.url_submitted_at else None
+            'url_submitted_at': self.url_submitted_at.isoformat() if self.url_submitted_at else None,
+            # Analytics compatibility
+            'url_validation_status': 'valid' if self.post_url_validated else 'invalid',
+            'post_url': self.url if self.post_url_validated else None
         }
 
     def __repr__(self):

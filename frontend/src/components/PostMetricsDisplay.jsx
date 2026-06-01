@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import PropTypes from 'prop-types';
-import toast from 'react-hot-toast';
 import { collaborationsAPI } from '../services/api';
 import MetricCard from './MetricCard';
 import SentimentChart from './SentimentChart';
@@ -24,13 +23,11 @@ const PostMetricsDisplay = ({
   collaborationId,
   deliverableId,
   deliverable,
-  milestoneId = null,
   isBrand = false,
   collaborationAmount = 0,
 }) => {
   const [metrics, setMetrics] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [isSyncing, setIsSyncing] = useState(false);
   const [error, setError] = useState(null);
 
   // Fetch cached metrics on mount
@@ -66,34 +63,6 @@ const PostMetricsDisplay = ({
     }
   };
 
-  /**
-   * Sync metrics from ThunziAI
-   */
-  const handleSyncMetrics = async () => {
-    try {
-      setIsSyncing(true);
-      setError(null);
-
-      const response = await collaborationsAPI.syncDeliverableMetrics(
-        collaborationId,
-        milestoneId,
-        deliverableId
-      );
-
-      if (response.data.success) {
-        setMetrics(response.data.metrics);
-        toast.success('Metrics synced successfully!');
-      }
-    } catch (err) {
-      console.error('Error syncing metrics:', err);
-      const errorMessage = err.response?.data?.message || 'Failed to sync metrics';
-      setError(errorMessage);
-      toast.error(errorMessage);
-    } finally {
-      setIsSyncing(false);
-    }
-  };
-
   // If no post URL submitted, don't show anything
   if (!deliverable?.post_url) {
     return null;
@@ -123,7 +92,7 @@ const PostMetricsDisplay = ({
   }
 
   // Empty state - no metrics yet
-  if (!metrics && !isSyncing) {
+  if (!metrics) {
     return (
       <div className="bg-white rounded-3xl shadow-sm hover:shadow-md p-6 mt-4">
         <h3 className="text-lg font-semibold text-dark mb-4">📊 Post Performance Metrics</h3>
@@ -135,29 +104,13 @@ const PostMetricsDisplay = ({
             </div>
             <p className="text-gray-600 mb-2">No metrics available yet</p>
             <p className="text-sm text-gray-500">
-              Click the button below to fetch performance data from ThunziAI
+              BantuBuzz automatically refreshes delivery metrics from ThunziAI every 4 hours.
             </p>
           </div>
 
-          <button
-            onClick={handleSyncMetrics}
-            disabled={isSyncing}
-            className="px-6 py-3 bg-primary text-dark rounded-full font-medium hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isSyncing ? 'Syncing...' : '🔄 Sync Metrics'}
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // Syncing state
-  if (isSyncing) {
-    return (
-      <div className="bg-white rounded-3xl shadow-sm p-6 mt-4">
-        <div className="flex items-center justify-center py-12">
-          <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full"></div>
-          <span className="ml-3 text-gray-600">Syncing metrics from ThunziAI...</span>
+          <span className="shrink-0 rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-dark">
+            Auto-syncs every 4h
+          </span>
         </div>
       </div>
     );
@@ -174,12 +127,9 @@ const PostMetricsDisplay = ({
           <p className="text-sm text-red-600 mb-4">
             Make sure the post has been published and synced in ThunziAI.
           </p>
-          <button
-            onClick={handleSyncMetrics}
-            className="px-4 py-2 bg-red-600 text-white rounded-full text-sm hover:bg-red-700 transition-colors"
-          >
-            Retry
-          </button>
+          <p className="text-sm text-red-600">
+            BantuBuzz will try again automatically during the next 4-hour sync.
+          </p>
         </div>
       </div>
     );
@@ -206,7 +156,7 @@ const PostMetricsDisplay = ({
       {/* Main Metrics Card */}
       <div className="bg-white rounded-3xl shadow-sm hover:shadow-md p-6">
         {/* Header */}
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between gap-4 mb-4">
           <div>
             <h3 className="text-lg font-semibold text-dark">📊 Post Performance</h3>
             <p className="text-sm text-gray-600 mt-1">
@@ -214,13 +164,9 @@ const PostMetricsDisplay = ({
             </p>
           </div>
 
-          <button
-            onClick={handleSyncMetrics}
-            disabled={isSyncing}
-            className="px-4 py-2 bg-primary text-dark rounded-full font-medium hover:bg-primary/90 transition-colors disabled:opacity-50 text-sm"
-          >
-            {isSyncing ? 'Syncing...' : '🔄 Sync'}
-          </button>
+          <span className="shrink-0 rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-dark">
+            Auto-syncs every 4h
+          </span>
         </div>
 
         {/* Sync Status */}
@@ -404,7 +350,6 @@ PostMetricsDisplay.propTypes = {
   collaborationId: PropTypes.number.isRequired,
   deliverableId: PropTypes.number.isRequired,
   deliverable: PropTypes.object.isRequired,
-  milestoneId: PropTypes.number,
   isBrand: PropTypes.bool,
   collaborationAmount: PropTypes.number,
 };

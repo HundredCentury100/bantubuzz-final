@@ -16,6 +16,7 @@ import {
   HomeIcon,
   MagnifyingGlassIcon,
   BriefcaseIcon,
+  DocumentTextIcon,
 } from '@heroicons/react/24/outline';
 import NotificationBell from './NotificationBell';
 import { messagingService } from '../services/messagingAPI';
@@ -353,6 +354,31 @@ const Navbar = () => {
                             >
                               <SparklesIcon className="h-5 w-5 mr-3 text-gray-400" />
                               Manage Subscriptions
+                            </Link>
+                          )}
+                        </Menu.Item>
+                        <Menu.Item>
+                          {({ active }) => (
+                            <Link
+                              to={user?.user_type === 'creator' ? '/billing' : '/brand/billing'}
+                              className={`${
+                                active ? 'bg-light' : ''
+                              } block px-4 py-2 text-sm text-gray-700 rounded-lg`}
+                            >
+                              Billing
+                            </Link>
+                          )}
+                        </Menu.Item>
+                        <Menu.Item>
+                          {({ active }) => (
+                            <Link
+                              to={user?.user_type === 'creator' ? '/billing' : '/brand/billing'}
+                              className={`${
+                                active ? 'bg-gray-50' : ''
+                              } flex items-center px-4 py-2 text-sm text-gray-700`}
+                            >
+                              <DocumentTextIcon className="h-5 w-5 mr-3 text-gray-400" />
+                              Billing
                             </Link>
                           )}
                         </Menu.Item>

@@ -9,8 +9,10 @@ from datetime import datetime, timedelta
 from app.celery_app import celery
 from app import db
 from app.models.collaboration import Collaboration
-from app.models.user import User
-from app.models.notification import Notification
+from app.models.milestone_deliverable import MilestoneDeliverable
+from app.models.package_deliverable import PackageDeliverable
+from app.services.product_notifications import notify_collaboration_completed
+from app.services.post_metrics_service import PostMetricsService
 from sqlalchemy import and_
 
 
@@ -53,33 +55,7 @@ def check_auto_complete_eligible():
                 db.session.commit()
                 completed_count += 1
 
-                # Notify brand
-                if collab.brand_id:
-                    brand_user = User.query.filter_by(id=collab.brand_id).first()
-                    if brand_user:
-                        notification = Notification(
-                            user_id=brand_user.id,
-                            type='collaboration_completed',
-                            title='Collaboration Auto-Completed',
-                            message=f'Your collaboration "{collab.title}" has been automatically completed after the 3-day review period.',
-                            link=f'/brand/collaborations/{collab.id}'
-                        )
-                        db.session.add(notification)
-
-                # Notify creator
-                if collab.creator_id:
-                    creator_user = User.query.filter_by(id=collab.creator_id).first()
-                    if creator_user:
-                        notification = Notification(
-                            user_id=creator_user.id,
-                            type='collaboration_completed',
-                            title='Collaboration Auto-Completed',
-                            message=f'Your collaboration "{collab.title}" has been automatically completed. Payment will be released shortly.',
-                            link=f'/creator/collaborations/{collab.id}'
-                        )
-                        db.session.add(notification)
-
-                db.session.commit()
+                notify_collaboration_completed(collab, auto_completed=True)
 
             except Exception as e:
                 db.session.rollback()
@@ -120,20 +96,6 @@ def set_auto_complete_date(collaboration_id):
             collab.auto_complete_eligible_at = datetime.utcnow() + timedelta(days=3)
             db.session.commit()
 
-            # Notify brand about 3-day auto-complete
-            if collab.brand_id:
-                brand_user = User.query.filter_by(id=collab.brand_id).first()
-                if brand_user:
-                    notification = Notification(
-                        user_id=brand_user.id,
-                        type='collaboration_update',
-                        title='Review Period Started',
-                        message=f'All deliverables submitted for "{collab.title}". You have 3 days to review before auto-completion.',
-                        link=f'/brand/collaborations/{collab.id}'
-                    )
-                    db.session.add(notification)
-                    db.session.commit()
-
             return {
                 'success': True,
                 'auto_complete_at': collab.auto_complete_eligible_at.isoformat()
@@ -150,4 +112,60 @@ def set_auto_complete_date(collaboration_id):
         return {
             'success': False,
             'error': str(e)
+        }
+
+
+@celery.task(name='app.tasks.collaboration_tasks.sync_submitted_post_metrics')
+def sync_submitted_post_metrics():
+    """
+    Sync ThunziAI metrics for submitted collaboration post references.
+
+    This replaces the manual Delivery sync button with a background autosync
+    that refreshes package and milestone deliverables every four hours.
+    """
+    try:
+        package_deliverables = PackageDeliverable.query.filter(
+            PackageDeliverable.post_url_validated == True,
+            PackageDeliverable.url.isnot(None),
+            PackageDeliverable.url != ''
+        ).all()
+
+        milestone_deliverables = MilestoneDeliverable.query.filter(
+            MilestoneDeliverable.post_url_validated == True,
+            MilestoneDeliverable.url.isnot(None),
+            MilestoneDeliverable.url != ''
+        ).all()
+
+        synced = 0
+        failed = 0
+
+        for deliverable in package_deliverables:
+            result = PostMetricsService.sync_deliverable_metrics(deliverable.id, deliverable_type='package')
+            if result.get('success'):
+                synced += 1
+            else:
+                failed += 1
+
+        for deliverable in milestone_deliverables:
+            result = PostMetricsService.sync_deliverable_metrics(deliverable.id, deliverable_type='milestone')
+            if result.get('success'):
+                synced += 1
+            else:
+                failed += 1
+
+        return {
+            'success': True,
+            'synced': synced,
+            'failed': failed,
+            'checked': len(package_deliverables) + len(milestone_deliverables),
+            'timestamp': datetime.utcnow().isoformat()
+        }
+
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error syncing submitted post metrics: {str(e)}")
+        return {
+            'success': False,
+            'error': str(e),
+            'timestamp': datetime.utcnow().isoformat()
         }

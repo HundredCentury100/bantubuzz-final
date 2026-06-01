@@ -63,48 +63,11 @@ def send_message():
         except Exception as websocket_error:
             print(f"Failed to broadcast message via websocket helper: {str(websocket_error)}")
 
-        # Send email notification to recipient asynchronously
-        import logging
-        logger = logging.getLogger(__name__)
-
         try:
-            logger.info(f"[EMAIL_NOTIFICATION] Starting email notification process for message to user {data['receiver_id']}")
-
-            from app.tasks.email_tasks import send_message_notification
-            from app.models import CreatorProfile, BrandProfile
-
-            sender = User.query.get(user_id)
-            sender_name = "A user"
-
-            if sender:
-                logger.info(f"[EMAIL_NOTIFICATION] Sender found: user_id={user_id}, type={sender.user_type}")
-                # Get sender name from profile
-                if sender.user_type == 'creator':
-                    creator = CreatorProfile.query.filter_by(user_id=user_id).first()
-                    if creator:
-                        sender_name = creator.username
-                        logger.info(f"[EMAIL_NOTIFICATION] Creator name: {sender_name}")
-                elif sender.user_type == 'brand':
-                    brand = BrandProfile.query.filter_by(user_id=user_id).first()
-                    if brand:
-                        sender_name = brand.company_name
-                        logger.info(f"[EMAIL_NOTIFICATION] Brand name: {sender_name}")
-
-            logger.info(f"[EMAIL_NOTIFICATION] About to queue email task: recipient={data['receiver_id']}, sender={sender_name}")
-
-            # Queue the email notification task
-            result = send_message_notification.delay(
-                recipient_user_id=data['receiver_id'],
-                sender_name=sender_name,
-                message_preview=data['content']
-            )
-
-            logger.info(f"[EMAIL_NOTIFICATION] Email task queued successfully! Task ID: {result.id}")
-
-        except Exception as email_error:
-            # Log error but don't fail the request
-            logger.error(f"[EMAIL_NOTIFICATION] Failed to queue message notification: {str(email_error)}", exc_info=True)
-            print(f"Failed to queue message notification: {str(email_error)}")
+            from app.services.product_notifications import notify_message_received
+            notify_message_received(message)
+        except Exception as notification_error:
+            print(f"Failed to create message notification: {str(notification_error)}")
 
         return jsonify({
             'message': 'Message sent successfully',

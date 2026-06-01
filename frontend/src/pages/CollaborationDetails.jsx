@@ -1007,17 +1007,23 @@ const CollaborationDetails = () => {
                         {/* URL Input or Display */}
                         {submittedPost?.post_url ? (
                           <div>
-                            <a
-                              href={submittedPost.post_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-sm text-primary hover:text-primary-dark flex items-center gap-1 mb-3"
-                            >
-                              View Live Post
-                              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                              </svg>
-                            </a>
+                            {submittedPost.post_url?.startsWith('http') ? (
+                              <a
+                                href={submittedPost.post_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-sm text-primary hover:text-primary-dark flex items-center gap-1 mb-3"
+                              >
+                                View Live Post
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                </svg>
+                              </a>
+                            ) : (
+                              <p className="mb-3 text-sm text-green-800">
+                                Facebook Post ID: <span className="font-mono">{submittedPost.post_id || submittedPost.post_url}</span>
+                              </p>
+                            )}
 
                             {/* Post Performance Metrics */}
                             {submittedPost.url_validation_status === 'valid' && (

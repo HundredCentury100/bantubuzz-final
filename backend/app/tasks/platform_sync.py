@@ -181,7 +181,7 @@ def sync_all_platforms():
     """
     Periodic task to sync all connected platforms across all creators.
 
-    This runs every 6 hours to keep platform data fresh.
+    This runs every 4 hours to keep platform data fresh.
 
     Returns:
         dict: Summary of sync operations
@@ -189,15 +189,15 @@ def sync_all_platforms():
     try:
         logger.info("Starting periodic sync for all platforms")
 
-        # Get all connected platforms that haven't been synced in the last 6 hours
-        six_hours_ago = datetime.utcnow() - timedelta(hours=6)
+        # Get all connected platforms that haven't been synced in the last 4 hours
+        four_hours_ago = datetime.utcnow() - timedelta(hours=4)
 
         platforms = ConnectedPlatform.query.filter(
             and_(
                 ConnectedPlatform.is_connected == True,
                 db.or_(
                     ConnectedPlatform.last_synced_at == None,
-                    ConnectedPlatform.last_synced_at < six_hours_ago
+                    ConnectedPlatform.last_synced_at < four_hours_ago
                 )
             )
         ).all()

@@ -46,6 +46,15 @@ const PortfolioFormModal = ({ item = null, collaborationData = null, onClose, on
   const [syncingStats, setSyncingStats] = useState(false);
   const [mediaFiles, setMediaFiles] = useState([]);
   const [isFromCollaboration, setIsFromCollaboration] = useState(false);
+  const selectedPlatform = (formData.platform || '').toLowerCase();
+  const isFacebookPost = selectedPlatform === 'facebook';
+  const postReferenceLabel = isFacebookPost ? 'Facebook Post ID' : 'Post URL';
+  const postReferencePlaceholder = isFacebookPost
+    ? 'Paste the Facebook numeric/original Post ID'
+    : 'Paste the public post URL';
+  const postReferenceHelp = isFacebookPost
+    ? 'Facebook uses numeric/original Post IDs in ThunziAI. Public Facebook URLs may not match because Facebook shows alphanumeric IDs.'
+    : 'Paste the public post URL from Instagram, TikTok, YouTube, X/Twitter, or other supported platforms.';
 
   const getMediaUrl = (url) => {
     if (!url) return '';
@@ -190,7 +199,7 @@ const PortfolioFormModal = ({ item = null, collaborationData = null, onClose, on
 
   const handleSyncStats = async () => {
     if (!formData.post_url?.trim()) {
-      toast.error('Paste a post URL first');
+      toast.error(`Paste a ${postReferenceLabel} first`);
       return;
     }
 
@@ -484,10 +493,15 @@ const PortfolioFormModal = ({ item = null, collaborationData = null, onClose, on
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Post URL</label>
+                <div className="mb-2 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                  <label className="block text-sm font-medium text-gray-700">{postReferenceLabel}</label>
+                  <span className="text-xs font-medium text-gray-500">
+                    {isFacebookPost ? 'Facebook: ID only' : 'Other platforms: URL'}
+                  </span>
+                </div>
                 <div className="flex flex-col gap-2 sm:flex-row">
                   <input
-                    type="url"
+                    type="text"
                     name="post_url"
                     value={formData.post_url}
                     onChange={handleChange}
@@ -497,7 +511,7 @@ const PortfolioFormModal = ({ item = null, collaborationData = null, onClose, on
                       }
                     }}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                    placeholder="https://..."
+                    placeholder={postReferencePlaceholder}
                   />
                   <button
                     type="button"
@@ -508,6 +522,9 @@ const PortfolioFormModal = ({ item = null, collaborationData = null, onClose, on
                     {syncingStats ? 'Fetching...' : 'Fetch Stats'}
                   </button>
                 </div>
+                <p className="mt-2 rounded-2xl bg-primary/10 px-4 py-3 text-sm text-gray-700">
+                  {postReferenceHelp}
+                </p>
               </div>
             </div>
           </div>
@@ -515,7 +532,9 @@ const PortfolioFormModal = ({ item = null, collaborationData = null, onClose, on
           {/* Performance Metrics */}
           <div className="mb-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-2">Performance Metrics</h3>
-            <p className="text-sm text-gray-500 mb-4">Stats are pulled from ThunziAI after you paste a post URL.</p>
+            <p className="text-sm text-gray-500 mb-4">
+              Stats are pulled from ThunziAI after you fetch this post reference. Creators do not enter these numbers manually.
+            </p>
 
             <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
               {[

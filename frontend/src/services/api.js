@@ -375,6 +375,12 @@ export const paymentsAPI = {
   }),
 };
 
+// Billing API
+export const billingAPI = {
+  getInvoices: () => api.get('/billing/invoices'),
+  downloadInvoice: (downloadUrl) => api.get(downloadUrl.replace(/^\/api/, ''), { responseType: 'blob' }),
+};
+
 // Briefs API
 export const briefsAPI = {
   // Basic CRUD

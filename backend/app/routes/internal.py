@@ -1,5 +1,6 @@
 from flask import Blueprint, request, jsonify
-from app.tasks.email_tasks import send_message_notification
+from app.models import User
+from app.services.product_notifications import notify_message_received_for_user
 import logging
 
 bp = Blueprint('internal', __name__)
@@ -25,25 +26,23 @@ def trigger_email_notification():
 
         recipient_user_id = data.get('recipient_user_id')
         sender_name = data.get('sender_name', 'A user')
-        message_preview = data.get('message_preview', '')
+        sender_type = data.get('sender_type')
 
         if not recipient_user_id:
             return jsonify({'error': 'recipient_user_id is required'}), 400
 
-        logger.info(f"[INTERNAL] Triggering email notification for user {recipient_user_id} from {sender_name}")
+        logger.info(f"[INTERNAL] Triggering message notification for user {recipient_user_id} from {sender_name}")
 
-        # Queue the Celery task
-        result = send_message_notification.delay(
-            recipient_user_id=recipient_user_id,
-            sender_name=sender_name,
-            message_preview=message_preview
-        )
+        recipient = User.query.get(recipient_user_id)
+        if not recipient:
+            return jsonify({'error': 'recipient user not found'}), 404
 
-        logger.info(f"[INTERNAL] Email notification queued successfully. Task ID: {result.id}")
+        notify_message_received_for_user(recipient, sender_name, sender_type)
+
+        logger.info(f"[INTERNAL] Message notification sent for user {recipient_user_id}")
 
         return jsonify({
-            'success': True,
-            'task_id': result.id
+            'success': True
         }), 200
 
     except Exception as e:

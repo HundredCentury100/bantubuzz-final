@@ -106,13 +106,16 @@ class Collaboration(db.Model):
                 collaboration_id=self.id,
                 status='approved'
             ).filter(
-                PackageDeliverable.live_post_url.isnot(None),
-                PackageDeliverable.live_post_url != ''
+                PackageDeliverable.url.isnot(None),
+                PackageDeliverable.url != ''
             ).count()
         else:
             # For legacy or campaign collaborations, use JSON
             total_approved = len(self.submitted_deliverables or [])
-            deliverables_with_urls = sum(1 for d in (self.submitted_deliverables or []) if d.get('live_post_url'))
+            deliverables_with_urls = sum(
+                1 for d in (self.submitted_deliverables or [])
+                if d.get('post_url') or d.get('live_post_url') or d.get('url')
+            )
 
         # Calculate base progress from approved deliverables
         if total_approved == 0:

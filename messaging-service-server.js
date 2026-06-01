@@ -201,6 +201,7 @@ io.on('connection', (socket) => {
         await axios.post(`${flaskBackendUrl}/api/internal/trigger-email-notification`, {
           recipient_user_id: receiverId,
           sender_name: message.sender_name || 'A user',
+          sender_type: message.sender_type,
           message_preview: content
         }, {
           headers: {

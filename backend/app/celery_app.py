@@ -50,10 +50,15 @@ def make_celery(app=None):
 
         # Beat schedule for periodic tasks
         beat_schedule={
-            # Sync all platforms every 6 hours
+            # Sync all platforms every 4 hours
             'sync-all-platforms': {
                 'task': 'app.tasks.platform_sync.sync_all_platforms',
-                'schedule': crontab(minute=0, hour='*/6'),  # Every 6 hours
+                'schedule': crontab(minute=0, hour='*/4'),  # Every 4 hours
+            },
+            # Sync submitted collaboration post metrics every 4 hours
+            'sync-collaboration-post-metrics': {
+                'task': 'app.tasks.collaboration_tasks.sync_submitted_post_metrics',
+                'schedule': crontab(minute=15, hour='*/4'),  # Every 4 hours at :15
             },
             # Update analytics cache every 4 hours
             'update-analytics-cache': {

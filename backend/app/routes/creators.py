@@ -28,7 +28,7 @@ def _public_creator_payload(creator):
 
     collaborations = Collaboration.query.filter(
         Collaboration.creator_id == creator.id,
-        Collaboration.status.in_(['in_progress', 'completed'])
+        Collaboration.status == 'completed'
     ).all()
 
     brands_by_id = {}
