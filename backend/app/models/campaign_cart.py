@@ -24,7 +24,7 @@ class CampaignCartItem(db.Model):
     # Item type and references
     item_type = db.Column(db.String(50), nullable=False)  # 'invitation', 'application', 'package'
     invitation_id = db.Column(db.Integer, db.ForeignKey('campaign_invitations.id', ondelete='CASCADE'))
-    proposal_id = db.Column(db.Integer, db.ForeignKey('proposals.id', ondelete='CASCADE'))
+    proposal_id = db.Column(db.Integer, db.ForeignKey('campaign_proposals.id', ondelete='CASCADE'))
     package_id = db.Column(db.Integer, db.ForeignKey('packages.id', ondelete='SET NULL'))
     creator_id = db.Column(db.Integer, db.ForeignKey('creator_profiles.id', ondelete='CASCADE'), nullable=False)
 
@@ -52,7 +52,7 @@ class CampaignCartItem(db.Model):
     brand = db.relationship('BrandProfile', backref='campaign_cart_items', foreign_keys=[brand_id])
     creator = db.relationship('CreatorProfile', backref='cart_items_received', foreign_keys=[creator_id])
     invitation = db.relationship('CampaignInvitation', backref='cart_item', foreign_keys=[invitation_id])
-    proposal = db.relationship('Proposal', backref='cart_item', foreign_keys=[proposal_id])
+    proposal = db.relationship('CampaignProposal', backref='cart_item', foreign_keys=[proposal_id])
     package = db.relationship('Package', backref='cart_items', foreign_keys=[package_id])
     booking = db.relationship('Booking', backref='cart_item', foreign_keys=[booking_id])
     collaboration = db.relationship('Collaboration', backref='cart_source_item', foreign_keys=[collaboration_id])
@@ -122,10 +122,10 @@ class CampaignCartItem(db.Model):
                 data['proposal'] = {
                     'id': self.proposal.id,
                     'status': self.proposal.status,
-                    'proposed_amount': float(self.proposal.proposed_amount) if self.proposal.proposed_amount else None,
-                    'pitch': self.proposal.pitch,
+                    'proposed_amount': float(self.proposal.proposed_price) if self.proposal.proposed_price else None,
+                    'pitch': self.proposal.proposal_message,
                     'deliverables': self.proposal.deliverables,
-                    'timeline_days': self.proposal.timeline_days,
+                    'timeline_days': self.proposal.delivery_timeline_days,
                 }
 
         return data

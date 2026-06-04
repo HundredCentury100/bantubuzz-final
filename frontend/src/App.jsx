@@ -43,6 +43,7 @@ import Campaigns from './pages/Campaigns';
 import CampaignForm from './pages/CampaignForm';
 import CampaignCreated from './pages/CampaignCreated';
 import CampaignSourcing from './pages/CampaignSourcing';
+import CampaignPublish from './pages/CampaignPublish';
 import CampaignPackageBrowser from './pages/CampaignPackageBrowser';
 import CampaignDetails from './pages/CampaignDetails';
 import BrowseCampaigns from './pages/BrowseCampaigns';
@@ -496,6 +497,14 @@ function App() {
         element={
           <ProtectedRoute requiredType="brand">
             <CampaignSourcing />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/brand/campaigns/:id/publish"
+        element={
+          <ProtectedRoute requiredType="brand">
+            <CampaignPublish />
           </ProtectedRoute>
         }
       />

@@ -749,6 +749,19 @@ Deployment note:
   - Delivery UI copy should say `Submit URL / Post ID / Delivery`.
   - Navbar unread message badge should use the Flask messages API as the source of truth and refresh on read/send/new-message events.
   - Background messaging socket failures should not show `Unable to load messages` toast on every site load.
+- Campaign creator application flow:
+  - Campaigns are still created as drafts first, then brands choose sourcing from `/brand/campaigns/<id>/source-creators`.
+  - `Publish for Applications` now goes through `/brand/campaigns/<id>/publish` so brands can review target locations, categories, follower range, and application deadline before going live.
+  - Backend publishing is handled by `POST /api/campaigns/<id>/publish`; it validates that the campaign accepts applications and that the application deadline is not in the past.
+  - Creator discovery uses `GET /api/campaigns/browse`; it matches active application campaigns against the logged-in creator's categories, location/city/country, and connected-platform follower count, then sorts by application deadline soonest first.
+  - Creator opportunity cards show brand, budget, campaign dates, red application deadline, milestone count, and separate View Details / Apply actions.
+  - Creator applications use locked campaign milestones/deliverables. Creators can only add proposed due dates, choose total vs per-milestone pricing, write a cover letter, and optionally set an overall timeline.
+  - Campaign proposal statuses are:
+    - `pending`: creator submitted, brand reviewing.
+    - `awaiting_payment`: brand added the proposal to campaign cart.
+    - `accepted`: payment confirmed and collaboration started.
+    - `rejected`: brand did not select the proposal.
+  - Campaign cart application items must point to `campaign_proposals`, not the older brief `proposals` table. Migration: `backend/migrations/versions/202606041700_fix_campaign_cart_proposal_fk.py`.
 - Remaining hardening for future slices:
   - Improve team invitation onboarding so new invitees land directly back on the invite after signup/login.
   - Build tailored onboarding steps after Agency/Enterprise signup.

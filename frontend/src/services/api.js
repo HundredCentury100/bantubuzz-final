@@ -168,6 +168,7 @@ export const campaignsAPI = {
   getCampaign: (id) => api.get(`/campaigns/${id}`),
   createCampaign: (data) => api.post('/campaigns', data),
   updateCampaign: (id, data) => api.put(`/campaigns/${id}`, data),
+  publishCampaign: (id) => api.post(`/campaigns/${id}/publish`),
   deleteCampaign: (id) => api.delete(`/campaigns/${id}`),
 
   // Brand: Review Proposals (Applications)

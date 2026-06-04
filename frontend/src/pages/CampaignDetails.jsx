@@ -19,6 +19,7 @@ const CampaignDetails = () => {
   const location = useLocation();
   const [campaign, setCampaign] = useState(null);
   const [proposals, setProposals] = useState([]);
+  const [pendingProposalCount, setPendingProposalCount] = useState(0);
   const [packages, setPackages] = useState([]);
   const [audienceData, setAudienceData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -77,6 +78,7 @@ const CampaignDetails = () => {
     try {
       const response = await campaignsAPI.getCampaignProposals(id);
       setProposals(response.data.proposals || []);
+      setPendingProposalCount(response.data.pending_count ?? (response.data.proposals || []).filter((proposal) => proposal.status === 'pending').length);
     } catch (error) {
       console.error('Error fetching proposals:', error);
       toast.error('Failed to load applications');
@@ -138,7 +140,7 @@ const CampaignDetails = () => {
     if (!rejectModal) return;
 
     try {
-      await campaignsAPI.rejectProposal(rejectModal, { notes: rejectNotes });
+      await campaignsAPI.rejectProposal(rejectModal, { brand_notes: rejectNotes });
       toast.success('Application rejected');
       setRejectModal(null);
       setRejectNotes('');
@@ -159,6 +161,8 @@ const CampaignDetails = () => {
       toast.error('Failed to update campaign status');
     }
   };
+
+  const visibleProposals = proposals.filter((proposal) => proposal.status !== 'rejected');
 
   const getStatusBadgeClass = (status) => {
     switch (status) {
@@ -327,7 +331,7 @@ const CampaignDetails = () => {
               </button>
               <button
                 type="button"
-                onClick={() => handleStatusChange('active')}
+                onClick={() => navigate(`/brand/campaigns/${id}/publish`)}
                 disabled={campaign.status === 'active' || !campaign.allows_applications}
                 className="flex items-start gap-3 rounded-2xl border border-gray-200 p-4 text-left transition hover:border-primary hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-60"
               >
@@ -368,7 +372,7 @@ const CampaignDetails = () => {
                   : 'text-gray-600 hover:text-gray-900'
               }`}
             >
-              Applications ({campaign.proposals_count || 0})
+              Applications ({pendingProposalCount || 0})
             </button>
           )}
           {campaign.allows_packages && (
@@ -600,7 +604,7 @@ const CampaignDetails = () => {
         {activeTab === 'applications' && (
           <div className="bg-white rounded-3xl shadow-lg p-6">
             <h2 className="text-xl font-bold text-gray-900 mb-4">Applications</h2>
-            {proposals.length === 0 ? (
+            {visibleProposals.length === 0 ? (
               <div className="text-center py-12">
                 <div className="text-gray-400 text-6xl mb-4">📝</div>
                 <h3 className="text-lg font-semibold text-gray-900 mb-2">No applications yet</h3>
@@ -610,7 +614,7 @@ const CampaignDetails = () => {
               </div>
             ) : (
               <div className="space-y-4">
-                {proposals.map((proposal) => (
+                {visibleProposals.map((proposal) => (
                   <div
                     key={proposal.id}
                     className="border border-gray-200 rounded-xl p-6 hover:border-primary transition-colors"
@@ -626,14 +630,14 @@ const CampaignDetails = () => {
                         )}
                         <div>
                           <h3 className="font-semibold text-gray-900 text-lg">
-                            {proposal.creator?.stage_name || proposal.creator?.business_name}
+                            {proposal.creator?.display_name || proposal.creator?.username || 'Creator'}
                           </h3>
-                          {proposal.creator?.category && (
-                            <p className="text-sm text-gray-600">{proposal.creator.category}</p>
+                          {proposal.creator?.categories?.length > 0 && (
+                            <p className="text-sm text-gray-600">{proposal.creator.categories.join(', ')}</p>
                           )}
-                          {proposal.creator?.followers_count && (
+                          {(proposal.creator?.follower_count || proposal.creator?.total_followers) && (
                             <p className="text-sm text-gray-500">
-                              {proposal.creator.followers_count.toLocaleString()} followers
+                              {(proposal.creator.follower_count || proposal.creator.total_followers).toLocaleString()} followers
                             </p>
                           )}
                         </div>
@@ -674,12 +678,12 @@ const CampaignDetails = () => {
 
                     {proposal.status === 'pending' && (
                       <div className="flex gap-2 justify-end">
-                        <button
-                          onClick={() => setSelectedProposal(proposal)}
+                        <Link
+                          to={proposal.creator?.username ? `/${proposal.creator.username}` : `/creator-profile/${proposal.creator_id}`}
                           className="px-4 py-2 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors"
                         >
                           View Creator Profile
-                        </button>
+                        </Link>
                         <button
                           onClick={() => setRejectModal(proposal.id)}
                           className="px-4 py-2 bg-red-600 text-white rounded-xl hover:bg-red-700 transition-colors"

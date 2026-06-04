@@ -11,7 +11,6 @@ const CampaignSourcing = () => {
   const navigate = useNavigate();
   const [campaign, setCampaign] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [publishing, setPublishing] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
 
   useEffect(() => {
@@ -31,23 +30,12 @@ const CampaignSourcing = () => {
     }
   };
 
-  const publishForApplications = async () => {
+  const publishForApplications = () => {
     if (!campaign?.allows_applications) {
       toast.error('This campaign is not set up to receive applications');
       return;
     }
-
-    try {
-      setPublishing(true);
-      await campaignsAPI.updateCampaign(id, { status: 'active' });
-      toast.success('Campaign published for applications');
-      navigate(`/brand/campaigns/${id}?tab=applications`);
-    } catch (error) {
-      console.error('Error publishing campaign:', error);
-      toast.error(error.response?.data?.error || 'Failed to publish campaign');
-    } finally {
-      setPublishing(false);
-    }
+    navigate(`/brand/campaigns/${id}/publish`);
   };
 
   if (loading) {
@@ -118,7 +106,7 @@ const CampaignSourcing = () => {
           <button
             type="button"
             onClick={publishForApplications}
-            disabled={publishing || !campaign?.allows_applications || campaign?.status === 'active'}
+            disabled={!campaign?.allows_applications || campaign?.status === 'active'}
             className="flex min-h-64 flex-col rounded-3xl border-2 border-transparent bg-white p-6 text-left shadow-lg transition hover:border-primary hover:shadow-xl disabled:cursor-not-allowed disabled:opacity-60"
           >
             <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/20 text-dark">
@@ -131,9 +119,7 @@ const CampaignSourcing = () => {
             <span className="mt-6 inline-flex items-center gap-2 font-semibold text-primary-dark">
               {campaign?.status === 'active'
                 ? 'Already published'
-                : publishing
-                  ? 'Publishing...'
-                  : campaign?.allows_applications
+                : campaign?.allows_applications
                     ? 'Publish campaign'
                     : 'Applications not enabled'}
               <ArrowRight className="h-4 w-4" />

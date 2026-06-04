@@ -59,6 +59,13 @@ const Opportunities = () => {
     setTimeout(() => fetchOpportunities(), 100);
   };
 
+  const formatBudget = (opportunity) => {
+    if ((opportunity.participation_mode === 'proposals' || opportunity.participation_mode === 'both') && opportunity.budget_min && opportunity.budget_max) {
+      return `$${opportunity.budget_min} - $${opportunity.budget_max}`;
+    }
+    return opportunity.budget ? `$${opportunity.budget}` : 'Open budget';
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-blue-50">
@@ -199,15 +206,15 @@ const Opportunities = () => {
                       {opportunity.description}
                     </p>
 
-                    {/* Budget Display */}
-                    <div className="mb-4">
-                      <p className="text-xs text-gray-500 mb-1">Budget</p>
-                      <p className="text-xl font-bold text-primary">
-                        {/* CRITICAL: NO toFixed() */}
-                        {opportunity.participation_mode === 'proposals' || opportunity.participation_mode === 'both'
-                          ? `$${opportunity.budget_min} - $${opportunity.budget_max}`
-                          : `$${opportunity.budget}`}
-                      </p>
+                    <div className="mb-4 grid grid-cols-2 gap-3">
+                      <div className="rounded-2xl bg-primary/10 p-3">
+                        <p className="mb-1 text-xs text-gray-500">Budget</p>
+                        <p className="text-lg font-bold text-primary">{formatBudget(opportunity)}</p>
+                      </div>
+                      <div className="rounded-2xl bg-gray-50 p-3">
+                        <p className="mb-1 text-xs text-gray-500">Milestones</p>
+                        <p className="text-lg font-bold text-gray-900">{opportunity.milestones?.length || 0}</p>
+                      </div>
                     </div>
 
                     {/* Brand Info */}
@@ -274,14 +281,28 @@ const Opportunities = () => {
                     </div>
                   )}
 
-                  {/* Action Button */}
-                  <div className="p-4 bg-gray-50">
+                  <div className="grid grid-cols-2 gap-3 p-4 bg-gray-50">
                     <Link
                       to={`/creator/opportunities/${opportunity.id}`}
-                      className="block w-full px-4 py-3 bg-primary text-white text-center rounded-xl hover:bg-primary-dark transition-colors font-medium"
+                      className="rounded-xl bg-white px-4 py-3 text-center font-medium text-gray-800 ring-1 ring-gray-200 transition hover:bg-gray-100"
                     >
-                      View Details & Apply
+                      View Details
                     </Link>
+                    {opportunity.has_applied ? (
+                      <Link
+                        to="/creator/applications"
+                        className="rounded-xl bg-primary/15 px-4 py-3 text-center font-medium text-primary-dark transition hover:bg-primary/20"
+                      >
+                        View Application
+                      </Link>
+                    ) : (
+                      <Link
+                        to={`/creator/opportunities/${opportunity.id}?apply=1`}
+                        className="rounded-xl bg-primary px-4 py-3 text-center font-medium text-white transition hover:bg-primary-dark"
+                      >
+                        Apply
+                      </Link>
+                    )}
                   </div>
                 </div>
               ))}

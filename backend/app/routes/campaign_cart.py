@@ -8,10 +8,11 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 from app import db
 from app.models import (
     Campaign, CampaignCartItem, User, BrandProfile, CreatorProfile,
-    Package, CampaignInvitation, Proposal, Booking, Collaboration
+    Package, CampaignInvitation, CampaignProposal, Booking, Collaboration
 )
 from app.services.email_service import EmailService
 from app.services.payment_service import PaymentService
+from app.utils.notifications import create_notification
 from datetime import datetime, timedelta
 from decimal import Decimal
 
@@ -232,7 +233,7 @@ def add_application_to_cart(campaign_id):
         if not proposal_id:
             return jsonify({'error': 'proposal_id is required'}), 400
 
-        proposal = Proposal.query.get(proposal_id)
+        proposal = CampaignProposal.query.get(proposal_id)
         if not proposal or proposal.campaign_id != campaign_id:
             return jsonify({'error': 'Application not found'}), 404
 
@@ -250,12 +251,11 @@ def add_application_to_cart(campaign_id):
             return jsonify({'error': 'Application already in cart'}), 400
 
         # Update proposal status
-        proposal.status = 'accepted'
-        proposal.accepted_pending_payment = True  # NEW: Marked as accepted but unpaid
-        proposal.updated_at = datetime.utcnow()
+        proposal.status = 'awaiting_payment'
+        proposal.reviewed_at = datetime.utcnow()
 
         # Create cart item
-        amount = proposal.proposed_amount or campaign.budget or Decimal('100.00')
+        amount = proposal.proposed_price or campaign.budget or Decimal('100.00')
         cart_item = CampaignCartItem(
             campaign_id=campaign_id,
             brand_id=brand.id,
@@ -267,14 +267,13 @@ def add_application_to_cart(campaign_id):
         db.session.add(cart_item)
         db.session.commit()
 
-        # Send notification to creator (accepted, payment pending)
-        creator_user = User.query.get(proposal.creator.user_id)
-        if creator_user:
-            try:
-                # TODO: Create specific email template for accepted-pending-payment
-                print(f"Application accepted and added to cart - creator will be notified after payment")
-            except Exception as email_error:
-                print(f"Failed to send notification: {email_error}")
+        create_notification(
+            proposal.creator.user_id,
+            'campaign',
+            'Application Added to Cart',
+            f'{brand.company_name or "A brand"} added your proposal for "{campaign.title}" to their campaign cart. Payment is pending.',
+            '/creator/applications'
+        )
 
         return jsonify({
             'success': True,

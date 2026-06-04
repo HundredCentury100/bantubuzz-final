@@ -21,6 +21,7 @@ from app.models.package import Package
 from app.models.booking import Booking
 from app.models.collaboration import Collaboration
 from app.services.workspace_service import get_request_workspace_id, require_workspace_access, scope_query_to_workspace
+from app.utils.notifications import create_notification
 
 bp = Blueprint('campaigns', __name__, url_prefix='/api/campaigns')
 
@@ -258,10 +259,68 @@ def get_campaign(campaign_id):
                 if workspace_error:
                     return jsonify({'error': workspace_error}), workspace_status
 
-        return jsonify(campaign.to_dict(include_brand=True)), 200
+        campaign_data = campaign.to_dict(include_brand=True)
+
+        if user and user.user_type == 'creator':
+            creator = CreatorProfile.query.filter_by(user_id=user_id).first()
+            if creator:
+                proposal = CampaignProposal.query.filter_by(
+                    campaign_id=campaign_id,
+                    creator_id=creator.id
+                ).first()
+                campaign_data['has_applied'] = proposal is not None
+                campaign_data['application_status'] = proposal.status if proposal else None
+
+        return jsonify(campaign_data), 200
 
     except Exception as e:
         print(f"Error fetching campaign: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+
+@bp.route('/<int:campaign_id>/publish', methods=['POST'])
+@jwt_required()
+def publish_campaign(campaign_id):
+    """Publish a campaign for creator applications after validating targeting settings."""
+    try:
+        user_id = get_jwt_identity()
+        brand = BrandProfile.query.filter_by(user_id=user_id).first()
+
+        if not brand:
+            return jsonify({'error': 'Brand profile not found'}), 404
+
+        campaign = Campaign.query.get(campaign_id)
+        if not campaign or campaign.brand_id != brand.id:
+            return jsonify({'error': 'Campaign not found'}), 404
+
+        if campaign.workspace_id:
+            _, workspace_error, workspace_status = require_workspace_access(user_id, campaign.workspace_id, 'can_manage_campaigns')
+            if workspace_error:
+                return jsonify({'error': workspace_error}), workspace_status
+
+        if not campaign.allows_applications:
+            return jsonify({'error': 'This campaign is not configured to accept applications'}), 400
+
+        if campaign.application_deadline:
+            now = datetime.now(timezone.utc)
+            deadline = campaign.application_deadline
+            if deadline.tzinfo is None:
+                deadline = deadline.replace(tzinfo=timezone.utc)
+            if deadline <= now:
+                return jsonify({'error': 'Application deadline must be in the future'}), 400
+
+        campaign.status = 'active'
+        campaign.updated_at = datetime.now(timezone.utc)
+        db.session.commit()
+
+        return jsonify({
+            'message': 'Campaign published for applications',
+            'campaign': campaign.to_dict(include_brand=True)
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error publishing campaign: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
 
@@ -435,40 +494,90 @@ def browse_campaigns():
     CRITICAL: Use timezone-aware datetime for comparisons
     """
     try:
-        # Get current time (timezone-aware)
+        user_id = get_jwt_identity()
+        creator = CreatorProfile.query.filter_by(user_id=user_id).first()
+        if not creator:
+            return jsonify({'error': 'Creator profile not found'}), 404
+
         now = datetime.now(timezone.utc)
+        creator_categories = set(creator.categories or [])
+        creator_locations = {
+            value.strip().lower()
+            for value in [creator.location, creator.city, creator.country]
+            if value and value.strip()
+        }
+        creator_followers = creator.get_total_followers()
 
-        # Base query: active campaigns only
-        query = Campaign.query.filter_by(status='active')
+        query = Campaign.query.filter(
+            Campaign.status == 'active',
+            Campaign.allows_applications == True,
+            or_(
+                Campaign.application_deadline == None,
+                Campaign.application_deadline > now
+            )
+        )
 
-        # Filter by participation mode
         participation_mode = request.args.get('mode')
         if participation_mode == 'packages':
             query = query.filter_by(allows_packages=True)
         elif participation_mode == 'proposals':
             query = query.filter_by(allows_applications=True)
-            # Only show campaigns with deadline in future or no deadline
-            query = query.filter(
-                or_(
-                    Campaign.application_deadline == None,
-                    Campaign.application_deadline > now  # CRITICAL: timezone-aware comparison
-                )
-            )
 
-        # Filter by category
         category = request.args.get('category')
         if category:
-            query = query.filter(Campaign.target_categories.contains([category]))
+            query = query.filter(or_(
+                Campaign.target_categories == None,
+                Campaign.target_categories == [],
+                Campaign.target_categories.contains([category])
+            ))
 
-        # Filter by location
         location = request.args.get('location')
         if location:
-            query = query.filter(Campaign.target_locations.contains([location]))
+            query = query.filter(or_(
+                Campaign.target_locations == None,
+                Campaign.target_locations == [],
+                Campaign.target_locations.contains([location])
+            ))
 
-        campaigns = query.order_by(Campaign.created_at.desc()).all()
+        campaigns = query.order_by(
+            Campaign.application_deadline.asc().nullslast(),
+            Campaign.created_at.desc()
+        ).all()
+
+        matched_campaigns = []
+        for campaign in campaigns:
+            target_categories = set(campaign.target_categories or [])
+            if target_categories and creator_categories and target_categories.isdisjoint(creator_categories):
+                continue
+            if target_categories and not creator_categories:
+                continue
+
+            target_locations = {
+                value.strip().lower()
+                for value in (campaign.target_locations or [])
+                if value and value.strip()
+            }
+            if target_locations and creator_locations and target_locations.isdisjoint(creator_locations):
+                continue
+            if target_locations and not creator_locations:
+                continue
+
+            if campaign.target_min_followers is not None and creator_followers < campaign.target_min_followers:
+                continue
+            if campaign.target_max_followers is not None and creator_followers > campaign.target_max_followers:
+                continue
+
+            proposal = CampaignProposal.query.filter_by(
+                campaign_id=campaign.id,
+                creator_id=creator.id
+            ).first()
+            campaign_data = campaign.to_dict(include_brand=True)
+            campaign_data['has_applied'] = proposal is not None
+            campaign_data['application_status'] = proposal.status if proposal else None
+            matched_campaigns.append(campaign_data)
 
         return jsonify({
-            'campaigns': [c.to_dict(include_brand=True) for c in campaigns]
+            'campaigns': matched_campaigns
         }), 200
 
     except Exception as e:
@@ -545,6 +654,15 @@ def apply_to_campaign(campaign_id):
         db.session.add(proposal)
         db.session.commit()
 
+        creator_name = creator.username or creator.display_name or 'A creator'
+        create_notification(
+            campaign.brand.user_id,
+            'campaign',
+            'New Campaign Application',
+            f'{creator_name} applied to your campaign "{campaign.title}".',
+            f'/brand/campaigns/{campaign.id}?tab=applications'
+        )
+
         return jsonify({
             'message': 'Application submitted successfully',
             'proposal': proposal.to_dict()
@@ -612,11 +730,12 @@ def get_campaign_proposals(campaign_id):
                 return jsonify({'error': workspace_error}), workspace_status
 
         proposals = CampaignProposal.query.filter_by(campaign_id=campaign_id).order_by(
-            CampaignProposal.applied_at.desc()
+            CampaignProposal.applied_at.asc()
         ).all()
 
         return jsonify({
-            'proposals': [p.to_dict(include_creator=True) for p in proposals]
+            'proposals': [p.to_dict(include_creator=True) for p in proposals],
+            'pending_count': sum(1 for p in proposals if p.status == 'pending')
         }), 200
 
     except Exception as e:
@@ -813,6 +932,14 @@ def reject_proposal(proposal_id):
         proposal.reviewed_at = datetime.now(timezone.utc)
 
         db.session.commit()
+
+        create_notification(
+            proposal.creator.user_id,
+            'campaign',
+            'Application Not Selected',
+            f'Your application to "{proposal.campaign.title}" was not selected.',
+            '/creator/applications'
+        )
 
         return jsonify({
             'message': 'Proposal rejected'

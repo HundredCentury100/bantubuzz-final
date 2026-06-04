@@ -11,11 +11,20 @@ const MyApplications = () => {
 
   useEffect(() => {
     fetchApplications();
+
+    const handleFocus = () => fetchApplications(false);
+    window.addEventListener('focus', handleFocus);
+    const interval = window.setInterval(() => fetchApplications(false), 30000);
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      window.clearInterval(interval);
+    };
   }, [filter]);
 
-  const fetchApplications = async () => {
+  const fetchApplications = async (showSpinner = true) => {
     try {
-      setLoading(true);
+      if (showSpinner) setLoading(true);
       const params = filter !== 'all' ? { status: filter } : {};
       const response = await opportunitiesAPI.getMyApplications(params);
       setApplications(response.data.applications || []);
@@ -23,7 +32,7 @@ const MyApplications = () => {
       console.error('Error fetching applications:', error);
       toast.error('Failed to load applications');
     } finally {
-      setLoading(false);
+      if (showSpinner) setLoading(false);
     }
   };
 

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { opportunitiesAPI } from '../services/api';
 import Navbar from '../components/Navbar';
 import toast from 'react-hot-toast';
@@ -7,6 +7,7 @@ import toast from 'react-hot-toast';
 const OpportunityDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [opportunity, setOpportunity] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showApplicationModal, setShowApplicationModal] = useState(false);
@@ -19,20 +20,15 @@ const OpportunityDetails = () => {
   });
   const [submitting, setSubmitting] = useState(false);
 
-  // Platform and content type options
-  const platforms = ['Instagram', 'TikTok', 'YouTube', 'Facebook', 'Twitter', 'LinkedIn'];
-  const contentTypes = {
-    Instagram: ['Post', 'Reel', 'Story', 'IGTV'],
-    TikTok: ['Video', 'Livestream'],
-    YouTube: ['Video', 'Short', 'Livestream'],
-    Facebook: ['Post', 'Video', 'Story', 'Livestream'],
-    Twitter: ['Tweet', 'Thread'],
-    LinkedIn: ['Post', 'Article', 'Video']
-  };
-
   useEffect(() => {
     fetchOpportunityDetails();
   }, [id]);
+
+  useEffect(() => {
+    if (opportunity && searchParams.get('apply') === '1' && !opportunity.has_applied) {
+      openApplicationModal();
+    }
+  }, [opportunity, searchParams]);
 
   const fetchOpportunityDetails = async () => {
     try {
@@ -53,8 +49,11 @@ const OpportunityDetails = () => {
       // Prepopulate milestones with deliverables from campaign
       const prepopulatedMilestones = opportunity.milestones.map((milestone, idx) => ({
         id: idx,
+        campaign_milestone_id: milestone.id,
+        milestone_number: milestone.milestone_number || idx + 1,
         name: milestone.name,
-        due_date: milestone.due_date ? milestone.due_date.split('T')[0] : '',
+        campaign_due_date: milestone.due_date ? milestone.due_date.split('T')[0] : '',
+        proposed_due_date: '',
         deliverables: milestone.deliverables || [],
         price: '' // Creator can set price per milestone
       }));
@@ -73,81 +72,6 @@ const OpportunityDetails = () => {
       ...prev,
       milestones: prev.milestones.map((m, i) =>
         i === index ? { ...m, [field]: value } : m
-      )
-    }));
-  };
-
-  // Add new milestone
-  const addMilestone = () => {
-    setApplicationForm(prev => ({
-      ...prev,
-      milestones: [
-        ...prev.milestones,
-        {
-          id: prev.milestones.length,
-          name: '',
-          due_date: '',
-          deliverables: [],
-          price: ''
-        }
-      ]
-    }));
-  };
-
-  // Remove milestone
-  const removeMilestone = (index) => {
-    setApplicationForm(prev => ({
-      ...prev,
-      milestones: prev.milestones.filter((_, i) => i !== index)
-    }));
-  };
-
-  // Add deliverable to milestone
-  const addDeliverableToMilestone = (milestoneIndex) => {
-    setApplicationForm(prev => ({
-      ...prev,
-      milestones: prev.milestones.map((m, i) =>
-        i === milestoneIndex
-          ? {
-              ...m,
-              deliverables: [
-                ...m.deliverables,
-                { platform: 'Instagram', content_type: 'Post', quantity: 1 }
-              ]
-            }
-          : m
-      )
-    }));
-  };
-
-  // Update deliverable in milestone
-  const updateDeliverableInMilestone = (milestoneIndex, deliverableIndex, field, value) => {
-    setApplicationForm(prev => ({
-      ...prev,
-      milestones: prev.milestones.map((m, i) =>
-        i === milestoneIndex
-          ? {
-              ...m,
-              deliverables: m.deliverables.map((d, j) =>
-                j === deliverableIndex ? { ...d, [field]: value } : d
-              )
-            }
-          : m
-      )
-    }));
-  };
-
-  // Remove deliverable from milestone
-  const removeDeliverableFromMilestone = (milestoneIndex, deliverableIndex) => {
-    setApplicationForm(prev => ({
-      ...prev,
-      milestones: prev.milestones.map((m, i) =>
-        i === milestoneIndex
-          ? {
-              ...m,
-              deliverables: m.deliverables.filter((_, j) => j !== deliverableIndex)
-            }
-          : m
       )
     }));
   };
@@ -200,6 +124,12 @@ const OpportunityDetails = () => {
       return;
     }
 
+    const milestonesWithoutDueDate = applicationForm.milestones.filter(m => !m.proposed_due_date);
+    if (milestonesWithoutDueDate.length > 0) {
+      toast.error('Please propose a due date for every milestone');
+      return;
+    }
+
     // Validate each milestone has deliverables
     const milestonesWithoutDeliverables = applicationForm.milestones.filter(m => !m.deliverables || m.deliverables.length === 0);
     if (milestonesWithoutDeliverables.length > 0) {
@@ -227,9 +157,11 @@ const OpportunityDetails = () => {
         proposal_message: applicationForm.proposal_message,
         pricing_mode: pricingMode,
         milestones: applicationForm.milestones.map((m, idx) => ({
-          milestone_number: idx + 1,
+          campaign_milestone_id: m.campaign_milestone_id,
+          milestone_number: m.milestone_number || idx + 1,
           name: m.name,
-          due_date: m.due_date,
+          due_date: m.proposed_due_date,
+          campaign_due_date: m.campaign_due_date,
           deliverables: m.deliverables,
           price: pricingMode === 'per_milestone' ? String(m.price) : null
         })),
@@ -315,9 +247,10 @@ const OpportunityDetails = () => {
             </div>
             <button
               onClick={openApplicationModal}
+              disabled={opportunity.has_applied}
               className="px-6 py-3 bg-primary text-white rounded-xl hover:bg-primary-dark transition-colors font-medium"
             >
-              Apply Now
+              {opportunity.has_applied ? 'Application Submitted' : 'Apply Now'}
             </button>
           </div>
         </div>
@@ -517,9 +450,10 @@ const OpportunityDetails = () => {
             {/* Apply Button */}
             <button
               onClick={openApplicationModal}
-              className="w-full px-6 py-3 bg-primary text-white rounded-xl hover:bg-primary-dark transition-colors font-medium"
+              disabled={opportunity.has_applied}
+              className="w-full px-6 py-3 bg-primary text-white rounded-xl hover:bg-primary-dark transition-colors font-medium disabled:cursor-not-allowed disabled:opacity-60"
             >
-              Apply to This Opportunity
+              {opportunity.has_applied ? 'Application Submitted' : 'Apply to This Opportunity'}
             </button>
           </div>
         </div>
@@ -617,65 +551,45 @@ const OpportunityDetails = () => {
                     <label className="block text-sm font-medium text-gray-700">
                       Milestones & Deliverables <span className="text-red-500">*</span>
                     </label>
-                    <button
-                      type="button"
-                      onClick={addMilestone}
-                      className="px-4 py-2 bg-primary text-white rounded-xl hover:bg-primary-dark transition-colors text-sm"
-                    >
-                      + Add Milestone
-                    </button>
                   </div>
 
                   <p className="text-xs text-gray-600 mb-4">
-                    Review and edit the milestones from the campaign. You can add more deliverables or milestones as needed.
+                    Brand milestones and deliverables are locked. Add your proposed due date for each milestone.
                   </p>
 
                   {applicationForm.milestones.length === 0 ? (
                     <div className="text-center py-8 border-2 border-dashed border-gray-300 rounded-xl">
-                      <p className="text-gray-600 mb-3">No milestones added yet</p>
-                      <button
-                        type="button"
-                        onClick={addMilestone}
-                        className="px-4 py-2 bg-primary text-white rounded-xl hover:bg-primary-dark transition-colors text-sm"
-                      >
-                        Add First Milestone
-                      </button>
+                      <p className="text-gray-600">This campaign has no milestones configured.</p>
                     </div>
                   ) : (
                     <div className="space-y-4">
                       {applicationForm.milestones.map((milestone, mIdx) => (
                         <div key={mIdx} className="border-2 border-gray-200 rounded-xl p-4 bg-gray-50">
                           <div className="flex justify-between items-start mb-3">
-                            <h4 className="font-semibold text-gray-900">Milestone {mIdx + 1}</h4>
-                            <button
-                              type="button"
-                              onClick={() => removeMilestone(mIdx)}
-                              className="text-red-600 hover:text-red-700 text-sm font-medium"
-                            >
-                              Remove
-                            </button>
+                            <h4 className="font-semibold text-gray-900">Milestone {milestone.milestone_number || mIdx + 1}</h4>
                           </div>
 
                           {/* Milestone Name */}
                           <div className="mb-3">
                             <label className="block text-xs text-gray-600 mb-1">Name</label>
-                            <input
-                              type="text"
-                              value={milestone.name}
-                              onChange={(e) => updateMilestone(mIdx, 'name', e.target.value)}
-                              placeholder="e.g., Content Creation & Posting"
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                            />
+                            <div className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900">
+                              {milestone.name}
+                            </div>
                           </div>
 
                           <div className="grid grid-cols-2 gap-3 mb-3">
-                            {/* Due Date */}
                             <div>
-                              <label className="block text-xs text-gray-600 mb-1">Due Date</label>
+                              <label className="block text-xs text-gray-600 mb-1">Brand Due Date</label>
+                              <div className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700">
+                                {milestone.campaign_due_date || 'Not set'}
+                              </div>
+                            </div>
+                            <div>
+                              <label className="block text-xs text-gray-600 mb-1">Your Proposed Due Date</label>
                               <input
                                 type="date"
-                                value={milestone.due_date}
-                                onChange={(e) => updateMilestone(mIdx, 'due_date', e.target.value)}
+                                value={milestone.proposed_due_date}
+                                onChange={(e) => updateMilestone(mIdx, 'proposed_due_date', e.target.value)}
                                 min={opportunity.start_date ? opportunity.start_date.split('T')[0] : ''}
                                 max={opportunity.end_date ? opportunity.end_date.split('T')[0] : ''}
                                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
@@ -701,79 +615,21 @@ const OpportunityDetails = () => {
 
                           {/* Deliverables */}
                           <div>
-                            <div className="flex justify-between items-center mb-2">
-                              <label className="block text-xs text-gray-600">Deliverables</label>
-                              <button
-                                type="button"
-                                onClick={() => addDeliverableToMilestone(mIdx)}
-                                className="text-xs text-primary hover:text-primary-dark font-medium"
-                              >
-                                + Add Deliverable
-                              </button>
-                            </div>
+                            <label className="mb-2 block text-xs text-gray-600">Deliverables</label>
 
                             {milestone.deliverables.length === 0 ? (
                               <div className="text-center py-3 border border-dashed border-gray-300 rounded-lg bg-white">
-                                <p className="text-xs text-gray-500 mb-2">No deliverables</p>
-                                <button
-                                  type="button"
-                                  onClick={() => addDeliverableToMilestone(mIdx)}
-                                  className="text-xs text-primary hover:text-primary-dark font-medium"
-                                >
-                                  Add Deliverable
-                                </button>
+                                <p className="text-xs text-gray-500">No deliverables listed</p>
                               </div>
                             ) : (
-                              <div className="space-y-2">
+                              <div className="flex flex-wrap gap-2">
                                 {milestone.deliverables.map((deliverable, dIdx) => (
-                                  <div key={dIdx} className="flex gap-2 items-start bg-white p-3 rounded-lg border border-gray-200">
-                                    <div className="flex-1 grid grid-cols-3 gap-2">
-                                      <div>
-                                        <label className="block text-xs text-gray-500 mb-1">Platform</label>
-                                        <select
-                                          value={deliverable.platform}
-                                          onChange={(e) => updateDeliverableInMilestone(mIdx, dIdx, 'platform', e.target.value)}
-                                          className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-primary focus:border-transparent"
-                                        >
-                                          {platforms.map(p => (
-                                            <option key={p} value={p}>{p}</option>
-                                          ))}
-                                        </select>
-                                      </div>
-
-                                      <div>
-                                        <label className="block text-xs text-gray-500 mb-1">Type</label>
-                                        <select
-                                          value={deliverable.content_type}
-                                          onChange={(e) => updateDeliverableInMilestone(mIdx, dIdx, 'content_type', e.target.value)}
-                                          className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-primary focus:border-transparent"
-                                        >
-                                          {contentTypes[deliverable.platform]?.map(ct => (
-                                            <option key={ct} value={ct}>{ct}</option>
-                                          ))}
-                                        </select>
-                                      </div>
-
-                                      <div>
-                                        <label className="block text-xs text-gray-500 mb-1">Qty</label>
-                                        <input
-                                          type="number"
-                                          value={deliverable.quantity}
-                                          onChange={(e) => updateDeliverableInMilestone(mIdx, dIdx, 'quantity', parseInt(e.target.value) || 1)}
-                                          min="1"
-                                          className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:ring-2 focus:ring-primary focus:border-transparent"
-                                        />
-                                      </div>
-                                    </div>
-
-                                    <button
-                                      type="button"
-                                      onClick={() => removeDeliverableFromMilestone(mIdx, dIdx)}
-                                      className="mt-5 text-red-600 hover:text-red-700 text-xs font-medium"
-                                    >
-                                      Remove
-                                    </button>
-                                  </div>
+                                  <span
+                                    key={dIdx}
+                                    className="rounded-full bg-white px-3 py-1 text-xs font-medium text-gray-700 ring-1 ring-gray-200"
+                                  >
+                                    {deliverable.quantity}x {deliverable.platform} {deliverable.content_type}
+                                  </span>
                                 ))}
                               </div>
                             )}
