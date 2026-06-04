@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
-import { creatorsAPI, BASE_URL } from '../services/api';
+import { authAPI, creatorsAPI, BASE_URL } from '../services/api';
 import { useAuth } from '../hooks/useAuth';
 import Navbar from '../components/Navbar';
 import toast from 'react-hot-toast';
@@ -37,6 +37,7 @@ const CreatorProfileEdit = () => {
   const [showPortfolioModal, setShowPortfolioModal] = useState(false);
   const [editingPortfolioItem, setEditingPortfolioItem] = useState(null);
   const [portfolioRefreshKey, setPortfolioRefreshKey] = useState(0);
+  const [security, setSecurity] = useState({ can_enable_2fa: false, two_factor_enabled: false });
 
   const {
     register,
@@ -72,8 +73,12 @@ const CreatorProfileEdit = () => {
 
   const fetchProfile = async () => {
     try {
-      const response = await creatorsAPI.getOwnProfile();
+      const [response, authResponse] = await Promise.all([
+        creatorsAPI.getOwnProfile(),
+        authAPI.getCurrentUser(),
+      ]);
       const data = response.data;
+      setSecurity(authResponse.data.security || { can_enable_2fa: false, two_factor_enabled: false });
       setProfile(data);
       setProfilePicture(data.profile_picture);
 
@@ -111,6 +116,7 @@ const CreatorProfileEdit = () => {
       // Revision settings
       setValue('free_revisions', data.free_revisions !== undefined ? data.free_revisions : 2);
       setValue('revision_fee', data.revision_fee || 0);
+      setValue('two_factor_enabled', Boolean(authResponse.data.security?.two_factor_enabled));
 
     } catch (err) {
       setError('Failed to load profile');
@@ -376,6 +382,9 @@ const CreatorProfileEdit = () => {
       };
 
       const response = await creatorsAPI.updateProfile(payload);
+      await authAPI.updateSecurity({
+        two_factor_enabled: Boolean(data.two_factor_enabled),
+      });
 
       // Update the profile in auth context
       updateAuthProfile(response.data.creator);
@@ -1005,6 +1014,27 @@ const CreatorProfileEdit = () => {
                   </div>
                 </div>
               </div>
+            </div>
+
+            {/* Account Security */}
+            <div className="card">
+              <h2 className="text-xl font-bold text-dark mb-4">Account Security</h2>
+              <label className={`flex items-start gap-3 rounded-lg border p-4 ${security.can_enable_2fa ? 'border-gray-200 bg-white' : 'border-gray-200 bg-gray-50'}`}>
+                <input
+                  type="checkbox"
+                  className="mt-1 h-5 w-5 rounded border-gray-300 text-primary focus:ring-primary"
+                  disabled={!security.can_enable_2fa}
+                  {...register('two_factor_enabled')}
+                />
+                <span>
+                  <span className="block font-semibold text-dark">Email two-factor authentication</span>
+                  <span className="mt-1 block text-sm text-gray-600">
+                    {security.can_enable_2fa
+                      ? 'Require an email verification code after password login.'
+                      : 'Available for paid tier creator accounts.'}
+                  </span>
+                </span>
+              </label>
             </div>
 
             {/* Actions */}

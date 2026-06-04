@@ -333,6 +333,30 @@ Relevant files:
 - Always verify production with `curl -s -i http://localhost:8002/api/health` from the server after restarting.
 - Keep PostgreSQL intact. Never change production database settings to SQLite.
 
+## Auth Security Learned
+
+- Welcome email is sent only after OTP activation, not immediately at raw signup.
+  - OTP activation route: `POST /api/auth/verify-otp`
+  - Email helper: `send_welcome_email(user)`
+- Failed login lockout is account-level for both brands and creators:
+  - Fields on `users`: `failed_login_attempts`, `locked_until`
+  - After 5 failed password attempts, login is blocked for 15 minutes.
+  - Password reset clears failed-login counters and lockout.
+- Password reset already uses email links for both brands and creators:
+  - `POST /api/auth/forgot-password`
+  - `POST /api/auth/reset-password/<token>`
+- Email 2FA is available only for paid-tier users:
+  - Field on `users`: `two_factor_enabled`
+  - Settings endpoint: `PUT /api/auth/security`
+  - Login challenge endpoint: `POST /api/auth/login/verify-2fa`
+  - Brands qualify through active paid `subscriptions`.
+  - Creators qualify through active verified paid `creator_subscriptions`, with fallback support for paid main `subscriptions`.
+  - Frontend profile edit pages show the 2FA toggle for both user types, but backend enforces paid eligibility.
+- Migration:
+  - `backend/migrations/versions/202606041300_add_user_login_security_fields.py`
+- Deployment script:
+  - `deployment/DEPLOY-AUTH-SECURITY.bat`
+
 ## ThunziAI Integration Notes
 
 Read these before touching social platform connection, creator analytics, post metrics, audience demographics, or brand analytics.

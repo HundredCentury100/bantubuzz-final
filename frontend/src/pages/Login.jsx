@@ -7,10 +7,12 @@ import Navbar from '../components/Navbar';
 import SEO from '../components/SEO';
 
 const Login = () => {
-  const { login, googleLoginCreator } = useAuth();
+  const { login, verifyLogin2FA, googleLoginCreator } = useAuth();
   const [loading, setLoading] = useState(false);
   const [googleLoading, setGoogleLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [twoFactorEmail, setTwoFactorEmail] = useState('');
+  const [twoFactorCode, setTwoFactorCode] = useState('');
   const {
     register,
     handleSubmit,
@@ -20,9 +22,23 @@ const Login = () => {
   const onSubmit = async (data) => {
     setLoading(true);
     try {
-      await login(data);
+      const result = await login(data);
+      if (result?.requires_2fa) {
+        setTwoFactorEmail(result.email || data.email);
+      }
     } catch (error) {
       // Error handled by useAuth
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleVerify2FA = async (event) => {
+    event.preventDefault();
+    if (!twoFactorCode || twoFactorCode.length < 6) return;
+    setLoading(true);
+    try {
+      await verifyLogin2FA({ email: twoFactorEmail, code: twoFactorCode });
     } finally {
       setLoading(false);
     }
@@ -45,6 +61,46 @@ const Login = () => {
               <p className="text-gray-600">Login to your BantuBuzz account</p>
             </div>
 
+            {twoFactorEmail ? (
+            <form onSubmit={handleVerify2FA} className="space-y-6">
+              <div className="rounded-lg border border-primary/30 bg-primary/10 p-4 text-sm text-dark">
+                We sent a login verification code to {twoFactorEmail}.
+              </div>
+              <div>
+                <label htmlFor="two_factor_code" className="block text-sm font-medium text-dark mb-2">
+                  Verification Code
+                </label>
+                <input
+                  id="two_factor_code"
+                  type="text"
+                  inputMode="numeric"
+                  maxLength={6}
+                  className="input text-center text-2xl tracking-[0.35em]"
+                  placeholder="000000"
+                  value={twoFactorCode}
+                  onChange={(event) => setTwoFactorCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={loading || twoFactorCode.length !== 6}
+                className="btn btn-primary w-full"
+              >
+                {loading ? 'Verifying...' : 'Verify and Login'}
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setTwoFactorEmail('');
+                  setTwoFactorCode('');
+                }}
+                className="btn btn-secondary w-full"
+                disabled={loading}
+              >
+                Back to Login
+              </button>
+            </form>
+            ) : (
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
               {/* Email */}
               <div>
@@ -131,8 +187,10 @@ const Login = () => {
                 )}
               </button>
             </form>
+            )}
 
             {/* Google Sign In for Creators */}
+            {!twoFactorEmail && (
             <div className="mt-6 pt-6 border-t border-gray-200">
               <p className="text-center text-sm text-gray-500 mb-4">
                 Creator? Sign in with Google
@@ -165,8 +223,10 @@ const Login = () => {
                 )}
               </div>
             </div>
+            )}
 
             {/* Sign Up Links */}
+            {!twoFactorEmail && (
             <div className="mt-6 pt-6 border-t border-gray-200">
               <p className="text-center text-sm text-gray-600 mb-4">
                 Don't have an account?
@@ -180,6 +240,7 @@ const Login = () => {
                 </Link>
               </div>
             </div>
+            )}
           </div>
         </div>
       </div>

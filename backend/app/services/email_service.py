@@ -95,6 +95,87 @@ def send_otp_email(email, otp_code, purpose='registration'):
     send_email(subject, email, text_body, html_body)
 
 
+def send_welcome_email(user):
+    """Send welcome email after account activation."""
+    frontend_url = current_app.config.get('FRONTEND_URL', 'https://bantubuzz.com')
+    is_brand = user.user_type == 'brand'
+    dashboard_url = f"{frontend_url}/brand/dashboard" if is_brand else f"{frontend_url}/creator/dashboard"
+    account_label = 'brand' if is_brand else 'creator'
+    subject = "Welcome to BantuBuzz"
+    text_body = f"""
+Welcome to BantuBuzz!
+
+Your {account_label} account is now active.
+
+You can now sign in and start using your dashboard:
+{dashboard_url}
+
+Best regards,
+The BantuBuzz Team
+"""
+    html_body = f"""
+<html>
+<body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; background-color: #F9FAFB;">
+    <div style="background-color: #B5E61D; padding: 20px; text-align: center;">
+        <h1 style="color: #1F2937; margin: 0;">BantuBuzz</h1>
+    </div>
+    <div style="padding: 30px; background-color: white;">
+        <h2 style="color: #1F2937;">Welcome to BantuBuzz</h2>
+        <p style="color: #1F2937; line-height: 1.6;">
+            Your {account_label} account is now active. You can sign in and start using your dashboard.
+        </p>
+        <div style="text-align: center; margin: 30px 0;">
+            <a href="{dashboard_url}"
+               style="background-color: #B5E61D; color: #1F2937; padding: 12px 30px;
+                      text-decoration: none; border-radius: 5px; font-weight: bold;">
+                Open Dashboard
+            </a>
+        </div>
+    </div>
+    <div style="background-color: #1F2937; padding: 20px; text-align: center;">
+        <p style="color: #F3F4F6; margin: 0; font-size: 14px;">Powered by BantuBuzz</p>
+    </div>
+</body>
+</html>
+"""
+    send_email(subject, user.email, text_body, html_body)
+
+
+def send_two_factor_code_email(email, otp_code):
+    """Send email-based two-factor authentication code."""
+    subject = f"Your BantuBuzz login code: {otp_code}"
+    text_body = f"""
+Your BantuBuzz login code is: {otp_code}
+
+This code expires in 10 minutes. If you did not try to sign in, reset your password immediately.
+
+Best regards,
+The BantuBuzz Team
+"""
+    html_body = f"""
+<html>
+<body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+    <div style="background-color: #B5E61D; padding: 20px; text-align: center;">
+        <h1 style="color: #1F2937; margin: 0;">BantuBuzz</h1>
+    </div>
+    <div style="padding: 30px; background-color: #F3F4F6;">
+        <h2 style="color: #1F2937;">Login Verification Code</h2>
+        <p style="color: #1F2937;">Use this code to finish signing in:</p>
+        <div style="text-align: center; margin: 30px 0;">
+            <div style="background-color: #1F2937; color: #B5E61D; padding: 20px 40px;
+                        font-size: 32px; font-weight: bold; letter-spacing: 8px;
+                        border-radius: 10px; display: inline-block;">
+                {otp_code}
+            </div>
+        </div>
+        <p style="color: #6B7280; font-size: 14px;">This code expires in 10 minutes.</p>
+    </div>
+</body>
+</html>
+"""
+    send_email(subject, email, text_body, html_body)
+
+
 def send_verification_email(email, token):
     """Send email verification"""
     frontend_url = current_app.config['FRONTEND_URL']

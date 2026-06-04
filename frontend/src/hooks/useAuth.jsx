@@ -59,6 +59,9 @@ export const AuthProvider = ({ children }) => {
   const login = async (credentials) => {
     try {
       const response = await authAPI.login(credentials);
+      if (response.data?.requires_2fa) {
+        return response.data;
+      }
       const { access_token, refresh_token, user: userData, profile: profileData } = response.data;
 
       // Store tokens and user data
@@ -95,6 +98,34 @@ export const AuthProvider = ({ children }) => {
         const message = errorData?.error || 'Login failed';
         toast.error(message);
       }
+      throw error;
+    }
+  };
+
+  const verifyLogin2FA = async (data) => {
+    try {
+      const response = await authAPI.verifyLogin2FA(data);
+      const { access_token, refresh_token, user: userData, profile: profileData } = response.data;
+
+      localStorage.setItem('access_token', access_token);
+      localStorage.setItem('refresh_token', refresh_token);
+      localStorage.setItem('user', JSON.stringify(userData));
+      localStorage.setItem('profile', JSON.stringify(profileData));
+
+      setUser(userData);
+      setProfile(profileData);
+
+      toast.success('Login successful!');
+      if (userData.user_type === 'creator') {
+        navigate('/creator/dashboard');
+      } else {
+        navigate('/brand/dashboard');
+      }
+
+      return response.data;
+    } catch (error) {
+      const message = error.response?.data?.error || 'Invalid verification code';
+      toast.error(message);
       throw error;
     }
   };
@@ -213,6 +244,7 @@ export const AuthProvider = ({ children }) => {
     profile,
     loading,
     login,
+    verifyLogin2FA,
     logout,
     registerCreator,
     registerBrand,

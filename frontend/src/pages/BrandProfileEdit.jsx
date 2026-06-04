@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
-import { brandsAPI, BASE_URL } from '../services/api';
+import { authAPI, brandsAPI, BASE_URL } from '../services/api';
 import { useAuth } from '../hooks/useAuth';
 import Navbar from '../components/Navbar';
 import toast from 'react-hot-toast';
@@ -55,6 +55,7 @@ const BrandProfileEdit = () => {
   const [uploadingReportLogo, setUploadingReportLogo] = useState(false);
   const [logo, setLogo] = useState(null);
   const [reportLogo, setReportLogo] = useState(null);
+  const [security, setSecurity] = useState({ can_enable_2fa: false, two_factor_enabled: false });
 
   const {
     register,
@@ -74,8 +75,12 @@ const BrandProfileEdit = () => {
 
   const fetchProfile = async () => {
     try {
-      const response = await brandsAPI.getOwnProfile();
+      const [response, authResponse] = await Promise.all([
+        brandsAPI.getOwnProfile(),
+        authAPI.getCurrentUser(),
+      ]);
       const data = response.data;
+      setSecurity(authResponse.data.security || { can_enable_2fa: false, two_factor_enabled: false });
       setProfile(data);
       setLogo(data.logo);
       setReportLogo(data.report_logo || data.logo);
@@ -94,6 +99,7 @@ const BrandProfileEdit = () => {
       setValue('report_sender_name', data.report_sender_name || data.company_name || '');
       setValue('report_reply_to_email', data.report_reply_to_email || data.user?.email || '');
       setValue('report_email_signature', data.report_email_signature || '');
+      setValue('two_factor_enabled', Boolean(authResponse.data.security?.two_factor_enabled));
 
       // Social links
       setValue('facebook', data.social_links?.facebook || '');
@@ -195,6 +201,9 @@ const BrandProfileEdit = () => {
       };
 
       const response = await brandsAPI.updateProfile(payload);
+      await authAPI.updateSecurity({
+        two_factor_enabled: Boolean(data.two_factor_enabled),
+      });
 
       // Update the profile in auth context
       updateAuthProfile(response.data.brand);
@@ -605,6 +614,27 @@ const BrandProfileEdit = () => {
                   </div>
                 </div>
               )}
+            </div>
+
+            {/* Social Media */}
+            <div className="card">
+              <h2 className="text-xl font-bold text-dark mb-4">Account Security</h2>
+              <label className={`flex items-start gap-3 rounded-lg border p-4 ${security.can_enable_2fa ? 'border-gray-200 bg-white' : 'border-gray-200 bg-gray-50'}`}>
+                <input
+                  type="checkbox"
+                  className="mt-1 h-5 w-5 rounded border-gray-300 text-primary focus:ring-primary"
+                  disabled={!security.can_enable_2fa}
+                  {...register('two_factor_enabled')}
+                />
+                <span>
+                  <span className="block font-semibold text-dark">Email two-factor authentication</span>
+                  <span className="mt-1 block text-sm text-gray-600">
+                    {security.can_enable_2fa
+                      ? 'Require an email verification code after password login.'
+                      : 'Available for paid tier brand, agency, and enterprise accounts.'}
+                  </span>
+                </span>
+              </label>
             </div>
 
             {/* Social Media */}

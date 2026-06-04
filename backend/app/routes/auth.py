@@ -10,9 +10,101 @@ from datetime import datetime, timedelta, timezone
 import re
 from app import db
 from app.models import User, CreatorProfile, BrandProfile, OTP, Subscription, SubscriptionPlan
-from app.services.email_service import send_otp_email, send_verification_email, send_password_reset_email
+from app.models import CreatorSubscription, CreatorSubscriptionPlan
+from app.services.email_service import (
+    send_otp_email,
+    send_verification_email,
+    send_password_reset_email,
+    send_two_factor_code_email,
+    send_welcome_email,
+)
 
 bp = Blueprint('auth', __name__)
+MAX_FAILED_LOGIN_ATTEMPTS = 5
+LOGIN_LOCKOUT_MINUTES = 15
+
+
+def _issue_auth_response(user):
+    claims = {
+        'user_type': user.user_type,
+        'is_admin': user.is_admin,
+        'admin_role': user.admin_role if user.is_admin else None
+    }
+    access_token = create_access_token(
+        identity=str(user.id),
+        additional_claims=claims
+    )
+    refresh_token = create_refresh_token(identity=str(user.id))
+
+    profile = None
+    if user.user_type == 'creator' and user.creator_profile:
+        profile = user.creator_profile.to_dict()
+    elif user.user_type == 'brand' and user.brand_profile:
+        profile = user.brand_profile.to_dict()
+
+    return {
+        'access_token': access_token,
+        'refresh_token': refresh_token,
+        'user': user.to_dict(),
+        'profile': profile
+    }
+
+
+def _has_active_paid_subscription(user):
+    now = datetime.utcnow()
+    if user.user_type == 'brand':
+        subscription = Subscription.query.join(SubscriptionPlan).filter(
+            Subscription.user_id == user.id,
+            Subscription.status == 'active',
+            SubscriptionPlan.price_monthly > 0,
+        ).order_by(Subscription.created_at.desc()).first()
+        return bool(subscription and subscription.is_active())
+
+    if user.user_type == 'creator' and user.creator_profile:
+        creator_subscription = CreatorSubscription.query.join(CreatorSubscriptionPlan).filter(
+            CreatorSubscription.creator_id == user.creator_profile.id,
+            CreatorSubscription.status == 'active',
+            CreatorSubscription.payment_verified == True,
+            CreatorSubscriptionPlan.price > 0,
+            CreatorSubscription.end_date > now,
+        ).first()
+        if creator_subscription:
+            return True
+
+        subscription = Subscription.query.join(SubscriptionPlan).filter(
+            Subscription.user_id == user.id,
+            Subscription.status == 'active',
+            SubscriptionPlan.price_monthly > 0,
+        ).order_by(Subscription.created_at.desc()).first()
+        return bool(subscription and subscription.is_active())
+
+    return False
+
+
+def _reset_login_security(user):
+    user.failed_login_attempts = 0
+    user.locked_until = None
+
+
+def _register_failed_login(user):
+    user.failed_login_attempts = (user.failed_login_attempts or 0) + 1
+    if user.failed_login_attempts >= MAX_FAILED_LOGIN_ATTEMPTS:
+        user.locked_until = datetime.utcnow() + timedelta(minutes=LOGIN_LOCKOUT_MINUTES)
+    db.session.commit()
+
+
+def _login_locked_response(user):
+    now = datetime.utcnow()
+    if user.locked_until and user.locked_until > now:
+        minutes = max(1, int((user.locked_until - now).total_seconds() // 60) + 1)
+        return jsonify({
+            'error': f'Too many failed login attempts. Try again in {minutes} minutes.',
+            'locked_until': user.locked_until.isoformat(),
+        }), 429
+    if user.locked_until and user.locked_until <= now:
+        _reset_login_security(user)
+        db.session.commit()
+    return None
 
 
 @bp.route('/register/creator', methods=['POST'])
@@ -186,8 +278,22 @@ def login():
 
         # Find user
         user = User.query.filter_by(email=data['email'].lower()).first()
-        if not user or not user.check_password(data['password']):
+        if not user:
             return jsonify({'error': 'Invalid email or password'}), 401
+
+        locked_response = _login_locked_response(user)
+        if locked_response:
+            return locked_response
+
+        if not user.check_password(data['password']):
+            _register_failed_login(user)
+            remaining = max(0, MAX_FAILED_LOGIN_ATTEMPTS - (user.failed_login_attempts or 0))
+            if user.locked_until and user.locked_until > datetime.utcnow():
+                return _login_locked_response(user)
+            return jsonify({
+                'error': 'Invalid email or password',
+                'attempts_remaining': remaining
+            }), 401
 
         # Check if user is active
         if not user.is_active:
@@ -201,37 +307,72 @@ def login():
                 'email': user.email
             }), 403
 
+        _reset_login_security(user)
+
+        if user.two_factor_enabled:
+            if not _has_active_paid_subscription(user):
+                user.two_factor_enabled = False
+            else:
+                OTP.query.filter_by(
+                    user_id=user.id,
+                    purpose='login_2fa',
+                    is_used=False
+                ).update({'is_used': True})
+                otp = OTP(user_id=user.id, purpose='login_2fa', expiry_minutes=10)
+                db.session.add(otp)
+                db.session.commit()
+                send_two_factor_code_email(user.email, otp.code)
+                return jsonify({
+                    'requires_2fa': True,
+                    'message': 'A login verification code has been sent to your email.',
+                    'email': user.email
+                }), 200
+
         # Update last login
         user.update_last_login()
         db.session.commit()
 
-        # Create tokens with admin claims
-        claims = {
-            'user_type': user.user_type,
-            'is_admin': user.is_admin,
-            'admin_role': user.admin_role if user.is_admin else None
-        }
-        access_token = create_access_token(
-            identity=str(user.id),
-            additional_claims=claims
-        )
-        refresh_token = create_refresh_token(identity=str(user.id))
-
-        # Get profile data
-        profile = None
-        if user.user_type == 'creator' and user.creator_profile:
-            profile = user.creator_profile.to_dict()
-        elif user.user_type == 'brand' and user.brand_profile:
-            profile = user.brand_profile.to_dict()
-
-        return jsonify({
-            'access_token': access_token,
-            'refresh_token': refresh_token,
-            'user': user.to_dict(),
-            'profile': profile
-        }), 200
+        return jsonify(_issue_auth_response(user)), 200
 
     except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@bp.route('/login/verify-2fa', methods=['POST'])
+def verify_login_two_factor():
+    """Verify email 2FA code and complete login."""
+    try:
+        data = request.get_json() or {}
+        email = (data.get('email') or '').lower()
+        code = data.get('code')
+        if not email or not code:
+            return jsonify({'error': 'Email and code are required'}), 400
+
+        user = User.query.filter_by(email=email).first()
+        if not user:
+            return jsonify({'error': 'Invalid verification code'}), 400
+        if not user.is_active:
+            return jsonify({'error': 'Account is deactivated'}), 403
+
+        otp = OTP.query.filter_by(
+            user_id=user.id,
+            code=code,
+            purpose='login_2fa',
+            is_used=False
+        ).order_by(OTP.created_at.desc()).first()
+
+        if not otp or not otp.is_valid():
+            return jsonify({'error': 'Invalid or expired verification code'}), 400
+
+        otp.mark_as_used()
+        _reset_login_security(user)
+        user.update_last_login()
+        db.session.commit()
+
+        return jsonify(_issue_auth_response(user)), 200
+
+    except Exception as e:
+        db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
 
@@ -287,6 +428,7 @@ def verify_otp():
         otp.mark_as_used()
 
         db.session.commit()
+        send_welcome_email(user)
 
         return jsonify({
             'message': 'Email verified successfully',
@@ -396,13 +538,14 @@ def reset_password(token):
             return jsonify({'error': 'Invalid reset token'}), 400
 
         # Check if token is expired
-        if user.reset_token_expires < datetime.now(timezone.utc):
+        if user.reset_token_expires < datetime.utcnow():
             return jsonify({'error': 'Reset token has expired'}), 400
 
         # Update password
         user.set_password(new_password)
         user.reset_token = None
         user.reset_token_expires = None
+        _reset_login_security(user)
         db.session.commit()
 
         return jsonify({'message': 'Password reset successfully'}), 200
@@ -432,10 +575,48 @@ def get_current_user():
 
         return jsonify({
             'user': user.to_dict(),
-            'profile': profile
+            'profile': profile,
+            'security': {
+                'can_enable_2fa': _has_active_paid_subscription(user),
+                'two_factor_enabled': bool(user.two_factor_enabled),
+            }
         }), 200
 
     except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@bp.route('/security', methods=['PUT'])
+@jwt_required()
+def update_security_settings():
+    """Update user account security settings."""
+    try:
+        user_id = int(get_jwt_identity())
+        user = User.query.get(user_id)
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+
+        data = request.get_json() or {}
+        if 'two_factor_enabled' in data:
+            enabled = bool(data.get('two_factor_enabled'))
+            if enabled and not _has_active_paid_subscription(user):
+                return jsonify({'error': 'Email 2FA is available for paid tier users only'}), 403
+            user.two_factor_enabled = enabled
+
+        user.updated_at = datetime.utcnow()
+        db.session.commit()
+
+        return jsonify({
+            'message': 'Security settings updated',
+            'user': user.to_dict(),
+            'security': {
+                'can_enable_2fa': _has_active_paid_subscription(user),
+                'two_factor_enabled': bool(user.two_factor_enabled),
+            }
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
 

@@ -18,6 +18,9 @@ class User(db.Model):
     verification_token = db.Column(db.String(100), unique=True)
     reset_token = db.Column(db.String(100), unique=True)
     reset_token_expires = db.Column(db.DateTime)
+    failed_login_attempts = db.Column(db.Integer, default=0, nullable=False)
+    locked_until = db.Column(db.DateTime, nullable=True)
+    two_factor_enabled = db.Column(db.Boolean, default=False, nullable=False)
     last_login = db.Column(db.DateTime)
     # Google OAuth fields
     google_oauth_id = db.Column(db.String(255), unique=True, nullable=True)
@@ -82,6 +85,9 @@ class User(db.Model):
             'is_admin': self.is_admin,
             'admin_role': self.admin_role,
             'phone_number': self.phone_number,
+            'failed_login_attempts': self.failed_login_attempts or 0,
+            'locked_until': self.locked_until.isoformat() if self.locked_until else None,
+            'two_factor_enabled': bool(self.two_factor_enabled),
             'has_google_oauth': bool(self.google_oauth_id),
             'google_profile_picture': self.google_profile_picture,
             'is_messaging_restricted': self.is_messaging_restricted,
