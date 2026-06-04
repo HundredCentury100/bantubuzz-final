@@ -3,7 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { campaignsAPI, packagesAPI, BASE_URL } from '../services/api';
 import Navbar from '../components/Navbar';
 import toast from 'react-hot-toast';
-import { Search, Package, Check } from 'lucide-react';
+import { Search, Package, Check, ExternalLink } from 'lucide-react';
 import { PLATFORM_CONFIGS } from '../constants/platformConfig';
 
 const CampaignPackageBrowser = () => {
@@ -144,17 +144,17 @@ const CampaignPackageBrowser = () => {
         {/* Header */}
         <div className="mb-8">
           <Link
-            to="/brand/campaigns"
+            to={`/brand/campaigns/${campaignId}`}
             className="text-gray-600 hover:text-gray-900 flex items-center gap-2 mb-4"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
-            Back to Campaigns
+            Back to Campaign
           </Link>
 
           <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            Browse Packages for Campaign
+            Browse and Add Packages
           </h1>
           {campaign && (
             <p className="text-gray-600">
@@ -238,7 +238,7 @@ const CampaignPackageBrowser = () => {
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
                   </svg>
-                  {`Proceed to Payment ($${totalCost.toFixed(2)})`}
+                  {`Add to Campaign Cart ($${totalCost.toFixed(2)})`}
                 </>
               )}
             </button>
@@ -317,7 +317,21 @@ const CampaignPackageBrowser = () => {
                               {pkg.creator.total_followers.toLocaleString()} followers
                             </p>
                           )}
+                          {(pkg.creator.engagement_rate || pkg.creator.average_engagement_rate) && (
+                            <p className="text-sm text-gray-600">
+                              {Number(pkg.creator.engagement_rate || pkg.creator.average_engagement_rate).toFixed(2)}% engagement
+                            </p>
+                          )}
                         </div>
+                        {(pkg.creator.username || pkg.creator.id) && (
+                          <Link
+                            to={pkg.creator.username ? `/${pkg.creator.username}` : `/creator/${pkg.creator.id}`}
+                            onClick={(event) => event.stopPropagation()}
+                            className="inline-flex items-center gap-1 rounded-full border border-gray-200 px-3 py-1 text-xs font-medium text-gray-700 transition hover:bg-gray-50"
+                          >
+                            Profile <ExternalLink className="h-3 w-3" />
+                          </Link>
+                        )}
                       </div>
                     )}
 
@@ -370,7 +384,7 @@ const CampaignPackageBrowser = () => {
               disabled={loading || (campaign && totalCost > parseFloat(campaign.budget))}
               className="w-full bg-primary hover:bg-primary-dark text-white font-medium py-3 rounded-xl transition-colors disabled:opacity-50"
             >
-              Proceed to Payment
+              Add to Campaign Cart
             </button>
           </div>
         )}

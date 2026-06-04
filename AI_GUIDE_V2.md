@@ -223,6 +223,14 @@ Notes learned from this batch:
 - For YES-track package collaborations, approved draft content has a `url` but it is not a live post URL. Progress should count only deliverables with `post_url_validated=True`; approval caps progress at 80%, and 100% is reached only after every live URL/Post ID is submitted.
 - The package cart is brand-only state. Frontend cart storage should be scoped to the brand user and hidden/cleared for creator sessions to prevent a shared-browser creator account from seeing a brand's cart.
 
+## Campaign Draft And Sourcing Flow
+
+- Campaign creation should save the campaign as `draft` first, then route the brand to `/brand/campaigns/:id/created`.
+- The post-creation screen offers `Add Creators` or `Save as Draft`.
+- `Add Creators` routes to `/brand/campaigns/:id/source-creators`, which presents the three sourcing choices: invite creators, browse/add packages, or publish for applications.
+- Creator opportunity browsing only uses active campaigns, so draft campaigns stay hidden from creators.
+- Campaign edit must update the full brief/setup surface, including participation mode, budget fields, targeting, dates, and milestones. Editing the brief should not notify creators automatically.
+
 ## Bank Transfer Collaboration Fix
 
 Problem:

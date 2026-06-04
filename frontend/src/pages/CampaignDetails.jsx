@@ -11,6 +11,7 @@ import CampaignChatPanel from '../components/CampaignChatPanel';
 import CampaignChatWindow from '../components/CampaignChatWindow';
 import CampaignCart from '../components/CampaignCart';
 import toast from 'react-hot-toast';
+import { Megaphone, PackagePlus, Send } from 'lucide-react';
 
 const CampaignDetails = () => {
   const { id } = useParams();
@@ -244,7 +245,7 @@ const CampaignDetails = () => {
               <p className="text-gray-600">{campaign.description}</p>
             </div>
             <div className="flex gap-2">
-              {(campaign.status === 'active' || campaign.status === 'paused') && (
+              {campaign.status !== 'completed' && (
                 <button
                   onClick={() => setShowInviteModal(true)}
                   className="px-4 py-2 bg-primary text-white rounded-xl hover:bg-primary-dark transition-colors font-medium"
@@ -285,6 +286,66 @@ const CampaignDetails = () => {
             </div>
           </div>
         </div>
+
+        {/* Creator Sourcing Actions */}
+        {campaign.status !== 'completed' && (
+          <div className="mb-6 rounded-3xl bg-white p-5 shadow-lg">
+            <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 className="text-lg font-bold text-gray-900">Creator Sourcing</h2>
+                <p className="text-sm text-gray-600">Invite creators, add packages, or publish for applications at any time.</p>
+              </div>
+              <Link
+                to={`/brand/campaigns/${id}/source-creators`}
+                className="text-sm font-semibold text-primary-dark hover:underline"
+              >
+                Open sourcing screen
+              </Link>
+            </div>
+            <div className="grid gap-3 md:grid-cols-3">
+              <button
+                type="button"
+                onClick={() => setShowInviteModal(true)}
+                className="flex items-start gap-3 rounded-2xl border border-gray-200 p-4 text-left transition hover:border-primary hover:bg-primary/5"
+              >
+                <Send className="mt-1 h-5 w-5 flex-shrink-0 text-primary" />
+                <div>
+                  <p className="font-semibold text-gray-900">Invite Creators</p>
+                  <p className="mt-1 text-sm text-gray-600">Invite creators to apply or join directly.</p>
+                </div>
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate(`/brand/campaigns/${id}/browse-packages`)}
+                className="flex items-start gap-3 rounded-2xl border border-gray-200 p-4 text-left transition hover:border-primary hover:bg-primary/5"
+              >
+                <PackagePlus className="mt-1 h-5 w-5 flex-shrink-0 text-primary" />
+                <div>
+                  <p className="font-semibold text-gray-900">Browse and Add Packages</p>
+                  <p className="mt-1 text-sm text-gray-600">Add selected packages to the campaign cart.</p>
+                </div>
+              </button>
+              <button
+                type="button"
+                onClick={() => handleStatusChange('active')}
+                disabled={campaign.status === 'active' || !campaign.allows_applications}
+                className="flex items-start gap-3 rounded-2xl border border-gray-200 p-4 text-left transition hover:border-primary hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <Megaphone className="mt-1 h-5 w-5 flex-shrink-0 text-primary" />
+                <div>
+                  <p className="font-semibold text-gray-900">Publish for Applications</p>
+                  <p className="mt-1 text-sm text-gray-600">
+                    {campaign.status === 'active'
+                      ? 'Already visible to creators.'
+                      : campaign.allows_applications
+                        ? 'Make this campaign visible to creators.'
+                        : 'Applications are not enabled for this campaign.'}
+                  </p>
+                </div>
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Tabs */}
         <div className="flex gap-2 mb-6 border-b border-gray-200 overflow-x-auto">

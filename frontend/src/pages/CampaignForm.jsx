@@ -92,14 +92,14 @@ const CampaignForm = () => {
 
       // Parse deliverables from milestones
       const deliverables = [];
+      const deliverableIndexByKey = new Map();
       if (campaign.milestones && campaign.milestones.length > 0) {
         campaign.milestones.forEach(milestone => {
           if (milestone.deliverables && Array.isArray(milestone.deliverables)) {
             milestone.deliverables.forEach(d => {
-              if (!deliverables.find(del =>
-                del.platform === d.platform &&
-                del.content_type === d.content_type
-              )) {
+              const key = `${d.platform || ''}:${d.content_type || ''}:${d.quantity || 1}`;
+              if (!deliverableIndexByKey.has(key)) {
+                deliverableIndexByKey.set(key, deliverables.length);
                 deliverables.push(d);
               }
             });
@@ -117,11 +117,19 @@ const CampaignForm = () => {
         budget: campaign.budget || '',
         start_date: campaign.start_date ? campaign.start_date.split('T')[0] : '',
         end_date: campaign.end_date ? campaign.end_date.split('T')[0] : '',
-        milestones: (campaign.milestones || []).map((m, idx) => ({
-          deliverable_index: 0, // Will need to match
-          due_date: m.due_date ? m.due_date.split('T')[0] : '',
-          name: m.name
-        })),
+        milestones: (campaign.milestones || []).map((m, idx) => {
+          const firstDeliverable = Array.isArray(m.deliverables) && m.deliverables.length > 0
+            ? m.deliverables[0]
+            : null;
+          const key = firstDeliverable
+            ? `${firstDeliverable.platform || ''}:${firstDeliverable.content_type || ''}:${firstDeliverable.quantity || 1}`
+            : '';
+          return {
+            deliverable_index: deliverableIndexByKey.get(key) ?? 0,
+            due_date: m.due_date ? m.due_date.split('T')[0] : '',
+            name: m.name
+          };
+        }),
         participation_mode: campaign.participation_mode || 'proposals',
         budget_min: campaign.budget_min || '',
         budget_max: campaign.budget_max || '',
@@ -388,18 +396,19 @@ const CampaignForm = () => {
         target_categories: formData.target_categories,
         target_locations: formData.target_locations,
         milestones: finalMilestones,
-        status: formData.status
+        status: isEditMode ? formData.status : 'draft'
       };
 
       if (isEditMode) {
-        await campaignsAPI.updateCampaign(id, payload);
+        const response = await campaignsAPI.updateCampaign(id, payload);
         toast.success('Campaign updated successfully');
+        navigate(`/brand/campaigns/${response.data.campaign?.id || id}`);
       } else {
-        await campaignsAPI.createCampaign(payload);
+        const response = await campaignsAPI.createCampaign(payload);
         toast.success('Campaign created successfully');
+        const campaignId = response.data.campaign?.id;
+        navigate(campaignId ? `/brand/campaigns/${campaignId}/created` : '/brand/campaigns');
       }
-
-      navigate('/brand/campaigns');
     } catch (error) {
       console.error('Error saving campaign:', error);
 
@@ -987,20 +996,31 @@ const CampaignForm = () => {
                 </>
               )}
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Campaign Status
-                </label>
-                <select
-                  name="status"
-                  value={formData.status}
-                  onChange={handleChange}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent"
-                >
-                  <option value="draft">Draft (Not visible to creators)</option>
-                  <option value="active">Active (Visible to creators)</option>
-                </select>
-              </div>
+              {isEditMode ? (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Campaign Status
+                  </label>
+                  <select
+                    name="status"
+                    value={formData.status}
+                    onChange={handleChange}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent"
+                  >
+                    <option value="draft">Draft (Not visible to creators)</option>
+                    <option value="active">Active (Visible to creators)</option>
+                    <option value="paused">Paused</option>
+                    <option value="completed">Completed</option>
+                  </select>
+                </div>
+              ) : (
+                <div className="rounded-2xl border border-primary/30 bg-primary/10 p-4">
+                  <p className="text-sm font-semibold text-gray-900">Campaign will be saved as a draft first.</p>
+                  <p className="mt-1 text-sm text-gray-700">
+                    After setup, you can add creators, keep it as a draft, or publish it for applications.
+                  </p>
+                </div>
+              )}
             </div>
           )}
 
@@ -1034,7 +1054,7 @@ const CampaignForm = () => {
                   disabled={loading}
                   className="px-6 py-3 bg-primary text-white rounded-xl hover:bg-primary-dark transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {loading ? 'Saving...' : (isEditMode ? 'Update Campaign' : 'Create Campaign')}
+                  {loading ? 'Saving...' : (isEditMode ? 'Update Campaign' : 'Create Campaign Brief')}
                 </button>
               )}
             </div>

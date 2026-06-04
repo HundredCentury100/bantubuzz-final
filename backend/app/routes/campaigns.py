@@ -173,6 +173,9 @@ def create_campaign():
                 budget_allocation = None
                 if milestone_data.get('budget_allocation'):
                     budget_allocation = Decimal(str(milestone_data['budget_allocation']))
+                due_date = None
+                if milestone_data.get('due_date'):
+                    due_date = datetime.fromisoformat(milestone_data['due_date'].replace('Z', '+00:00'))
 
                 milestone = CampaignMilestone(
                     campaign_id=campaign.id,
@@ -181,7 +184,8 @@ def create_campaign():
                     description=milestone_data.get('description'),
                     deliverables=milestone_data.get('deliverables', []),
                     budget_allocation=budget_allocation,
-                    duration_days=milestone_data.get('duration_days')
+                    duration_days=milestone_data.get('duration_days'),
+                    due_date=due_date
                 )
                 db.session.add(milestone)
 
@@ -324,13 +328,56 @@ def update_campaign(campaign_id):
             else:
                 campaign.application_deadline = None
 
-        # Update budget fields (based on participation mode)
-        if 'budget' in data and data['budget']:
-            campaign.budget = Decimal(str(data['budget']))
-        if 'budget_min' in data and data['budget_min']:
-            campaign.budget_min = Decimal(str(data['budget_min']))
-        if 'budget_max' in data and data['budget_max']:
-            campaign.budget_max = Decimal(str(data['budget_max']))
+        if 'participation_mode' in data:
+            participation_mode = data.get('participation_mode') or campaign.participation_mode
+            if participation_mode not in ['packages', 'proposals', 'both']:
+                return jsonify({'error': 'Invalid participation mode'}), 400
+            campaign.participation_mode = participation_mode
+            campaign.allows_applications = participation_mode in ['proposals', 'both']
+            campaign.allows_packages = participation_mode in ['packages', 'both']
+
+        if 'requires_milestones' in data:
+            campaign.requires_milestones = bool(data.get('requires_milestones'))
+
+        participation_mode = campaign.participation_mode
+        if participation_mode in ['packages', 'both']:
+            if 'budget' in data:
+                campaign.budget = Decimal(str(data['budget'])) if data.get('budget') not in ['', None] else None
+        else:
+            campaign.budget = None
+
+        if participation_mode in ['proposals', 'both']:
+            if 'budget_min' in data:
+                campaign.budget_min = Decimal(str(data['budget_min'])) if data.get('budget_min') not in ['', None] else None
+            if 'budget_max' in data:
+                campaign.budget_max = Decimal(str(data['budget_max'])) if data.get('budget_max') not in ['', None] else None
+            if campaign.budget_min is not None and campaign.budget_max is not None and campaign.budget_min > campaign.budget_max:
+                return jsonify({'error': 'Budget min cannot be greater than budget max'}), 400
+        else:
+            campaign.budget_min = None
+            campaign.budget_max = None
+
+        if 'milestones' in data:
+            CampaignMilestone.query.filter_by(campaign_id=campaign.id).delete()
+            for milestone_data in data.get('milestones') or []:
+                budget_allocation = None
+                if milestone_data.get('budget_allocation') not in ['', None]:
+                    budget_allocation = Decimal(str(milestone_data['budget_allocation']))
+                due_date = None
+                if milestone_data.get('due_date'):
+                    due_date = datetime.fromisoformat(milestone_data['due_date'].replace('Z', '+00:00'))
+
+                milestone = CampaignMilestone(
+                    campaign_id=campaign.id,
+                    milestone_number=milestone_data['milestone_number'],
+                    name=milestone_data['name'],
+                    description=milestone_data.get('description'),
+                    deliverables=milestone_data.get('deliverables', []),
+                    budget_allocation=budget_allocation,
+                    duration_days=milestone_data.get('duration_days'),
+                    due_date=due_date
+                )
+                db.session.add(milestone)
 
         campaign.updated_at = datetime.now(timezone.utc)
         db.session.commit()

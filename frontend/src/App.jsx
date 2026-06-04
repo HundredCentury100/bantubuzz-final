@@ -41,6 +41,8 @@ import BlockedUsers from './pages/BlockedUsers';
 import Notifications from './pages/Notifications';
 import Campaigns from './pages/Campaigns';
 import CampaignForm from './pages/CampaignForm';
+import CampaignCreated from './pages/CampaignCreated';
+import CampaignSourcing from './pages/CampaignSourcing';
 import CampaignPackageBrowser from './pages/CampaignPackageBrowser';
 import CampaignDetails from './pages/CampaignDetails';
 import BrowseCampaigns from './pages/BrowseCampaigns';
@@ -478,6 +480,22 @@ function App() {
         element={
           <ProtectedRoute requiredType="brand">
             <CampaignForm />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/brand/campaigns/:id/created"
+        element={
+          <ProtectedRoute requiredType="brand">
+            <CampaignCreated />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/brand/campaigns/:id/source-creators"
+        element={
+          <ProtectedRoute requiredType="brand">
+            <CampaignSourcing />
           </ProtectedRoute>
         }
       />
