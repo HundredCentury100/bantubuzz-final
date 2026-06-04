@@ -11,20 +11,24 @@ def send_async_email(app, msg):
         mail.send(msg)
 
 
-def send_email(subject, recipients, text_body, html_body=None):
+def send_email(subject, recipients, text_body, html_body=None, sender_name='BantuBuzz', reply_to=None, attachments=None):
     """Send email"""
     # Format sender with display name using email.utils.formataddr
-    sender_email = current_app.config.get('MAIL_USERNAME', 'user@bantubuzz.com')
-    sender_display = formataddr(('BantuBuzz', sender_email))
+    sender_email = current_app.config.get('MAIL_DEFAULT_SENDER') or current_app.config.get('MAIL_USERNAME', 'user@bantubuzz.com')
+    sender_display = formataddr((sender_name or 'BantuBuzz', sender_email))
 
     msg = Message(
         subject=subject,
         recipients=recipients if isinstance(recipients, list) else [recipients],
-        sender=sender_display
+        sender=sender_display,
+        reply_to=reply_to
     )
     msg.body = text_body
     if html_body:
         msg.html = html_body
+    for attachment in attachments or []:
+        filename, content_type, data = attachment
+        msg.attach(filename, content_type, data)
 
     # Send asynchronously
     Thread(target=send_async_email, args=(current_app._get_current_object(), msg)).start()

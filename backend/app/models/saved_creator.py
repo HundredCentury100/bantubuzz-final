@@ -8,10 +8,13 @@ class SavedCreator(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     brand_id = db.Column(db.Integer, db.ForeignKey('brand_profiles.id'), nullable=False)
     creator_id = db.Column(db.Integer, db.ForeignKey('creator_profiles.id'), nullable=False)
+    workspace_id = db.Column(db.Integer, db.ForeignKey('client_workspaces.id', ondelete='SET NULL'), nullable=True, index=True)
     saved_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     # Unique constraint to prevent duplicate saves
-    __table_args__ = (db.UniqueConstraint('brand_id', 'creator_id', name='unique_brand_creator'),)
+    __table_args__ = (db.UniqueConstraint('brand_id', 'workspace_id', 'creator_id', name='unique_brand_workspace_creator'),)
+
+    workspace = db.relationship('ClientWorkspace', backref=db.backref('saved_creators', lazy='dynamic'))
 
     def to_dict(self):
         """Convert saved creator to dictionary"""
@@ -19,6 +22,7 @@ class SavedCreator(db.Model):
             'id': self.id,
             'brand_id': self.brand_id,
             'creator_id': self.creator_id,
+            'workspace_id': self.workspace_id,
             'saved_at': self.saved_at.isoformat()
         }
 

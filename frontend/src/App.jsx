@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './hooks/useAuth';
 import ScrollToTop from './components/ScrollToTop';
 import { SubscriptionProvider } from './contexts/SubscriptionContext';
+import { WorkspaceProvider } from './contexts/WorkspaceContext';
 import SubscriptionWrapper from './components/SubscriptionWrapper';
 
 // Pages
@@ -15,6 +16,9 @@ import CreatorProfileEdit from './pages/CreatorProfileEdit';
 import PackageManagement from './pages/PackageManagement';
 import PackageForm from './pages/PackageForm';
 import BrandDashboard from './pages/BrandDashboard';
+import AgencyDashboard from './pages/AgencyDashboard';
+import WorkspaceManage from './pages/WorkspaceManage';
+import WorkspaceInvite from './pages/WorkspaceInvite';
 import BrandProfileEdit from './pages/BrandProfileEdit';
 import BrandAnalytics from './pages/BrandAnalytics';
 import BrandAnalyticsOverview from './pages/BrandAnalyticsOverview';
@@ -179,7 +183,8 @@ const AdminRoute = ({ children }) => {
 function App() {
   return (
     <SubscriptionProvider>
-      <SubscriptionWrapper>
+      <WorkspaceProvider>
+        <SubscriptionWrapper>
         <ScrollToTop />
         <Routes>
       {/* Public Routes */}
@@ -421,6 +426,22 @@ function App() {
         element={
           <ProtectedRoute requiredType="brand">
             <BrandDashboard />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/brand/agency"
+        element={
+          <ProtectedRoute requiredType="brand">
+            <AgencyDashboard />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/brand/workspaces/:id"
+        element={
+          <ProtectedRoute requiredType="brand">
+            <WorkspaceManage />
           </ProtectedRoute>
         }
       />
@@ -873,6 +894,7 @@ function App() {
       <Route path="/success-stories" element={<SuccessStories />} />
       <Route path="/contact" element={<Contact />} />
       <Route path="/pricing" element={<Pricing />} />
+      <Route path="/brand/workspace-invite/:token" element={<WorkspaceInvite />} />
       <Route path="/privacy" element={<PrivacyPolicy />} />
       <Route path="/terms" element={<TermsOfService />} />
 
@@ -931,7 +953,8 @@ function App() {
       {/* 404 */}
       <Route path="*" element={<NotFound />} />
     </Routes>
-      </SubscriptionWrapper>
+        </SubscriptionWrapper>
+      </WorkspaceProvider>
     </SubscriptionProvider>
   );
 }

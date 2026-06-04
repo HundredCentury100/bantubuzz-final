@@ -111,6 +111,10 @@ def register_brand():
         if not all(field in data for field in required_fields):
             return jsonify({'error': 'Missing required fields'}), 400
 
+        account_type = data.get('account_type', 'brand')
+        if account_type not in ['brand', 'agency', 'enterprise']:
+            return jsonify({'error': 'Invalid account type'}), 400
+
         # Check if user already exists
         if User.query.filter_by(email=data['email'].lower()).first():
             return jsonify({'error': 'Email already registered'}), 409
@@ -127,7 +131,9 @@ def register_brand():
         # Create brand profile
         brand_profile = BrandProfile(
             user_id=user.id,
-            company_name=data['company_name']
+            company_name=data['company_name'],
+            account_type=account_type,
+            expected_workspace_count=data.get('expected_workspace_count')
         )
         db.session.add(brand_profile)
 

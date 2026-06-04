@@ -403,7 +403,7 @@ class AnalyticsService:
         return mentions
 
     @staticmethod
-    def get_all_collaborations_summary(brand_id: int) -> Dict:
+    def get_all_collaborations_summary(brand_id: int, workspace_id: int = None) -> Dict:
         """
         Get summary analytics across all collaborations for a brand
 
@@ -420,9 +420,10 @@ class AnalyticsService:
                 return None
 
             # Get all collaborations for this brand
-            collaborations = Collaboration.query.filter_by(
-                brand_id=brand_profile.id
-            ).all()
+            collaborations_query = Collaboration.query.filter_by(brand_id=brand_profile.id)
+            if workspace_id:
+                collaborations_query = collaborations_query.filter_by(workspace_id=workspace_id)
+            collaborations = collaborations_query.all()
 
             if not collaborations:
                 return {

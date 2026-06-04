@@ -29,6 +29,7 @@ from .connected_platform import ConnectedPlatform
 from .post_metrics import PostMetrics
 from .portfolio_item import PortfolioItem
 from .smilepay_transaction import SmilePayTransaction
+from .client_workspace import ClientWorkspace, WorkspaceAddon, WorkspaceInvitation, WorkspaceMemberPermission
 
 # Trust & Safety models
 from .user_block import UserBlock
@@ -117,6 +118,10 @@ __all__ = [
     'CampaignCartItem',
     'PortfolioItem',
     'SmilePayTransaction',
+    'ClientWorkspace',
+    'WorkspaceAddon',
+    'WorkspaceInvitation',
+    'WorkspaceMemberPermission',
     'CreatorSubscriptionPlan',
     'CreatorSubscription',
     'VerificationApplication',

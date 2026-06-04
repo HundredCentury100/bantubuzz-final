@@ -34,6 +34,7 @@ class Campaign(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     brand_id = db.Column(db.Integer, db.ForeignKey('brand_profiles.id', ondelete='CASCADE'), nullable=False)
+    workspace_id = db.Column(db.Integer, db.ForeignKey('client_workspaces.id', ondelete='SET NULL'), nullable=True, index=True)
     brief_id = db.Column(db.Integer, db.ForeignKey('briefs.id', ondelete='SET NULL'))
 
     # Basic Info
@@ -82,6 +83,7 @@ class Campaign(db.Model):
     # Relationships
     # Note: 'brand' backref is defined in BrandProfile.campaigns relationship
     brand = db.relationship('BrandProfile', back_populates='campaigns')
+    workspace = db.relationship('ClientWorkspace', backref=db.backref('campaigns', lazy='dynamic'))
     milestones = db.relationship('CampaignMilestone', backref='campaign', lazy='dynamic', cascade='all, delete-orphan', order_by='CampaignMilestone.milestone_number')
     proposals = db.relationship('CampaignProposal', backref='campaign', lazy='dynamic', cascade='all, delete-orphan')
     packages = db.relationship('Package', secondary=campaign_packages, backref='campaigns')
@@ -94,6 +96,7 @@ class Campaign(db.Model):
         result = {
             'id': self.id,
             'brand_id': self.brand_id,
+            'workspace_id': self.workspace_id,
             'brief_id': self.brief_id,
             'title': self.title,
             'description': self.description,

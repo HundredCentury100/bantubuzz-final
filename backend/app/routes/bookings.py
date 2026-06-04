@@ -11,6 +11,7 @@ from app.models import (
 from app.services.payment_service import initiate_payment, check_payment_status, process_payment_webhook
 from app.utils.notifications import notify_booking_status
 from app.services.product_notifications import notify_collaboration_active, notify_creator_new_booking
+from app.services.workspace_service import get_request_workspace_id, require_workspace_access, scope_query_to_workspace
 
 bp = Blueprint('bookings', __name__)
 
@@ -107,6 +108,11 @@ def get_bookings():
             if not brand:
                 return jsonify({'bookings': [], 'total': 0, 'pages': 0, 'current_page': 1}), 200
             query = Booking.query.filter_by(brand_id=brand.id)
+            workspace_id = get_request_workspace_id()
+            workspace, workspace_error, workspace_status = require_workspace_access(user_id, workspace_id)
+            if workspace_error:
+                return jsonify({'error': workspace_error}), workspace_status
+            query = scope_query_to_workspace(query, Booking, workspace.id if workspace else None)
 
         pagination = query.order_by(Booking.created_at.desc()).paginate(
             page=page, per_page=per_page, error_out=False
@@ -181,6 +187,15 @@ def create_booking():
                 }), 403
 
         data = request.get_json()
+        workspace_id = get_request_workspace_id(data)
+        workspace, workspace_error, workspace_status = require_workspace_access(
+            user_id,
+            workspace_id,
+            'can_manage_campaigns',
+        )
+        if workspace_error:
+            return jsonify({'error': workspace_error}), workspace_status
+
         if 'package_id' not in data:
             return jsonify({'error': 'Package ID is required'}), 400
 
@@ -191,6 +206,7 @@ def create_booking():
         booking = Booking(
             package_id=package.id,
             campaign_id=data.get('campaign_id'),
+            workspace_id=workspace.id if workspace else None,
             creator_id=package.creator_id,
             brand_id=brand.id,
             amount=package.price,
@@ -273,6 +289,7 @@ def update_booking_status(booking_id):
                     booking_id=booking.id,
                     creator_id=booking.creator_id,
                     brand_id=booking.brand_id,
+                    workspace_id=booking.workspace_id,
                     title=f"Collaboration for {package.title if package else 'Package'}",
                     description=package.description if package else '',
                     amount=booking.amount,
@@ -734,6 +751,7 @@ def cart_payment_status():
                         booking_id=booking.id,
                         creator_id=booking.creator_id,
                         brand_id=booking.brand_id,
+                        workspace_id=booking.workspace_id,
                         title=f"Collaboration for {package.title if package else 'Package'}",
                         description=package.description if package else '',
                         amount=booking.amount,
@@ -1034,6 +1052,7 @@ def cart_pay_with_wallet():
                 booking_id=booking.id,
                 creator_id=booking.creator_id,
                 brand_id=booking.brand_id,
+                workspace_id=booking.workspace_id,
                 title=f"Collaboration for {package.title}",
                 description=package.description or '',
                 amount=booking.amount,
@@ -1397,6 +1416,7 @@ def verify_bank_transfer_payment(booking_id):
                         collaboration_type='campaign',
                         campaign_application_id=application.id,
                         brand_id=booking.brand_id,
+                        workspace_id=booking.workspace_id or (campaign.workspace_id if campaign else None),
                         creator_id=booking.creator_id,
                         title=campaign.title if campaign else 'Campaign Collaboration',
                         description=campaign.description if campaign else '',
@@ -1458,6 +1478,7 @@ def verify_bank_transfer_payment(booking_id):
                     collaboration_type='package',  # Brief creates package-like collab
                     booking_id=booking.id,
                     brand_id=booking.brand_id,
+                    workspace_id=booking.workspace_id,
                     creator_id=booking.creator_id,
                     brief_id=proposal.brief_id,
                     source_type='brief',
@@ -1563,6 +1584,7 @@ def verify_bank_transfer_payment(booking_id):
                     collaboration_type='package',
                     booking_id=booking.id,
                     brand_id=booking.brand_id,
+                    workspace_id=booking.workspace_id or (campaign.workspace_id if campaign else None),
                     creator_id=booking.creator_id,
                     title=f"{campaign.title if campaign else 'Campaign'} - {booking.package.title}",
                     description=booking.package.description,
@@ -1622,6 +1644,7 @@ def verify_bank_transfer_payment(booking_id):
                     booking_id=booking.id,
                     creator_id=booking.creator_id,
                     brand_id=booking.brand_id,
+                    workspace_id=booking.workspace_id,
                     title=f"Collaboration for {package.title if package else 'Package'}",
                     description=package.description if package else '',
                     amount=booking.amount,

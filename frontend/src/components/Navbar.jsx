@@ -23,6 +23,7 @@ import { messagingService } from '../services/messagingAPI';
 import { creatorsAPI, brandsAPI } from '../services/api';
 import Avatar from './Avatar';
 import api from '../services/api';
+import { useWorkspace } from '../contexts/WorkspaceContext';
 
 const Navbar = () => {
   const { isAuthenticated, user, logout } = useAuth();
@@ -32,6 +33,16 @@ const Navbar = () => {
   const [userProfile, setUserProfile] = useState(null);
   const [walletBalance, setWalletBalance] = useState(0);
   const [creatorEarnings, setCreatorEarnings] = useState(0);
+  const {
+    workspaces,
+    selectedWorkspaceId,
+    isAgency,
+    workspaceMeta,
+    selectWorkspace,
+  } = useWorkspace() || {};
+  const workspaceLanguage = workspaceMeta?.language || {};
+  const workspaceNavLabel = workspaceLanguage.account_type === 'enterprise' ? 'Enterprise' : 'Agency';
+  const workspacePluralLabel = workspaceLanguage.workspace_plural || 'clients';
 
   // Helper function to check if a link is active
   const isActive = (path) => {
@@ -124,6 +135,11 @@ const Navbar = () => {
 
   const handleLogout = () => {
     logout();
+  };
+
+  const handleWorkspaceChange = (workspaceId) => {
+    selectWorkspace(workspaceId);
+    window.location.reload();
   };
 
   const mobileBottomItems = user?.user_type === 'brand'
@@ -226,6 +242,16 @@ const Navbar = () => {
                 </Link>
                 {user?.user_type === 'brand' && (
                   <>
+                    {isAgency && (
+                      <Link
+                        to="/brand/agency"
+                        className={`text-gray-700 hover:text-gray-900 transition-colors text-sm font-medium ${
+                          isActive('/brand/agency') ? 'border-b-2 border-primary pb-1' : ''
+                        }`}
+                      >
+                        {workspaceNavLabel}
+                      </Link>
+                    )}
                     <Link
                       to="/brand/analytics"
                       className={`text-gray-700 hover:text-gray-900 transition-colors text-sm font-medium ${
@@ -262,6 +288,21 @@ const Navbar = () => {
                 >
                   Collaborations
                 </Link>
+                {user?.user_type === 'brand' && isAgency && (
+                  <select
+                    value={selectedWorkspaceId || 'all'}
+                    onChange={(event) => handleWorkspaceChange(event.target.value)}
+                    className="max-w-[180px] rounded-full border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                    title="Client workspace"
+                  >
+                    <option value="all">All {workspacePluralLabel}</option>
+                    {(workspaces || []).map((workspace) => (
+                      <option key={workspace.id} value={workspace.id}>
+                        {workspace.name}
+                      </option>
+                    ))}
+                  </select>
+                )}
                 <Link
                   to="/messages"
                   className={`text-gray-700 hover:text-gray-900 transition-colors relative p-2 ${
@@ -515,6 +556,20 @@ const Navbar = () => {
                             </Link>
                           )}
                         </Menu.Item>
+                        {user?.user_type === 'brand' && isAgency && (
+                          <Menu.Item>
+                            {({ active }) => (
+                              <Link
+                                to="/brand/agency"
+                                className={`${
+                                  active || isActive('/brand/agency') ? 'bg-light' : ''
+                                } block px-4 py-2 text-sm text-gray-700 rounded-lg`}
+                              >
+                                {workspaceNavLabel}
+                              </Link>
+                            )}
+                          </Menu.Item>
+                        )}
                         {user?.user_type === 'brand' && (
                           <Menu.Item>
                             {({ active }) => (
@@ -542,6 +597,25 @@ const Navbar = () => {
                               </Link>
                             )}
                           </Menu.Item>
+                        )}
+                        {user?.user_type === 'brand' && isAgency && (
+                          <div className="px-4 py-2">
+                            <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">
+                              Client
+                            </label>
+                            <select
+                              value={selectedWorkspaceId || 'all'}
+                              onChange={(event) => handleWorkspaceChange(event.target.value)}
+                              className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                            >
+                              <option value="all">All {workspacePluralLabel}</option>
+                              {(workspaces || []).map((workspace) => (
+                                <option key={workspace.id} value={workspace.id}>
+                                  {workspace.name}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
                         )}
                         {user?.user_type === 'creator' && (
                           <Menu.Item>

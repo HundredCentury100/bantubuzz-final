@@ -22,6 +22,27 @@ const INDUSTRIES = [
 
 const COMPANY_SIZES = ['1-10', '11-50', '51-200', '201-500', '500+'];
 
+const ACCOUNT_TYPES = {
+  brand: {
+    title: 'Brand',
+    description: 'For one company booking creators for its own campaigns.',
+    countLabel: 'Number of Brands or Clients',
+    countPlaceholder: '1',
+  },
+  agency: {
+    title: 'Agency',
+    description: 'For teams managing creator campaigns across multiple client brands.',
+    countLabel: 'Number of Clients',
+    countPlaceholder: '5',
+  },
+  enterprise: {
+    title: 'Enterprise',
+    description: 'For organisations managing campaigns across multiple brands or business units.',
+    countLabel: 'Number of Brands',
+    countPlaceholder: '10',
+  },
+};
+
 const BrandProfileEdit = () => {
   const navigate = useNavigate();
   const { updateProfile: updateAuthProfile } = useAuth();
@@ -31,14 +52,21 @@ const BrandProfileEdit = () => {
   const [profile, setProfile] = useState(null);
   const [loadingProfile, setLoadingProfile] = useState(true);
   const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [uploadingReportLogo, setUploadingReportLogo] = useState(false);
   const [logo, setLogo] = useState(null);
+  const [reportLogo, setReportLogo] = useState(null);
 
   const {
     register,
     handleSubmit,
     setValue,
+    watch,
     formState: { errors },
   } = useForm();
+  const selectedAccountType = watch('account_type') || profile?.account_type || 'brand';
+  const selectedAccountConfig = ACCOUNT_TYPES[selectedAccountType] || ACCOUNT_TYPES.brand;
+  const reportColor = watch('report_brand_color') || '#B5E61D';
+  const reportSecondaryColor = watch('report_secondary_color') || '#1F2937';
 
   useEffect(() => {
     fetchProfile();
@@ -50,6 +78,7 @@ const BrandProfileEdit = () => {
       const data = response.data;
       setProfile(data);
       setLogo(data.logo);
+      setReportLogo(data.report_logo || data.logo);
 
       // Set form values
       setValue('company_name', data.company_name || '');
@@ -58,6 +87,13 @@ const BrandProfileEdit = () => {
       setValue('industry', data.industry || '');
       setValue('company_size', data.company_size || '');
       setValue('location', data.location || '');
+      setValue('account_type', data.account_type || 'brand');
+      setValue('expected_workspace_count', data.expected_workspace_count || '');
+      setValue('report_brand_color', data.report_brand_color || '#B5E61D');
+      setValue('report_secondary_color', data.report_secondary_color || '#1F2937');
+      setValue('report_sender_name', data.report_sender_name || data.company_name || '');
+      setValue('report_reply_to_email', data.report_reply_to_email || data.user?.email || '');
+      setValue('report_email_signature', data.report_email_signature || '');
 
       // Social links
       setValue('facebook', data.social_links?.facebook || '');
@@ -100,6 +136,32 @@ const BrandProfileEdit = () => {
     }
   };
 
+  const handleReportLogoUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please select an image file');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('File size must be less than 5MB');
+      return;
+    }
+
+    setUploadingReportLogo(true);
+    try {
+      const response = await brandsAPI.uploadReportLogo(file);
+      setReportLogo(response.data.report_logo);
+      toast.success('Report logo uploaded successfully');
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to upload report logo');
+    } finally {
+      setUploadingReportLogo(false);
+    }
+  };
+
   const onSubmit = async (data) => {
     setLoading(true);
     setError('');
@@ -122,6 +184,13 @@ const BrandProfileEdit = () => {
         industry: data.industry,
         company_size: data.company_size,
         location: data.location,
+        account_type: data.account_type || 'brand',
+        expected_workspace_count: data.expected_workspace_count || 0,
+        report_brand_color: data.report_brand_color || '#B5E61D',
+        report_secondary_color: data.report_secondary_color || '#1F2937',
+        report_sender_name: data.report_sender_name || '',
+        report_reply_to_email: data.report_reply_to_email || '',
+        report_email_signature: data.report_email_signature || '',
         social_links: socialLinks
       };
 
@@ -339,6 +408,203 @@ const BrandProfileEdit = () => {
                   {...register('location')}
                 />
               </div>
+            </div>
+
+            {/* Account Type */}
+            <div className="card">
+              <h2 className="text-xl font-bold text-dark mb-4">Account Type</h2>
+              <p className="text-sm text-gray-600 mb-5">
+                Choose how BantuBuzz should structure your workspace. Agency and Enterprise accounts unlock separated workspaces with tailored language.
+              </p>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {Object.entries(ACCOUNT_TYPES).map(([value, option]) => (
+                  <label
+                    key={value}
+                    className="relative cursor-pointer rounded-lg border border-gray-200 bg-white p-4 hover:border-primary transition-colors"
+                  >
+                    <input
+                      type="radio"
+                      value={value}
+                      className="peer sr-only"
+                      {...register('account_type')}
+                    />
+                    <div className="absolute right-3 top-3 h-4 w-4 rounded-full border border-gray-300 peer-checked:border-primary peer-checked:bg-primary"></div>
+                    <div className="pr-6">
+                      <h3 className="font-bold text-dark">{option.title}</h3>
+                      <p className="text-sm text-gray-600 mt-2">{option.description}</p>
+                    </div>
+                    <div className="absolute inset-0 rounded-lg border-2 border-transparent peer-checked:border-primary pointer-events-none"></div>
+                  </label>
+                ))}
+              </div>
+
+              <div className="mt-6">
+                <label className="block text-sm font-medium text-dark mb-2">
+                  {selectedAccountConfig.countLabel}
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  className="input"
+                  placeholder={selectedAccountConfig.countPlaceholder}
+                  {...register('expected_workspace_count', { valueAsNumber: true })}
+                />
+              </div>
+
+              <div className="mt-6">
+                <label className="block text-sm font-medium text-dark mb-2">
+                  Report Accent Color
+                </label>
+                <div className="flex items-center gap-3">
+                  <input type="hidden" {...register('report_brand_color')} />
+                  <input
+                    type="color"
+                    value={reportColor}
+                    onChange={(event) => setValue('report_brand_color', event.target.value)}
+                    className="h-11 w-14 rounded-lg border border-gray-200 bg-white p-1"
+                  />
+                  <input
+                    type="text"
+                    value={reportColor}
+                    onChange={(event) => setValue('report_brand_color', event.target.value)}
+                    className="input max-w-xs"
+                    placeholder="#B5E61D"
+                  />
+                </div>
+                <p className="mt-2 text-sm text-gray-600">
+                  Used on Agency and Enterprise workspace reports.
+                </p>
+              </div>
+
+              {(selectedAccountType === 'agency' || selectedAccountType === 'enterprise') && (
+                <div className="mt-8 rounded-lg border border-gray-200 bg-gray-50 p-5">
+                  <h3 className="text-lg font-bold text-dark">White-Label Report Branding</h3>
+                  <p className="mt-1 text-sm text-gray-600">
+                    These details appear on client-facing PDF reports and report emails. Custom sender domains will be added later.
+                  </p>
+
+                  <div className="mt-5 flex flex-col gap-5 md:flex-row md:items-center">
+                    <div className="relative">
+                      {reportLogo ? (
+                        <img
+                          src={`${BASE_URL}${reportLogo}`}
+                          alt="Report Logo"
+                          className="h-24 w-40 rounded-lg border-4 border-white bg-white object-contain shadow-sm"
+                        />
+                      ) : (
+                        <div className="flex h-24 w-40 items-center justify-center rounded-lg bg-white text-sm text-gray-500 shadow-sm">
+                          Report logo
+                        </div>
+                      )}
+                      {uploadingReportLogo && (
+                        <div className="absolute inset-0 flex items-center justify-center rounded-lg bg-black/40">
+                          <div className="h-7 w-7 animate-spin rounded-full border-b-2 border-white"></div>
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <label className="cursor-pointer">
+                        <input
+                          type="file"
+                          accept="image/*"
+                          onChange={handleReportLogoUpload}
+                          className="hidden"
+                          disabled={uploadingReportLogo}
+                        />
+                        <span className="inline-block rounded-full bg-dark px-5 py-2 text-sm font-semibold text-white">
+                          {uploadingReportLogo ? 'Uploading...' : 'Upload Report Logo'}
+                        </span>
+                      </label>
+                      <p className="mt-2 text-sm text-gray-600">Used on PDF report headers. Falls back to company logo if empty.</p>
+                    </div>
+                  </div>
+
+                  <div className="mt-6 grid grid-cols-1 gap-5 md:grid-cols-2">
+                    <div>
+                      <label className="block text-sm font-medium text-dark mb-2">
+                        Primary Report Color
+                      </label>
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="color"
+                          value={reportColor}
+                          onChange={(event) => setValue('report_brand_color', event.target.value)}
+                          className="h-11 w-14 rounded-lg border border-gray-200 bg-white p-1"
+                        />
+                        <input
+                          type="text"
+                          value={reportColor}
+                          onChange={(event) => setValue('report_brand_color', event.target.value)}
+                          className="input"
+                          placeholder="#B5E61D"
+                        />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-dark mb-2">
+                        Secondary Report Color
+                      </label>
+                      <div className="flex items-center gap-3">
+                        <input type="hidden" {...register('report_secondary_color')} />
+                        <input
+                          type="color"
+                          value={reportSecondaryColor}
+                          onChange={(event) => setValue('report_secondary_color', event.target.value)}
+                          className="h-11 w-14 rounded-lg border border-gray-200 bg-white p-1"
+                        />
+                        <input
+                          type="text"
+                          value={reportSecondaryColor}
+                          onChange={(event) => setValue('report_secondary_color', event.target.value)}
+                          className="input"
+                          placeholder="#1F2937"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-6 grid grid-cols-1 gap-5 md:grid-cols-2">
+                    <div>
+                      <label className="block text-sm font-medium text-dark mb-2">
+                        Report Sender Name
+                      </label>
+                      <input
+                        type="text"
+                        className="input"
+                        placeholder="Rapportech Africa"
+                        {...register('report_sender_name')}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-dark mb-2">
+                        Reply-To Email
+                      </label>
+                      <input
+                        type="email"
+                        className="input"
+                        placeholder="reports@youragency.com"
+                        {...register('report_reply_to_email')}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="mt-6">
+                    <label className="block text-sm font-medium text-dark mb-2">
+                      Custom Email Signature
+                    </label>
+                    <textarea
+                      rows={4}
+                      className="input"
+                      placeholder={'Prepared by Rapportech Africa\nStrategy Team\nreports@rapportech.co.zw'}
+                      {...register('report_email_signature')}
+                    />
+                    <p className="mt-2 text-sm text-gray-600">
+                      Added to report emails and the final page of PDF reports.
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Social Media */}

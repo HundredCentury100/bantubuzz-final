@@ -3,6 +3,7 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 from datetime import datetime, timedelta
 from app import db
 from app.models import Analytics, Booking, Package, Campaign
+from app.services.workspace_service import get_request_workspace_id, require_workspace_access, scope_query_to_workspace
 from sqlalchemy import func
 
 bp = Blueprint('analytics', __name__)
@@ -49,27 +50,39 @@ def get_dashboard_stats():
 
         else:  # brand
             brand = BrandProfile.query.filter_by(user_id=user_id).first()
+            workspace_id = get_request_workspace_id()
+            workspace, workspace_error, workspace_status = require_workspace_access(user_id, workspace_id, 'can_view_analytics')
+            if workspace_error:
+                return jsonify({'error': workspace_error}), workspace_status
 
             # Total campaigns
-            total_campaigns = Campaign.query.filter_by(brand_id=brand.id).count()
+            campaigns_query = Campaign.query.filter_by(brand_id=brand.id)
+            campaigns_query = scope_query_to_workspace(campaigns_query, Campaign, workspace.id if workspace else None)
+            total_campaigns = campaigns_query.count()
 
             # Total spending
-            total_spending = db.session.query(func.sum(Booking.amount)).filter(
+            spending_query = db.session.query(func.sum(Booking.amount)).filter(
                 Booking.brand_id == brand.id,
                 Booking.payment_status == 'paid'
-            ).scalar() or 0
+            )
+            spending_query = scope_query_to_workspace(spending_query, Booking, workspace.id if workspace else None)
+            total_spending = spending_query.scalar() or 0
 
             # Active bookings
-            active_bookings = Booking.query.filter_by(
+            active_query = Booking.query.filter_by(
                 brand_id=brand.id,
                 status='in_progress'
-            ).count()
+            )
+            active_query = scope_query_to_workspace(active_query, Booking, workspace.id if workspace else None)
+            active_bookings = active_query.count()
 
             # Completed bookings
-            completed_bookings = Booking.query.filter_by(
+            completed_query = Booking.query.filter_by(
                 brand_id=brand.id,
                 status='completed'
-            ).count()
+            )
+            completed_query = scope_query_to_workspace(completed_query, Booking, workspace.id if workspace else None)
+            completed_bookings = completed_query.count()
 
             stats = {
                 'total_campaigns': total_campaigns,

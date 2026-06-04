@@ -557,6 +557,115 @@ Deployment note:
   - Brand route: `/brand/billing`
   - Download/open invoice uses authenticated axios, because direct anchor navigation would not include the JWT header.
 
+## Agency Client Workspaces Learned
+
+- Multi-client agency workspace foundation lives in:
+  - `backend/app/models/client_workspace.py`
+  - `backend/app/routes/workspaces.py`
+  - `backend/app/services/workspace_service.py`
+  - `frontend/src/contexts/WorkspaceContext.jsx`
+  - `frontend/src/pages/AgencyDashboard.jsx`
+  - `frontend/src/pages/WorkspaceManage.jsx`
+- Agency and Enterprise share the same workspace engine. The distinction is language and positioning:
+  - Agency says clients, client workspaces, all clients, account managers, client reports.
+  - Enterprise says brands, brand workspaces, all brands, brand managers, stakeholder reports.
+- Brand profiles now store:
+  - `account_type`: `brand`, `agency`, or `enterprise`
+  - `expected_workspace_count`: signup/onboarding estimate for clients or brands.
+- Brand registration accepts `account_type` and `expected_workspace_count`.
+- Frontend brand signup is now a two-step flow:
+  - Choose Brand, Agency, or Enterprise.
+  - Fill a tailored form with Company Name, Agency Name, or Organisation Name and the relevant expected count.
+- Database migration:
+  - `backend/migrations/versions/202606021000_add_client_workspaces.py`
+- Workspace-aware backend columns are nullable for compatibility with old production records:
+  - `campaigns.workspace_id`
+  - `bookings.workspace_id`
+  - `collaborations.workspace_id`
+  - `briefs.workspace_id`
+  - `campaign_payments.workspace_id`
+- The frontend stores selected workspace in `localStorage.selected_workspace_id`.
+- `frontend/src/services/api.js` sends selected workspace as `X-Workspace-Id` on authenticated requests.
+- Agency route:
+  - `/brand/agency`
+- Workspace management route:
+  - `/brand/workspaces/<id>`
+- Workspace selector is in `frontend/src/components/Navbar.jsx` for brand agency accounts.
+- Workspace selector currently reloads the page after switching clients so existing pages refetch with the new `X-Workspace-Id` header.
+- API routes:
+  - `GET /api/workspaces`
+  - `POST /api/workspaces`
+  - `GET /api/workspaces/master-dashboard`
+  - `GET/PUT/DELETE /api/workspaces/<id>`
+  - `GET/POST /api/workspaces/<id>/members`
+  - `DELETE /api/workspaces/<id>/members/<member_id>`
+- Subscription plans already had `max_client_workspaces`; agency plan should set this to 10.
+- Agency/Enterprise access must be unlocked through real subscription activation, not manual account-type shortcuts:
+  - Pricing can deep-link to subscription management with the Agency plan selected.
+  - Smile&Pay subscription payments are completed through `backend/app/services/smilepay_service.py`.
+  - A paid Smile&Pay subscription must set `subscriptions.status = active`, `payment_status = paid`, `payment_verified = true`, billing dates, payment metadata, and then align `brand_profiles.account_type`.
+  - Brand wallet subscription payments activate the subscription after wallet deduction and then align `brand_profiles.account_type`.
+  - Brand bank-transfer subscription proofs upload through `POST /api/subscriptions/upload-proof`.
+  - Admin verification for brand subscription bank transfers is handled by `PUT /api/admin/payments/brand-subscription/<id>/verify`.
+  - Paid subscription periods should start at payment completion/verification time, not when the pending subscription row is first created.
+  - Admin pending payments includes brand subscription proofs so QA/admin can verify them from the normal Admin Payments screen.
+- Brand subscription manual payment fields live on `backend/app/models/subscription.py` and migration `backend/migrations/versions/202606031200_add_brand_subscription_payment_fields.py`.
+- Extra workspace billing uses real `WorkspaceAddon` payment records:
+  - Monthly extra workspace: `$30`
+  - Annual extra workspace: `$300` (same 2 months free rule)
+  - Workspaces created above the included limit are created inactive.
+  - They activate only after real payment through Smile&Pay, brand wallet, or admin-verified bank-transfer proof.
+  - Smile&Pay uses `paymentType="workspace_addon"` and is completed from `backend/app/services/smilepay_service.py`.
+  - Wallet payment uses `POST /api/workspaces/addons/<addon_id>/pay-with-wallet` and deducts the brand wallet before activation.
+  - Bank transfer proof uses `POST /api/workspaces/addons/<addon_id>/upload-proof` and appears in Admin Payments for verification.
+  - Admin endpoints:
+    - `PUT /api/admin/payments/workspace-addon/<addon_id>/verify`
+    - `PUT /api/admin/payments/workspace-addon/<addon_id>/reject`
+  - `GET /api/workspaces` includes `pending_addons` so an agency can refresh the dashboard and still finish or track pending extra workspace payment.
+- Workspace add-on payment fields live in migration:
+  - `backend/migrations/versions/202606031330_add_workspace_addon_payment_fields.py`
+- Current implementation is foundation + first scoping pass:
+  - Campaign create/list respects workspace.
+  - Brief create/list respects workspace, and converted campaigns inherit the brief workspace.
+  - Booking create/list respects workspace.
+  - Collaboration brand list respects workspace.
+  - Billing can filter by workspace.
+  - Saved creators respect the selected workspace through `saved_creators.workspace_id`.
+  - Master dashboard shows workspace totals and links into workspace management.
+  - Master dashboard supports `start_date`/`end_date` filters and exports:
+    - CSV: `/api/workspaces/master-dashboard/export?format=csv`
+    - Printable HTML report: `/api/workspaces/master-dashboard/export?format=html`
+  - Printable workspace reports use the brand profile logo/name and `brand_profiles.report_brand_color`.
+  - Workspace management supports editing workspace details and assigning existing BantuBuzz users by email.
+  - Workspace management now supports pending email invitations:
+    - Existing BantuBuzz users are assigned immediately.
+    - Unknown emails create a `WorkspaceInvitation` row and receive `/brand/workspace-invite/<token>`.
+    - Invite acceptance requires the user to be signed in with the invited email.
+- Analytics scoping now includes:
+  - Brand dashboard analytics route `GET /api/analytics/dashboard`.
+  - Brand audience route `GET /api/brands/audience`.
+  - Collaboration summary `GET /api/collaborations/analytics/summary`.
+  - Collaboration analytics/audience endpoints.
+  - Campaign performance and audience endpoints.
+- Permission hardening now checks workspace permissions on campaign/collaboration reads and mutations where a workspace is attached.
+- White-label reports are implemented without custom sender-domain DNS for now:
+  - Agency/Enterprise report settings live on `brand_profiles`.
+  - Fields include `report_logo`, `report_logo_sizes`, `report_brand_color`, `report_secondary_color`, `report_email_signature`, `report_sender_name`, and `report_reply_to_email`.
+  - Migration: `backend/migrations/versions/202606041000_add_white_label_report_settings.py`.
+  - Dedicated report logo upload route: `POST /api/brands/profile/report-logo`.
+  - PDF generation uses Pillow in `backend/app/services/white_label_report_service.py`; no Playwright/WeasyPrint server dependency is required.
+  - Master dashboard supports branded PDF export: `/api/workspaces/master-dashboard/export?format=pdf`.
+  - Master dashboard supports emailing the branded PDF: `POST /api/workspaces/master-dashboard/email-report`.
+  - Report PDFs remove the BantuBuzz logo and keep the small locked `Powered by BantuBuzz` footer.
+  - Report emails currently send through the configured BantuBuzz SMTP sender with the agency sender display name and agency reply-to email. Custom `no-reply@agency-domain.com` requires a future DNS/domain-verification provider integration.
+- Remaining hardening for future slices:
+  - Improve team invitation onboarding so new invitees land directly back on the invite after signup/login.
+  - Build tailored onboarding steps after Agency/Enterprise signup.
+  - Add account type change/upgrade from account settings without losing existing data.
+  - Add custom report sender domains with SPF/DKIM/DMARC verification.
+  - Build scheduled reports.
+  - Build cross-workspace analytics exports.
+
 1. Read this file first.
 2. Then read `AI_GUIDE.md` for the larger historical context.
 3. Check `git status --short`.

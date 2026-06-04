@@ -11,6 +11,7 @@ const RegisterBrand = () => {
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [accountType, setAccountType] = useState(null);
   const {
     register,
     handleSubmit,
@@ -19,6 +20,38 @@ const RegisterBrand = () => {
   } = useForm();
 
   const password = watch('password');
+  const accountCopy = {
+    brand: {
+      title: 'Create Brand Account',
+      subtitle: 'Find and book creators for your business campaigns',
+      nameLabel: 'Company Name',
+      namePlaceholder: 'Your company name',
+      countLabel: null,
+      button: 'Create Brand Account',
+      otpType: 'brand',
+    },
+    agency: {
+      title: 'Create Agency Account',
+      subtitle: 'Manage all your clients from one place',
+      nameLabel: 'Agency Name',
+      namePlaceholder: 'Rapportech Africa',
+      countLabel: 'Number of Clients',
+      countPlaceholder: '5 - 10 clients',
+      button: 'Create Agency Account',
+      otpType: 'agency',
+    },
+    enterprise: {
+      title: 'Create Enterprise Account',
+      subtitle: 'One platform for all your brands',
+      nameLabel: 'Organisation Name',
+      namePlaceholder: 'Econet Group',
+      countLabel: 'Number of Brands',
+      countPlaceholder: 'More than 10',
+      button: 'Create Enterprise Account',
+      otpType: 'enterprise',
+    },
+  };
+  const currentCopy = accountCopy[accountType] || accountCopy.brand;
 
   const onSubmit = async (data) => {
     setLoading(true);
@@ -28,13 +61,15 @@ const RegisterBrand = () => {
         email: data.email,
         password: data.password,
         company_name: data.company_name,
+        account_type: accountType || 'brand',
+        expected_workspace_count: data.expected_workspace_count,
       });
 
       // Navigate to OTP verification page
       navigate('/verify-otp', {
         state: {
           email: data.email,
-          userType: 'brand'
+          userType: currentCopy.otpType
         }
       });
     } catch (err) {
@@ -56,9 +91,50 @@ const RegisterBrand = () => {
       <div className="container-custom section-padding">
         <div className="max-w-md mx-auto">
           <div className="card">
+            {!accountType ? (
+              <>
+                <div className="text-center mb-8">
+                  <h1 className="text-3xl font-bold text-dark mb-2">Join BantuBuzz</h1>
+                  <p className="text-gray-600">Tell us who you are to get started</p>
+                </div>
+                <div className="space-y-3">
+                  {[
+                    ['brand', 'A Brand', 'I want to find and book creators for my business campaigns'],
+                    ['agency', 'An Agency', 'I manage influencer campaigns for multiple client brands'],
+                    ['enterprise', 'Enterprise', 'Large organisation with multiple brands and team members'],
+                  ].map(([type, title, description]) => (
+                    <button
+                      key={type}
+                      type="button"
+                      onClick={() => setAccountType(type)}
+                      className="w-full rounded-2xl border border-gray-200 bg-white p-4 text-left transition-colors hover:border-primary hover:bg-primary/5"
+                    >
+                      <p className="font-bold text-dark">{title}</p>
+                      <p className="mt-1 text-sm text-gray-600">{description}</p>
+                    </button>
+                  ))}
+                </div>
+                <div className="mt-6 text-center">
+                  <p className="text-sm text-gray-600">
+                    Already have an account?{' '}
+                    <Link to="/login" className="text-primary hover:text-primary-dark font-medium">
+                      Login
+                    </Link>
+                  </p>
+                </div>
+              </>
+            ) : (
+              <>
+            <button
+              type="button"
+              onClick={() => setAccountType(null)}
+              className="mb-6 text-sm font-medium text-gray-600 hover:text-dark"
+            >
+              Back to account type
+            </button>
             <div className="text-center mb-8">
-              <h1 className="text-3xl font-bold text-dark mb-2">Join as a Brand</h1>
-              <p className="text-gray-600">Connect with Africa's top creators</p>
+              <h1 className="text-3xl font-bold text-dark mb-2">{currentCopy.title}</h1>
+              <p className="text-gray-600">{currentCopy.subtitle}</p>
             </div>
 
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
@@ -72,21 +148,41 @@ const RegisterBrand = () => {
               {/* Company Name */}
               <div>
                 <label htmlFor="company_name" className="block text-sm font-medium text-dark mb-2">
-                  Company Name
+                  {currentCopy.nameLabel}
                 </label>
                 <input
                   id="company_name"
                   type="text"
                   className="input"
-                  placeholder="Your company name"
+                  placeholder={currentCopy.namePlaceholder}
                   {...register('company_name', {
-                    required: 'Company name is required',
+                    required: `${currentCopy.nameLabel} is required`,
                   })}
                 />
                 {errors.company_name && (
                   <p className="mt-1 text-sm text-error">{errors.company_name.message}</p>
                 )}
               </div>
+
+              {currentCopy.countLabel && (
+                <div>
+                  <label htmlFor="expected_workspace_count" className="block text-sm font-medium text-dark mb-2">
+                    {currentCopy.countLabel}
+                  </label>
+                  <select
+                    id="expected_workspace_count"
+                    className="input"
+                    defaultValue=""
+                    {...register('expected_workspace_count')}
+                  >
+                    <option value="" disabled>{currentCopy.countPlaceholder}</option>
+                    <option value="1-2">1 - 2</option>
+                    <option value="3-5">3 - 5</option>
+                    <option value="5-10">5 - 10</option>
+                    <option value="more-than-10">More than 10</option>
+                  </select>
+                </div>
+              )}
 
               {/* Email */}
               <div>
@@ -227,7 +323,7 @@ const RegisterBrand = () => {
                     Creating account...
                   </div>
                 ) : (
-                  'Create Brand Account'
+                  currentCopy.button
                 )}
               </button>
             </form>
@@ -241,6 +337,8 @@ const RegisterBrand = () => {
                 </Link>
               </p>
             </div>
+              </>
+            )}
           </div>
 
           {/* Why Join */}

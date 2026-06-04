@@ -7,7 +7,7 @@ from datetime import datetime
 import os
 from werkzeug.utils import secure_filename
 from app import db
-from app.models import User, Subscription, SubscriptionPlan
+from app.models import BrandProfile, User, Subscription, SubscriptionPlan
 from app.services.payment_service import initiate_subscription_payment, check_subscription_payment_status
 
 bp = Blueprint('subscriptions', __name__)
@@ -17,6 +17,19 @@ ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'pdf'}
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+
+def apply_subscription_account_type(user_id, plan):
+    """Keep brand profile positioning aligned with active subscription plans."""
+    if not plan or plan.user_type != 'brand':
+        return
+    brand = BrandProfile.query.filter_by(user_id=user_id).first()
+    if not brand:
+        return
+    if plan.slug in ['agency', 'brand-agency'] or int(plan.max_client_workspaces or 0) > 0:
+        brand.account_type = 'agency'
+    elif brand.account_type not in ['enterprise']:
+        brand.account_type = 'brand'
 
 
 @bp.route('/plans', methods=['GET'])
@@ -152,6 +165,7 @@ def subscribe():
             subscription.set_billing_period(billing_cycle)
             subscription.last_payment_date = datetime.utcnow()
             db.session.add(subscription)
+            apply_subscription_account_type(user_id, plan)
             db.session.commit()
 
             return jsonify({
@@ -648,13 +662,13 @@ def pay_subscription_with_wallet():
         # Calculate amount based on billing cycle
         amount = plan.price_yearly if billing_cycle == 'yearly' else plan.price_monthly
 
-        # Get brand wallet (brands use brand_wallet, not creator wallet)
-        from app.models import BrandWallet, BrandWalletTransaction, BrandProfile
+        # Brands use the shared Wallet model with user_type='brand'.
+        from app.models import Wallet, WalletTransaction, BrandProfile
         brand = BrandProfile.query.filter_by(user_id=user_id).first()
         if not brand:
             return jsonify({'success': False, 'error': 'Brand profile not found'}), 404
 
-        wallet = BrandWallet.query.filter_by(user_id=user_id).first()
+        wallet = Wallet.query.filter_by(user_id=user_id).first()
         if not wallet:
             return jsonify({'success': False, 'error': 'Wallet not found'}), 404
 
@@ -667,17 +681,20 @@ def pay_subscription_with_wallet():
 
         # Deduct from wallet
         wallet.available_balance -= amount
+        wallet.total_spent = float(wallet.total_spent or 0) + float(amount)
         wallet.updated_at = datetime.utcnow()
 
         # Create wallet transaction
-        transaction = BrandWalletTransaction(
+        transaction = WalletTransaction(
             wallet_id=wallet.id,
             user_id=user_id,
-            amount=amount,
-            transaction_type='subscription_payment',
-            status='completed',
+            amount=-abs(float(amount)),
+            transaction_type='payment',
+            status='available',
+            clearance_required=False,
             description=f'Payment for {plan.name} subscription ({billing_cycle})',
-            metadata={
+            transaction_metadata={
+                'payment_type': 'subscription',
                 'subscription_id': subscription.id,
                 'plan_id': plan.id,
                 'plan_name': plan.name,
@@ -685,6 +702,7 @@ def pay_subscription_with_wallet():
             }
         )
         db.session.add(transaction)
+        db.session.flush()
 
         # Activate subscription
         subscription.status = 'active'
@@ -695,10 +713,10 @@ def pay_subscription_with_wallet():
         subscription.payment_reference = f'WALLET-{transaction.id}'
         subscription.updated_at = datetime.utcnow()
 
-        # Set billing period if not already set
-        if not subscription.current_period_end:
-            subscription.set_billing_period(billing_cycle)
+        # Paid subscription periods start when the payment is completed.
+        subscription.set_billing_period(billing_cycle)
 
+        apply_subscription_account_type(user_id, plan)
         db.session.commit()
 
         return jsonify({

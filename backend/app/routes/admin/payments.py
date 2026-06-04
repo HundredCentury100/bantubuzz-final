@@ -6,7 +6,7 @@ Handles verification, viewing, and management of all payments and bookings
 from flask import jsonify, request
 from datetime import datetime, timedelta
 from app import db
-from app.models import Payment, Booking, User, BrandProfile, CreatorProfile, PaymentVerification, CreatorSubscription, CreatorSubscriptionPlan, Collaboration, Package
+from app.models import Payment, Booking, User, BrandProfile, CreatorProfile, PaymentVerification, CreatorSubscription, CreatorSubscriptionPlan, Subscription, Collaboration, Package, WorkspaceAddon
 from app.decorators.admin import admin_required
 from flask_jwt_extended import get_jwt_identity
 from . import bp
@@ -71,6 +71,40 @@ def ensure_direct_booking_collaboration(booking):
         print(f"Failed to create NO-track deliverables for collaboration {collaboration.id}: {error}")
 
     return collaboration
+
+
+def get_brand_subscription_amount(subscription):
+    if not subscription or not subscription.plan:
+        return 0
+    if subscription.billing_cycle == 'yearly':
+        return subscription.plan.price_yearly or 0
+    return subscription.plan.price_monthly or 0
+
+
+def apply_brand_subscription_account_type(subscription):
+    if not subscription or not subscription.plan or subscription.plan.user_type != 'brand':
+        return
+
+    brand = BrandProfile.query.filter_by(user_id=subscription.user_id).first()
+    if not brand:
+        return
+
+    plan = subscription.plan
+    if plan.slug in ['agency', 'brand-agency'] or int(plan.max_client_workspaces or 0) > 0:
+        brand.account_type = 'agency'
+    elif brand.account_type != 'enterprise':
+        brand.account_type = 'brand'
+
+
+def activate_workspace_addon(addon, payment_method='manual', payment_reference=None):
+    addon.status = 'active'
+    addon.payment_status = 'verified' if payment_method == 'manual' else 'paid'
+    addon.payment_method = addon.payment_method or payment_method
+    addon.payment_reference = payment_reference or addon.payment_reference
+    addon.activated_at = datetime.utcnow()
+    if addon.workspace:
+        addon.workspace.is_active = True
+        addon.workspace.updated_at = datetime.utcnow()
 
 
 @bp.route('/payments', methods=['GET'])
@@ -152,6 +186,16 @@ def get_pending_payments():
             CreatorSubscription.payment_proof_path.isnot(None)
         ).all()
 
+        pending_brand_subs = Subscription.query.filter(
+            Subscription.payment_status == 'pending_verification',
+            Subscription.payment_proof_path.isnot(None)
+        ).all()
+
+        pending_workspace_addons = WorkspaceAddon.query.filter(
+            WorkspaceAddon.payment_status == 'pending_verification',
+            WorkspaceAddon.payment_proof_path.isnot(None)
+        ).all()
+
         # Format payment data with user information
         payments_data = []
         for payment in payments:
@@ -212,6 +256,55 @@ def get_pending_payments():
                 'created_at': creator_sub.created_at.isoformat(),
                 'creator_name': creator.username if creator else 'Unknown',
                 'creator_email': creator_user.email if creator_user else 'unknown@email.com'
+            })
+
+        # Format brand subscription data
+        for brand_sub in pending_brand_subs:
+            brand_user = User.query.get(brand_sub.user_id)
+            brand = BrandProfile.query.filter_by(user_id=brand_sub.user_id).first()
+
+            payments_data.append({
+                'id': f'brand_sub_{brand_sub.id}',
+                'brand_subscription_id': brand_sub.id,
+                'user_id': brand_user.id if brand_user else None,
+                'user_name': brand_user.name if brand_user and hasattr(brand_user, 'name') else (brand_user.email if brand_user else 'Unknown'),
+                'user_email': brand_user.email if brand_user else 'unknown@email.com',
+                'user_type': 'brand',
+                'amount': float(get_brand_subscription_amount(brand_sub)),
+                'payment_method': brand_sub.payment_method,
+                'payment_proof_url': brand_sub.payment_proof_path,
+                'status': 'pending_verification',
+                'payment_category': 'brand_subscription',
+                'subscription_plan': brand_sub.plan.name if brand_sub.plan else 'Unknown Plan',
+                'billing_cycle': brand_sub.billing_cycle,
+                'created_at': brand_sub.created_at.isoformat() if brand_sub.created_at else None,
+                'brand_name': brand.company_name if brand else 'Unknown',
+                'brand_email': brand_user.email if brand_user else 'unknown@email.com'
+            })
+
+        # Format workspace add-on data
+        for addon in pending_workspace_addons:
+            workspace = addon.workspace
+            brand = BrandProfile.query.get(workspace.agency_brand_id) if workspace else None
+            brand_user = User.query.get(brand.user_id) if brand else None
+
+            payments_data.append({
+                'id': f'workspace_addon_{addon.id}',
+                'workspace_addon_id': addon.id,
+                'user_id': brand_user.id if brand_user else None,
+                'user_name': brand_user.name if brand_user and hasattr(brand_user, 'name') else (brand_user.email if brand_user else 'Unknown'),
+                'user_email': brand_user.email if brand_user else 'unknown@email.com',
+                'user_type': 'brand',
+                'amount': float(addon.amount or 0),
+                'payment_method': addon.payment_method,
+                'payment_proof_url': addon.payment_proof_path,
+                'status': 'pending_verification',
+                'payment_category': 'workspace_addon',
+                'subscription_plan': 'Extra Workspace Add-on',
+                'billing_cycle': addon.billing_cycle,
+                'created_at': addon.created_at.isoformat() if addon.created_at else None,
+                'brand_name': brand.company_name if brand else 'Unknown',
+                'workspace_name': workspace.name if workspace else 'Unknown',
             })
 
         return jsonify({
@@ -626,6 +719,201 @@ def reject_creator_subscription_payment(subscription_id):
             'success': True,
             'message': 'Creator subscription payment rejected',
             'subscription': subscription.to_dict()
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@bp.route('/payments/brand-subscription/<int:subscription_id>/verify', methods=['PUT'])
+@admin_required
+def verify_brand_subscription_payment(subscription_id):
+    """
+    Verify a brand subscription manual payment.
+    This is the bank-transfer path for paid brand plans, including Agency.
+    """
+    try:
+        admin_id = int(get_jwt_identity())
+        subscription = Subscription.query.get(subscription_id)
+
+        if not subscription:
+            return jsonify({
+                'success': False,
+                'error': 'Subscription not found'
+            }), 404
+
+        data = request.get_json() or {}
+        notes = data.get('notes', '')
+        amount = get_brand_subscription_amount(subscription)
+
+        subscription.payment_verified = True
+        subscription.payment_status = 'verified'
+        subscription.status = 'active'
+        subscription.payment_method = subscription.payment_method or 'manual'
+        subscription.last_payment_date = datetime.utcnow()
+        subscription.last_payment_amount = amount
+        subscription.admin_note = notes
+        subscription.modified_by_admin = admin_id
+        subscription.updated_at = datetime.utcnow()
+
+        # Paid subscription periods start when admin verifies the bank transfer.
+        subscription.set_billing_period(subscription.billing_cycle or 'monthly')
+
+        apply_brand_subscription_account_type(subscription)
+
+        db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'message': 'Brand subscription payment verified successfully',
+            'subscription': subscription.to_dict()
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@bp.route('/payments/brand-subscription/<int:subscription_id>/reject', methods=['PUT'])
+@admin_required
+def reject_brand_subscription_payment(subscription_id):
+    """
+    Reject a brand subscription manual payment.
+    """
+    try:
+        admin_id = int(get_jwt_identity())
+        subscription = Subscription.query.get(subscription_id)
+
+        if not subscription:
+            return jsonify({
+                'success': False,
+                'error': 'Subscription not found'
+            }), 404
+
+        data = request.get_json() or {}
+        notes = data.get('notes')
+
+        if not notes:
+            return jsonify({
+                'success': False,
+                'error': 'Rejection notes are required'
+            }), 400
+
+        subscription.payment_status = 'rejected'
+        subscription.status = 'cancelled'
+        subscription.admin_note = f"REJECTED: {notes}"
+        subscription.modified_by_admin = admin_id
+        subscription.updated_at = datetime.utcnow()
+
+        db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'message': 'Brand subscription payment rejected',
+            'subscription': subscription.to_dict()
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@bp.route('/payments/workspace-addon/<int:addon_id>/verify', methods=['PUT'])
+@admin_required
+def verify_workspace_addon_payment(addon_id):
+    """
+    Verify an extra workspace add-on manual payment.
+    """
+    try:
+        admin_id = int(get_jwt_identity())
+        addon = WorkspaceAddon.query.get(addon_id)
+
+        if not addon:
+            return jsonify({
+                'success': False,
+                'error': 'Workspace add-on not found'
+            }), 404
+
+        data = request.get_json() or {}
+        notes = data.get('notes', '')
+
+        activate_workspace_addon(addon, 'manual')
+
+        if addon.subscription:
+            existing_note = addon.subscription.admin_note or ''
+            addon.subscription.admin_note = f"{existing_note}\nWorkspace add-on {addon.id} verified by admin {admin_id}: {notes}".strip()
+            addon.subscription.modified_by_admin = admin_id
+
+        db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'message': 'Workspace add-on payment verified successfully',
+            'addon': addon.to_dict(),
+            'workspace': addon.workspace.to_dict(include_counts=True) if addon.workspace else None
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+
+@bp.route('/payments/workspace-addon/<int:addon_id>/reject', methods=['PUT'])
+@admin_required
+def reject_workspace_addon_payment(addon_id):
+    """
+    Reject an extra workspace add-on manual payment.
+    """
+    try:
+        admin_id = int(get_jwt_identity())
+        addon = WorkspaceAddon.query.get(addon_id)
+
+        if not addon:
+            return jsonify({
+                'success': False,
+                'error': 'Workspace add-on not found'
+            }), 404
+
+        data = request.get_json() or {}
+        notes = data.get('notes')
+
+        if not notes:
+            return jsonify({
+                'success': False,
+                'error': 'Rejection notes are required'
+            }), 400
+
+        addon.payment_status = 'rejected'
+        addon.status = 'rejected'
+        addon.payment_reference = f'REJECTED-BY-{admin_id}'
+        if addon.workspace:
+            addon.workspace.is_active = False
+            addon.workspace.updated_at = datetime.utcnow()
+
+        if addon.subscription:
+            existing_note = addon.subscription.admin_note or ''
+            addon.subscription.admin_note = f"{existing_note}\nWorkspace add-on {addon.id} rejected by admin {admin_id}: {notes}".strip()
+            addon.subscription.modified_by_admin = admin_id
+
+        db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'message': 'Workspace add-on payment rejected',
+            'addon': addon.to_dict()
         }), 200
 
     except Exception as e:

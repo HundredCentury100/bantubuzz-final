@@ -19,6 +19,7 @@ class Collaboration(db.Model):
     # Parties involved
     brand_id = db.Column(db.Integer, db.ForeignKey('brand_profiles.id'), nullable=False)
     creator_id = db.Column(db.Integer, db.ForeignKey('creator_profiles.id'), nullable=False)
+    workspace_id = db.Column(db.Integer, db.ForeignKey('client_workspaces.id', ondelete='SET NULL'), nullable=True, index=True)
 
     # Basic information
     title = db.Column(db.String(200), nullable=False)  # Campaign title or Package title
@@ -74,6 +75,7 @@ class Collaboration(db.Model):
     # Relationships
     brand = db.relationship('BrandProfile', backref=db.backref('collaborations', lazy='dynamic'))
     creator = db.relationship('CreatorProfile', backref=db.backref('collaborations', lazy='dynamic'))
+    workspace = db.relationship('ClientWorkspace', backref=db.backref('collaborations', lazy='dynamic'))
     campaign_application = db.relationship('CampaignProposal', backref=db.backref('collaboration', uselist=False))
     booking = db.relationship('Booking', backref=db.backref('collaboration', uselist=False))
 
@@ -145,6 +147,7 @@ class Collaboration(db.Model):
             'booking_id': self.booking_id,
             'brand_id': self.brand_id,
             'creator_id': self.creator_id,
+            'workspace_id': self.workspace_id,
             'title': self.title,
             'description': self.description,
             'amount': self.amount,

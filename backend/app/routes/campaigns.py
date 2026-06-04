@@ -20,6 +20,7 @@ from app.models.creator_profile import CreatorProfile
 from app.models.package import Package
 from app.models.booking import Booking
 from app.models.collaboration import Collaboration
+from app.services.workspace_service import get_request_workspace_id, require_workspace_access, scope_query_to_workspace
 
 bp = Blueprint('campaigns', __name__, url_prefix='/api/campaigns')
 
@@ -58,6 +59,14 @@ def create_campaign():
             }), 403
 
         data = request.get_json()
+        workspace_id = get_request_workspace_id(data)
+        workspace, workspace_error, workspace_status = require_workspace_access(
+            user_id,
+            workspace_id,
+            'can_manage_campaigns',
+        )
+        if workspace_error:
+            return jsonify({'error': workspace_error}), workspace_status
 
         # Validate participation mode
         participation_mode = data.get('participation_mode', 'proposals')
@@ -129,6 +138,7 @@ def create_campaign():
         # Create campaign
         campaign = Campaign(
             brand_id=brand.id,
+            workspace_id=workspace.id if workspace else None,
             brief_id=data.get('brief_id'),
             title=data['title'],
             description=data['description'],
@@ -203,8 +213,13 @@ def get_campaigns():
 
         # Get filter parameters
         status = request.args.get('status')
+        workspace_id = get_request_workspace_id()
+        workspace, workspace_error, workspace_status = require_workspace_access(user_id, workspace_id)
+        if workspace_error:
+            return jsonify({'error': workspace_error}), workspace_status
 
         query = Campaign.query.filter_by(brand_id=brand.id)
+        query = scope_query_to_workspace(query, Campaign, workspace.id if workspace else None)
 
         if status:
             query = query.filter_by(status=status)
@@ -225,9 +240,19 @@ def get_campaigns():
 def get_campaign(campaign_id):
     """Get campaign details"""
     try:
+        user_id = get_jwt_identity()
         campaign = Campaign.query.get(campaign_id)
         if not campaign:
             return jsonify({'error': 'Campaign not found'}), 404
+        user = User.query.get(int(user_id))
+        if user and user.user_type == 'brand':
+            brand = BrandProfile.query.filter_by(user_id=user_id).first()
+            if not brand or campaign.brand_id != brand.id:
+                return jsonify({'error': 'Campaign not found'}), 404
+            if campaign.workspace_id:
+                _, workspace_error, workspace_status = require_workspace_access(user_id, campaign.workspace_id)
+                if workspace_error:
+                    return jsonify({'error': workspace_error}), workspace_status
 
         return jsonify(campaign.to_dict(include_brand=True)), 200
 
@@ -250,6 +275,10 @@ def update_campaign(campaign_id):
         campaign = Campaign.query.get(campaign_id)
         if not campaign or campaign.brand_id != brand.id:
             return jsonify({'error': 'Campaign not found'}), 404
+        if campaign.workspace_id:
+            _, workspace_error, workspace_status = require_workspace_access(user_id, campaign.workspace_id, 'can_manage_campaigns')
+            if workspace_error:
+                return jsonify({'error': workspace_error}), workspace_status
 
         data = request.get_json()
 
@@ -331,6 +360,10 @@ def delete_campaign(campaign_id):
         campaign = Campaign.query.get(campaign_id)
         if not campaign or campaign.brand_id != brand.id:
             return jsonify({'error': 'Campaign not found'}), 404
+        if campaign.workspace_id:
+            _, workspace_error, workspace_status = require_workspace_access(user_id, campaign.workspace_id, 'can_manage_campaigns')
+            if workspace_error:
+                return jsonify({'error': workspace_error}), workspace_status
 
         db.session.delete(campaign)
         db.session.commit()
@@ -526,6 +559,10 @@ def get_campaign_proposals(campaign_id):
         campaign = Campaign.query.get(campaign_id)
         if not campaign or campaign.brand_id != brand.id:
             return jsonify({'error': 'Campaign not found'}), 404
+        if campaign.workspace_id:
+            _, workspace_error, workspace_status = require_workspace_access(user_id, campaign.workspace_id, 'can_manage_campaigns')
+            if workspace_error:
+                return jsonify({'error': workspace_error}), workspace_status
 
         proposals = CampaignProposal.query.filter_by(campaign_id=campaign_id).order_by(
             CampaignProposal.applied_at.desc()
@@ -560,6 +597,10 @@ def accept_proposal(proposal_id):
 
         if proposal.campaign.brand_id != brand.id:
             return jsonify({'error': 'Unauthorized'}), 403
+        if proposal.campaign.workspace_id:
+            _, workspace_error, workspace_status = require_workspace_access(user_id, proposal.campaign.workspace_id, 'can_manage_campaigns')
+            if workspace_error:
+                return jsonify({'error': workspace_error}), workspace_status
 
         if proposal.status != 'pending':
             return jsonify({'error': 'Proposal already processed'}), 400
@@ -570,6 +611,7 @@ def accept_proposal(proposal_id):
             brand_id=brand.id,
             creator_id=proposal.creator_id,
             campaign_id=proposal.campaign_id,
+            workspace_id=proposal.campaign.workspace_id,
             amount=proposal.proposed_price,
             total_price=proposal.proposed_price,
             status='pending',
@@ -631,6 +673,7 @@ def complete_proposal_payment(proposal_id):
             campaign_id=proposal.campaign_id,
             booking_id=booking.id,
             brand_id=proposal.campaign.brand_id,
+            workspace_id=booking.workspace_id or proposal.campaign.workspace_id,
             creator_id=proposal.creator_id,
             title=proposal.campaign.title,
             description=proposal.campaign.description,
@@ -774,6 +817,7 @@ def add_package_to_campaign(campaign_id):
             booking_type='campaign_package',
             package_id=package.id,
             campaign_id=campaign.id,
+            workspace_id=campaign.workspace_id,
             brand_id=brand.id,
             creator_id=package.creator_id,
             amount=package.price,
@@ -838,6 +882,7 @@ def complete_package_payment(campaign_id, package_id):
             package_id=package_id,
             booking_id=booking.id,
             brand_id=campaign.brand_id,
+            workspace_id=booking.workspace_id or campaign.workspace_id,
             creator_id=package.creator_id,
             title=f"{campaign.title} - {package.title}",
             description=package.description,
@@ -1070,6 +1115,10 @@ def get_campaign_performance(campaign_id):
         campaign = Campaign.query.get(campaign_id)
         if not campaign or campaign.brand_id != brand.id:
             return jsonify({'error': 'Campaign not found or unauthorized'}), 404
+        if campaign.workspace_id:
+            _, workspace_error, workspace_status = require_workspace_access(user_id, campaign.workspace_id, 'can_view_analytics')
+            if workspace_error:
+                return jsonify({'error': workspace_error}), workspace_status
 
         # Get performance analytics
         from app.services.campaign_analytics_service import campaign_analytics_service
@@ -1105,6 +1154,10 @@ def get_campaign_audience(campaign_id):
         campaign = Campaign.query.get(campaign_id)
         if not campaign or campaign.brand_id != brand.id:
             return jsonify({'error': 'Campaign not found or unauthorized'}), 404
+        if campaign.workspace_id:
+            _, workspace_error, workspace_status = require_workspace_access(user_id, campaign.workspace_id, 'can_view_analytics')
+            if workspace_error:
+                return jsonify({'error': workspace_error}), workspace_status
 
         # Get all collaborations for this campaign
         collaborations = Collaboration.query.filter_by(campaign_id=campaign_id).all()

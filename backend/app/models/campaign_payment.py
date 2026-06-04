@@ -14,6 +14,7 @@ class CampaignPayment(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     campaign_id = db.Column(db.Integer, db.ForeignKey('campaigns.id', ondelete='CASCADE'), nullable=False)
     brand_user_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='CASCADE'), nullable=False)
+    workspace_id = db.Column(db.Integer, db.ForeignKey('client_workspaces.id', ondelete='SET NULL'), nullable=True, index=True)
     payment_type = db.Column(db.String(20), nullable=False)  # 'full_campaign', 'batch', 'individual'
     total_amount = db.Column(db.Numeric(10, 2), nullable=False)
     platform_fee = db.Column(db.Numeric(10, 2), default=0)
@@ -32,6 +33,7 @@ class CampaignPayment(db.Model):
     # Relationships
     campaign = db.relationship('Campaign', backref=db.backref('payments', lazy='dynamic'))
     brand = db.relationship('User', foreign_keys=[brand_user_id], backref='campaign_payments_made')
+    workspace = db.relationship('ClientWorkspace', backref=db.backref('campaign_payments', lazy='dynamic'))
     items = db.relationship('CampaignPaymentItem', backref='payment', lazy='dynamic', cascade='all, delete-orphan')
 
     def __repr__(self):
@@ -44,6 +46,7 @@ class CampaignPayment(db.Model):
             'campaign_id': self.campaign_id,
             'campaign_title': self.campaign.title if self.campaign else None,
             'brand_user_id': self.brand_user_id,
+            'workspace_id': self.workspace_id,
             'payment_type': self.payment_type,
             'total_amount': float(self.total_amount),
             'platform_fee': float(self.platform_fee) if self.platform_fee else 0,
@@ -101,6 +104,7 @@ class CampaignPayment(db.Model):
         payment = CampaignPayment(
             campaign_id=campaign_id,
             brand_user_id=brand_user_id,
+            workspace_id=collaborations[0].workspace_id if collaborations else None,
             payment_type=payment_type,
             total_amount=total_amount,
             platform_fee=platform_fee,

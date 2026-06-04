@@ -12,6 +12,7 @@ from app.services.product_notifications import (
     notify_creator_content_approved,
     notify_creator_revision_requested,
 )
+from app.services.workspace_service import get_request_workspace_id, require_workspace_access, scope_query_to_workspace
 
 bp = Blueprint('collaborations', __name__)
 
@@ -90,6 +91,11 @@ def get_collaborations():
                 current_app.logger.error(f"[GET_COLLABORATIONS] Brand profile not found for user {user_id}")
                 return jsonify({'error': 'Brand profile not found'}), 404
             query = Collaboration.query.filter_by(brand_id=brand.id)
+            workspace_id = get_request_workspace_id()
+            workspace, workspace_error, workspace_status = require_workspace_access(user_id, workspace_id)
+            if workspace_error:
+                return jsonify({'error': workspace_error}), workspace_status
+            query = scope_query_to_workspace(query, Collaboration, workspace.id if workspace else None)
 
         if status_filter:
             query = query.filter_by(status=status_filter)
@@ -141,6 +147,10 @@ def get_collaboration(collab_id):
             brand = BrandProfile.query.filter_by(user_id=user_id).first()
             if collaboration.brand_id != brand.id:
                 return jsonify({'error': 'Unauthorized'}), 403
+            if collaboration.workspace_id:
+                _, workspace_error, workspace_status = require_workspace_access(user_id, collaboration.workspace_id)
+                if workspace_error:
+                    return jsonify({'error': workspace_error}), workspace_status
 
         return jsonify(collaboration.to_dict(include_relations=True)), 200
 
@@ -2138,6 +2148,10 @@ def get_collaboration_analytics(collab_id):
             brand = BrandProfile.query.filter_by(user_id=user_id).first()
             if collaboration.brand_id != brand.id:
                 return jsonify({'error': 'Unauthorized'}), 403
+            if collaboration.workspace_id:
+                _, workspace_error, workspace_status = require_workspace_access(user_id, collaboration.workspace_id, 'can_view_analytics')
+                if workspace_error:
+                    return jsonify({'error': workspace_error}), workspace_status
 
         # Get rich analytics while preserving the legacy top-level metrics keys
         analytics = AnalyticsService.get_collaboration_analytics(collab_id)
@@ -2189,8 +2203,14 @@ def get_all_collaborations_summary():
         if user.user_type != 'brand':
             return jsonify({'error': 'Unauthorized - Brand access only'}), 403
 
+        workspace_id = get_request_workspace_id()
+        if workspace_id:
+            _, workspace_error, workspace_status = require_workspace_access(user_id, workspace_id, 'can_view_analytics')
+            if workspace_error:
+                return jsonify({'error': workspace_error}), workspace_status
+
         # Get summary analytics
-        summary = AnalyticsService.get_all_collaborations_summary(user_id)
+        summary = AnalyticsService.get_all_collaborations_summary(user_id, workspace_id=workspace_id)
 
         if not summary:
             return jsonify({
@@ -2235,6 +2255,11 @@ def get_collaboration_audience(collaboration_id):
 
         if not brand or collaboration.brand_id != brand.id:
             return jsonify({'error': 'Unauthorized'}), 403
+
+        if collaboration.workspace_id:
+            _, workspace_error, workspace_status = require_workspace_access(user_id, collaboration.workspace_id, 'can_view_analytics')
+            if workspace_error:
+                return jsonify({'error': workspace_error}), workspace_status
 
         # Get ThunziAI account for the creator
         from app.models.thunzi_account import ThunziAccount

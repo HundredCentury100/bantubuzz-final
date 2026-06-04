@@ -562,6 +562,8 @@ class SmilePayService:
                 SmilePayService._complete_cart_payment(transaction)
             elif transaction.payment_type == 'collaboration':
                 SmilePayService._complete_collaboration_payment(transaction)
+            elif transaction.payment_type == 'workspace_addon':
+                SmilePayService._complete_workspace_addon_payment(transaction)
 
             # Send notification email
             SmilePayService._send_payment_success_notification(transaction)
@@ -572,14 +574,39 @@ class SmilePayService:
     @staticmethod
     def _complete_subscription_payment(transaction: SmilePayTransaction):
         """Complete subscription payment"""
-        from app.models import Subscription
+        from app.models import BrandProfile, Subscription
 
         subscription = Subscription.query.get(transaction.payment_id)
         if subscription:
+            plan = subscription.plan
+            billing_cycle = subscription.billing_cycle or 'monthly'
+            paid_amount = transaction.amount
+
+            if not paid_amount and plan:
+                paid_amount = plan.price_yearly if billing_cycle == 'yearly' else plan.price_monthly
+
+            subscription.status = 'active'
             subscription.payment_status = 'paid'
+            subscription.payment_verified = True
+            subscription.payment_method = transaction.payment_method or 'smilepay'
             subscription.smilepay_order_reference = transaction.order_reference
+            subscription.payment_reference = transaction.smilepay_reference or transaction.transaction_reference or transaction.order_reference
+            subscription.last_payment_date = datetime.utcnow()
+            subscription.last_payment_amount = paid_amount
+            subscription.updated_at = datetime.utcnow()
+
+            subscription.set_billing_period(billing_cycle)
+
+            if plan and plan.user_type == 'brand':
+                brand = BrandProfile.query.filter_by(user_id=subscription.user_id).first()
+                if brand:
+                    if plan.slug in ['agency', 'brand-agency'] or int(plan.max_client_workspaces or 0) > 0:
+                        brand.account_type = 'agency'
+                    elif brand.account_type != 'enterprise':
+                        brand.account_type = 'brand'
+
             db.session.commit()
-            logger.info(f"Subscription {subscription.id} marked as paid")
+            logger.info(f"Subscription {subscription.id} activated after SmilePay payment")
 
     @staticmethod
     def _complete_booking_payment(transaction: SmilePayTransaction):
@@ -623,6 +650,25 @@ class SmilePayService:
             collaboration.smilepay_order_reference = transaction.order_reference
             db.session.commit()
             logger.info(f"Collaboration {collaboration.id} marked as paid")
+
+    @staticmethod
+    def _complete_workspace_addon_payment(transaction: SmilePayTransaction):
+        """Complete extra workspace add-on payment"""
+        from app.models import WorkspaceAddon
+
+        addon = WorkspaceAddon.query.get(transaction.payment_id)
+        if addon:
+            addon.status = 'active'
+            addon.payment_status = 'paid'
+            addon.payment_method = transaction.payment_method or 'smilepay'
+            addon.smilepay_order_reference = transaction.order_reference
+            addon.payment_reference = transaction.smilepay_reference or transaction.transaction_reference or transaction.order_reference
+            addon.activated_at = datetime.utcnow()
+            if addon.workspace:
+                addon.workspace.is_active = True
+                addon.workspace.updated_at = datetime.utcnow()
+            db.session.commit()
+            logger.info(f"Workspace add-on {addon.id} activated after SmilePay payment")
 
     @staticmethod
     def _handle_failed_payment(transaction: SmilePayTransaction):

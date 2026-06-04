@@ -4,6 +4,11 @@ from datetime import datetime, timedelta
 from app import db
 from app.models import Brief, BriefMilestone, User, BrandProfile, CreatorProfile, Proposal
 from app.utils.notifications import create_notification
+from app.services.workspace_service import (
+    get_request_workspace_id,
+    require_workspace_access,
+    scope_query_to_workspace,
+)
 
 bp = Blueprint('briefs', __name__)
 
@@ -24,6 +29,13 @@ def create_brief():
             return jsonify({'error': 'Brand profile not found'}), 404
 
         data = request.get_json()
+        workspace_id = get_request_workspace_id()
+        if workspace_id:
+            _, access_error, status_code = require_workspace_access(
+                user_id, workspace_id, 'can_manage_campaigns'
+            )
+            if access_error:
+                return jsonify({'error': access_error}), status_code
 
         # Validate required fields
         required = ['title', 'description', 'goal', 'platforms', 'budget_min', 'budget_max',
@@ -47,6 +59,7 @@ def create_brief():
         # Create brief
         brief = Brief(
             brand_id=brand.id,
+            workspace_id=workspace_id,
             title=data['title'],
             description=data['description'],
             goal=data['goal'],
@@ -105,6 +118,7 @@ def get_briefs():
             # Brand sees their own briefs
             brand = BrandProfile.query.filter_by(user_id=user_id).first()
             query = Brief.query.filter_by(brand_id=brand.id)
+            query = scope_query_to_workspace(query, Brief, get_request_workspace_id())
 
             if status != 'all':
                 query = query.filter_by(status=status)
@@ -167,6 +181,14 @@ def get_brief(brief_id):
         if not brief:
             return jsonify({'error': 'Brief not found'}), 404
 
+        if user.user_type == 'brand':
+            brand = BrandProfile.query.filter_by(user_id=user_id).first()
+            if not brand or brief.brand_id != brand.id:
+                return jsonify({'error': 'Unauthorized'}), 403
+            selected_workspace_id = get_request_workspace_id()
+            if selected_workspace_id and brief.workspace_id != selected_workspace_id:
+                return jsonify({'error': 'Brief not found in selected workspace'}), 404
+
         # Check if creator meets criteria (for frontend to show eligibility status)
         meets_criteria = True
         if user.user_type == 'creator':
@@ -203,6 +225,12 @@ def update_brief(brief_id):
 
         if brief.brand_id != brand.id:
             return jsonify({'error': 'Unauthorized'}), 403
+        if brief.workspace_id:
+            _, access_error, status_code = require_workspace_access(
+                user_id, brief.workspace_id, 'can_manage_campaigns'
+            )
+            if access_error:
+                return jsonify({'error': access_error}), status_code
 
         if brief.status != 'draft':
             return jsonify({'error': 'Can only update draft briefs'}), 400
@@ -287,6 +315,12 @@ def delete_brief(brief_id):
 
         if brief.brand_id != brand.id:
             return jsonify({'error': 'Unauthorized'}), 403
+        if brief.workspace_id:
+            _, access_error, status_code = require_workspace_access(
+                user_id, brief.workspace_id, 'can_manage_campaigns'
+            )
+            if access_error:
+                return jsonify({'error': access_error}), status_code
 
         if brief.status != 'draft':
             return jsonify({'error': 'Can only delete draft briefs'}), 400
@@ -320,6 +354,12 @@ def publish_brief(brief_id):
 
         if brief.brand_id != brand.id:
             return jsonify({'error': 'Unauthorized'}), 403
+        if brief.workspace_id:
+            _, access_error, status_code = require_workspace_access(
+                user_id, brief.workspace_id, 'can_manage_campaigns'
+            )
+            if access_error:
+                return jsonify({'error': access_error}), status_code
 
         if brief.status != 'draft':
             return jsonify({'error': 'Brief is not in draft status'}), 400
@@ -357,6 +397,12 @@ def close_brief(brief_id):
 
         if brief.brand_id != brand.id:
             return jsonify({'error': 'Unauthorized'}), 403
+        if brief.workspace_id:
+            _, access_error, status_code = require_workspace_access(
+                user_id, brief.workspace_id, 'can_manage_campaigns'
+            )
+            if access_error:
+                return jsonify({'error': access_error}), status_code
 
         brief.status = 'closed'
         brief.closed_at = datetime.utcnow()
@@ -391,6 +437,12 @@ def get_brief_proposals(brief_id):
 
         if brief.brand_id != brand.id:
             return jsonify({'error': 'Unauthorized'}), 403
+        if brief.workspace_id:
+            _, access_error, status_code = require_workspace_access(
+                user_id, brief.workspace_id, 'can_manage_campaigns'
+            )
+            if access_error:
+                return jsonify({'error': access_error}), status_code
 
         proposals = Proposal.query.filter_by(brief_id=brief_id).order_by(Proposal.created_at.desc()).all()
 
@@ -421,6 +473,12 @@ def convert_brief_to_campaign(brief_id):
 
         if brief.brand_id != brand.id:
             return jsonify({'error': 'Unauthorized'}), 403
+        if brief.workspace_id:
+            _, access_error, status_code = require_workspace_access(
+                user_id, brief.workspace_id, 'can_manage_campaigns'
+            )
+            if access_error:
+                return jsonify({'error': access_error}), status_code
 
         # Check if already converted
         if brief.campaign:
@@ -436,6 +494,7 @@ def convert_brief_to_campaign(brief_id):
         campaign = Campaign(
             brand_id=brand.id,
             brief_id=brief.id,
+            workspace_id=brief.workspace_id,
             title=brief.title,
             description=brief.description,
             objectives=brief.goal,

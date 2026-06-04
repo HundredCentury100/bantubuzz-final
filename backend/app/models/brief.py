@@ -7,6 +7,7 @@ class Brief(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     brand_id = db.Column(db.Integer, db.ForeignKey('brand_profiles.id'), nullable=False)
+    workspace_id = db.Column(db.Integer, db.ForeignKey('client_workspaces.id', ondelete='SET NULL'), nullable=True, index=True)
     title = db.Column(db.String(200), nullable=False)
     description = db.Column(db.Text, nullable=False)
     goal = db.Column(db.Text, nullable=False)
@@ -29,6 +30,7 @@ class Brief(db.Model):
 
     # Relationships
     brand = db.relationship('BrandProfile', backref='briefs')
+    workspace = db.relationship('ClientWorkspace', backref=db.backref('briefs', lazy='dynamic'))
     milestones = db.relationship('BriefMilestone', backref='brief', lazy='dynamic', cascade='all, delete-orphan', order_by='BriefMilestone.milestone_number')
     proposals = db.relationship('Proposal', backref='brief', lazy='dynamic', cascade='all, delete-orphan')
     campaign = db.relationship('Campaign', backref='source_brief', foreign_keys='Campaign.brief_id', uselist=False)
@@ -38,6 +40,7 @@ class Brief(db.Model):
         data = {
             'id': self.id,
             'brand_id': self.brand_id,
+            'workspace_id': self.workspace_id,
             'title': self.title,
             'description': self.description,
             'goal': self.goal,

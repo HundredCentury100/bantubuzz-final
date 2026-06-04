@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import api from '../services/api';
@@ -210,6 +210,21 @@ export default function SubscriptionManage() {
     }
   };
 
+  const selectedPlan = useMemo(() => {
+    if (!selectedPlanId) return null;
+    return plans.find((plan) => (
+      String(plan.id) === String(selectedPlanId)
+      || plan.slug === selectedPlanId
+      || (selectedPlanId === 'agency' && ['agency', 'brand-agency'].includes(plan.slug))
+    ));
+  }, [plans, selectedPlanId]);
+
+  useEffect(() => {
+    if (!selectedPlan || loading) return;
+    const element = document.getElementById(`plan-${selectedPlan.id}`);
+    element?.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+  }, [selectedPlan, loading]);
+
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -236,6 +251,7 @@ export default function SubscriptionManage() {
   const currentPlan = actualSubscription?.plan || currentSubscription?.plan || plans.find(p => p.slug === 'free');
   const isActive = actualSubscription?.status === 'active';
   const isCancelled = actualSubscription?.cancel_at_period_end;
+  const isAgencySlug = (slug) => ['agency', 'brand-agency'].includes(slug);
 
   return (
     <div className="min-h-screen flex flex-col bg-light">
@@ -370,12 +386,19 @@ export default function SubscriptionManage() {
           )}
 
           {/* Available/Upgrade Plans */}
-          {(!hasActiveSubscription || (hasActiveSubscription && currentPlan?.slug !== 'agency')) && (
+          {(!hasActiveSubscription || (hasActiveSubscription && !isAgencySlug(currentPlan?.slug))) && (
             <div>
               <div className="text-center mb-8">
                 <h2 className="text-3xl md:text-4xl font-bold text-dark mb-4">
                   {hasActiveSubscription ? 'Upgrade Your Plan' : 'Choose Your Plan'}
                 </h2>
+                {selectedPlan && (
+                  <p className="mx-auto mt-2 max-w-2xl rounded-2xl bg-primary/15 px-4 py-3 text-sm font-medium text-dark">
+                    {selectedPlan.slug === 'agency' || selectedPlan.slug === 'brand-agency'
+                      ? 'Agency plan selected. Choose your billing cycle, then continue to payment to unlock client workspaces.'
+                      : `${selectedPlan.name} selected from pricing.`}
+                  </p>
+                )}
 
                 {/* Billing Toggle */}
                 <div className="flex items-center justify-center gap-4 mt-8">
@@ -411,14 +434,17 @@ export default function SubscriptionManage() {
                       const isCurrentPlan = currentPlan?.id === plan.id;
                       const isFree = plan.price_monthly === 0 && plan.price_yearly === 0;
                       const isPopular = plan.slug === 'pro' || plan.slug === 'creatorPro';
-                      const isAgency = plan.slug === 'agency';
+                      const isAgency = isAgencySlug(plan.slug);
                       const saving = plan.price_monthly > 0 ? plan.price_monthly * 2 : 0;
 
                       return (
                         <div
+                          id={`plan-${plan.id}`}
                           key={plan.id}
                           className={`relative bg-white rounded-2xl shadow-sm hover:shadow-md transition-all duration-200 p-4 flex flex-col flex-1 min-w-[220px] max-w-[240px] ${
-                            isPopular ? 'border-2 border-primary' : 'border border-gray-200'
+                            selectedPlan?.id === plan.id
+                              ? 'border-2 border-dark ring-4 ring-primary/20'
+                              : isPopular ? 'border-2 border-primary' : 'border border-gray-200'
                           }`}
                         >
                           {/* Badge */}
@@ -429,7 +455,7 @@ export default function SubscriptionManage() {
                           )}
                           {isAgency && (
                             <div className="absolute -top-2.5 left-1/2 transform -translate-x-1/2 bg-dark text-white px-3 py-0.5 rounded-full text-[10px] font-semibold uppercase">
-                              AGENCY PLAN
+                              {selectedPlan?.id === plan.id ? 'SELECTED AGENCY PLAN' : 'AGENCY PLAN'}
                             </div>
                           )}
 
@@ -726,7 +752,7 @@ export default function SubscriptionManage() {
                                   : 'border-2 border-gray-300 hover:border-dark text-dark hover:bg-gray-50'
                               } disabled:opacity-50`}
                             >
-                              {actionLoading ? 'Processing...' : hasActiveSubscription ? 'Upgrade' : isFree ? 'Get Started — Free' : 'Subscribe Now'}
+                              {actionLoading ? 'Processing...' : hasActiveSubscription ? `Upgrade to ${plan.name}` : isFree ? 'Get Started - Free' : `Subscribe to ${plan.name}`}
                             </button>
                           )}
                         </div>

@@ -1,11 +1,13 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from datetime import datetime
+import re
 from app import db
 from app.models import BrandProfile, SavedCreator, CreatorProfile, User
 from app.utils import save_profile_picture, delete_profile_picture
 from app.utils.file_upload import save_and_compress_image
 from app.utils.image_compression import delete_image_variants
+from app.services.workspace_service import get_request_workspace_id, require_workspace_access
 
 bp = Blueprint('brands', __name__)
 
@@ -88,6 +90,43 @@ def update_profile():
         if 'social_links' in data:
             brand.social_links = data['social_links']
 
+        if 'report_brand_color' in data:
+            color = data.get('report_brand_color') or '#B5E61D'
+            if not re.match(r'^#[0-9A-Fa-f]{6}$', color):
+                return jsonify({'error': 'Report brand color must be a hex color'}), 400
+            brand.report_brand_color = color
+
+        if 'report_secondary_color' in data:
+            color = data.get('report_secondary_color') or '#1F2937'
+            if not re.match(r'^#[0-9A-Fa-f]{6}$', color):
+                return jsonify({'error': 'Report secondary color must be a hex color'}), 400
+            brand.report_secondary_color = color
+
+        if 'report_email_signature' in data:
+            brand.report_email_signature = (data.get('report_email_signature') or '').strip()[:2000]
+
+        if 'report_sender_name' in data:
+            brand.report_sender_name = (data.get('report_sender_name') or '').strip()[:120]
+
+        if 'report_reply_to_email' in data:
+            reply_to = (data.get('report_reply_to_email') or '').strip()
+            if reply_to and not re.match(r'^[^@\s]+@[^@\s]+\.[^@\s]+$', reply_to):
+                return jsonify({'error': 'Report reply-to email is invalid'}), 400
+            brand.report_reply_to_email = reply_to[:120] if reply_to else None
+
+        if 'account_type' in data:
+            account_type = data.get('account_type') or 'brand'
+            if account_type not in ['brand', 'agency', 'enterprise']:
+                return jsonify({'error': 'Invalid account type'}), 400
+            brand.account_type = account_type
+
+        if 'expected_workspace_count' in data:
+            try:
+                expected_count = int(data.get('expected_workspace_count') or 0)
+            except (TypeError, ValueError):
+                return jsonify({'error': 'Expected workspace count must be a number'}), 400
+            brand.expected_workspace_count = max(expected_count, 0)
+
         brand.updated_at = datetime.utcnow()
         db.session.commit()
 
@@ -95,6 +134,61 @@ def update_profile():
             'message': 'Profile updated successfully',
             'brand': brand.to_dict(include_user=True)
         }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@bp.route('/profile/report-logo', methods=['POST'])
+@jwt_required()
+def upload_report_logo():
+    """Upload dedicated white-label report logo."""
+    try:
+        user_id = int(get_jwt_identity())
+        user = User.query.get(user_id)
+
+        if not user or user.user_type != 'brand':
+            return jsonify({'error': 'Not authorized'}), 403
+
+        brand = user.brand_profile
+        if not brand:
+            return jsonify({'error': 'Brand profile not found'}), 404
+
+        if brand.account_type not in ['agency', 'enterprise']:
+            return jsonify({'error': 'White-label report branding requires an Agency or Enterprise account'}), 403
+
+        if 'file' not in request.files:
+            return jsonify({'error': 'No file provided'}), 400
+
+        file = request.files['file']
+        if file.filename == '':
+            return jsonify({'error': 'No file selected'}), 400
+
+        if brand.report_logo_sizes:
+            delete_image_variants(brand.report_logo_sizes)
+        elif brand.report_logo:
+            delete_profile_picture(brand.report_logo)
+
+        try:
+            image_data = save_and_compress_image(file, folder='profiles/reports')
+            brand.report_logo_sizes = {
+                'thumbnail': image_data['thumbnail'],
+                'medium': image_data['medium'],
+                'large': image_data['large']
+            }
+            brand.report_logo = image_data['medium']
+            brand.updated_at = datetime.utcnow()
+            db.session.commit()
+
+            return jsonify({
+                'message': 'Report logo updated successfully',
+                'report_logo': image_data['medium'],
+                'report_logo_sizes': brand.report_logo_sizes
+            }), 200
+
+        except ValueError as e:
+            return jsonify({'error': str(e)}), 400
 
     except Exception as e:
         db.session.rollback()
@@ -172,8 +266,24 @@ def get_saved_creators():
         if not brand:
             return jsonify({'error': 'Brand profile not found'}), 404
 
-        saved = SavedCreator.query.filter_by(brand_id=brand.id).all()
-        creators = [CreatorProfile.query.get(s.creator_id).to_dict(include_user=True) for s in saved]
+        workspace_id = get_request_workspace_id()
+        query = SavedCreator.query.filter_by(brand_id=brand.id)
+        if workspace_id:
+            _, workspace_error, workspace_status = require_workspace_access(user_id, workspace_id, 'can_manage_creators')
+            if workspace_error:
+                return jsonify({'error': workspace_error}), workspace_status
+            query = query.filter_by(workspace_id=workspace_id)
+
+        saved = query.order_by(SavedCreator.saved_at.desc()).all()
+        creators = []
+        seen_creator_ids = set()
+        for saved_creator in saved:
+            if saved_creator.creator_id in seen_creator_ids:
+                continue
+            creator = CreatorProfile.query.get(saved_creator.creator_id)
+            if creator:
+                creators.append(creator.to_dict(include_user=True))
+                seen_creator_ids.add(saved_creator.creator_id)
 
         return jsonify({'creators': creators}), 200
 
@@ -192,16 +302,23 @@ def save_creator(creator_id):
         if not brand:
             return jsonify({'error': 'Brand profile not found'}), 404
 
+        workspace_id = get_request_workspace_id()
+        if workspace_id:
+            _, workspace_error, workspace_status = require_workspace_access(user_id, workspace_id, 'can_manage_creators')
+            if workspace_error:
+                return jsonify({'error': workspace_error}), workspace_status
+
         # Check if already saved
         existing = SavedCreator.query.filter_by(
             brand_id=brand.id,
-            creator_id=creator_id
+            creator_id=creator_id,
+            workspace_id=workspace_id
         ).first()
 
         if existing:
             return jsonify({'message': 'Creator already saved'}), 200
 
-        saved = SavedCreator(brand_id=brand.id, creator_id=creator_id)
+        saved = SavedCreator(brand_id=brand.id, creator_id=creator_id, workspace_id=workspace_id)
         db.session.add(saved)
         db.session.commit()
 
@@ -223,15 +340,23 @@ def unsave_creator(creator_id):
         if not brand:
             return jsonify({'error': 'Brand profile not found'}), 404
 
+        workspace_id = get_request_workspace_id()
+        if workspace_id:
+            _, workspace_error, workspace_status = require_workspace_access(user_id, workspace_id, 'can_manage_creators')
+            if workspace_error:
+                return jsonify({'error': workspace_error}), workspace_status
+
         saved = SavedCreator.query.filter_by(
             brand_id=brand.id,
-            creator_id=creator_id
-        ).first()
+            creator_id=creator_id,
+            workspace_id=workspace_id
+        ).all()
 
         if not saved:
             return jsonify({'error': 'Creator not in saved list'}), 404
 
-        db.session.delete(saved)
+        for saved_creator in saved:
+            db.session.delete(saved_creator)
         db.session.commit()
 
         return jsonify({'message': 'Creator unsaved successfully'}), 200
@@ -265,7 +390,14 @@ def get_brand_audience():
         from app.models.thunzi_account import ThunziAccount
         from app.services.thunzi_service import thunzi_service
 
-        collaborations = Collaboration.query.filter_by(brand_id=brand.id).all()
+        workspace_id = get_request_workspace_id()
+        collaborations_query = Collaboration.query.filter_by(brand_id=brand.id)
+        if workspace_id:
+            _, workspace_error, workspace_status = require_workspace_access(user_id, workspace_id, 'can_view_analytics')
+            if workspace_error:
+                return jsonify({'error': workspace_error}), workspace_status
+            collaborations_query = collaborations_query.filter_by(workspace_id=workspace_id)
+        collaborations = collaborations_query.all()
 
         if not collaborations:
             return jsonify({'error': 'No collaborations found'}), 404
@@ -305,7 +437,10 @@ def get_brand_audience():
 
         # Add additional context
         from app.models.campaign import Campaign
-        campaigns = Campaign.query.filter_by(brand_id=brand.id).all()
+        campaigns_query = Campaign.query.filter_by(brand_id=brand.id)
+        if workspace_id:
+            campaigns_query = campaigns_query.filter_by(workspace_id=workspace_id)
+        campaigns = campaigns_query.all()
 
         return jsonify({
             **audience_data,

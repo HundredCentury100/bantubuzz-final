@@ -76,6 +76,8 @@ export default function AdminPayments() {
       } else if (selectedPayment.brand_subscription_id) {
         // Handle brand subscriptions (if needed in the future)
         await api.put(`/admin/payments/brand-subscription/${selectedPayment.brand_subscription_id}/verify`, { notes: verifyData.notes });
+      } else if (selectedPayment.workspace_addon_id) {
+        await api.put(`/admin/payments/workspace-addon/${selectedPayment.workspace_addon_id}/verify`, { notes: verifyData.notes });
       } else {
         // Regular payment/booking
         await api.put(`/admin/payments/${selectedPayment.id}/verify`, verifyData);
@@ -137,6 +139,10 @@ export default function AdminPayments() {
     // Handle brand subscriptions
     if (payment.payment_category === 'brand_subscription') {
       return payment.subscription_plan || 'Brand Subscription';
+    }
+
+    if (payment.payment_category === 'workspace_addon') {
+      return payment.workspace_name ? `Extra Workspace - ${payment.workspace_name}` : 'Extra Workspace Add-on';
     }
 
     // Handle bookings

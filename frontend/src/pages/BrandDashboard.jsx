@@ -120,7 +120,7 @@ const BrandDashboard = () => {
 
       <div className="container-custom section-padding">
         {/* Upgrade Banner - Show Next Tier Features */}
-        {subscription && subscription.plan && subscription.plan.slug !== 'agency' && !subscriptionBannerDismissed && (
+        {subscription && subscription.plan && !['agency', 'brand-agency'].includes(subscription.plan.slug) && !subscriptionBannerDismissed && (
           <div className="mb-8 p-6 bg-primary border border-primary rounded-3xl relative">
             <button
               onClick={handleDismissSubscriptionBanner}

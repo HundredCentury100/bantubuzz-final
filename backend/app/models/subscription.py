@@ -30,6 +30,10 @@ class Subscription(db.Model):
     payment_method = db.Column(db.String(30))  # paynow, bank_transfer, stripe, paypal, etc.
     payment_reference = db.Column(db.String(100))  # External payment ID
     paynow_poll_url = db.Column(db.Text, nullable=True)  # Paynow polling URL
+    payment_status = db.Column(db.String(30), nullable=True)  # pending_verification, verified, paid, rejected
+    payment_verified = db.Column(db.Boolean, default=False)
+    payment_proof_path = db.Column(db.String(255), nullable=True)
+    smilepay_order_reference = db.Column(db.String(100), nullable=True)
     last_payment_date = db.Column(db.DateTime, nullable=True)
     next_payment_date = db.Column(db.DateTime, nullable=True)
     last_payment_amount = db.Column(db.Numeric(10, 2), nullable=True)
@@ -167,6 +171,10 @@ class Subscription(db.Model):
             'cancel_at_period_end': self.cancel_at_period_end,
             'cancelled_at': self.cancelled_at.isoformat() if self.cancelled_at else None,
             'payment_method': self.payment_method,
+            'payment_status': self.payment_status,
+            'payment_verified': self.payment_verified,
+            'payment_proof_path': self.payment_proof_path,
+            'smilepay_order_reference': self.smilepay_order_reference,
             'next_payment_date': self.next_payment_date.isoformat() if self.next_payment_date else None,
             'last_payment_date': self.last_payment_date.isoformat() if self.last_payment_date else None,
             'last_payment_amount': float(self.last_payment_amount) if self.last_payment_amount else None,

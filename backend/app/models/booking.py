@@ -8,6 +8,7 @@ class Booking(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     package_id = db.Column(db.Integer, db.ForeignKey('packages.id'), nullable=True)  # Nullable for campaign applications
     campaign_id = db.Column(db.Integer, db.ForeignKey('campaigns.id'), nullable=True)
+    workspace_id = db.Column(db.Integer, db.ForeignKey('client_workspaces.id', ondelete='SET NULL'), nullable=True, index=True)
     brief_id = db.Column(db.Integer, db.ForeignKey('briefs.id'), nullable=True)  # For brief-based bookings
     proposal_id = db.Column(db.Integer, db.ForeignKey('proposals.id'), nullable=True)  # For proposal-based bookings
     creator_id = db.Column(db.Integer, db.ForeignKey('creator_profiles.id'), nullable=False)
@@ -31,6 +32,7 @@ class Booking(db.Model):
 
     # Relationships
     messages = db.relationship('Message', backref='booking', lazy='dynamic')
+    workspace = db.relationship('ClientWorkspace', backref=db.backref('bookings', lazy='dynamic'))
 
     def to_dict(self, include_relations=False):
         """Convert booking to dictionary"""
@@ -38,6 +40,7 @@ class Booking(db.Model):
             'id': self.id,
             'package_id': self.package_id,
             'campaign_id': self.campaign_id,
+            'workspace_id': self.workspace_id,
             'brief_id': self.brief_id if hasattr(self, 'brief_id') else None,
             'proposal_id': self.proposal_id if hasattr(self, 'proposal_id') else None,
             'creator_id': self.creator_id,

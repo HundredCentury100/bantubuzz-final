@@ -472,7 +472,7 @@ function PlanCard({ plan, billing, onSubscribe }) {
             : 'border-2 border-gray-300 hover:border-dark text-dark hover:bg-gray-50'
         }`}
       >
-        {moPrice === 0 ? "Get Started — Free" : plan.id === "agency" ? "Contact Sales" : "Subscribe Now"}
+        {moPrice === 0 ? "Get Started — Free" : plan.id === "agency" ? "Upgrade to Agency" : "Subscribe Now"}
       </button>
     </div>
   );
@@ -592,7 +592,7 @@ export default function Pricing() {
                   Managing campaigns for multiple clients?
                 </h3>
                 <p className="text-gray-700 leading-relaxed mb-6">
-                  One platform for all your clients. Separate dashboards, white-label reports with your agency branding, 10 team members, and the platform's lowest service fee at 2%.
+                  Upgrade your brand account to Agency and manage every client separately. Each client gets isolated campaigns, analytics, billing, and reporting, with 10 workspaces included.
                 </p>
                 <div className="flex flex-wrap gap-2">
                   {["10 client workspaces", "White-label reports", "10 team members", "+$30/extra workspace", "2% service fee", "Dedicated account manager"].map(f => (
@@ -609,7 +609,7 @@ export default function Pricing() {
                   onClick={() => handleSubscribe("agency")}
                   className="px-8 py-3 rounded-full bg-dark hover:bg-gray-800 text-white font-semibold transition-colors"
                 >
-                  Contact Sales
+                  Upgrade to Agency
                 </button>
               </div>
             </div>

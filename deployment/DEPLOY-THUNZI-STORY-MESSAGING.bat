@@ -19,27 +19,52 @@ echo.
 echo This deploys only the latest changes:
 echo   - frontend build files into /var/www/bantubuzz/frontend
 echo   - backend/app/routes/portfolio.py
+echo   - backend/app/routes/auth.py
+echo   - backend/app/routes/brands.py
+echo   - backend/app/routes/briefs.py
 echo   - backend/app/routes/messages.py
 echo   - backend/app/routes/internal.py
 echo   - backend/app/routes/billing.py
+echo   - backend/app/routes/workspaces.py
+echo   - backend/app/routes/subscriptions.py
+echo   - backend/app/routes/admin/payments.py
+echo   - backend/app/routes/analytics.py
 echo   - backend/app/routes/bookings.py
 echo   - backend/app/routes/collaborations.py
 echo   - backend/app/routes/creators.py
 echo   - backend/app/__init__.py
 echo   - backend/app/celery_app.py
+echo   - backend/app/models/__init__.py
+echo   - backend/app/models/client_workspace.py
+echo   - backend/app/models/brand_profile.py
+echo   - backend/app/models/booking.py
+echo   - backend/app/models/brief.py
+echo   - backend/app/models/campaign.py
+echo   - backend/app/models/campaign_payment.py
 echo   - backend/app/models/collaboration.py
+echo   - backend/app/models/saved_creator.py
+echo   - backend/app/models/subscription.py
+echo   - backend/app/services/workspace_service.py
+echo   - backend/app/services/analytics_service.py
+echo   - backend/app/services/smilepay_service.py
+echo   - backend/app/services/email_service.py
+echo   - backend/app/services/white_label_report_service.py
 echo   - backend/app/services/product_notifications.py
 echo   - backend/app/services/payment_service.py
 echo   - backend/app/services/post_metrics_service.py
 echo   - backend/app/models/milestone_deliverable.py
 echo   - backend/app/tasks/collaboration_tasks.py
 echo   - backend/app/tasks/platform_sync.py
+echo   - backend/migrations/versions/202606021000_add_client_workspaces.py
+echo   - backend/migrations/versions/202606031200_add_brand_subscription_payment_fields.py
+echo   - backend/migrations/versions/202606031330_add_workspace_addon_payment_fields.py
+echo   - backend/migrations/versions/202606041000_add_white_label_report_settings.py
 echo   - messaging-service/server.js
-echo   - server-side py_compile for uploaded backend files
+echo   - server-side py_compile and flask db upgrade
 echo   - Gunicorn, messaging service, Celery if configured, and Apache restart
 echo   - local and public health checks
 echo.
-echo No database migration or backfill will run.
+echo This deployment runs flask db upgrade for the client workspace migration.
 echo.
 echo You will be asked for the SSH password on each ssh/scp step.
 echo Press Ctrl+C to cancel, or any key to continue.
@@ -69,18 +94,32 @@ if errorlevel 1 goto fail
 
 echo.
 echo [5/8] Backing up current production files...
-ssh %SERVER_USER%@%SERVER_HOST% "set -e; cd %REMOTE_ROOT%; TS=$(date +%%Y%%m%%d_%%H%%M%%S); echo 'Creating backup at /root/bantubuzz_thunzi_story_messaging_backup_'$TS'.tar.gz'; tar --ignore-failed-read -czf /root/bantubuzz_thunzi_story_messaging_backup_$TS.tar.gz backend/app/__init__.py backend/app/celery_app.py backend/app/routes/portfolio.py backend/app/routes/messages.py backend/app/routes/internal.py backend/app/routes/billing.py backend/app/routes/bookings.py backend/app/routes/collaborations.py backend/app/routes/creators.py backend/app/services/product_notifications.py backend/app/services/payment_service.py backend/app/services/post_metrics_service.py backend/app/models/collaboration.py backend/app/models/milestone_deliverable.py backend/app/tasks/collaboration_tasks.py backend/app/tasks/platform_sync.py messaging-service/server.js frontend/index.html frontend/assets frontend/favicon.ico frontend/manifest.json; mkdir -p backend/app/routes backend/app/services backend/app/models backend/app/tasks messaging-service frontend"
+ssh %SERVER_USER%@%SERVER_HOST% "set -e; cd %REMOTE_ROOT%; TS=$(date +%%Y%%m%%d_%%H%%M%%S); echo 'Creating backup at /root/bantubuzz_thunzi_story_messaging_backup_'$TS'.tar.gz'; tar --ignore-failed-read -czf /root/bantubuzz_thunzi_story_messaging_backup_$TS.tar.gz backend/app/__init__.py backend/app/celery_app.py backend/app/routes/portfolio.py backend/app/routes/auth.py backend/app/routes/brands.py backend/app/routes/briefs.py backend/app/routes/messages.py backend/app/routes/internal.py backend/app/routes/billing.py backend/app/routes/workspaces.py backend/app/routes/subscriptions.py backend/app/routes/admin/payments.py backend/app/routes/analytics.py backend/app/routes/bookings.py backend/app/routes/collaborations.py backend/app/routes/creators.py backend/app/services/workspace_service.py backend/app/services/analytics_service.py backend/app/services/smilepay_service.py backend/app/services/email_service.py backend/app/services/white_label_report_service.py backend/app/services/product_notifications.py backend/app/services/payment_service.py backend/app/services/post_metrics_service.py backend/app/models/__init__.py backend/app/models/client_workspace.py backend/app/models/brand_profile.py backend/app/models/booking.py backend/app/models/brief.py backend/app/models/campaign.py backend/app/models/campaign_payment.py backend/app/models/collaboration.py backend/app/models/saved_creator.py backend/app/models/subscription.py backend/app/models/milestone_deliverable.py backend/app/tasks/collaboration_tasks.py backend/app/tasks/platform_sync.py backend/migrations/versions/202606021000_add_client_workspaces.py backend/migrations/versions/202606031200_add_brand_subscription_payment_fields.py backend/migrations/versions/202606031330_add_workspace_addon_payment_fields.py backend/migrations/versions/202606041000_add_white_label_report_settings.py messaging-service/server.js frontend/index.html frontend/assets frontend/favicon.ico frontend/manifest.json; mkdir -p backend/app/routes/admin backend/app/services backend/app/models backend/app/tasks backend/migrations/versions messaging-service frontend"
 if errorlevel 1 goto fail
 
 echo.
 echo [6/8] Uploading backend route files...
 scp "%ROOT%\backend\app\routes\portfolio.py" %SERVER_USER%@%SERVER_HOST%:%REMOTE_ROOT%/backend/app/routes/portfolio.py
 if errorlevel 1 goto fail
+scp "%ROOT%\backend\app\routes\auth.py" %SERVER_USER%@%SERVER_HOST%:%REMOTE_ROOT%/backend/app/routes/auth.py
+if errorlevel 1 goto fail
+scp "%ROOT%\backend\app\routes\brands.py" %SERVER_USER%@%SERVER_HOST%:%REMOTE_ROOT%/backend/app/routes/brands.py
+if errorlevel 1 goto fail
+scp "%ROOT%\backend\app\routes\briefs.py" %SERVER_USER%@%SERVER_HOST%:%REMOTE_ROOT%/backend/app/routes/briefs.py
+if errorlevel 1 goto fail
 scp "%ROOT%\backend\app\routes\messages.py" %SERVER_USER%@%SERVER_HOST%:%REMOTE_ROOT%/backend/app/routes/messages.py
 if errorlevel 1 goto fail
 scp "%ROOT%\backend\app\routes\internal.py" %SERVER_USER%@%SERVER_HOST%:%REMOTE_ROOT%/backend/app/routes/internal.py
 if errorlevel 1 goto fail
 scp "%ROOT%\backend\app\routes\billing.py" %SERVER_USER%@%SERVER_HOST%:%REMOTE_ROOT%/backend/app/routes/billing.py
+if errorlevel 1 goto fail
+scp "%ROOT%\backend\app\routes\workspaces.py" %SERVER_USER%@%SERVER_HOST%:%REMOTE_ROOT%/backend/app/routes/workspaces.py
+if errorlevel 1 goto fail
+scp "%ROOT%\backend\app\routes\subscriptions.py" %SERVER_USER%@%SERVER_HOST%:%REMOTE_ROOT%/backend/app/routes/subscriptions.py
+if errorlevel 1 goto fail
+scp "%ROOT%\backend\app\routes\admin\payments.py" %SERVER_USER%@%SERVER_HOST%:%REMOTE_ROOT%/backend/app/routes/admin/payments.py
+if errorlevel 1 goto fail
+scp "%ROOT%\backend\app\routes\analytics.py" %SERVER_USER%@%SERVER_HOST%:%REMOTE_ROOT%/backend/app/routes/analytics.py
 if errorlevel 1 goto fail
 scp "%ROOT%\backend\app\routes\bookings.py" %SERVER_USER%@%SERVER_HOST%:%REMOTE_ROOT%/backend/app/routes/bookings.py
 if errorlevel 1 goto fail
@@ -92,7 +131,35 @@ scp "%ROOT%\backend\app\__init__.py" %SERVER_USER%@%SERVER_HOST%:%REMOTE_ROOT%/b
 if errorlevel 1 goto fail
 scp "%ROOT%\backend\app\celery_app.py" %SERVER_USER%@%SERVER_HOST%:%REMOTE_ROOT%/backend/app/celery_app.py
 if errorlevel 1 goto fail
+scp "%ROOT%\backend\app\models\__init__.py" %SERVER_USER%@%SERVER_HOST%:%REMOTE_ROOT%/backend/app/models/__init__.py
+if errorlevel 1 goto fail
+scp "%ROOT%\backend\app\models\client_workspace.py" %SERVER_USER%@%SERVER_HOST%:%REMOTE_ROOT%/backend/app/models/client_workspace.py
+if errorlevel 1 goto fail
+scp "%ROOT%\backend\app\models\brand_profile.py" %SERVER_USER%@%SERVER_HOST%:%REMOTE_ROOT%/backend/app/models/brand_profile.py
+if errorlevel 1 goto fail
+scp "%ROOT%\backend\app\models\booking.py" %SERVER_USER%@%SERVER_HOST%:%REMOTE_ROOT%/backend/app/models/booking.py
+if errorlevel 1 goto fail
+scp "%ROOT%\backend\app\models\brief.py" %SERVER_USER%@%SERVER_HOST%:%REMOTE_ROOT%/backend/app/models/brief.py
+if errorlevel 1 goto fail
+scp "%ROOT%\backend\app\models\campaign.py" %SERVER_USER%@%SERVER_HOST%:%REMOTE_ROOT%/backend/app/models/campaign.py
+if errorlevel 1 goto fail
+scp "%ROOT%\backend\app\models\campaign_payment.py" %SERVER_USER%@%SERVER_HOST%:%REMOTE_ROOT%/backend/app/models/campaign_payment.py
+if errorlevel 1 goto fail
 scp "%ROOT%\backend\app\models\collaboration.py" %SERVER_USER%@%SERVER_HOST%:%REMOTE_ROOT%/backend/app/models/collaboration.py
+if errorlevel 1 goto fail
+scp "%ROOT%\backend\app\models\saved_creator.py" %SERVER_USER%@%SERVER_HOST%:%REMOTE_ROOT%/backend/app/models/saved_creator.py
+if errorlevel 1 goto fail
+scp "%ROOT%\backend\app\models\subscription.py" %SERVER_USER%@%SERVER_HOST%:%REMOTE_ROOT%/backend/app/models/subscription.py
+if errorlevel 1 goto fail
+scp "%ROOT%\backend\app\services\workspace_service.py" %SERVER_USER%@%SERVER_HOST%:%REMOTE_ROOT%/backend/app/services/workspace_service.py
+if errorlevel 1 goto fail
+scp "%ROOT%\backend\app\services\analytics_service.py" %SERVER_USER%@%SERVER_HOST%:%REMOTE_ROOT%/backend/app/services/analytics_service.py
+if errorlevel 1 goto fail
+scp "%ROOT%\backend\app\services\smilepay_service.py" %SERVER_USER%@%SERVER_HOST%:%REMOTE_ROOT%/backend/app/services/smilepay_service.py
+if errorlevel 1 goto fail
+scp "%ROOT%\backend\app\services\email_service.py" %SERVER_USER%@%SERVER_HOST%:%REMOTE_ROOT%/backend/app/services/email_service.py
+if errorlevel 1 goto fail
+scp "%ROOT%\backend\app\services\white_label_report_service.py" %SERVER_USER%@%SERVER_HOST%:%REMOTE_ROOT%/backend/app/services/white_label_report_service.py
 if errorlevel 1 goto fail
 scp "%ROOT%\backend\app\services\product_notifications.py" %SERVER_USER%@%SERVER_HOST%:%REMOTE_ROOT%/backend/app/services/product_notifications.py
 if errorlevel 1 goto fail
@@ -106,12 +173,20 @@ scp "%ROOT%\backend\app\tasks\collaboration_tasks.py" %SERVER_USER%@%SERVER_HOST
 if errorlevel 1 goto fail
 scp "%ROOT%\backend\app\tasks\platform_sync.py" %SERVER_USER%@%SERVER_HOST%:%REMOTE_ROOT%/backend/app/tasks/platform_sync.py
 if errorlevel 1 goto fail
+scp "%ROOT%\backend\migrations\versions\202606021000_add_client_workspaces.py" %SERVER_USER%@%SERVER_HOST%:%REMOTE_ROOT%/backend/migrations/versions/202606021000_add_client_workspaces.py
+if errorlevel 1 goto fail
+scp "%ROOT%\backend\migrations\versions\202606031200_add_brand_subscription_payment_fields.py" %SERVER_USER%@%SERVER_HOST%:%REMOTE_ROOT%/backend/migrations/versions/202606031200_add_brand_subscription_payment_fields.py
+if errorlevel 1 goto fail
+scp "%ROOT%\backend\migrations\versions\202606031330_add_workspace_addon_payment_fields.py" %SERVER_USER%@%SERVER_HOST%:%REMOTE_ROOT%/backend/migrations/versions/202606031330_add_workspace_addon_payment_fields.py
+if errorlevel 1 goto fail
+scp "%ROOT%\backend\migrations\versions\202606041000_add_white_label_report_settings.py" %SERVER_USER%@%SERVER_HOST%:%REMOTE_ROOT%/backend/migrations/versions/202606041000_add_white_label_report_settings.py
+if errorlevel 1 goto fail
 scp "%ROOT%\messaging-service\server.js" %SERVER_USER%@%SERVER_HOST%:%REMOTE_ROOT%/messaging-service/server.js
 if errorlevel 1 goto fail
 
 echo.
 echo [7/8] Extracting frontend, compiling backend, and restarting services...
-ssh %SERVER_USER%@%SERVER_HOST% "set -e; cd %REMOTE_ROOT%; rm -rf frontend/assets frontend/index.html frontend/favicon.ico frontend/manifest.json; tar -xzf /tmp/bantubuzz_frontend_thunzi_story_messaging.tar.gz -C frontend; rm -f /tmp/bantubuzz_frontend_thunzi_story_messaging.tar.gz; cd backend; source venv/bin/activate; python -m py_compile app/__init__.py app/celery_app.py app/routes/portfolio.py app/routes/messages.py app/routes/internal.py app/routes/billing.py app/routes/bookings.py app/routes/collaborations.py app/routes/creators.py app/services/product_notifications.py app/services/payment_service.py app/services/post_metrics_service.py app/models/collaboration.py app/models/milestone_deliverable.py app/tasks/collaboration_tasks.py app/tasks/platform_sync.py; pkill gunicorn || true; sleep 2; venv/bin/gunicorn -w 4 -b 0.0.0.0:8002 --timeout 120 --error-logfile gunicorn_error.log --access-logfile gunicorn_access.log 'app:create_app()' --daemon; (pm2 restart messaging-service 2>/dev/null || pm2 restart bantubuzz-messaging 2>/dev/null || true); (systemctl restart celery 2>/dev/null || true); (systemctl restart celerybeat 2>/dev/null || true); (pm2 restart celery 2>/dev/null || true); (pm2 restart celery-beat 2>/dev/null || true); systemctl restart apache2; sleep 3; echo 'Gunicorn processes:'; ps aux | grep '[g]unicorn'; echo 'Port 8002:'; (ss -tlnp | grep 8002 || netstat -tlnp | grep 8002)"
+ssh %SERVER_USER%@%SERVER_HOST% "set -e; cd %REMOTE_ROOT%; rm -rf frontend/assets frontend/index.html frontend/favicon.ico frontend/manifest.json; tar -xzf /tmp/bantubuzz_frontend_thunzi_story_messaging.tar.gz -C frontend; rm -f /tmp/bantubuzz_frontend_thunzi_story_messaging.tar.gz; cd backend; source venv/bin/activate; python -m py_compile app/__init__.py app/celery_app.py app/routes/portfolio.py app/routes/auth.py app/routes/brands.py app/routes/briefs.py app/routes/messages.py app/routes/internal.py app/routes/billing.py app/routes/workspaces.py app/routes/subscriptions.py app/routes/admin/payments.py app/routes/analytics.py app/routes/bookings.py app/routes/collaborations.py app/routes/creators.py app/services/workspace_service.py app/services/analytics_service.py app/services/smilepay_service.py app/services/email_service.py app/services/white_label_report_service.py app/services/product_notifications.py app/services/payment_service.py app/services/post_metrics_service.py app/models/__init__.py app/models/client_workspace.py app/models/brand_profile.py app/models/booking.py app/models/brief.py app/models/campaign.py app/models/campaign_payment.py app/models/collaboration.py app/models/saved_creator.py app/models/subscription.py app/models/milestone_deliverable.py app/tasks/collaboration_tasks.py app/tasks/platform_sync.py migrations/versions/202606021000_add_client_workspaces.py migrations/versions/202606031200_add_brand_subscription_payment_fields.py migrations/versions/202606031330_add_workspace_addon_payment_fields.py migrations/versions/202606041000_add_white_label_report_settings.py; flask db upgrade; pkill gunicorn || true; sleep 2; venv/bin/gunicorn -w 4 -b 0.0.0.0:8002 --timeout 120 --error-logfile gunicorn_error.log --access-logfile gunicorn_access.log 'app:create_app()' --daemon; (pm2 restart messaging-service 2>/dev/null || pm2 restart bantubuzz-messaging 2>/dev/null || true); (systemctl restart celery 2>/dev/null || true); (systemctl restart celerybeat 2>/dev/null || true); (pm2 restart celery 2>/dev/null || true); (pm2 restart celery-beat 2>/dev/null || true); systemctl restart apache2; sleep 3; echo 'Gunicorn processes:'; ps aux | grep '[g]unicorn'; echo 'Port 8002:'; (ss -tlnp | grep 8002 || netstat -tlnp | grep 8002)"
 if errorlevel 1 goto fail
 
 echo.
@@ -137,6 +212,23 @@ echo   - Creator and brand product notifications create in-app notifications and
 echo   - Message notifications work through both Flask REST and Node Socket.IO paths
 echo   - Delivery metrics auto-sync every 4 hours; manual Sync button is hidden
 echo   - Billing page opens past/upcoming invoices for collaborations and campaigns
+echo   - Brand agency users can open /brand/agency
+echo   - Brand profile settings can switch account type to Agency or Enterprise
+echo   - Agency plan from pricing opens subscription management with Agency selected
+echo   - SmilePay subscription payment activates Agency access after PAID status
+echo   - Wallet subscription payment activates Agency access immediately after wallet deduction
+echo   - Brand subscription bank-transfer proof appears in admin pending payments
+echo   - Admin verification of brand subscription proof activates Agency access
+echo   - Agency workspace selector appears in navbar after client workspaces exist
+echo   - Workspace team invites assign existing users and email pending invites to new users
+echo   - Master dashboard date filters, CSV export, and printable report export work
+echo   - Printable workspace reports use brand logo/name and report accent color
+echo   - Campaigns, bookings, collaborations, and billing respect selected workspace
+echo   - Briefs respect selected workspace and carry workspace into converted campaigns
+echo   - Saved creators respect selected workspace
+echo   - Agency white-label settings save report logo, colors, signature, sender name, and reply-to
+echo   - Master dashboard exports branded PDF with no BantuBuzz logo and small Powered by BantuBuzz footer
+echo   - Master dashboard emails branded PDF through current BantuBuzz mail sender with agency reply-to
 echo.
 pause
 exit /b 0

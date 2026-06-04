@@ -13,6 +13,7 @@ from app.models import (
     Subscription,
     User,
 )
+from app.services.workspace_service import get_request_workspace_id, require_workspace_access
 
 bp = Blueprint('billing', __name__)
 
@@ -151,16 +152,22 @@ def _creator_subscription_invoice(subscription):
     }
 
 
-def _get_user_invoices(user):
+def _get_user_invoices(user, workspace_id=None):
     invoices = []
 
     if user.user_type == 'brand':
         brand = BrandProfile.query.filter_by(user_id=user.id).first()
         if brand:
-            bookings = Booking.query.filter_by(brand_id=brand.id).order_by(Booking.created_at.desc()).all()
+            booking_query = Booking.query.filter_by(brand_id=brand.id)
+            if workspace_id:
+                booking_query = booking_query.filter_by(workspace_id=workspace_id)
+            bookings = booking_query.order_by(Booking.created_at.desc()).all()
             invoices.extend(_booking_invoice(booking, 'brand') for booking in bookings)
 
-            campaign_payments = CampaignPayment.query.filter_by(brand_user_id=user.id).order_by(CampaignPayment.initiated_at.desc()).all()
+            payment_query = CampaignPayment.query.filter_by(brand_user_id=user.id)
+            if workspace_id:
+                payment_query = payment_query.filter_by(workspace_id=workspace_id)
+            campaign_payments = payment_query.order_by(CampaignPayment.initiated_at.desc()).all()
             invoices.extend(_campaign_payment_invoice(payment) for payment in campaign_payments)
 
         subscriptions = Subscription.query.filter_by(user_id=user.id).order_by(Subscription.created_at.desc()).all()
@@ -190,7 +197,13 @@ def get_invoices():
     if not user:
         return jsonify({'error': 'User not found'}), 404
 
-    invoices = _get_user_invoices(user)
+    workspace_id = get_request_workspace_id()
+    if workspace_id:
+        workspace, workspace_error, workspace_status = require_workspace_access(user.id, workspace_id, 'can_manage_billing')
+        if workspace_error:
+            return jsonify({'error': workspace_error}), workspace_status
+
+    invoices = _get_user_invoices(user, workspace_id=workspace_id)
     return jsonify({
         'past_invoices': [item for item in invoices if item['status'] == 'paid'],
         'upcoming_invoices': [item for item in invoices if item['status'] != 'paid'],
@@ -264,7 +277,7 @@ def download_invoice(source_type, source_id):
 
     invoice = next(
         (
-            item for item in _get_user_invoices(user)
+            item for item in _get_user_invoices(user, workspace_id=get_request_workspace_id())
             if item['source_type'] in ['collaboration', 'campaign'] and item['download_url'] and item['download_url'].endswith(f'/{source_type}/{source_id}/download')
         ),
         None

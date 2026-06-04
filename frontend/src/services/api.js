@@ -18,6 +18,10 @@ api.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    const workspaceId = localStorage.getItem('selected_workspace_id');
+    if (workspaceId && workspaceId !== 'all') {
+      config.headers['X-Workspace-Id'] = workspaceId;
+    }
     return config;
   },
   (error) => {
@@ -130,6 +134,13 @@ export const brandsAPI = {
     const formData = new FormData();
     formData.append('file', file);
     return api.post('/brands/profile/logo', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+  uploadReportLogo: (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    return api.post('/brands/profile/report-logo', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
   },
@@ -379,6 +390,31 @@ export const paymentsAPI = {
 export const billingAPI = {
   getInvoices: () => api.get('/billing/invoices'),
   downloadInvoice: (downloadUrl) => api.get(downloadUrl.replace(/^\/api/, ''), { responseType: 'blob' }),
+};
+
+// Agency Client Workspaces API
+export const workspacesAPI = {
+  getWorkspaces: () => api.get('/workspaces'),
+  createWorkspace: (data) => api.post('/workspaces', data),
+  getWorkspace: (id) => api.get(`/workspaces/${id}`),
+  updateWorkspace: (id, data) => api.put(`/workspaces/${id}`, data),
+  deleteWorkspace: (id) => api.delete(`/workspaces/${id}`),
+  getMasterDashboard: (params) => api.get('/workspaces/master-dashboard', { params }),
+  exportMasterDashboard: (params) => api.get('/workspaces/master-dashboard/export', {
+    params,
+    responseType: 'blob',
+  }),
+  emailMasterDashboardReport: (data, params) => api.post('/workspaces/master-dashboard/email-report', data, { params }),
+  getMembers: (id) => api.get(`/workspaces/${id}/members`),
+  saveMember: (id, data) => api.post(`/workspaces/${id}/members`, data),
+  removeMember: (workspaceId, memberId) => api.delete(`/workspaces/${workspaceId}/members/${memberId}`),
+  payAddonWithWallet: (addonId) => api.post(`/workspaces/addons/${addonId}/pay-with-wallet`),
+  uploadAddonProof: (addonId, formData) => api.post(`/workspaces/addons/${addonId}/upload-proof`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  }),
+  getInvitation: (token) => api.get(`/workspaces/invitations/${token}`),
+  acceptInvitation: (token) => api.post(`/workspaces/invitations/${token}/accept`),
+  cancelInvitation: (invitationId) => api.delete(`/workspaces/invitations/${invitationId}`),
 };
 
 // Briefs API
