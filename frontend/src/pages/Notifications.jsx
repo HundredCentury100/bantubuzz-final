@@ -5,6 +5,7 @@ import { BellIcon, CheckIcon } from '@heroicons/react/24/outline';
 import { useNotifications } from '../contexts/NotificationContext';
 import api from '../services/api';
 import toast from 'react-hot-toast';
+import { formatRelativeTime } from '../utils/dateTime';
 
 const Notifications = () => {
   const { markAsRead, markAllAsRead } = useNotifications();
@@ -83,22 +84,6 @@ const Notifications = () => {
       rejection: '❌',
     };
     return icons[type] || '🔔';
-  };
-
-  const getTimeAgo = (dateString) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const seconds = Math.floor((now - date) / 1000);
-
-    if (seconds < 60) return 'Just now';
-    if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
-    if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
-    if (seconds < 604800) return `${Math.floor(seconds / 86400)}d ago`;
-    return date.toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: date.getFullYear() !== now.getFullYear() ? 'numeric' : undefined
-    });
   };
 
   if (loading && page === 1) {
@@ -225,7 +210,7 @@ const Notifications = () => {
                       {notification.message}
                     </p>
                     <div className="flex items-center gap-3 text-xs text-gray-400">
-                      <span>{getTimeAgo(notification.created_at)}</span>
+                      <span>{formatRelativeTime(notification.created_at)}</span>
                       {notification.type && (
                         <>
                           <span>•</span>

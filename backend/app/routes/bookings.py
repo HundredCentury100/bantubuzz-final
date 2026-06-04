@@ -1078,9 +1078,9 @@ def cart_pay_with_wallet():
             # Auto-create deliverable records for NO track collaborations
             create_no_track_deliverables(collaboration)
 
-            notify_creator_new_booking(booking)
-
         db.session.commit()
+        for booking, _ in bookings:
+            notify_creator_new_booking(booking)
         for collab_id in activated_collaboration_ids:
             collab = Collaboration.query.get(collab_id)
             if collab:

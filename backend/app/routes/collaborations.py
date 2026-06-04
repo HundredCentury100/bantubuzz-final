@@ -1692,7 +1692,11 @@ def submit_package_deliverable_url(collab_id, deliverable_id):
             expected_count = len(collaboration.deliverables or [])
             live_url_count = PackageDeliverable.query.filter_by(
                 collaboration_id=collab_id,
-                deliverable_type='live_post'
+                status='approved',
+                post_url_validated=True
+            ).filter(
+                PackageDeliverable.url.isnot(None),
+                PackageDeliverable.url != ''
             ).count()
 
             print(f"[SUBMIT_URL] Live URLs: {live_url_count}/{expected_count}")
@@ -1714,6 +1718,7 @@ def submit_package_deliverable_url(collab_id, deliverable_id):
             else:
                 collaboration.updated_at = datetime.utcnow()
 
+            collaboration.progress_percentage = collaboration.calculate_progress()
             db.session.commit()
             notify_brand_live_urls_submitted(collaboration)
 

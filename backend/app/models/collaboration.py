@@ -106,7 +106,8 @@ class Collaboration(db.Model):
             # Count how many deliverables have live URLs
             deliverables_with_urls = PackageDeliverable.query.filter_by(
                 collaboration_id=self.id,
-                status='approved'
+                status='approved',
+                post_url_validated=True
             ).filter(
                 PackageDeliverable.url.isnot(None),
                 PackageDeliverable.url != ''

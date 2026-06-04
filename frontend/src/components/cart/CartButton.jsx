@@ -1,11 +1,13 @@
 import { useCart } from '../../contexts/CartContext';
+import { useAuth } from '../../hooks/useAuth';
 import { ShoppingCart } from 'lucide-react';
 
 export default function CartButton() {
   const { getCartCount, openCart } = useCart();
+  const { user } = useAuth();
   const count = getCartCount();
 
-  if (count === 0) return null;
+  if (user?.user_type === 'creator' || count === 0) return null;
 
   return (
     <button

@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
+import { useAuth } from '../hooks/useAuth';
 
 const CartContext = createContext();
 
@@ -12,28 +13,64 @@ export const useCart = () => {
 };
 
 export const CartProvider = ({ children }) => {
+  const { user, isAuthenticated } = useAuth();
   const [cartItems, setCartItems] = useState([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
+  const [cartLoaded, setCartLoaded] = useState(false);
+  const isBrandUser = user?.user_type === 'brand';
+  const isCreatorUser = user?.user_type === 'creator';
+  const storageKey = isBrandUser && user?.id
+    ? `bantubuzz_cart_brand_${user.id}`
+    : (!isAuthenticated ? 'bantubuzz_cart_guest' : null);
 
-  // Load cart from localStorage on mount
+  // Load cart from localStorage when the signed-in cart owner changes.
   useEffect(() => {
-    const savedCart = localStorage.getItem('bantubuzz_cart');
+    setCartLoaded(false);
+
+    if (isCreatorUser || !storageKey) {
+      setCartItems([]);
+      setIsCartOpen(false);
+      localStorage.removeItem('bantubuzz_cart');
+      setCartLoaded(true);
+      return;
+    }
+
+    const legacyCart = localStorage.getItem('bantubuzz_cart');
+    const guestCart = isBrandUser ? localStorage.getItem('bantubuzz_cart_guest') : null;
+    const savedCart = localStorage.getItem(storageKey) || guestCart || legacyCart;
+
     if (savedCart) {
       try {
         setCartItems(JSON.parse(savedCart));
+        localStorage.setItem(storageKey, savedCart);
+        localStorage.removeItem('bantubuzz_cart');
+        if (isBrandUser) {
+          localStorage.removeItem('bantubuzz_cart_guest');
+        }
       } catch (error) {
         console.error('Failed to parse cart from localStorage:', error);
+        localStorage.removeItem(storageKey);
         localStorage.removeItem('bantubuzz_cart');
+        setCartItems([]);
       }
+    } else {
+      setCartItems([]);
     }
-  }, []);
+    setCartLoaded(true);
+  }, [storageKey, isBrandUser, isCreatorUser]);
 
   // Save cart to localStorage whenever it changes
   useEffect(() => {
-    localStorage.setItem('bantubuzz_cart', JSON.stringify(cartItems));
-  }, [cartItems]);
+    if (!cartLoaded || !storageKey) return;
+    localStorage.setItem(storageKey, JSON.stringify(cartItems));
+  }, [cartItems, cartLoaded, storageKey]);
 
   const addToCart = (item) => {
+    if (isCreatorUser) {
+      toast.error('Only brands can book creator packages');
+      return;
+    }
+
     // item structure: { package_id, creator_id, creator_name, title, description, price, deliverables }
     const existingItem = cartItems.find(i => i.package_id === item.package_id);
 
@@ -53,8 +90,14 @@ export const CartProvider = ({ children }) => {
 
   const clearCart = () => {
     setCartItems([]);
+    if (storageKey) {
+      localStorage.removeItem(storageKey);
+    }
     localStorage.removeItem('bantubuzz_cart');
-    toast.success('Cart cleared');
+    localStorage.removeItem('bantubuzz_cart_guest');
+    if (!isCreatorUser) {
+      toast.success('Cart cleared');
+    }
   };
 
   const getCartTotal = () => {
@@ -68,7 +111,10 @@ export const CartProvider = ({ children }) => {
     return cartItems.length;
   };
 
-  const openCart = () => setIsCartOpen(true);
+  const openCart = () => {
+    if (isCreatorUser) return;
+    setIsCartOpen(true);
+  };
   const closeCart = () => setIsCartOpen(false);
 
   const value = {

@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { BellIcon } from '@heroicons/react/24/outline';
 import { useNotifications } from '../contexts/NotificationContext';
+import { formatRelativeTime } from '../utils/dateTime';
 
 const NotificationBell = () => {
   const [isOpen, setIsOpen] = useState(false);
@@ -54,18 +55,6 @@ const NotificationBell = () => {
       return 'border-l-4 border-green-500 bg-green-50/50';
     }
     return '';
-  };
-
-  const getTimeAgo = (dateString) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const seconds = Math.floor((now - date) / 1000);
-
-    if (seconds < 60) return 'Just now';
-    if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
-    if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
-    if (seconds < 604800) return `${Math.floor(seconds / 86400)}d ago`;
-    return date.toLocaleDateString();
   };
 
   const displayedNotifications = notifications.slice(0, 10);
@@ -141,7 +130,7 @@ const NotificationBell = () => {
                           {notification.message}
                         </p>
                         <p className="text-xs text-gray-400 mt-1">
-                          {getTimeAgo(notification.created_at)}
+                          {formatRelativeTime(notification.created_at)}
                         </p>
                       </div>
                     </div>

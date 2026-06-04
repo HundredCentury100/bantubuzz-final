@@ -70,6 +70,15 @@ const CollaborationDetails = () => {
 
   const isBrand = user?.user_type === 'brand';
   const deliveryTiming = getDeliveryTiming(collaboration?.expected_completion_date);
+  const isEditingUserInput =
+    showDeliverableModal ||
+    showRevisionModal ||
+    showCancelModal ||
+    showSuccessStoryModal ||
+    !!editingDeliverable ||
+    submitting ||
+    requestingRevision ||
+    cancelling;
 
   useEffect(() => {
     fetchCollaboration();
@@ -77,10 +86,10 @@ const CollaborationDetails = () => {
 
   // Auto-refresh collaboration data every 30 seconds (fallback for when WebSocket is not connected)
   useAutoRefresh(() => {
-    if (!loading) {
+    if (!loading && !isEditingUserInput) {
       fetchCollaboration();
     }
-  }, 30000, !!collaboration); // Only enable when collaboration is loaded
+  }, 30000, !!collaboration && !isEditingUserInput); // Only enable when collaboration is loaded and the user is not editing
 
   // Real-time updates via Socket.IO
   useEffect(() => {
@@ -88,6 +97,9 @@ const CollaborationDetails = () => {
 
     const handleCollaborationUpdate = (data) => {
       if (data.collaboration_id === parseInt(id)) {
+        if (isEditingUserInput) {
+          return;
+        }
         console.log('Collaboration updated, refreshing...');
         toast.info('Collaboration updated');
         fetchCollaboration();
@@ -99,7 +111,7 @@ const CollaborationDetails = () => {
     return () => {
       socket.off('collaboration_updated', handleCollaborationUpdate);
     };
-  }, [socket, id]);
+  }, [socket, id, isEditingUserInput]);
 
   const fetchCollaboration = async () => {
     try {
@@ -409,7 +421,7 @@ const CollaborationDetails = () => {
     <div className="min-h-screen bg-light">
       <Navbar />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-8 pb-28 sm:pb-8">
         {/* Header */}
         <div className="mb-8">
           <Link

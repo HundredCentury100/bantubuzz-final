@@ -197,6 +197,32 @@ Run:
 .\deployment\DEPLOY-THUNZIAI-V2.bat
 ```
 
+### `deployment/DEPLOY-COLLABORATION-PAYMENT-CART-FIXES.bat`
+
+Purpose:
+
+- Builds frontend locally.
+- Packages contents of `frontend/dist`.
+- Uploads frontend tarball.
+- Uploads only the backend files changed for the collaboration/payment/cart QA bugfix batch.
+- Hardens product notification/email side effects so successful user actions do not return false 500s after database changes.
+- Deploys the YES-track progress/live URL counting fix and brand-only cart behavior.
+- Runs backend `py_compile`.
+- Restarts Gunicorn with `pkill gunicorn`, restarts Apache, and checks local/public health endpoints.
+
+Run:
+
+```powershell
+.\deployment\DEPLOY-COLLABORATION-PAYMENT-CART-FIXES.bat
+```
+
+Notes learned from this batch:
+
+- Server timestamps from Flask are often UTC ISO strings without a `Z`; frontend relative-time UI should parse those as UTC or messages/notifications can appear two hours old in the South Africa/Zimbabwe timezone.
+- Do not let notification/email side effects fail the already-completed collaboration/payment action. Product notification helpers should log notification/email failures instead of bubbling them into the route response.
+- For YES-track package collaborations, approved draft content has a `url` but it is not a live post URL. Progress should count only deliverables with `post_url_validated=True`; approval caps progress at 80%, and 100% is reached only after every live URL/Post ID is submitted.
+- The package cart is brand-only state. Frontend cart storage should be scoped to the brand user and hidden/cleared for creator sessions to prevent a shared-browser creator account from seeing a brand's cart.
+
 ## Bank Transfer Collaboration Fix
 
 Problem:

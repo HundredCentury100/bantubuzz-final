@@ -33,7 +33,7 @@ const DeliverableURLInput = ({
   deliverable,
   onSuccess
 }) => {
-  const [postUrl, setPostUrl] = useState(deliverable?.post_url || deliverable?.url || '');
+  const [postUrl, setPostUrl] = useState(deliverable?.post_url || '');
   const [selectedPlatform, setSelectedPlatform] = useState(deliverable?.post_platform || '');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
@@ -254,7 +254,7 @@ const DeliverableURLInput = ({
             {submitting && <Loader2 size={16} className="animate-spin" />}
             {submitting ? 'Submitting...' : 'Submit Reference'}
           </button>
-          {deliverable?.url && (
+          {deliverable?.post_url_validated && (
             <button
               type="button"
               onClick={() => setShowInput(false)}

@@ -9,7 +9,7 @@ export default function CartModal() {
   const { user, isAuthenticated } = useAuth();
   const { cartItems, removeFromCart, clearCart, getCartTotal, isCartOpen, closeCart } = useCart();
 
-  if (!isCartOpen) return null;
+  if (!isCartOpen || user?.user_type === 'creator') return null;
 
   const handleCheckout = () => {
     if (cartItems.length === 0) {

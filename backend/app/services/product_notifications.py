@@ -63,20 +63,34 @@ The BantuBuzz Team
 def _notify_user(user, notification_type, title, message, action_url, email_subject=None, email_heading=None):
     if not user:
         return
-    create_notification(
-        user_id=user.id,
-        notification_type=notification_type,
-        title=title,
-        message=message,
-        action_url=action_url
-    )
-    _send_product_email(
-        user=user,
-        subject=email_subject or title,
-        heading=email_heading or title,
-        message=message,
-        action_url=action_url
-    )
+    try:
+        create_notification(
+            user_id=user.id,
+            notification_type=notification_type,
+            title=title,
+            message=message,
+            action_url=action_url
+        )
+    except Exception as exc:
+        current_app.logger.warning(
+            "Failed to create product notification for user %s: %s",
+            getattr(user, 'id', None),
+            exc
+        )
+    try:
+        _send_product_email(
+            user=user,
+            subject=email_subject or title,
+            heading=email_heading or title,
+            message=message,
+            action_url=action_url
+        )
+    except Exception as exc:
+        current_app.logger.warning(
+            "Failed to send product notification email to user %s: %s",
+            getattr(user, 'id', None),
+            exc
+        )
 
 
 def notify_creator_new_booking(booking):

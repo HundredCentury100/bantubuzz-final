@@ -15,6 +15,9 @@ def send_email(subject, recipients, text_body, html_body=None, sender_name='Bant
     """Send email"""
     # Format sender with display name using email.utils.formataddr
     sender_email = current_app.config.get('MAIL_DEFAULT_SENDER') or current_app.config.get('MAIL_USERNAME', 'user@bantubuzz.com')
+    if isinstance(sender_email, (tuple, list)):
+        sender_name = sender_name or sender_email[0]
+        sender_email = sender_email[-1]
     sender_display = formataddr((sender_name or 'BantuBuzz', sender_email))
 
     msg = Message(

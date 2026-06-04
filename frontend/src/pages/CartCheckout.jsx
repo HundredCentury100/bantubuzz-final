@@ -70,6 +70,11 @@ const CartCheckout = () => {
   };
 
   const validateCollaborationDetails = () => {
+    if (user?.user_type !== 'brand') {
+      toast.error('Only brands can book creator packages');
+      navigate('/creator/dashboard');
+      return false;
+    }
     if (!collaborationBrief.trim()) {
       toast.error('Please describe what you want the creator to do');
       return false;
