@@ -1,5 +1,6 @@
 import re
 from decimal import Decimal
+from datetime import datetime
 
 from flask import request
 
@@ -10,6 +11,7 @@ from app.models import (
     Subscription,
     User,
     WorkspaceAddon,
+    WorkspaceInvitation,
     WorkspaceMemberPermission,
 )
 
@@ -17,6 +19,15 @@ from app.models import (
 DEFAULT_INCLUDED_WORKSPACES = 10
 EXTRA_WORKSPACE_MONTHLY_PRICE = Decimal('30.00')
 EXTRA_WORKSPACE_YEARLY_PRICE = Decimal('300.00')
+PLAN_TEAM_MEMBER_LIMITS = {
+    'free': 1,
+    'starter': 2,
+    'pro': 3,
+    'premium': 5,
+    'agency': 10,
+    'brand-agency': 10,
+    'enterprise': 10,
+}
 
 
 ROLE_PERMISSIONS = {
@@ -73,6 +84,56 @@ def get_workspace_limit(user_id):
     if not plan:
         return 0, None
     return int(plan.max_client_workspaces or 0), plan
+
+
+def get_team_member_limit(user_id):
+    subscription = get_active_subscription(user_id)
+    plan = subscription.plan if subscription else None
+    if not plan:
+        return PLAN_TEAM_MEMBER_LIMITS['free'], None
+
+    slug = (plan.slug or '').lower()
+    fallback_limit = PLAN_TEAM_MEMBER_LIMITS.get(slug)
+    configured_limit = int(plan.max_team_members or 0)
+    if fallback_limit:
+        return fallback_limit, plan
+    return configured_limit or PLAN_TEAM_MEMBER_LIMITS['free'], plan
+
+
+def expire_workspace_invitations(workspace_id):
+    expired = WorkspaceInvitation.query.filter(
+        WorkspaceInvitation.workspace_id == workspace_id,
+        WorkspaceInvitation.status == 'pending',
+        WorkspaceInvitation.expires_at < datetime.utcnow(),
+    ).all()
+    for invitation in expired:
+        invitation.status = 'expired'
+        invitation.updated_at = datetime.utcnow()
+    return len(expired)
+
+
+def get_workspace_seat_usage(workspace, exclude_invitation_id=None):
+    expire_workspace_invitations(workspace.id)
+    member_count = WorkspaceMemberPermission.query.filter_by(workspace_id=workspace.id).count()
+    pending_query = WorkspaceInvitation.query.filter(
+        WorkspaceInvitation.workspace_id == workspace.id,
+        WorkspaceInvitation.status == 'pending',
+        WorkspaceInvitation.expires_at >= datetime.utcnow(),
+    )
+    if exclude_invitation_id:
+        pending_query = pending_query.filter(WorkspaceInvitation.id != exclude_invitation_id)
+    pending_count = pending_query.count()
+    owner_user_id = workspace.agency_brand.user_id if workspace.agency_brand else None
+    limit, plan = get_team_member_limit(owner_user_id) if owner_user_id else (PLAN_TEAM_MEMBER_LIMITS['free'], None)
+    used = member_count + pending_count
+    return {
+        'used': used,
+        'members': member_count,
+        'pending_invitations': pending_count,
+        'limit': limit,
+        'available': max(0, limit - used) if limit >= 0 else None,
+        'plan': plan,
+    }
 
 
 def is_agency_user(user):

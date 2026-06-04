@@ -8,6 +8,7 @@ import {
   ArrowLeftIcon,
   BuildingOffice2Icon,
   ClockIcon,
+  ClipboardDocumentListIcon,
   TrashIcon,
   UserPlusIcon,
 } from '@heroicons/react/24/outline';
@@ -16,8 +17,16 @@ const roleOptions = [
   { value: 'admin', label: 'Admin' },
   { value: 'manager', label: 'Manager' },
   { value: 'viewer', label: 'Viewer' },
-  { value: 'finance', label: 'Finance' },
 ];
+
+const auditLabels = {
+  invitation_sent: 'Invitation sent',
+  invitation_cancelled: 'Invitation cancelled',
+  invitation_accepted: 'Invitation accepted',
+  member_added: 'Member added',
+  member_removed: 'Member removed',
+  member_role_updated: 'Role updated',
+};
 
 const WorkspaceManage = () => {
   const { id } = useParams();
@@ -25,6 +34,8 @@ const WorkspaceManage = () => {
   const [workspace, setWorkspace] = useState(null);
   const [members, setMembers] = useState([]);
   const [invitations, setInvitations] = useState([]);
+  const [seatUsage, setSeatUsage] = useState(null);
+  const [auditLogs, setAuditLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [memberForm, setMemberForm] = useState({ email: '', role: 'manager' });
@@ -53,6 +64,8 @@ const WorkspaceManage = () => {
       setWorkspace(nextWorkspace);
       setMembers(membersRes.data.members || []);
       setInvitations(membersRes.data.invitations || []);
+      setSeatUsage(membersRes.data.seat_usage || null);
+      setAuditLogs(membersRes.data.audit_logs || []);
       setForm({
         name: nextWorkspace.name || '',
         industry: nextWorkspace.industry || '',
@@ -107,6 +120,10 @@ const WorkspaceManage = () => {
           return [response.data.invitation, ...withoutExisting];
         });
       }
+      if (response.data.seat_usage) {
+        setSeatUsage(response.data.seat_usage);
+      }
+      await fetchData();
       setMemberForm({ email: '', role: 'manager' });
       toast.success(response.data.invitation ? 'Team invitation sent' : 'Team member assigned');
     } catch (err) {
@@ -118,6 +135,7 @@ const WorkspaceManage = () => {
     try {
       await workspacesAPI.cancelInvitation(invitationId);
       setInvitations((current) => current.filter((invitation) => invitation.id !== invitationId));
+      await fetchData();
       toast.success('Invitation cancelled');
     } catch (err) {
       toast.error(err.response?.data?.error || 'Failed to cancel invitation');
@@ -128,11 +146,16 @@ const WorkspaceManage = () => {
     try {
       await workspacesAPI.removeMember(id, memberId);
       setMembers((current) => current.filter((member) => member.id !== memberId));
+      await fetchData();
       toast.success('Team member removed');
     } catch (err) {
       toast.error(err.response?.data?.error || 'Failed to remove team member');
     }
   };
+
+  const seatsFull = seatUsage && seatUsage.available === 0;
+  const seatLimitLabel = seatUsage?.limit ?? 1;
+  const seatUsedLabel = seatUsage?.used ?? members.length + invitations.length;
 
   if (loading) {
     return (
@@ -230,11 +253,24 @@ const WorkspaceManage = () => {
 
             <section className="rounded-3xl bg-white p-6 shadow-sm">
               <div className="mb-5">
-                <h2 className="text-xl font-bold text-dark">Team Access</h2>
-                <p className="mt-1 text-sm text-gray-600">Invite team members and assign them to this {label.toLowerCase()} workspace.</p>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <h2 className="text-xl font-bold text-dark">Team Access</h2>
+                    <p className="mt-1 text-sm text-gray-600">Invite team members and assign them to this {label.toLowerCase()} workspace.</p>
+                  </div>
+                  <div className="rounded-2xl bg-primary/15 px-4 py-3 text-sm font-semibold text-dark">
+                    {seatUsedLabel} / {seatLimitLabel} seats
+                    <p className="mt-1 text-xs font-medium text-gray-600">{seatUsage?.plan_name || 'Free'} plan</p>
+                  </div>
+                </div>
               </div>
 
               <form onSubmit={handleAddMember} className="mb-5 space-y-3 rounded-2xl bg-light p-4">
+                {seatsFull && (
+                  <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                    This workspace has reached its team seat limit. Remove a member, cancel a pending invitation, or upgrade before inviting another teammate.
+                  </div>
+                )}
                 <label className="block">
                   <span className="mb-1 block text-sm font-medium text-dark">Email</span>
                   <input
@@ -242,6 +278,7 @@ const WorkspaceManage = () => {
                     onChange={(event) => setMemberForm((current) => ({ ...current, email: event.target.value }))}
                     placeholder="team@company.com"
                     className="input"
+                    disabled={seatsFull}
                   />
                 </label>
                 <label className="block">
@@ -250,13 +287,18 @@ const WorkspaceManage = () => {
                     value={memberForm.role}
                     onChange={(event) => setMemberForm((current) => ({ ...current, role: event.target.value }))}
                     className="input"
+                    disabled={seatsFull}
                   >
                     {roleOptions.map((role) => (
                       <option key={role.value} value={role.value}>{role.label}</option>
                     ))}
                   </select>
                 </label>
-                <button type="submit" className="inline-flex items-center gap-2 rounded-full bg-dark px-4 py-2 text-sm font-semibold text-white">
+                <button
+                  type="submit"
+                  disabled={seatsFull}
+                  className="inline-flex items-center gap-2 rounded-full bg-dark px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-600"
+                >
                   <UserPlusIcon className="h-4 w-4" />
                   Invite Member
                 </button>
@@ -300,7 +342,7 @@ const WorkspaceManage = () => {
                           </div>
                           <p className="mt-1 text-xs capitalize text-gray-600">
                             {invitation.role} invite
-                            {invitation.expires_at ? ` · expires ${new Date(invitation.expires_at).toLocaleDateString()}` : ''}
+                            {invitation.expires_at ? ` - expires ${new Date(invitation.expires_at).toLocaleDateString()}` : ''}
                           </p>
                         </div>
                         <button
@@ -318,6 +360,42 @@ const WorkspaceManage = () => {
               )}
             </section>
           </div>
+
+          <section className="rounded-3xl bg-white p-6 shadow-sm">
+            <div className="mb-5 flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-primary/15">
+                <ClipboardDocumentListIcon className="h-5 w-5 text-dark" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-dark">Team Audit Log</h2>
+                <p className="text-sm text-gray-600">Member additions, removals, and invitation changes for this workspace.</p>
+              </div>
+            </div>
+
+            {auditLogs.length === 0 ? (
+              <p className="rounded-2xl border border-dashed border-gray-200 p-5 text-center text-sm text-gray-500">
+                No team access changes recorded yet.
+              </p>
+            ) : (
+              <div className="divide-y divide-gray-100">
+                {auditLogs.map((log) => (
+                  <div key={log.id} className="flex flex-col gap-1 py-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <p className="font-semibold text-dark">{auditLabels[log.action] || log.action}</p>
+                      <p className="text-sm text-gray-600">
+                        {log.target_email}
+                        {log.role ? ` as ${log.role}` : ''}
+                      </p>
+                    </div>
+                    <div className="text-sm text-gray-500">
+                      {log.actor_email ? `By ${log.actor_email}` : 'System'}
+                      {log.created_at ? ` - ${new Date(log.created_at).toLocaleString()}` : ''}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
         </div>
       </main>
     </div>

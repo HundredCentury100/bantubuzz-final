@@ -682,6 +682,24 @@ Deployment note:
   - Master dashboard supports emailing the branded PDF: `POST /api/workspaces/master-dashboard/email-report`.
   - Report PDFs remove the BantuBuzz logo and keep the small locked `Powered by BantuBuzz` footer.
   - Report emails currently send through the configured BantuBuzz SMTP sender with the agency sender display name and agency reply-to email. Custom `no-reply@agency-domain.com` requires a future DNS/domain-verification provider integration.
+- Workspace team seat limits and audit logging:
+  - Brand workspace team invites are plan-limited by total seats, including the owner.
+  - Product limits are:
+    - Free: 1 seat
+    - Starter: 2 seats
+    - Pro: 3 seats
+    - Premium: 5 seats
+    - Agency/Enterprise: 10 seats
+  - `subscription_plans.max_team_members` is used, with code fallbacks to these product limits so older plan rows do not block QA.
+  - Pending unexpired invitations count toward the seat limit until accepted, cancelled, or expired.
+  - Workspace invitations expire after 7 days.
+  - New workspace invites only accept Admin, Manager, or Viewer roles.
+  - Browser-provided custom permission payloads are ignored; permissions come from the selected server-side role.
+  - Removed members lose access immediately because their `workspace_member_permissions` row is deleted.
+  - Workspace member/invitation events are recorded in `workspace_audit_logs`.
+  - Workspace management UI displays seat usage and the latest team audit log.
+  - Migration: `backend/migrations/versions/202606041500_add_workspace_audit_logs.py`.
+  - Deploy script: `deployment/DEPLOY-WORKSPACE-TEAM.bat`.
 - Remaining hardening for future slices:
   - Improve team invitation onboarding so new invitees land directly back on the invite after signup/login.
   - Build tailored onboarding steps after Agency/Enterprise signup.

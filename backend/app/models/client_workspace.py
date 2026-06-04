@@ -128,7 +128,7 @@ class WorkspaceInvitation(db.Model):
 
     @staticmethod
     def default_expiry():
-        return datetime.utcnow() + timedelta(days=14)
+        return datetime.utcnow() + timedelta(days=7)
 
     def is_expired(self):
         return self.expires_at and self.expires_at < datetime.utcnow()
@@ -145,6 +145,39 @@ class WorkspaceInvitation(db.Model):
             'accepted_at': self.accepted_at.isoformat() if self.accepted_at else None,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+        }
+
+
+class WorkspaceAuditLog(db.Model):
+    """Audit trail for workspace team membership changes."""
+    __tablename__ = 'workspace_audit_logs'
+
+    id = db.Column(db.Integer, primary_key=True)
+    workspace_id = db.Column(db.Integer, db.ForeignKey('client_workspaces.id', ondelete='CASCADE'), nullable=False, index=True)
+    actor_user_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='SET NULL'), nullable=True, index=True)
+    target_user_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='SET NULL'), nullable=True, index=True)
+    target_email = db.Column(db.String(120), nullable=False, index=True)
+    action = db.Column(db.String(50), nullable=False)
+    role = db.Column(db.String(30))
+    details = db.Column(db.JSON, default=dict)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+
+    workspace = db.relationship('ClientWorkspace', backref=db.backref('audit_logs', lazy='dynamic', cascade='all, delete-orphan'))
+    actor = db.relationship('User', foreign_keys=[actor_user_id], backref=db.backref('workspace_audit_events', lazy='dynamic'))
+    target_user = db.relationship('User', foreign_keys=[target_user_id])
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'workspace_id': self.workspace_id,
+            'actor_user_id': self.actor_user_id,
+            'actor_email': self.actor.email if self.actor else None,
+            'target_user_id': self.target_user_id,
+            'target_email': self.target_email,
+            'action': self.action,
+            'role': self.role,
+            'details': self.details or {},
+            'created_at': self.created_at.isoformat() if self.created_at else None,
         }
 
 

@@ -21,6 +21,7 @@ from app.models import (
     Wallet,
     WalletTransaction,
     WorkspaceAddon,
+    WorkspaceAuditLog,
     WorkspaceInvitation,
     WorkspaceMemberPermission,
 )
@@ -31,6 +32,7 @@ from app.services.workspace_service import (
     ROLE_PERMISSIONS,
     create_workspace_addon_if_needed,
     get_active_subscription,
+    get_workspace_seat_usage,
     get_workspace_limit,
     is_agency_user,
     require_workspace_access,
@@ -44,6 +46,7 @@ bp = Blueprint('workspaces', __name__)
 
 UPLOAD_FOLDER = '/var/www/bantubuzz/backend/uploads/payment_proofs'
 ALLOWED_PROOF_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'pdf'}
+INVITABLE_WORKSPACE_ROLES = {'admin', 'manager', 'viewer'}
 
 
 def _allowed_proof_file(filename):
@@ -281,6 +284,32 @@ def _save_workspace_membership(workspace, user, role, permissions=None):
     membership.permissions = permissions or ROLE_PERMISSIONS[role]
     membership.updated_at = datetime.utcnow()
     return membership
+
+
+def _workspace_seat_payload(workspace):
+    usage = get_workspace_seat_usage(workspace)
+    plan = usage.get('plan')
+    return {
+        'used': usage['used'],
+        'members': usage['members'],
+        'pending_invitations': usage['pending_invitations'],
+        'limit': usage['limit'],
+        'available': usage['available'],
+        'plan_name': plan.name if plan else 'Free',
+        'plan_slug': plan.slug if plan else 'free',
+    }
+
+
+def _log_workspace_audit(workspace, action, target_email, role=None, target_user_id=None, details=None):
+    db.session.add(WorkspaceAuditLog(
+        workspace_id=workspace.id,
+        actor_user_id=int(get_jwt_identity()) if get_jwt_identity() else None,
+        target_user_id=target_user_id,
+        target_email=(target_email or '').strip().lower(),
+        action=action,
+        role=role,
+        details=details or {},
+    ))
 
 
 def _get_accessible_addon(user_id, addon_id):
@@ -758,14 +787,21 @@ def list_members(workspace_id):
     workspace, error, status = require_workspace_access(get_jwt_identity(), workspace_id, 'can_invite_members')
     if error:
         return jsonify({'error': error}), status
+    get_workspace_seat_usage(workspace)
     members = WorkspaceMemberPermission.query.filter_by(workspace_id=workspace.id).all()
     invitations = WorkspaceInvitation.query.filter_by(
         workspace_id=workspace.id,
         status='pending',
     ).order_by(WorkspaceInvitation.created_at.desc()).all()
+    audit_logs = WorkspaceAuditLog.query.filter_by(
+        workspace_id=workspace.id,
+    ).order_by(WorkspaceAuditLog.created_at.desc()).limit(50).all()
+    db.session.commit()
     return jsonify({
         'members': [member.to_dict() for member in members],
-        'invitations': [invitation.to_dict() for invitation in invitations],
+        'invitations': [invitation.to_dict() for invitation in invitations if not invitation.is_expired()],
+        'seat_usage': _workspace_seat_payload(workspace),
+        'audit_logs': [log.to_dict() for log in audit_logs],
     }), 200
 
 
@@ -779,30 +815,66 @@ def add_member(workspace_id):
     data = request.get_json() or {}
     email = (data.get('email') or '').strip().lower()
     role = data.get('role') or 'viewer'
-    if role not in ROLE_PERMISSIONS:
-        return jsonify({'error': 'Invalid workspace role'}), 400
+    if not email:
+        return jsonify({'error': 'Email is required'}), 400
+    if role not in INVITABLE_WORKSPACE_ROLES:
+        return jsonify({'error': 'Invalid workspace role. Choose Admin, Manager, or Viewer.'}), 400
 
     member_user = User.query.filter_by(email=email).first()
     if member_user:
+        existing_membership = WorkspaceMemberPermission.query.filter_by(
+            workspace_id=workspace.id,
+            user_id=member_user.id,
+        ).first()
+        if not existing_membership and get_workspace_seat_usage(workspace)['available'] <= 0:
+            seat_usage = _workspace_seat_payload(workspace)
+            return jsonify({
+                'error': f"Team seat limit reached for your {seat_usage['plan_name']} plan. Upgrade your plan or remove a member before adding another teammate.",
+                'seat_usage': seat_usage,
+            }), 403
+
         membership = _save_workspace_membership(
             workspace,
             member_user,
             role,
-            data.get('permissions'),
+            ROLE_PERMISSIONS[role],
         )
         WorkspaceInvitation.query.filter_by(
             workspace_id=workspace.id,
             email=email,
             status='pending',
         ).update({'status': 'accepted', 'accepted_at': datetime.utcnow()})
+        _log_workspace_audit(
+            workspace,
+            'member_role_updated' if existing_membership else 'member_added',
+            email,
+            role,
+            target_user_id=member_user.id,
+        )
         db.session.commit()
-        return jsonify({'message': 'Workspace member saved', 'member': membership.to_dict()}), 200
+        return jsonify({
+            'message': 'Workspace member saved',
+            'member': membership.to_dict(),
+            'seat_usage': _workspace_seat_payload(workspace),
+        }), 200
 
     invitation = WorkspaceInvitation.query.filter_by(
         workspace_id=workspace.id,
         email=email,
         status='pending',
     ).first()
+    if invitation and invitation.is_expired():
+        invitation.status = 'expired'
+        invitation.updated_at = datetime.utcnow()
+        invitation = None
+
+    if not invitation and get_workspace_seat_usage(workspace)['available'] <= 0:
+        seat_usage = _workspace_seat_payload(workspace)
+        return jsonify({
+            'error': f"Team seat limit reached for your {seat_usage['plan_name']} plan. Upgrade your plan or cancel a pending invitation before inviting another teammate.",
+            'seat_usage': seat_usage,
+        }), 403
+
     if not invitation:
         invitation = WorkspaceInvitation(
             workspace_id=workspace.id,
@@ -813,9 +885,16 @@ def add_member(workspace_id):
         db.session.add(invitation)
 
     invitation.role = role
-    invitation.permissions = data.get('permissions') or ROLE_PERMISSIONS[role]
+    invitation.permissions = ROLE_PERMISSIONS[role]
     invitation.expires_at = WorkspaceInvitation.default_expiry()
     invitation.updated_at = datetime.utcnow()
+    _log_workspace_audit(
+        workspace,
+        'invitation_sent',
+        email,
+        role,
+        details={'expires_at': invitation.expires_at.isoformat()},
+    )
     db.session.commit()
 
     inviter = User.query.get(int(get_jwt_identity()))
@@ -825,6 +904,7 @@ def add_member(workspace_id):
     return jsonify({
         'message': 'Workspace invitation sent',
         'invitation': invitation.to_dict(),
+        'seat_usage': _workspace_seat_payload(workspace),
     }), 202
 
 
@@ -844,15 +924,26 @@ def remove_member(workspace_id, member_id):
     if membership.role == 'owner':
         return jsonify({'error': 'Workspace owner cannot be removed'}), 400
 
+    _log_workspace_audit(
+        workspace,
+        'member_removed',
+        membership.user.email if membership.user else '',
+        membership.role,
+        target_user_id=membership.user_id,
+    )
     db.session.delete(membership)
     db.session.commit()
-    return jsonify({'message': 'Workspace member removed'}), 200
+    return jsonify({'message': 'Workspace member removed', 'seat_usage': _workspace_seat_payload(workspace)}), 200
 
 
 @bp.route('/invitations/<token>', methods=['GET'])
 def get_invitation(token):
     invitation = WorkspaceInvitation.query.filter_by(token=token, status='pending').first()
     if not invitation or invitation.is_expired():
+        if invitation and invitation.status == 'pending':
+            invitation.status = 'expired'
+            invitation.updated_at = datetime.utcnow()
+            db.session.commit()
         return jsonify({'error': 'Invitation not found or expired'}), 404
 
     brand = BrandProfile.query.get(invitation.workspace.agency_brand_id)
@@ -874,6 +965,18 @@ def accept_invitation(token):
     if not user or user.email.lower() != invitation.email.lower():
         return jsonify({'error': 'Please sign in with the email address that received this invitation'}), 403
 
+    existing_membership = WorkspaceMemberPermission.query.filter_by(
+        workspace_id=invitation.workspace_id,
+        user_id=user.id,
+    ).first()
+    usage = get_workspace_seat_usage(invitation.workspace, exclude_invitation_id=invitation.id)
+    if not existing_membership and usage['available'] <= 0:
+        seat_payload = _workspace_seat_payload(invitation.workspace)
+        return jsonify({
+            'error': f"Team seat limit reached for the {seat_payload['plan_name']} plan. Ask an admin to upgrade the plan or free a seat.",
+            'seat_usage': seat_payload,
+        }), 403
+
     membership = _save_workspace_membership(
         invitation.workspace,
         user,
@@ -883,6 +986,13 @@ def accept_invitation(token):
     invitation.status = 'accepted'
     invitation.accepted_at = datetime.utcnow()
     invitation.updated_at = datetime.utcnow()
+    _log_workspace_audit(
+        invitation.workspace,
+        'invitation_accepted',
+        invitation.email,
+        invitation.role,
+        target_user_id=user.id,
+    )
     db.session.commit()
 
     return jsonify({
@@ -909,5 +1019,12 @@ def cancel_invitation(invitation_id):
 
     invitation.status = 'cancelled'
     invitation.updated_at = datetime.utcnow()
+    _log_workspace_audit(
+        workspace,
+        'invitation_cancelled',
+        invitation.email,
+        invitation.role,
+        details={'invitation_id': invitation.id},
+    )
     db.session.commit()
-    return jsonify({'message': 'Workspace invitation cancelled'}), 200
+    return jsonify({'message': 'Workspace invitation cancelled', 'seat_usage': _workspace_seat_payload(workspace)}), 200
