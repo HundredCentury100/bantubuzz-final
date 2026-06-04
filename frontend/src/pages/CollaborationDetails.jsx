@@ -13,6 +13,28 @@ import MarkCompleteButton from '../components/MarkCompleteButton';
 import PortfolioFormModal from '../components/PortfolioFormModal';
 import toast from 'react-hot-toast';
 
+const getDeliveryTiming = (dateValue) => {
+  if (!dateValue) return null;
+  const dueDate = new Date(dateValue);
+  if (Number.isNaN(dueDate.getTime())) return null;
+  const diffMs = dueDate.getTime() - Date.now();
+  const overdue = diffMs < 0;
+  const absMs = Math.abs(diffMs);
+  const days = Math.floor(absMs / (1000 * 60 * 60 * 24));
+  const hours = Math.floor((absMs / (1000 * 60 * 60)) % 24);
+  const minutes = Math.floor((absMs / (1000 * 60)) % 60);
+  const parts = [];
+  if (days > 0) parts.push(`${days}d`);
+  if (hours > 0 || days > 0) parts.push(`${hours}h`);
+  parts.push(`${minutes}m`);
+  return {
+    dueDate,
+    overdue,
+    within12Hours: !overdue && diffMs <= 12 * 60 * 60 * 1000,
+    label: parts.join(' '),
+  };
+};
+
 const CollaborationDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -47,6 +69,7 @@ const CollaborationDetails = () => {
   const [editingDeliverable, setEditingDeliverable] = useState(null);
 
   const isBrand = user?.user_type === 'brand';
+  const deliveryTiming = getDeliveryTiming(collaboration?.expected_completion_date);
 
   useEffect(() => {
     fetchCollaboration();
@@ -413,6 +436,37 @@ const CollaborationDetails = () => {
             </div>
           </div>
         </div>
+
+        {collaboration.status === 'in_progress' && deliveryTiming && (
+          <div className={`mb-6 rounded-2xl border-2 p-4 ${
+            deliveryTiming.overdue
+              ? 'border-red-200 bg-red-50'
+              : deliveryTiming.within12Hours
+                ? 'border-amber-200 bg-amber-50'
+                : 'border-primary/30 bg-primary/10'
+          }`}>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className={`font-semibold ${
+                  deliveryTiming.overdue ? 'text-red-900' : deliveryTiming.within12Hours ? 'text-amber-900' : 'text-dark'
+                }`}>
+                  {deliveryTiming.overdue ? 'Delivery is overdue' : `Delivery due in ${deliveryTiming.label}`}
+                </p>
+                <p className="mt-1 text-sm text-gray-700">
+                  Due {deliveryTiming.dueDate.toLocaleString()}
+                  {!isBrand && deliveryTiming.within12Hours && !deliveryTiming.overdue
+                    ? '. Late delivery may impact your ratings.'
+                    : ''}
+                </p>
+              </div>
+              {!isBrand && deliveryTiming.within12Hours && !deliveryTiming.overdue && (
+                <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-amber-900">
+                  12-hour reminder
+                </span>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Live URLs Submitted - Awaiting Brand Review */}
         {isBrand && collaboration.status === 'in_progress' && collaboration.live_urls_submitted_at && (

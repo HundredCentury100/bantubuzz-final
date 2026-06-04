@@ -14,6 +14,7 @@ from app.models import (
     User,
 )
 from app.services.workspace_service import get_request_workspace_id, require_workspace_access
+from app.utils.subscription_helper import get_brand_service_fee_percentage
 
 bp = Blueprint('billing', __name__)
 
@@ -61,6 +62,24 @@ def _booking_invoice(booking, viewer_type):
     source_type = 'collaboration'
     if booking.campaign_id or booking.booking_type in ['campaign_application', 'campaign_package']:
         source_type = 'campaign'
+    subtotal = _money(booking.amount or booking.total_price)
+    brand_user_id = booking.brand.user_id if getattr(booking, 'brand', None) else None
+    service_fee_percentage = get_brand_service_fee_percentage(brand_user_id) if viewer_type == 'brand' and brand_user_id else 0
+    service_fee = subtotal * (service_fee_percentage / 100)
+    total = subtotal + service_fee if viewer_type == 'brand' else subtotal
+    line_items = [
+        {
+            'label': _booking_title(booking),
+            'description': 'Creator collaboration fee',
+            'amount': subtotal,
+        }
+    ]
+    if viewer_type == 'brand':
+        line_items.append({
+            'label': f'BantuBuzz service fee ({service_fee_percentage:.2f}%)',
+            'description': 'Service fee based on your current brand plan',
+            'amount': service_fee,
+        })
 
     return {
         'id': f'booking-{booking.id}',
@@ -69,7 +88,11 @@ def _booking_invoice(booking, viewer_type):
         'source_id': booking.id,
         'title': _booking_title(booking),
         'description': f'{_brand_name(getattr(booking, "brand", None))} and {_creator_name(getattr(booking, "creator", None))}',
-        'amount': _money(booking.total_price or booking.amount),
+        'amount': total,
+        'subtotal': subtotal,
+        'service_fee': service_fee,
+        'service_fee_percentage': service_fee_percentage,
+        'line_items': line_items,
         'currency': 'USD',
         'status': 'paid' if is_paid else 'upcoming',
         'payment_status': booking.payment_status,
@@ -83,14 +106,29 @@ def _booking_invoice(booking, viewer_type):
 
 
 def _campaign_payment_invoice(payment):
+    items_count = payment.items.count() if hasattr(payment.items, 'count') else len(payment.items or [])
     return {
         'id': f'campaign-payment-{payment.id}',
         'invoice_number': _invoice_number('INV-CMP', payment.id),
         'source_type': 'campaign',
         'source_id': payment.id,
         'title': payment.campaign.title if payment.campaign else 'Campaign payment',
-        'description': f'{payment.items.count()} campaign collaboration item(s)',
+        'description': f'{items_count} campaign collaboration item(s)',
         'amount': _money(payment.total_amount),
+        'subtotal': _money(payment.total_amount) - _money(payment.platform_fee),
+        'service_fee': _money(payment.platform_fee),
+        'line_items': [
+            {
+                'label': payment.campaign.title if payment.campaign else 'Campaign collaborations',
+                'description': f'{items_count} campaign collaboration item(s)',
+                'amount': _money(payment.total_amount) - _money(payment.platform_fee),
+            },
+            {
+                'label': 'BantuBuzz service fee',
+                'description': 'Service fee for campaign payment processing',
+                'amount': _money(payment.platform_fee),
+            },
+        ],
         'currency': 'USD',
         'status': 'paid' if payment.status == 'completed' else 'upcoming',
         'payment_status': payment.status,
@@ -176,13 +214,6 @@ def _get_user_invoices(user, workspace_id=None):
     elif user.user_type == 'creator':
         creator = CreatorProfile.query.filter_by(user_id=user.id).first()
         if creator:
-            bookings = Booking.query.filter_by(creator_id=creator.id).order_by(Booking.created_at.desc()).all()
-            invoices.extend(
-                _booking_invoice(booking, 'creator')
-                for booking in bookings
-                if booking.payment_status in ['paid', 'verified']
-            )
-
             creator_subscriptions = CreatorSubscription.query.filter_by(creator_id=creator.id).order_by(CreatorSubscription.created_at.desc()).all()
             invoices.extend(_creator_subscription_invoice(subscription) for subscription in creator_subscriptions)
 
@@ -218,6 +249,15 @@ def _render_invoice_html(invoice, user):
     issued = escape(invoice.get('issued_at') or 'Not available')
     paid = escape(invoice.get('paid_at') or 'Not paid yet')
     user_label = escape(user.email)
+
+    rows = ''.join(
+        f"""<tr>
+          <td>{escape(item.get('label') or '')}<br><span class="muted">{escape(item.get('description') or '')}</span></td>
+          <td>{escape(invoice['source_type'])}</td>
+          <td>${_money(item.get('amount')):.2f}</td>
+        </tr>"""
+        for item in invoice.get('line_items') or [{'label': title, 'description': description, 'amount': invoice['amount']}]
+    )
 
     html = f"""<!doctype html>
 <html>
@@ -258,7 +298,7 @@ def _render_invoice_html(invoice, user):
       <tr><th>Description</th><th>Type</th><th>Amount</th></tr>
     </thead>
     <tbody>
-      <tr><td>{title}<br><span class="muted">{description}</span></td><td>{escape(invoice['source_type'])}</td><td>{amount}</td></tr>
+      {rows}
     </tbody>
   </table>
   <p class="total">Total: {amount}</p>

@@ -19,8 +19,7 @@ import {
   DocumentTextIcon,
 } from '@heroicons/react/24/outline';
 import NotificationBell from './NotificationBell';
-import { messagingService } from '../services/messagingAPI';
-import { creatorsAPI, brandsAPI } from '../services/api';
+import { creatorsAPI, brandsAPI, messagesAPI } from '../services/api';
 import Avatar from './Avatar';
 import api from '../services/api';
 import { useWorkspace } from '../contexts/WorkspaceContext';
@@ -75,7 +74,7 @@ const Navbar = () => {
     const fetchUnreadCount = async () => {
       if (isAuthenticated) {
         try {
-          const response = await messagingService.getConversations();
+          const response = await messagesAPI.getConversations();
           const conversations = response.data.conversations || [];
           const totalUnread = conversations.reduce((sum, conv) => sum + (conv.unread_count || 0), 0);
           setUnreadMessageCount(totalUnread);
@@ -86,9 +85,17 @@ const Navbar = () => {
     };
 
     fetchUnreadCount();
+    window.addEventListener('messages_marked_read', fetchUnreadCount);
+    window.addEventListener('message_sent', fetchUnreadCount);
+    window.addEventListener('new_message_received', fetchUnreadCount);
     // Refresh every 30 seconds
     const interval = setInterval(fetchUnreadCount, 30000);
-    return () => clearInterval(interval);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('messages_marked_read', fetchUnreadCount);
+      window.removeEventListener('message_sent', fetchUnreadCount);
+      window.removeEventListener('new_message_received', fetchUnreadCount);
+    };
   }, [isAuthenticated]);
 
   // Fetch brand wallet balance

@@ -15,6 +15,7 @@ from app.services.email_service import EmailService
 from app.utils.campaign_helpers import (
     user_owns_campaign, get_campaign_collaborations
 )
+from app.utils.subscription_helper import get_brand_service_fee_percentage
 from datetime import datetime
 import uuid
 
@@ -91,12 +92,14 @@ def calculate_payment():
                 'amount': item_amount
             })
 
-        platform_fee = subtotal * 0.10  # 10% platform fee
+        service_fee_percentage = get_brand_service_fee_percentage(user_id)
+        platform_fee = subtotal * (service_fee_percentage / 100)
         total_amount = subtotal + platform_fee
 
         return jsonify({
             'subtotal': subtotal,
             'platform_fee': platform_fee,
+            'service_fee_percentage': service_fee_percentage,
             'total_amount': total_amount,
             'items': items,
             'items_count': len(items)

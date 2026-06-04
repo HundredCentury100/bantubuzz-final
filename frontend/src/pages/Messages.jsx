@@ -141,11 +141,16 @@ const Messages = () => {
     if (selectedConversation) {
       const conversationMessages = messages[selectedConversation.id] || [];
       const unreadIds = conversationMessages
-        .filter(msg => !msg.read_at && msg.receiver_id === getCurrentUserId())
+        .filter(msg => !msg.is_read && msg.receiver_id === getCurrentUserId())
         .map(msg => msg.id);
 
       if (unreadIds.length > 0) {
         markMessagesAsRead(unreadIds);
+        setConversations((current) => current.map((conversation) => (
+          conversation.id === selectedConversation.id
+            ? { ...conversation, unread_count: 0 }
+            : conversation
+        )));
       }
     }
   }, [selectedConversation, messages]);
@@ -162,13 +167,6 @@ const Messages = () => {
       setConversations(response.data.conversations || []);
     } catch (error) {
       console.error('Error loading conversations:', error);
-
-      // Check if it's a network error (messaging service unavailable)
-      if (error.code === 'ERR_NETWORK' || error.message.includes('Network Error')) {
-        toast.error('Unable to load messages. The messaging service is currently unavailable.');
-      } else {
-        toast.error('Unable to load conversations. Please try again later.');
-      }
 
       // Set empty array so UI shows "No conversations" instead of staying in loading state
       setConversations([]);

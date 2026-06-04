@@ -46,3 +46,20 @@ def get_brand_subscription_plan(brand_user_id):
     ).first()
 
     return subscription.plan if subscription else None
+
+
+def get_brand_service_fee_percentage(brand_user_id):
+    """
+    Get the brand collaboration service fee percentage for invoices and checkout.
+    Falls back to 12% when a plan is missing or old rows have no value.
+    """
+    subscription = Subscription.query.filter_by(
+        user_id=brand_user_id,
+        status='active'
+    ).first()
+
+    if not subscription or not subscription.plan:
+        return 12.0
+
+    fee_percentage = subscription.plan.service_fee_percentage
+    return float(fee_percentage) if fee_percentage is not None else 12.0

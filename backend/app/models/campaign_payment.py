@@ -96,9 +96,12 @@ class CampaignPayment(db.Model):
         collaborations = valid_collaborations
 
         # Calculate total amount
-        total_amount = sum(float(collab.package.price) for collab in collaborations)
-        platform_fee = total_amount * 0.10  # 10% platform fee
-        net_amount = total_amount - platform_fee
+        subtotal = sum(float(collab.package.price) for collab in collaborations)
+        from app.utils.subscription_helper import get_brand_service_fee_percentage
+        service_fee_percentage = get_brand_service_fee_percentage(brand_user_id)
+        platform_fee = subtotal * (service_fee_percentage / 100)
+        total_amount = subtotal + platform_fee
+        net_amount = subtotal
 
         # Create payment
         payment = CampaignPayment(
@@ -118,8 +121,8 @@ class CampaignPayment(db.Model):
         # Create payment items
         for collab in collaborations:
             item_amount = float(collab.package.price)
-            item_fee = item_amount * 0.10
-            item_net = item_amount - item_fee
+            item_fee = item_amount * (service_fee_percentage / 100)
+            item_net = item_amount
 
             # Get creator user_id from CreatorProfile relationship
             creator_user_id = collab.creator.user_id if collab.creator else None

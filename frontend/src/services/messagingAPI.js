@@ -121,6 +121,9 @@ export const messagingService = {
   markAsRead: (messageIds) =>
     messagingAPI.post('/messages/read', { messageIds }),
 
+  markAsReadFallback: (messageIds) =>
+    mainAPI.post('/messages/read', { messageIds }),
+
   // Report a user/message (uses main API)
   reportMessage: (data) => mainAPI.post('/messaging/report', data),
 

@@ -103,6 +103,34 @@ def mark_as_read(message_id):
         return jsonify({'error': str(e)}), 500
 
 
+@bp.route('/read', methods=['POST'])
+@jwt_required()
+def mark_many_as_read():
+    """Mark multiple messages as read for the current user."""
+    try:
+        user_id = int(get_jwt_identity())
+        data = request.get_json() or {}
+        message_ids = data.get('messageIds') or data.get('message_ids') or []
+        if not isinstance(message_ids, list):
+            return jsonify({'error': 'messageIds must be a list'}), 400
+
+        ids = [int(message_id) for message_id in message_ids if str(message_id).isdigit()]
+        if not ids:
+            return jsonify({'message': 'No messages to mark as read', 'updated': 0}), 200
+
+        updated = Message.query.filter(
+            Message.id.in_(ids),
+            Message.receiver_id == user_id,
+        ).update({'is_read': True}, synchronize_session=False)
+        db.session.commit()
+
+        return jsonify({'message': 'Messages marked as read', 'updated': updated}), 200
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
 @bp.route('/conversations', methods=['GET'])
 @jwt_required()
 def get_conversations():

@@ -35,6 +35,14 @@ def _looks_like_url(value):
     return value.startswith(('http://', 'https://')) or '.' in value
 
 
+def _first_dict(value):
+    if isinstance(value, dict):
+        return value
+    if isinstance(value, list):
+        return next((item for item in value if isinstance(item, dict)), None)
+    return None
+
+
 def _fetch_thunzi_metrics_for_url(creator, post_url):
     if not post_url:
         return None, 'Post URL or Facebook Post ID is required'
@@ -53,9 +61,9 @@ def _fetch_thunzi_metrics_for_url(creator, post_url):
         return None, 'Unable to authenticate with ThunziAI'
 
     if _looks_like_url(post_ref):
-        post = thunzi_service.find_post_by_url(post_ref, thunzi_account.thunzi_company_id)
+        post = _first_dict(thunzi_service.find_post_by_url(post_ref, thunzi_account.thunzi_company_id))
     else:
-        post = thunzi_service.get_post_by_original_id(post_ref)
+        post = _first_dict(thunzi_service.get_post_by_original_id(post_ref))
         if post and post.get('companyId') and str(post.get('companyId')) != str(thunzi_account.thunzi_company_id):
             return None, 'That post ID does not belong to your connected ThunziAI account'
 
@@ -63,7 +71,7 @@ def _fetch_thunzi_metrics_for_url(creator, post_url):
         return None, 'Post not found in ThunziAI. For Facebook, paste the numeric/original Post ID if the public URL cannot be matched.'
 
     original_post_id = post.get('originalId') or post.get('originalPostId') or post_ref
-    insights = thunzi_service.get_post_insights_by_original_id(original_post_id) if original_post_id else None
+    insights = _first_dict(thunzi_service.get_post_insights_by_original_id(original_post_id)) if original_post_id else None
     post_data = (insights or {}).get('post') or post
 
     views = post_data.get('videoViews')

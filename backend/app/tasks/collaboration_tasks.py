@@ -10,8 +10,9 @@ from app.celery_app import celery
 from app import db
 from app.models.collaboration import Collaboration
 from app.models.milestone_deliverable import MilestoneDeliverable
+from app.models.notification import Notification
 from app.models.package_deliverable import PackageDeliverable
-from app.services.product_notifications import notify_collaboration_completed
+from app.services.product_notifications import notify_collaboration_completed, notify_creator_delivery_due_soon
 from app.services.post_metrics_service import PostMetricsService
 from sqlalchemy import and_
 
@@ -74,6 +75,46 @@ def check_auto_complete_eligible():
             'success': False,
             'error': str(e)
         }
+
+
+@celery.task(name='app.tasks.collaboration_tasks.send_delivery_due_reminders')
+def send_delivery_due_reminders():
+    """
+    Warn creators 12 hours before expected completion.
+
+    Run this periodically from Celery Beat. It is idempotent because it checks
+    for an existing reminder notification for the same collaboration first.
+    """
+    try:
+        now = datetime.utcnow()
+        window_end = now + timedelta(hours=12)
+        collaborations = Collaboration.query.filter(
+            Collaboration.status == 'in_progress',
+            Collaboration.expected_completion_date != None,
+            Collaboration.expected_completion_date > now,
+            Collaboration.expected_completion_date <= window_end,
+        ).all()
+
+        sent = 0
+        for collab in collaborations:
+            creator_user = collab.creator.user if collab.creator else None
+            if not creator_user:
+                continue
+            existing = Notification.query.filter_by(
+                user_id=creator_user.id,
+                type='collaboration',
+                title='Delivery due in 12 hours',
+                action_url=f'/creator/collaborations/{collab.id}',
+            ).first()
+            if existing:
+                continue
+            notify_creator_delivery_due_soon(collab)
+            sent += 1
+
+        return {'success': True, 'sent': sent, 'checked': len(collaborations)}
+    except Exception as e:
+        print(f"Error sending delivery due reminders: {str(e)}")
+        return {'success': False, 'error': str(e)}
 
 
 @celery.task(name='app.tasks.collaboration_tasks.set_auto_complete_date')

@@ -11,7 +11,7 @@ Provides comprehensive analytics for brand campaigns including:
 from app import db
 from app.models import (
     Collaboration, PostMetrics, User, CreatorProfile,
-    BrandProfile, PackageDeliverable
+    BrandProfile, CollaborationMilestone, PackageDeliverable
 )
 from sqlalchemy import func, desc
 from datetime import datetime, timedelta
@@ -131,7 +131,10 @@ class AnalyticsService:
         ).all()
         deliverables.extend(('package', deliverable) for deliverable in package_deliverables)
 
-        for milestone in collaboration.milestones:
+        milestones = CollaborationMilestone.query.filter_by(
+            collaboration_id=collaboration.id
+        ).all()
+        for milestone in milestones:
             deliverables.extend(
                 ('milestone', deliverable)
                 for deliverable in milestone.deliverables.all()

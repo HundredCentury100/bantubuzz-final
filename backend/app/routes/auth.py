@@ -1,4 +1,4 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, current_app, request, jsonify
 from flask_jwt_extended import (
     create_access_token,
     create_refresh_token,
@@ -105,6 +105,34 @@ def _login_locked_response(user):
         _reset_login_security(user)
         db.session.commit()
     return None
+
+
+def _parse_optional_int(value):
+    if value in [None, '', 'null', 'undefined']:
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, str):
+        cleaned = value.strip().lower()
+        if not cleaned:
+            return None
+        workspace_ranges = {
+            '1-2': 2,
+            '3-5': 5,
+            '5-10': 10,
+            'more-than-10': 11,
+            'more_than_10': 11,
+        }
+        if cleaned in workspace_ranges:
+            return workspace_ranges[cleaned]
+        try:
+            return int(cleaned)
+        except ValueError:
+            return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
 
 
 @bp.route('/register/creator', methods=['POST'])
@@ -225,7 +253,7 @@ def register_brand():
             user_id=user.id,
             company_name=data['company_name'],
             account_type=account_type,
-            expected_workspace_count=data.get('expected_workspace_count')
+            expected_workspace_count=_parse_optional_int(data.get('expected_workspace_count'))
         )
         db.session.add(brand_profile)
 
@@ -263,7 +291,8 @@ def register_brand():
 
     except Exception as e:
         db.session.rollback()
-        return jsonify({'error': str(e)}), 500
+        current_app.logger.exception('Brand registration failed')
+        return jsonify({'error': 'Registration failed. Please check your details and try again.'}), 500
 
 
 @bp.route('/login', methods=['POST'])

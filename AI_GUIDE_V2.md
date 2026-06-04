@@ -700,6 +700,21 @@ Deployment note:
   - Workspace management UI displays seat usage and the latest team audit log.
   - Migration: `backend/migrations/versions/202606041500_add_workspace_audit_logs.py`.
   - Deploy script: `deployment/DEPLOY-WORKSPACE-TEAM.bat`.
+- Product QA bug batch after workspace teams:
+  - Deploy script: `deployment/DEPLOY-PRODUCT-QA-FIXES.bat`.
+  - Agency/Enterprise signup must normalize `expected_workspace_count` to an integer or `null`.
+    - Frontend dropdown values map to: `1-2 => 2`, `3-5 => 5`, `5-10 => 10`, `more-than-10 => 11`.
+    - Backend registration also defensively parses these values and returns a generic registration error instead of raw DB stack traces.
+  - Brand billing invoices should include a collaboration subtotal plus a BantuBuzz service-fee line calculated from `subscription_plans.service_fee_percentage`.
+  - Creator billing should show BantuBuzz-to-creator subscription invoices only, not collaboration earning records.
+  - Campaign payment calculations and records should use the brand plan service fee, not a hardcoded 10%.
+  - Success story and collaboration Thunzi metrics must tolerate Thunzi responses that are either a dict or a list of dicts.
+  - Collaboration analytics should query `CollaborationMilestone` directly because `Collaboration` does not define a `milestones` relationship.
+  - Delivery notifications to brands should use product language: `Creator submitted delivery`.
+  - Creators get an hourly Celery-checked 12-hour delivery reminder notification/email before `expected_completion_date`; duplicate reminders are prevented by checking existing notifications.
+  - Delivery UI copy should say `Submit URL / Post ID / Delivery`.
+  - Navbar unread message badge should use the Flask messages API as the source of truth and refresh on read/send/new-message events.
+  - Background messaging socket failures should not show `Unable to load messages` toast on every site load.
 - Remaining hardening for future slices:
   - Improve team invitation onboarding so new invitees land directly back on the invite after signup/login.
   - Build tailored onboarding steps after Agency/Enterprise signup.

@@ -166,10 +166,24 @@ def notify_brand_live_urls_submitted(collaboration):
     _notify_user(
         brand_user,
         'collaboration',
-        'Creator submitted live post URLs',
-        f'{creator_name} submitted live post URLs for "{collaboration.title}".',
+        'Creator submitted delivery',
+        f'{creator_name} submitted delivery URLs/Post IDs for "{collaboration.title}".',
         f'/brand/collaborations/{collaboration.id}',
-        email_subject='Creator submitted live post URLs'
+        email_subject='Creator submitted delivery'
+    )
+
+
+def notify_creator_delivery_due_soon(collaboration):
+    creator_user = getattr(getattr(collaboration, 'creator', None), 'user', None)
+    if not creator_user:
+        return
+    _notify_user(
+        creator_user,
+        'collaboration',
+        'Delivery due in 12 hours',
+        f'Your delivery for "{collaboration.title}" is due soon. Late delivery may impact your ratings.',
+        f'/creator/collaborations/{collaboration.id}',
+        email_subject='Delivery due in 12 hours'
     )
 
 

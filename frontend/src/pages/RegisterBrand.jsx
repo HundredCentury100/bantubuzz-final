@@ -53,6 +53,16 @@ const RegisterBrand = () => {
   };
   const currentCopy = accountCopy[accountType] || accountCopy.brand;
 
+  const parseWorkspaceCount = (value) => {
+    const counts = {
+      '1-2': 2,
+      '3-5': 5,
+      '5-10': 10,
+      'more-than-10': 11,
+    };
+    return counts[value] || null;
+  };
+
   const onSubmit = async (data) => {
     setLoading(true);
     setError('');
@@ -62,7 +72,7 @@ const RegisterBrand = () => {
         password: data.password,
         company_name: data.company_name,
         account_type: accountType || 'brand',
-        expected_workspace_count: data.expected_workspace_count,
+        expected_workspace_count: parseWorkspaceCount(data.expected_workspace_count),
       });
 
       // Navigate to OTP verification page

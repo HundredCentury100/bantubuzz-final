@@ -92,7 +92,6 @@ export const MessagingProvider = ({ children }) => {
 
       socketInstance.on('reconnect_failed', () => {
         console.error('❌ Failed to reconnect after maximum attempts');
-        toast.error('Unable to load messages. Please refresh the page.');
       });
 
       socketInstance.on('authenticated', (data) => {
@@ -110,7 +109,7 @@ export const MessagingProvider = ({ children }) => {
             // For now, show error to user
             toast.error('Your session has expired. Please refresh the page.');
           } else {
-            toast.error('Unable to load messages');
+            console.warn('Messaging authentication failed in background');
           }
 
           // Disconnect the socket if auth failed
@@ -285,11 +284,24 @@ export const MessagingProvider = ({ children }) => {
 
   // Mark messages as read
   const markMessagesAsRead = useCallback((messageIds) => {
-    if (!socketRef.current || !isConnected) {
+    const ids = Array.isArray(messageIds) ? messageIds : [];
+    if (ids.length === 0) {
       return;
     }
 
-    socketRef.current.emit('mark_read', { messageIds });
+    if (!socketRef.current || !isConnected) {
+      messagingService.markAsReadFallback(ids)
+        .then(() => {
+          window.dispatchEvent(new CustomEvent('messages_marked_read', { detail: { messageIds: ids } }));
+        })
+        .catch((error) => {
+          console.error('REST mark-read fallback failed:', error);
+        });
+      return;
+    }
+
+    socketRef.current.emit('mark_read', { messageIds: ids });
+    window.dispatchEvent(new CustomEvent('messages_marked_read', { detail: { messageIds: ids } }));
   }, [isConnected]);
 
   // Send typing indicator

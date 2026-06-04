@@ -188,9 +188,9 @@ const DeliverableURLInput = ({
       <div className="flex items-start gap-2 mb-3">
         <Link2 size={20} className="text-primary flex-shrink-0 mt-0.5" />
         <div className="flex-1">
-          <h4 className="font-medium text-dark">Submit Post Reference</h4>
+          <h4 className="font-medium text-dark">Submit URL / Post ID / Delivery</h4>
           <p className="text-xs text-gray-700 mt-1">
-            Select the platform, then paste the live post reference ThunziAI needs for analytics tracking.
+            Select the platform, then paste the live URL or Facebook Post ID needed for delivery tracking and analytics.
           </p>
         </div>
       </div>
@@ -268,7 +268,7 @@ const DeliverableURLInput = ({
       </form>
 
       <div className="mt-3 pt-3 border-t border-primary/20">
-        <p className="text-xs text-gray-700 font-medium mb-1">Supported Platforms:</p>
+        <p className="text-xs text-gray-700 font-medium mb-1">Supported Delivery References:</p>
         <div className="flex flex-wrap gap-2">
           {['Instagram', 'Facebook', 'YouTube', 'TikTok', 'Twitter/X'].map((platform) => (
             <span key={platform} className="text-xs bg-white text-dark px-2 py-1 rounded-full">

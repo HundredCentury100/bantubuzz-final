@@ -80,6 +80,11 @@ def make_celery(app=None):
                 'task': 'app.tasks.collaboration_tasks.check_auto_complete_eligible',
                 'schedule': crontab(minute=0, hour=10),  # Daily at 10 AM
             },
+            # Warn creators 12 hours before delivery is due
+            'send-delivery-due-reminders': {
+                'task': 'app.tasks.collaboration_tasks.send_delivery_due_reminders',
+                'schedule': crontab(minute=0),  # Hourly
+            },
         }
     )
 

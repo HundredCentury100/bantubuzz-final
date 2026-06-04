@@ -24,6 +24,14 @@ class PostMetricsService:
     """Service for syncing post metrics from ThunziAI"""
 
     @staticmethod
+    def _first_dict(value):
+        if isinstance(value, dict):
+            return value
+        if isinstance(value, list):
+            return next((item for item in value if isinstance(item, dict)), None)
+        return None
+
+    @staticmethod
     def sync_deliverable_metrics(deliverable_id: int, deliverable_type: str = 'milestone') -> Dict:
         """
         Sync metrics for a specific deliverable from ThunziAI
@@ -150,13 +158,14 @@ class PostMetricsService:
             # Prefer ThunziAI's direct URL lookup when available. Facebook can also
             # be submitted as a numeric/original Post ID because public Facebook URLs
             # often expose alphanumeric IDs while Graph/Thunzi use numeric IDs.
+            thunzi_posts = []
             if looks_like_url:
-                matching_post = thunzi_service.find_post_by_url(
+                matching_post = PostMetricsService._first_dict(thunzi_service.find_post_by_url(
                     post_reference,
                     thunzi_account.thunzi_company_id
-                )
+                ))
             else:
-                matching_post = thunzi_service.get_post_by_original_id(post_reference)
+                matching_post = PostMetricsService._first_dict(thunzi_service.get_post_by_original_id(post_reference))
                 if (matching_post and matching_post.get('companyId') and
                     str(matching_post.get('companyId')) != str(thunzi_account.thunzi_company_id)):
                     matching_post = None
@@ -238,7 +247,7 @@ class PostMetricsService:
                 matching_post.get('originalPostId') or
                 deliverable.post_id
             )
-            insights = thunzi_service.get_post_insights_by_original_id(original_post_id)
+            insights = PostMetricsService._first_dict(thunzi_service.get_post_insights_by_original_id(original_post_id))
 
             if not insights:
                 current_app.logger.warning(
@@ -417,7 +426,7 @@ class PostMetricsService:
             }
         """
         from flask import current_app
-        from app.models import Collaboration
+        from app.models import Collaboration, CollaborationMilestone
 
         try:
             collaboration = Collaboration.query.get(collaboration_id)
@@ -435,7 +444,10 @@ class PostMetricsService:
             # Get all deliverables with submitted URLs
             deliverables = []
 
-            for milestone in collaboration.milestones:
+            milestones = CollaborationMilestone.query.filter_by(
+                collaboration_id=collaboration.id
+            ).all()
+            for milestone in milestones:
                 for deliverable in milestone.deliverables:
                     if deliverable.post_url_validated:
                         deliverables.append(('milestone', deliverable))
