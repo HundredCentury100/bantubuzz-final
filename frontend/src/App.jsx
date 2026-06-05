@@ -149,6 +149,14 @@ const ProtectedRoute = ({ children, requiredType }) => {
 };
 
 // Public Route Component (redirect if authenticated)
+const getStoredProfile = () => {
+  try {
+    return JSON.parse(localStorage.getItem('profile') || 'null');
+  } catch {
+    return null;
+  }
+};
+
 const PublicRoute = ({ children }) => {
   const { isAuthenticated, user, loading } = useAuth();
 
@@ -161,6 +169,10 @@ const PublicRoute = ({ children }) => {
   }
 
   if (isAuthenticated) {
+    const profile = getStoredProfile();
+    if (user?.user_type === 'brand' && ['agency', 'enterprise'].includes(profile?.account_type)) {
+      return <Navigate to="/brand/agency" replace />;
+    }
     return <Navigate to={`/${user?.user_type}/dashboard`} replace />;
   }
 

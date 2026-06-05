@@ -78,6 +78,8 @@ export const AuthProvider = ({ children }) => {
       // Redirect based on user type
       if (userData.user_type === 'creator') {
         navigate('/creator/dashboard');
+      } else if (['agency', 'enterprise'].includes(profileData?.account_type)) {
+        navigate('/brand/agency');
       } else {
         navigate('/brand/dashboard');
       }
@@ -118,6 +120,8 @@ export const AuthProvider = ({ children }) => {
       toast.success('Login successful!');
       if (userData.user_type === 'creator') {
         navigate('/creator/dashboard');
+      } else if (['agency', 'enterprise'].includes(profileData?.account_type)) {
+        navigate('/brand/agency');
       } else {
         navigate('/brand/dashboard');
       }
@@ -234,6 +238,15 @@ export const AuthProvider = ({ children }) => {
     navigate('/');
   };
 
+  const refreshCurrentUser = async () => {
+    const response = await authAPI.getCurrentUser();
+    setUser(response.data.user);
+    setProfile(response.data.profile);
+    localStorage.setItem('user', JSON.stringify(response.data.user));
+    localStorage.setItem('profile', JSON.stringify(response.data.profile));
+    return response.data;
+  };
+
   const updateProfile = (newProfile) => {
     setProfile(newProfile);
     localStorage.setItem('profile', JSON.stringify(newProfile));
@@ -249,6 +262,7 @@ export const AuthProvider = ({ children }) => {
     registerCreator,
     registerBrand,
     updateProfile,
+    refreshCurrentUser,
     googleLoginCreator,
     googleCompleteProfile,
     isAuthenticated: !!user,

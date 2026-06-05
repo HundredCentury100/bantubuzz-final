@@ -574,7 +574,8 @@ class SmilePayService:
     @staticmethod
     def _complete_subscription_payment(transaction: SmilePayTransaction):
         """Complete subscription payment"""
-        from app.models import BrandProfile, Subscription
+        from app.models import Subscription
+        from app.services.agency_subscription_service import apply_brand_subscription_entitlements
 
         subscription = Subscription.query.get(transaction.payment_id)
         if subscription:
@@ -597,13 +598,7 @@ class SmilePayService:
 
             subscription.set_billing_period(billing_cycle)
 
-            if plan and plan.user_type == 'brand':
-                brand = BrandProfile.query.filter_by(user_id=subscription.user_id).first()
-                if brand:
-                    if plan.slug in ['agency', 'brand-agency'] or int(plan.max_client_workspaces or 0) > 0:
-                        brand.account_type = 'agency'
-                    elif brand.account_type != 'enterprise':
-                        brand.account_type = 'brand'
+            apply_brand_subscription_entitlements(subscription.user_id, plan)
 
             db.session.commit()
             logger.info(f"Subscription {subscription.id} activated after SmilePay payment")

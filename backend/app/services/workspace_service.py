@@ -14,6 +14,7 @@ from app.models import (
     WorkspaceInvitation,
     WorkspaceMemberPermission,
 )
+from app.services.agency_subscription_service import is_agency_plan
 
 
 DEFAULT_INCLUDED_WORKSPACES = 10
@@ -140,7 +141,7 @@ def is_agency_user(user):
     if not user or user.user_type != 'brand':
         return False
     limit, plan = get_workspace_limit(user.id)
-    return bool(plan and (plan.slug in ['agency', 'brand-agency'] or limit > 0))
+    return bool(plan and is_agency_plan(plan))
 
 
 def get_agency_brand(user_id):

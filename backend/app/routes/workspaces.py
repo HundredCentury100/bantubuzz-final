@@ -353,6 +353,21 @@ def _pending_workspace_addons_for_brand(brand_id):
     ).order_by(WorkspaceAddon.created_at.desc()).all()
 
 
+def _agency_meta(user, brand):
+    limit, plan = get_workspace_limit(user.id)
+    subscription = get_active_subscription(user.id)
+    active = is_agency_user(user)
+    included_limit = limit or (DEFAULT_INCLUDED_WORKSPACES if active else 0)
+    return {
+        'is_agency': active,
+        'account_type': brand.account_type or 'brand',
+        'requires_agency_subscription': brand.account_type in ['agency', 'enterprise'] and not active,
+        'included_limit': included_limit,
+        'billing_cycle': subscription.billing_cycle if subscription else 'monthly',
+        'plan': plan.to_dict() if plan else None,
+    }
+
+
 @bp.route('', methods=['GET'])
 @jwt_required()
 def list_workspaces():
@@ -361,8 +376,7 @@ def list_workspaces():
         message, status = error
         return jsonify({'error': message}), status
 
-    limit, plan = get_workspace_limit(user.id)
-    subscription = get_active_subscription(user.id)
+    meta = _agency_meta(user, brand)
     own_workspaces = ClientWorkspace.query.filter_by(
         agency_brand_id=brand.id,
         is_active=True,
@@ -374,19 +388,16 @@ def list_workspaces():
     ]
 
     workspaces_by_id = {workspace.id: workspace for workspace in [*own_workspaces, *member_workspaces]}
-    included_limit = limit or (DEFAULT_INCLUDED_WORKSPACES if plan and plan.slug in ['agency', 'brand-agency'] else 0)
     pending_addons = _pending_workspace_addons_for_brand(brand.id)
 
     return jsonify({
-        'is_agency': is_agency_user(user),
-        'included_limit': included_limit,
+        **meta,
         'active_count': len(own_workspaces),
-        'extra_count': max(0, len(own_workspaces) - included_limit),
+        'extra_count': max(0, len(own_workspaces) - meta['included_limit']),
         'extra_workspace_pricing': {
             'monthly': float(EXTRA_WORKSPACE_MONTHLY_PRICE),
             'yearly': float(EXTRA_WORKSPACE_YEARLY_PRICE),
         },
-        'billing_cycle': subscription.billing_cycle if subscription else 'monthly',
         'language': _workspace_language(brand),
         'workspaces': [workspace.to_dict(include_counts=True) for workspace in workspaces_by_id.values()],
         'pending_addons': [
@@ -557,7 +568,10 @@ def master_dashboard():
     start_date, end_date, date_error = _parse_date_range()
     if date_error:
         return jsonify({'error': date_error}), 400
-    return jsonify(_master_dashboard_payload(brand, start_date, end_date)), 200
+    return jsonify({
+        **_master_dashboard_payload(brand, start_date, end_date),
+        **_agency_meta(user, brand),
+    }), 200
 
 
 @bp.route('/master-dashboard/export', methods=['GET'])

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import { workspacesAPI } from '../services/api';
 import { useWorkspace } from '../contexts/WorkspaceContext';
@@ -12,7 +12,11 @@ import {
   CheckCircleIcon,
   ClockIcon,
   CurrencyDollarIcon,
+  EnvelopeIcon,
+  PlusIcon,
   PrinterIcon,
+  SwatchIcon,
+  UserGroupIcon,
 } from '@heroicons/react/24/outline';
 
 const money = (value) => `$${Number(value || 0).toFixed(2)}`;
@@ -31,10 +35,42 @@ const StatCard = ({ label, value, icon: Icon }) => (
   </div>
 );
 
+const FeatureLink = ({ to, icon: Icon, title, description }) => (
+  <Link
+    to={to}
+    className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm transition-colors hover:border-primary"
+  >
+    <div className="flex items-start gap-3">
+      <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-primary/15">
+        <Icon className="h-5 w-5 text-dark" />
+      </div>
+      <div>
+        <p className="font-semibold text-dark">{title}</p>
+        <p className="mt-1 text-sm leading-relaxed text-gray-600">{description}</p>
+      </div>
+    </div>
+  </Link>
+);
+
+const SetupStep = ({ done, title, description, action }) => (
+  <div className="flex items-start gap-3 rounded-2xl border border-gray-200 bg-white p-4">
+    <div className={`mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full ${done ? 'bg-primary text-dark' : 'bg-gray-100 text-gray-400'}`}>
+      <CheckCircleIcon className="h-5 w-5" />
+    </div>
+    <div className="min-w-0 flex-1">
+      <p className="font-semibold text-dark">{title}</p>
+      <p className="mt-1 text-sm text-gray-600">{description}</p>
+      {action && <div className="mt-3">{action}</div>}
+    </div>
+  </div>
+);
+
 const AgencyDashboard = () => {
+  const navigate = useNavigate();
   const { selectWorkspace, refreshWorkspaces, workspaceMeta } = useWorkspace() || {};
   const [clients, setClients] = useState([]);
   const [totals, setTotals] = useState(null);
+  const [agencyMeta, setAgencyMeta] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showCreateForm, setShowCreateForm] = useState(false);
@@ -63,7 +99,7 @@ const AgencyDashboard = () => {
     billing_email: '',
     website: '',
   });
-  const language = workspaceMeta?.language || {
+  const language = agencyMeta?.language || workspaceMeta?.language || {
     dashboard_title: 'Agency Dashboard',
     dashboard_subtitle: 'All clients at a glance',
     workspace_singular: 'client',
@@ -72,17 +108,29 @@ const AgencyDashboard = () => {
     empty_state: "You haven't added any clients yet. Add your first client.",
   };
   const pendingAddonAwaitingVerification = pendingAddon?.payment_status === 'pending_verification';
+  const meta = agencyMeta || workspaceMeta || {};
+  const accountType = meta.account_type || language.account_type || 'agency';
+  const workspaceLabel = language.workspace_singular || (accountType === 'enterprise' ? 'brand' : 'client');
+  const workspacePlural = language.workspace_plural || (accountType === 'enterprise' ? 'brands' : 'clients');
 
   const fetchDashboard = async () => {
       try {
         setLoading(true);
         setError('');
-        const response = await workspacesAPI.getMasterDashboard({
-          start_date: filters.start_date || undefined,
-          end_date: filters.end_date || undefined,
+        const [dashboardResponse, workspaceResponse] = await Promise.all([
+          workspacesAPI.getMasterDashboard({
+            start_date: filters.start_date || undefined,
+            end_date: filters.end_date || undefined,
+          }),
+          workspacesAPI.getWorkspaces(),
+        ]);
+        setClients(dashboardResponse.data.clients || []);
+        setTotals(dashboardResponse.data.totals || {});
+        setAgencyMeta({
+          ...workspaceResponse.data,
+          ...dashboardResponse.data,
+          language: dashboardResponse.data.language || workspaceResponse.data.language,
         });
-        setClients(response.data.clients || []);
-        setTotals(response.data.totals || {});
       } catch (err) {
         setError(err.response?.data?.error || 'Failed to load agency dashboard');
       } finally {
@@ -253,6 +301,98 @@ const AgencyDashboard = () => {
       setSendingReport(false);
     }
   };
+
+  const setupSteps = [
+    {
+      title: 'Agency subscription active',
+      description: 'Unlock client workspaces, white-label reports, and agency-level team seats.',
+      done: Boolean(meta.is_agency),
+      action: !meta.is_agency ? (
+        <button
+          type="button"
+          onClick={() => navigate('/subscription/manage', { state: { selectedPlanId: 'agency', billingCycle: meta.billing_cycle || 'monthly' } })}
+          className="rounded-full bg-dark px-4 py-2 text-sm font-semibold text-white"
+        >
+          Pay Agency Subscription
+        </button>
+      ) : null,
+    },
+    {
+      title: 'Branding and report identity',
+      description: 'Confirm your logo, report colors, reply-to email, sender name, and email signature.',
+      done: false,
+      action: (
+        <Link to="/brand/profile/edit" className="rounded-full border border-gray-200 px-4 py-2 text-sm font-semibold text-dark hover:border-primary">
+          Set Branding
+        </Link>
+      ),
+    },
+    {
+      title: `Add first ${workspaceLabel}`,
+      description: `Create a separated workspace so campaigns, analytics, billing, and reports stay isolated.`,
+      done: clients.length > 0,
+      action: meta.is_agency ? (
+        <button
+          type="button"
+          onClick={() => setShowCreateForm(true)}
+          className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-dark hover:bg-primary/90"
+        >
+          {language.add_label}
+        </button>
+      ) : null,
+    },
+    {
+      title: 'Invite your team',
+      description: `Assign admins, managers, or viewers to each ${workspaceLabel} once the first workspace exists.`,
+      done: false,
+      action: clients[0] ? (
+        <Link to={`/brand/workspaces/${clients[0].id}`} className="rounded-full border border-gray-200 px-4 py-2 text-sm font-semibold text-dark hover:border-primary">
+          Manage Team
+        </Link>
+      ) : null,
+    },
+  ];
+
+  if (!loading && meta.requires_agency_subscription) {
+    return (
+      <div className="min-h-screen bg-light">
+        <Navbar />
+        <main className="px-6 py-10 lg:px-12 xl:px-20">
+          <div className="mx-auto max-w-5xl space-y-6">
+            <section className="rounded-3xl bg-white p-6 shadow-sm md:p-8">
+              <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                    {accountType === 'enterprise' ? 'Enterprise setup' : 'Agency setup'}
+                  </p>
+                  <h1 className="mt-2 text-3xl font-bold text-dark">
+                    Activate your {accountType === 'enterprise' ? 'Enterprise' : 'Agency'} workspace
+                  </h1>
+                  <p className="mt-3 max-w-2xl text-gray-600">
+                    Your account is ready for {workspacePlural} workspaces. Complete the Agency subscription first, then add your branding and first {workspaceLabel}.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => navigate('/subscription/manage', { state: { selectedPlanId: 'agency', billingCycle: meta.billing_cycle || 'monthly' } })}
+                  className="inline-flex items-center justify-center gap-2 rounded-full bg-dark px-6 py-3 text-sm font-semibold text-white"
+                >
+                  <CurrencyDollarIcon className="h-5 w-5" />
+                  Pay Agency Subscription
+                </button>
+              </div>
+            </section>
+
+            <section className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              {setupSteps.map((step) => (
+                <SetupStep key={step.title} {...step} />
+              ))}
+            </section>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-light">
@@ -494,6 +634,74 @@ const AgencyDashboard = () => {
 
           {!loading && !error && (
             <>
+              <section className="rounded-3xl bg-white p-6 shadow-sm">
+                <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+                  <div>
+                    <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                      {accountType === 'enterprise' ? 'Enterprise command center' : 'Agency command center'}
+                    </p>
+                    <h2 className="mt-2 text-2xl font-bold text-dark">
+                      Set up once, manage every {workspaceLabel} separately
+                    </h2>
+                    <p className="mt-2 max-w-3xl text-sm leading-relaxed text-gray-600">
+                      Use this dashboard for cross-{workspaceLabel} visibility, white-label reporting, billing breakdowns, and team access. Select a specific {workspaceLabel} in the navbar to use normal brand tools inside that workspace.
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowCreateForm(true)}
+                    className="inline-flex items-center justify-center gap-2 rounded-full bg-primary px-5 py-3 text-sm font-semibold text-dark hover:bg-primary/90"
+                  >
+                    <PlusIcon className="h-5 w-5" />
+                    {language.add_label}
+                  </button>
+                </div>
+              </section>
+
+              <section className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                <div className="space-y-3">
+                  <h2 className="text-xl font-bold text-dark">Agency Setup</h2>
+                  {setupSteps.map((step) => (
+                    <SetupStep key={step.title} {...step} />
+                  ))}
+                </div>
+                <div className="space-y-3">
+                  <h2 className="text-xl font-bold text-dark">Quick Links</h2>
+                  <div className="grid grid-cols-1 gap-3">
+                    <FeatureLink
+                      to="/brand/profile/edit"
+                      icon={SwatchIcon}
+                      title="White-label settings"
+                      description="Set logo, report colors, sender details, and email signature."
+                    />
+                    <FeatureLink
+                      to="/billing"
+                      icon={CurrencyDollarIcon}
+                      title="Central billing"
+                      description={`Review invoices and spend across all ${workspacePlural}.`}
+                    />
+                    <FeatureLink
+                      to="/brand/analytics"
+                      icon={ChartBarIcon}
+                      title={`All-${workspaceLabel} analytics`}
+                      description="See cross-workspace performance before drilling into one client."
+                    />
+                    <FeatureLink
+                      to={clients[0] ? `/brand/workspaces/${clients[0].id}` : '/brand/agency'}
+                      icon={UserGroupIcon}
+                      title="Team permissions"
+                      description={`Invite teammates and assign access per ${workspaceLabel}.`}
+                    />
+                    <FeatureLink
+                      to="/messages"
+                      icon={EnvelopeIcon}
+                      title="Messages"
+                      description={`Keep communication organized while working across ${workspacePlural}.`}
+                    />
+                  </div>
+                </div>
+              </section>
+
               <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
                 <StatCard label={language.workspace_plural[0].toUpperCase() + language.workspace_plural.slice(1)} value={totals?.clients || 0} icon={BuildingOffice2Icon} />
                 <StatCard label="Campaigns" value={totals?.campaigns || 0} icon={ChartBarIcon} />

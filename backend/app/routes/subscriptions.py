@@ -9,6 +9,7 @@ from werkzeug.utils import secure_filename
 from app import db
 from app.models import BrandProfile, User, Subscription, SubscriptionPlan
 from app.services.payment_service import initiate_subscription_payment, check_subscription_payment_status
+from app.services.agency_subscription_service import apply_brand_subscription_entitlements
 
 bp = Blueprint('subscriptions', __name__)
 
@@ -21,15 +22,7 @@ def allowed_file(filename):
 
 def apply_subscription_account_type(user_id, plan):
     """Keep brand profile positioning aligned with active subscription plans."""
-    if not plan or plan.user_type != 'brand':
-        return
-    brand = BrandProfile.query.filter_by(user_id=user_id).first()
-    if not brand:
-        return
-    if plan.slug in ['agency', 'brand-agency'] or int(plan.max_client_workspaces or 0) > 0:
-        brand.account_type = 'agency'
-    elif brand.account_type not in ['enterprise']:
-        brand.account_type = 'brand'
+    apply_brand_subscription_entitlements(user_id, plan)
 
 
 @bp.route('/plans', methods=['GET'])

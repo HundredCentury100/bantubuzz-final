@@ -10,7 +10,7 @@ const SubscriptionPayment = () => {
   const { subscriptionId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const { user } = useAuth();
+  const { user, refreshCurrentUser } = useAuth();
   const [subscription, setSubscription] = useState(null);
   const [loading, setLoading] = useState(true);
   const [paymentLoading, setPaymentLoading] = useState(false);
@@ -27,6 +27,24 @@ const SubscriptionPayment = () => {
   const planInfo = location.state?.plan;
   const billingCycle = location.state?.billingCycle || 'monthly';
   const stateSubscription = location.state?.subscription;
+  const isAgencyPlan = (plan) => {
+    const slug = plan?.slug || '';
+    const workspaceLimit = plan?.restrictions?.max_client_workspaces ?? plan?.max_client_workspaces ?? 0;
+    return ['agency', 'brand-agency'].includes(slug) || Number(workspaceLimit || 0) > 0;
+  };
+
+  const navigateAfterBrandPayment = async (plan) => {
+    if (user?.user_type === 'brand') {
+      try {
+        await refreshCurrentUser?.();
+      } catch (error) {
+        console.error('Failed to refresh user after subscription payment:', error);
+      }
+      navigate(isAgencyPlan(plan) ? '/brand/agency' : '/subscription/manage');
+      return;
+    }
+    navigate('/subscription/manage');
+  };
 
   useEffect(() => {
     if (subscriptionId) {
@@ -123,8 +141,7 @@ const SubscriptionPayment = () => {
         if (plan?.subscription_type === 'verification' || plan?.slug?.includes('verification')) {
           navigate('/creator/verification/apply');
         } else {
-          // For brand subscriptions
-          navigate('/subscription/manage');
+          await navigateAfterBrandPayment(plan);
         }
       }
     } catch (error) {
@@ -193,8 +210,7 @@ const SubscriptionPayment = () => {
             state: { subscription: subscription || stateSubscription }
           });
         } else {
-          // For brand subscriptions
-          navigate('/subscription/manage');
+          await navigateAfterBrandPayment(plan);
         }
       }
     } catch (error) {
@@ -224,8 +240,7 @@ const SubscriptionPayment = () => {
         if (plan?.subscription_type === 'verification' || plan?.slug?.includes('verification')) {
           navigate('/creator/verification/apply');
         } else {
-          // For brand subscriptions
-          navigate('/subscription/manage');
+          await navigateAfterBrandPayment(plan);
         }
       } else {
         const status = response.data.data.payment.status || 'pending';
@@ -257,8 +272,7 @@ const SubscriptionPayment = () => {
     if (plan?.subscription_type === 'verification' || plan?.slug?.includes('verification')) {
       navigate('/creator/verification/apply');
     } else {
-      // For brand subscriptions
-      navigate('/subscription/manage');
+      await navigateAfterBrandPayment(plan);
     }
   };
 
@@ -589,7 +603,7 @@ const SubscriptionPayment = () => {
         itemName={plan?.name || 'Subscription'}
         itemDescription={`${billingCycle} subscription - ${plan?.name || ''}`}
         onSuccess={handleSmilePaySuccess}
-        returnUrl={`${window.location.origin}/subscription/manage`}
+        returnUrl={`${window.location.origin}${isAgencyPlan(plan) ? '/brand/agency' : '/subscription/manage'}`}
         resultUrl={`${window.location.origin}/api/payments/smilepay/webhook/callback`}
       />
     </div>

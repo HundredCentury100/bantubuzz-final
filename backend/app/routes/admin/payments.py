@@ -7,6 +7,7 @@ from flask import jsonify, request
 from datetime import datetime, timedelta
 from app import db
 from app.models import Payment, Booking, User, BrandProfile, CreatorProfile, PaymentVerification, CreatorSubscription, CreatorSubscriptionPlan, Subscription, Collaboration, Package, WorkspaceAddon
+from app.services.agency_subscription_service import apply_brand_subscription_entitlements
 from app.decorators.admin import admin_required
 from flask_jwt_extended import get_jwt_identity
 from . import bp
@@ -82,18 +83,8 @@ def get_brand_subscription_amount(subscription):
 
 
 def apply_brand_subscription_account_type(subscription):
-    if not subscription or not subscription.plan or subscription.plan.user_type != 'brand':
-        return
-
-    brand = BrandProfile.query.filter_by(user_id=subscription.user_id).first()
-    if not brand:
-        return
-
-    plan = subscription.plan
-    if plan.slug in ['agency', 'brand-agency'] or int(plan.max_client_workspaces or 0) > 0:
-        brand.account_type = 'agency'
-    elif brand.account_type != 'enterprise':
-        brand.account_type = 'brand'
+    if subscription:
+        apply_brand_subscription_entitlements(subscription.user_id, subscription.plan)
 
 
 def activate_workspace_addon(addon, payment_method='manual', payment_reference=None):
