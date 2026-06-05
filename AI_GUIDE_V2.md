@@ -762,6 +762,39 @@ Deployment note:
     - `accepted`: payment confirmed and collaboration started.
     - `rejected`: brand did not select the proposal.
   - Campaign cart application items must point to `campaign_proposals`, not the older brief `proposals` table. Migration: `backend/migrations/versions/202606041700_fix_campaign_cart_proposal_fk.py`.
+- Agency subscription onboarding and activation flow:
+  - Deploy script: `deployment/DEPLOY-AGENCY-PLAN-FLOW.bat`.
+  - Commit: `c344abf Implement agency subscription onboarding flow`.
+  - `backend/app/services/agency_subscription_service.py` is the central helper for aligning an activated subscription plan with `brand_profiles.account_type`.
+  - Existing brand accounts become agency/enterprise accounts only through a real paid Agency subscription activation.
+  - New Agency/Enterprise signups land on `/brand/agency` but see a subscription gate until the Agency subscription is paid.
+  - Agency payments can complete through brand wallet, Smile&Pay, or admin-verified bank transfer.
+  - After Agency payment, `/brand/agency` shows the setup checklist and prominent actions for:
+    - Adding the first client/brand workspace.
+    - Uploading report/agency branding assets.
+    - Managing team access.
+    - Viewing billing/reporting links.
+  - Normal brand tools run inside a selected workspace using the navbar workspace selector and `X-Workspace-Id`.
+  - `backend/normalize_agency_plan.py` is used in deployment to normalize existing production Agency plan rows.
+- QA unblock batch for subscription, success story, booking access, creator dashboard, and creator billing:
+  - Deploy script: `deployment/DEPLOY-QA-UNBLOCK-FIXES.bat`.
+  - Commit: `e3e64ac Fix QA subscription and creator flow blockers`.
+  - Shared axios client `frontend/src/services/api.js` removes the forced JSON `Content-Type` header whenever the request body is `FormData`; this is required for proof uploads and other multipart requests to reach Flask as `request.files`.
+  - Brand subscription bank-transfer proof upload remains `POST /api/subscriptions/upload-proof`.
+  - Creator subscription endpoints in `frontend/src/pages/SubscriptionPayment.jsx` must not include a second `/api` prefix because the shared client already uses `/api` as `baseURL`.
+  - Success stories created from collaborations must read `BrandProfile.company_name`; `business_name` does not exist on `BrandProfile`.
+  - Booking list/details routes are brand-only:
+    - Frontend `/bookings` and `/bookings/:id` use `ProtectedRoute requiredType="brand"`.
+    - Backend `GET /api/bookings/<id>` returns 403 for creators and for brands that do not own the booking.
+  - Yes-track draft submission in `frontend/src/pages/CollaborationDetails.jsx` supports the QA-required Google Drive flow:
+    - Creators see the content items in their package.
+    - They can paste one shared Google Drive link when posting the same draft across platforms.
+    - They can leave the shared link empty and paste separate Google Drive links per item when content differs per platform.
+    - Each draft link should be shared as `Anyone with the link` before submission.
+  - Creator dashboard mobile stat cards use compact local card styling rather than the global `.card` padding.
+  - Creator dashboard has a CTA between stats/profile status and My Packages linking to `/creator/campaigns` with the message `Looking for your next collaboration? Browse open opportunities`.
+  - Creator `/billing` is protected for creators and uses the shared billing endpoint.
+  - Creator billing invoices include creator subscriptions; featured/visibility purchases are categorized as `boost` invoices by `backend/app/routes/billing.py`.
 - Remaining hardening for future slices:
   - Improve team invitation onboarding so new invitees land directly back on the invite after signup/login.
   - Build tailored onboarding steps after Agency/Enterprise signup.
