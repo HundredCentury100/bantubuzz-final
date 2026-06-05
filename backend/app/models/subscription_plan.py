@@ -70,7 +70,12 @@ class SubscriptionPlan(db.Model):
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     # Relationships
-    subscriptions = db.relationship('Subscription', backref='plan', lazy='dynamic')
+    subscriptions = db.relationship(
+        'Subscription',
+        backref='plan',
+        lazy='dynamic',
+        foreign_keys='Subscription.plan_id',
+    )
 
     def to_dict(self):
         monthly_price = float(self.price_monthly)

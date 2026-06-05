@@ -19,6 +19,11 @@ This file is a living handoff guide for future AI/Codex sessions working on the 
 - Recent bugfix commit on `development`: `4487d01 Fix collaboration workflow and creator profile polish`
 - `main` was fast-forwarded to the previous `development` tip before this bugfix commit.
 - After making deployment helper changes, check `git status --short` before committing anything else because deployment helper files may be untracked or modified.
+- June 5, 2026 local working tree includes subscription lifecycle diagnostic/hotfix work:
+  - `backend/app/models/subscription_plan.py`
+  - `deployment/DEPLOY-SUBSCRIPTION-LIFECYCLE.bat`
+  - `deployment/DIAGNOSE-SUBSCRIPTION-LIFECYCLE.bat`
+  - `deployment/FIX-SUBSCRIPTION-LIFECYCLE-MAPPER.bat`
 
 ## Deployment Lessons Learned
 
@@ -120,6 +125,16 @@ netstat -tlnp | grep 8002 || ss -tlnp | grep 8002
 curl -s -i http://localhost:8002/api/health
 ```
 
+For SQLAlchemy model or migration changes, also verify mapper configuration before declaring the backend healthy:
+
+```bash
+cd /var/www/bantubuzz/backend
+source venv/bin/activate
+python -c "from app import create_app; from sqlalchemy.orm import configure_mappers; app=create_app(); app.app_context().push(); configure_mappers(); print('mapper config ok')"
+```
+
+`/api/health` can return 200 even when real routes fail later during lazy SQLAlchemy mapper configuration.
+
 Public health endpoint:
 
 ```text
@@ -177,6 +192,37 @@ Run:
 
 ```powershell
 .\deployment\RESTART-BACKEND-NOW.bat
+```
+
+### `deployment/DIAGNOSE-SUBSCRIPTION-LIFECYCLE.bat`
+
+Purpose:
+
+- Read-only production diagnostics for subscription lifecycle deploy issues.
+- Captures migration state, mapper/import checks, Gunicorn processes, port `8002`, local/public health, Apache status, Celery service candidates, PM2 status, and recent Gunicorn/Apache/Celery logs.
+- Writes local output to `deployment/subscription-lifecycle-diagnostics.txt` for paste-back debugging.
+- Does not deploy, migrate, restart, or edit anything.
+
+Run:
+
+```powershell
+.\deployment\DIAGNOSE-SUBSCRIPTION-LIFECYCLE.bat
+```
+
+### `deployment/FIX-SUBSCRIPTION-LIFECYCLE-MAPPER.bat`
+
+Purpose:
+
+- Hotfixes the June 5 subscription lifecycle SQLAlchemy mapper ambiguity.
+- Backs up production `backend/app/models/subscription_plan.py`.
+- Uploads the fixed local model.
+- Runs `py_compile` and `configure_mappers()` before restart.
+- Restarts Gunicorn, Apache, and the actual production Celery service names when present: `celery-worker` and `celery-beat`.
+
+Run:
+
+```powershell
+.\deployment\FIX-SUBSCRIPTION-LIFECYCLE-MAPPER.bat
 ```
 
 ### `deployment/DEPLOY-THUNZIAI-V2.bat`
@@ -834,6 +880,13 @@ Deployment note:
   - Celery Beat tasks in `backend/app/tasks/subscription_tasks.py` send 7-day renewal reminders and process wallet auto-renewals, retries, cancellations, and scheduled downgrades.
   - SmilePay does not currently expose a reusable mandate/token in this codebase, so off-session auto-renewal is only automatic for wallet-paid subscriptions. SmilePay/bank-transfer users get reminder/retry state and must complete a new payment unless tokenized recurring billing is added.
   - Deploy script: `deployment/DEPLOY-SUBSCRIPTION-LIFECYCLE.bat`.
+  - June 5 production issue:
+    - Adding `subscriptions.pending_plan_id` created a second foreign-key path from `subscriptions` to `subscription_plans`.
+    - SQLAlchemy could no longer infer `SubscriptionPlan.subscriptions` and failed lazily on real API requests with:
+      `Could not determine join condition between parent/child tables on relationship SubscriptionPlan.subscriptions`.
+    - Fix in `backend/app/models/subscription_plan.py`: relationship must specify `foreign_keys='Subscription.plan_id'`.
+    - Health endpoint still returned 200 because it does not force mapper configuration. Deployment scripts that touch models should run `configure_mappers()` after migration/compile checks.
+    - Production Celery services discovered by diagnostics are `celery-worker.service` and `celery-beat.service`; the older `celery`/`celerybeat` names may not exist.
 - Remaining hardening for future slices:
   - Improve team invitation onboarding so new invitees land directly back on the invite after signup/login.
   - Build tailored onboarding steps after Agency/Enterprise signup.
@@ -842,8 +895,8 @@ Deployment note:
   - Build scheduled reports.
   - Build cross-workspace analytics exports.
 
-1. Read this file first.
-2. Then read `AI_GUIDE.md` for the larger historical context.
+1. Read `AI_GUIDE.md` first for the larger historical context and original project conventions.
+2. Then read this file for the current working state and latest deployment lessons.
 3. Check `git status --short`.
 4. Check recent commits with `git log --oneline -10`.
 5. Before deployment, verify which files changed.
