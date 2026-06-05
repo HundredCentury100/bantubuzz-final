@@ -1,9 +1,66 @@
-from flask import Blueprint, request, jsonify
+import os
+import uuid
+from datetime import datetime
+
+from flask import Blueprint, current_app, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
+from werkzeug.utils import secure_filename
 from app import db
-from app.models import Message, User
+from app.models import Message, PushSubscription, User
 
 bp = Blueprint('messages', __name__)
+
+
+ALLOWED_MESSAGE_EXTENSIONS = {
+    'png', 'jpg', 'jpeg', 'gif', 'webp',
+    'pdf', 'doc', 'docx', 'xls', 'xlsx', 'csv', 'txt',
+    'mp4', 'mov', 'webm'
+}
+IMAGE_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'webp'}
+
+
+def _allowed_message_file(filename):
+    return (
+        filename
+        and '.' in filename
+        and filename.rsplit('.', 1)[1].lower() in ALLOWED_MESSAGE_EXTENSIONS
+    )
+
+
+def _attachment_type(filename, mimetype):
+    extension = filename.rsplit('.', 1)[1].lower() if '.' in filename else ''
+    if extension in IMAGE_EXTENSIONS or (mimetype or '').startswith('image/'):
+        return 'image'
+    return 'file'
+
+
+def _message_payload_from_request(data):
+    message_type = data.get('message_type') or 'text'
+    content = (data.get('content') or '').strip()
+    attachment_url = data.get('attachment_url')
+    attachment_name = data.get('attachment_name')
+    link_url = (data.get('link_url') or '').strip()
+
+    if message_type in ['image', 'file'] and not attachment_url:
+        raise ValueError('attachment_url is required for file and image messages')
+    if message_type == 'content_link' and not link_url:
+        raise ValueError('link_url is required for content link messages')
+    if not content and message_type == 'text':
+        raise ValueError('content is required')
+
+    return {
+        'message_type': message_type,
+        'content': content or attachment_name or link_url or '',
+        'attachment_url': attachment_url,
+        'attachment_type': data.get('attachment_type'),
+        'attachment_name': attachment_name,
+        'attachment_mime_type': data.get('attachment_mime_type'),
+        'attachment_size': data.get('attachment_size'),
+        'link_url': link_url or None,
+        'link_title': data.get('link_title'),
+        'link_description': data.get('link_description'),
+        'link_image': data.get('link_image'),
+    }
 
 
 @bp.route('/', methods=['GET'])
@@ -41,17 +98,21 @@ def send_message():
     """Send a new message"""
     try:
         user_id = get_jwt_identity()
-        data = request.get_json()
+        data = request.get_json() or {}
 
-        if not all(field in data for field in ['receiver_id', 'content']):
-            return jsonify({'error': 'Missing required fields'}), 400
+        if 'receiver_id' not in data:
+            return jsonify({'error': 'Missing receiver_id'}), 400
+
+        try:
+            payload = _message_payload_from_request(data)
+        except ValueError as exc:
+            return jsonify({'error': str(exc)}), 400
 
         message = Message(
             sender_id=user_id,
             receiver_id=data['receiver_id'],
             booking_id=data.get('booking_id'),
-            content=data['content'],
-            attachment_url=data.get('attachment_url')
+            **payload
         )
 
         db.session.add(message)
@@ -94,9 +155,15 @@ def mark_as_read(message_id):
             return jsonify({'error': 'Unauthorized'}), 403
 
         message.is_read = True
+        message.read_at = message.read_at or datetime.utcnow()
         db.session.commit()
 
-        return jsonify({'message': 'Message marked as read'}), 200
+        return jsonify({
+            'message': 'Message marked as read',
+            'message_id': message.id,
+            'read_at': message.read_at.isoformat() if message.read_at else None,
+            'sender_id': message.sender_id
+        }), 200
 
     except Exception as e:
         db.session.rollback()
@@ -118,13 +185,141 @@ def mark_many_as_read():
         if not ids:
             return jsonify({'message': 'No messages to mark as read', 'updated': 0}), 200
 
+        read_at = datetime.utcnow()
         updated = Message.query.filter(
             Message.id.in_(ids),
             Message.receiver_id == user_id,
-        ).update({'is_read': True}, synchronize_session=False)
+        ).update({'is_read': True, 'read_at': read_at}, synchronize_session=False)
         db.session.commit()
 
-        return jsonify({'message': 'Messages marked as read', 'updated': updated}), 200
+        read_messages = Message.query.filter(Message.id.in_(ids)).all()
+        read_by_sender = {}
+        for message in read_messages:
+            if message.receiver_id == user_id:
+                read_by_sender.setdefault(str(message.sender_id), []).append(message.id)
+
+        return jsonify({
+            'message': 'Messages marked as read',
+            'updated': updated,
+            'message_ids': ids,
+            'read_at': read_at.isoformat(),
+            'read_by_sender': read_by_sender
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@bp.route('/attachments', methods=['POST'])
+@jwt_required()
+def upload_message_attachment():
+    """Upload a message image or file attachment."""
+    try:
+        if 'file' not in request.files:
+            return jsonify({'error': 'No file provided'}), 400
+
+        file = request.files['file']
+        if not file or file.filename == '':
+            return jsonify({'error': 'No file provided'}), 400
+        if not _allowed_message_file(file.filename):
+            return jsonify({'error': 'File type not allowed'}), 400
+
+        original_name = secure_filename(file.filename)
+        extension = original_name.rsplit('.', 1)[1].lower()
+        filename = f"{uuid.uuid4().hex}.{extension}"
+        upload_dir = os.path.join(current_app.root_path, '..', 'uploads', 'messages')
+        os.makedirs(upload_dir, exist_ok=True)
+        file_path = os.path.join(upload_dir, filename)
+        file.save(file_path)
+
+        relative_url = f'/uploads/messages/{filename}'
+        size = os.path.getsize(file_path)
+        attachment_type = _attachment_type(original_name, file.mimetype)
+
+        return jsonify({
+            'url': relative_url,
+            'attachment_url': relative_url,
+            'attachment_type': attachment_type,
+            'file_name': original_name,
+            'attachment_name': original_name,
+            'mime_type': file.mimetype,
+            'attachment_mime_type': file.mimetype,
+            'file_size': size,
+            'attachment_size': size,
+        }), 201
+
+    except Exception as e:
+        current_app.logger.error('Message attachment upload failed: %s', e)
+        return jsonify({'error': str(e)}), 500
+
+
+@bp.route('/push/vapid-public-key', methods=['GET'])
+def get_vapid_public_key():
+    """Return the configured Web Push public key, if available."""
+    public_key = current_app.config.get('VAPID_PUBLIC_KEY') or os.getenv('VAPID_PUBLIC_KEY')
+    return jsonify({
+        'public_key': public_key,
+        'enabled': bool(public_key)
+    }), 200
+
+
+@bp.route('/push-subscriptions', methods=['POST'])
+@jwt_required()
+def save_push_subscription():
+    """Save or update a browser push subscription for the current user."""
+    try:
+        user_id = int(get_jwt_identity())
+        data = request.get_json() or {}
+        endpoint = data.get('endpoint')
+        keys = data.get('keys') or {}
+        p256dh = keys.get('p256dh')
+        auth = keys.get('auth')
+
+        if not endpoint or not p256dh or not auth:
+            return jsonify({'error': 'Invalid push subscription'}), 400
+
+        subscription = PushSubscription.query.filter_by(endpoint=endpoint).first()
+        if not subscription:
+            subscription = PushSubscription(endpoint=endpoint)
+            db.session.add(subscription)
+
+        subscription.user_id = user_id
+        subscription.p256dh = p256dh
+        subscription.auth = auth
+        subscription.user_agent = request.headers.get('User-Agent')
+        subscription.is_active = True
+        subscription.updated_at = datetime.utcnow()
+        db.session.commit()
+
+        return jsonify({
+            'message': 'Push subscription saved',
+            'subscription': subscription.to_dict()
+        }), 201
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@bp.route('/push-subscriptions', methods=['DELETE'])
+@jwt_required()
+def disable_push_subscription():
+    """Disable a browser push subscription for the current user."""
+    try:
+        user_id = int(get_jwt_identity())
+        data = request.get_json() or {}
+        endpoint = data.get('endpoint')
+        if not endpoint:
+            return jsonify({'error': 'endpoint is required'}), 400
+
+        updated = PushSubscription.query.filter_by(
+            user_id=user_id,
+            endpoint=endpoint
+        ).update({'is_active': False}, synchronize_session=False)
+        db.session.commit()
+
+        return jsonify({'message': 'Push subscription disabled', 'updated': updated}), 200
 
     except Exception as e:
         db.session.rollback()

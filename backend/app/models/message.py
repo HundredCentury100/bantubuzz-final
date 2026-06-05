@@ -14,7 +14,16 @@ class Message(db.Model):
     message_type = db.Column(db.String(20), default='text')  # text, custom_request, custom_offer
     content = db.Column(db.Text, nullable=False)
     is_read = db.Column(db.Boolean, default=False)
+    read_at = db.Column(db.DateTime)
     attachment_url = db.Column(db.String(255))
+    attachment_type = db.Column(db.String(30))
+    attachment_name = db.Column(db.String(255))
+    attachment_mime_type = db.Column(db.String(120))
+    attachment_size = db.Column(db.Integer)
+    link_url = db.Column(db.Text)
+    link_title = db.Column(db.String(255))
+    link_description = db.Column(db.Text)
+    link_image = db.Column(db.Text)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     def to_dict(self):
@@ -29,7 +38,16 @@ class Message(db.Model):
             'message_type': self.message_type,
             'content': self.content,
             'is_read': self.is_read,
+            'read_at': self.read_at.isoformat() if self.read_at else None,
             'attachment_url': self.attachment_url,
+            'attachment_type': self.attachment_type,
+            'attachment_name': self.attachment_name,
+            'attachment_mime_type': self.attachment_mime_type,
+            'attachment_size': self.attachment_size,
+            'link_url': self.link_url,
+            'link_title': self.link_title,
+            'link_description': self.link_description,
+            'link_image': self.link_image,
             'created_at': self.created_at.isoformat()
         }
 

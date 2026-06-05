@@ -261,11 +261,21 @@ def notify_message_received_for_user(receiver, sender_name='A user', sender_role
 
     role = sender_role if sender_role in ['brand', 'creator'] else 'user'
     title = f'New message received from {role}'
+    body = f'You have a new message from {sender_name}.'
     _notify_user(
         receiver,
         'message',
         title,
-        f'You have a new message from {sender_name}.',
+        body,
         '/messages',
         email_subject=title
     )
+    try:
+        from app.services.push_service import send_push_notification
+        send_push_notification(receiver.id, title, body, '/messages', tag='message')
+    except Exception as exc:
+        current_app.logger.warning(
+            "Failed to send push notification to user %s: %s",
+            getattr(receiver, 'id', None),
+            exc
+        )

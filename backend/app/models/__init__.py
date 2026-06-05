@@ -4,6 +4,7 @@ from .brand_profile import BrandProfile
 from .package import Package
 from .booking import Booking
 from .message import Message
+from .push_subscription import PushSubscription
 from .notification import Notification
 from .saved_creator import SavedCreator
 from .analytics import Analytics
@@ -71,6 +72,7 @@ __all__ = [
     'CampaignProposal',
     'Booking',
     'Message',
+    'PushSubscription',
     'Notification',
     'SavedCreator',
     'Analytics',

@@ -10,6 +10,7 @@ import CustomOfferModal from '../components/CustomOfferModal';
 import { BASE_URL } from '../services/api';
 import { useAuth } from '../hooks/useAuth';
 import toast from 'react-hot-toast';
+import { FaFileAlt, FaImage, FaPaperclip, FaTimes } from 'react-icons/fa';
 import BlockUserModal from '../components/BlockUserModal';
 import ReportMessageModal from '../components/ReportMessageModal';
 import SafetyWarningModal from '../components/SafetyWarningModal';
@@ -29,6 +30,7 @@ const Messages = () => {
     markMessagesAsRead,
     sendTypingIndicator,
     loadConversationMessages,
+    enablePushNotifications,
   } = useMessaging();
 
   const [conversations, setConversations] = useState([]);
@@ -40,6 +42,11 @@ const Messages = () => {
   const [searchQuery, setSearchQuery] = useState(''); // Search query for filtering conversations
   const messagesEndRef = useRef(null);
   const typingTimeoutRef = useRef(null);
+  const fileInputRef = useRef(null);
+  const imageInputRef = useRef(null);
+  const [pendingAttachment, setPendingAttachment] = useState(null);
+  const [attachmentUploading, setAttachmentUploading] = useState(false);
+  const [pushPromptVisible, setPushPromptVisible] = useState(false);
 
   // Trust & Safety modals state
   const [showBlockModal, setShowBlockModal] = useState(false);
@@ -59,6 +66,9 @@ const Messages = () => {
   // Load all conversations on mount
   useEffect(() => {
     loadConversations();
+    if ('Notification' in window && Notification.permission === 'default') {
+      setPushPromptVisible(true);
+    }
   }, []);
 
   // Listen for real-time message events to refresh conversation list
@@ -210,41 +220,76 @@ const Messages = () => {
     setBlockStatus(null);
   };
 
+  const buildOutgoingMessage = () => {
+    const trimmedText = messageText.trim();
+    const linkMatch = !pendingAttachment ? trimmedText.match(/https?:\/\/[^\s]+/i) : null;
+
+    const extra = pendingAttachment
+      ? {
+          message_type: pendingAttachment.attachment_type,
+          attachment_url: pendingAttachment.attachment_url,
+          attachment_type: pendingAttachment.attachment_type,
+          attachment_name: pendingAttachment.attachment_name,
+          attachment_mime_type: pendingAttachment.attachment_mime_type,
+          attachment_size: pendingAttachment.attachment_size,
+        }
+      : linkMatch
+        ? {
+            message_type: 'content_link',
+            link_url: linkMatch[0],
+            link_title: linkMatch[0],
+          }
+        : { message_type: 'text' };
+
+    const content = pendingAttachment
+      ? (trimmedText || pendingAttachment.attachment_name)
+      : trimmedText;
+
+    return { content, extra, trimmedText };
+  };
+
+  const sendCurrentMessage = async () => {
+    const { content, extra } = buildOutgoingMessage();
+    const success = await sendMessage(selectedConversation.id, content, null, extra);
+
+    if (success) {
+      setMessageText('');
+      setPendingAttachment(null);
+      sendTypingIndicator(selectedConversation.id, false);
+    }
+
+    return success;
+  };
+
   const handleSendMessage = async (e) => {
     e.preventDefault();
 
-    if (!messageText.trim() || !selectedConversation) {
+    if ((!messageText.trim() && !pendingAttachment) || !selectedConversation) {
       return;
     }
 
+    const { trimmedText } = buildOutgoingMessage();
+
     // Check message safety before sending
-    const safetyCheck = checkMessageSafety(messageText.trim());
+    const safetyCheck = trimmedText ? checkMessageSafety(trimmedText) : { needsWarning: false };
     if (safetyCheck.needsWarning) {
       setSafetyWarningData({
         type: safetyCheck.warningType,
-        message: messageText.trim(),
+        message: trimmedText,
         patterns: safetyCheck.patterns
       });
       setShowSafetyWarning(true);
       return;
     }
 
-    // Send message if no safety issues
-    const success = await sendMessage(selectedConversation.id, messageText.trim());
-
-    if (success) {
-      setMessageText('');
-      sendTypingIndicator(selectedConversation.id, false);
-    }
+    await sendCurrentMessage();
   };
 
   const handleSendAnywayAfterWarning = async () => {
     // User chose to send message despite warning
-    const success = await sendMessage(selectedConversation.id, safetyWarningData.message);
+    const success = await sendCurrentMessage();
 
     if (success) {
-      setMessageText('');
-      sendTypingIndicator(selectedConversation.id, false);
       setShowSafetyWarning(false);
       setSafetyWarningData(null);
     }
@@ -317,12 +362,132 @@ const Messages = () => {
     }, 2000);
   };
 
+  const handleAttachmentSelect = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+
+    try {
+      setAttachmentUploading(true);
+      const formData = new FormData();
+      formData.append('file', file);
+      const response = await messagingService.uploadAttachment(formData);
+      setPendingAttachment(response.data);
+    } catch (error) {
+      console.error('Attachment upload failed:', error);
+      toast.error(error.response?.data?.error || 'Unable to upload attachment');
+    } finally {
+      setAttachmentUploading(false);
+    }
+  };
+
+  const handleEnablePush = async () => {
+    try {
+      const result = await enablePushNotifications();
+      if (result.enabled) {
+        toast.success('Message notifications enabled');
+        setPushPromptVisible(false);
+      } else if (result.reason === 'not_configured') {
+        toast('Push notifications are not configured on the server yet.');
+        setPushPromptVisible(false);
+      } else {
+        toast('Push notifications were not enabled.');
+        setPushPromptVisible(false);
+      }
+    } catch (error) {
+      console.error('Unable to enable push notifications:', error);
+      toast.error('Unable to enable push notifications');
+    }
+  };
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
   const formatMessageTime = (timestamp) => {
     return formatRelativeTime(timestamp);
+  };
+
+  const toAbsoluteUrl = (url) => {
+    if (!url) return '';
+    if (url.startsWith('http')) return url;
+    return `${BASE_URL}${url}`;
+  };
+
+  const formatFileSize = (size) => {
+    if (!size) return '';
+    if (size >= 1024 * 1024) return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+    if (size >= 1024) return `${(size / 1024).toFixed(1)} KB`;
+    return `${size} B`;
+  };
+
+  const getMessageReceipt = (message, isOwnMessage) => {
+    if (!isOwnMessage) return null;
+    if (message.is_read) return message.read_at ? `Read ${formatMessageTime(message.read_at)}` : 'Read';
+    return 'Sent';
+  };
+
+  const renderMessageBody = (message, isOwnMessage) => {
+    if (message.message_type === 'image' && message.attachment_url) {
+      return (
+        <div className="space-y-2">
+          <img
+            src={toAbsoluteUrl(message.attachment_url)}
+            alt={message.attachment_name || 'Message image'}
+            className="max-h-72 rounded-lg object-cover"
+          />
+          {message.content && message.content !== message.attachment_name && (
+            <p className="break-words">{message.content}</p>
+          )}
+        </div>
+      );
+    }
+
+    if (message.message_type === 'file' && message.attachment_url) {
+      return (
+        <a
+          href={toAbsoluteUrl(message.attachment_url)}
+          target="_blank"
+          rel="noreferrer"
+          className={`flex items-center gap-3 rounded-lg p-3 ${
+            isOwnMessage ? 'bg-white/15 hover:bg-white/25' : 'bg-white hover:bg-gray-50'
+          } transition-colors`}
+        >
+          <FaFileAlt className="flex-shrink-0" />
+          <span className="min-w-0">
+            <span className="block font-medium truncate">{message.attachment_name || message.content || 'Download file'}</span>
+            <span className={`text-xs ${isOwnMessage ? 'text-white/70' : 'text-gray-500'}`}>
+              {formatFileSize(message.attachment_size)}
+            </span>
+          </span>
+        </a>
+      );
+    }
+
+    if (message.message_type === 'content_link' && message.link_url) {
+      return (
+        <a
+          href={message.link_url}
+          target="_blank"
+          rel="noreferrer"
+          className={`block rounded-lg p-3 border ${
+            isOwnMessage ? 'border-white/20 bg-white/15 hover:bg-white/25' : 'border-gray-200 bg-white hover:bg-gray-50'
+          } transition-colors`}
+        >
+          <p className="font-semibold break-words">{message.link_title || message.link_url}</p>
+          {message.link_description && (
+            <p className={`text-sm mt-1 ${isOwnMessage ? 'text-white/80' : 'text-gray-600'}`}>
+              {message.link_description}
+            </p>
+          )}
+          <p className={`text-xs mt-2 break-all ${isOwnMessage ? 'text-white/70' : 'text-primary'}`}>
+            {message.link_url}
+          </p>
+        </a>
+      );
+    }
+
+    return <p className="break-words">{message.content}</p>;
   };
 
   const isUserOnline = (userId) => {
@@ -379,6 +544,31 @@ const Messages = () => {
           <div className="bg-primary/20 border border-primary text-primary-dark px-4 py-3 rounded-lg mb-6 flex items-center gap-2">
             <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary-dark"></div>
             <span>Loading your messages...</span>
+          </div>
+        )}
+
+        {pushPromptVisible && (
+          <div className="bg-white border border-primary/30 rounded-lg mb-6 p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div>
+              <p className="font-semibold text-dark">Get new message alerts on this device</p>
+              <p className="text-sm text-gray-600">Enable mobile/browser push notifications so you do not miss creator or brand messages.</p>
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setPushPromptVisible(false)}
+                className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-full"
+              >
+                Not now
+              </button>
+              <button
+                type="button"
+                onClick={handleEnablePush}
+                className="px-4 py-2 text-sm bg-primary text-dark font-medium rounded-full hover:bg-primary/90"
+              >
+                Enable
+              </button>
+            </div>
           </div>
         )}
 
@@ -657,13 +847,16 @@ const Messages = () => {
                                 : 'bg-gray-100 text-gray-900'
                             }`}
                           >
-                            <p className="break-words">{message.content}</p>
+                            {renderMessageBody(message, isOwnMessage)}
                             <p
                               className={`text-xs mt-1 ${
                                 isOwnMessage ? 'text-white/70' : 'text-gray-500'
                               }`}
                             >
                               {formatMessageTime(message.created_at)}
+                              {getMessageReceipt(message, isOwnMessage) && (
+                                <span className="ml-2">{getMessageReceipt(message, isOwnMessage)}</span>
+                              )}
                             </p>
                           </div>
                         </div>
@@ -716,6 +909,29 @@ const Messages = () => {
 
                 {/* Message Input */}
                 <form onSubmit={handleSendMessage} className="p-3 sm:p-4 border-t border-gray-200 bg-white">
+                  {pendingAttachment && (
+                    <div className="mb-3 flex items-center justify-between rounded-lg bg-gray-50 border border-gray-200 px-3 py-2">
+                      <div className="flex items-center gap-3 min-w-0">
+                        {pendingAttachment.attachment_type === 'image' ? (
+                          <FaImage className="text-primary flex-shrink-0" />
+                        ) : (
+                          <FaFileAlt className="text-primary flex-shrink-0" />
+                        )}
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-dark truncate">{pendingAttachment.attachment_name}</p>
+                          <p className="text-xs text-gray-500">{formatFileSize(pendingAttachment.attachment_size)}</p>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setPendingAttachment(null)}
+                        className="p-2 text-gray-500 hover:text-red-600 rounded-full"
+                        aria-label="Remove attachment"
+                      >
+                        <FaTimes />
+                      </button>
+                    </div>
+                  )}
                   <div className="flex items-center gap-2 w-full max-w-full">
                     {/* Custom Package Button */}
                     <button
@@ -755,6 +971,39 @@ const Messages = () => {
                       </div>
                     </button>
 
+                    <input
+                      ref={imageInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={handleAttachmentSelect}
+                    />
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      accept=".pdf,.doc,.docx,.xls,.xlsx,.csv,.txt,.mp4,.mov,.webm,image/*"
+                      className="hidden"
+                      onChange={handleAttachmentSelect}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => imageInputRef.current?.click()}
+                      disabled={attachmentUploading}
+                      className="flex-shrink-0 p-2.5 text-primary hover:bg-primary/10 rounded-full transition-all"
+                      title="Send image"
+                    >
+                      <FaImage className="w-5 h-5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={attachmentUploading}
+                      className="flex-shrink-0 p-2.5 text-primary hover:bg-primary/10 rounded-full transition-all"
+                      title="Attach file"
+                    >
+                      <FaPaperclip className="w-5 h-5" />
+                    </button>
+
                     <div className="flex-1 min-w-0">
                       <input
                         type="text"
@@ -772,7 +1021,7 @@ const Messages = () => {
                     </div>
                     <button
                       type="submit"
-                      disabled={!messageText.trim()}
+                      disabled={(!messageText.trim() && !pendingAttachment) || attachmentUploading}
                       className="bg-primary hover:bg-primary-dark text-white rounded-full disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center flex-shrink-0 w-12 h-12 min-w-[48px] min-h-[48px] shadow-lg active:scale-95"
                       title="Send message"
                       aria-label="Send message"

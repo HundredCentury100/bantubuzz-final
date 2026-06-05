@@ -813,6 +813,16 @@ Deployment note:
   - Single collaboration analytics returns `collaboration.type`, `collaboration.type_label`, `platform_breakdown`, and `by_platform`.
   - Campaign performance analytics in `backend/app/services/campaign_analytics_service.py` must group by actual submitted `PostMetrics.post_platform`, not package/cart labels, so multi-platform packages split into separate channel buckets.
   - Campaign analytics exposes `by_creator`, `by_platform`, and `by_creator_platform` for product reporting: overall campaign, best performing creator, platform performance, and creator-per-platform performance.
+- Rich messaging and message notifications:
+  - Message rows now support rich metadata: `read_at`, attachment type/name/mime/size, and content-link metadata.
+  - Migration: `backend/migrations/versions/202606051000_add_rich_messaging_and_push.py`.
+  - Message attachments upload through `POST /api/messages/attachments` and are stored under `/uploads/messages`.
+  - The React chat UI can send text, images, files, and pasted URL content links.
+  - Socket.IO message payloads must preserve the same metadata as Flask REST fallback messages.
+  - Read receipts use `messages.is_read` plus `messages.read_at`; the messaging service emits `messages_read` to the original sender.
+  - Web Push subscriptions are stored in `push_subscriptions`; push is optional unless `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, and `pywebpush` are configured.
+  - Service worker file: `frontend/public/message-push-sw.js`.
+  - Deploy script: `deployment/DEPLOY-RICH-MESSAGING.bat`; it restarts Gunicorn, Apache, and the PM2 messaging service.
 - Remaining hardening for future slices:
   - Improve team invitation onboarding so new invitees land directly back on the invite after signup/login.
   - Build tailored onboarding steps after Agency/Enterprise signup.

@@ -98,7 +98,21 @@ io.on('connection', (socket) => {
   // Handle sending messages
   socket.on('send_message', async (data) => {
     try {
-      const { receiverId, content, bookingId } = data;
+      const {
+        receiverId,
+        content,
+        bookingId,
+        messageType,
+        attachmentUrl,
+        attachmentType,
+        attachmentName,
+        attachmentMimeType,
+        attachmentSize,
+        linkUrl,
+        linkTitle,
+        linkDescription,
+        linkImage
+      } = data;
 
       if (!socket.userId) {
         socket.emit('error', { message: 'Not authenticated' });
@@ -107,12 +121,31 @@ io.on('connection', (socket) => {
 
       // Save message to database (PostgreSQL)
       const insertQuery = `
-        INSERT INTO messages (sender_id, receiver_id, booking_id, content, is_read, created_at)
-        VALUES ($1, $2, $3, $4, $5, NOW())
+        INSERT INTO messages (
+          sender_id, receiver_id, booking_id, message_type, content, is_read,
+          attachment_url, attachment_type, attachment_name, attachment_mime_type, attachment_size,
+          link_url, link_title, link_description, link_image, created_at
+        )
+        VALUES ($1, $2, $3, $4, $5, false, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW())
         RETURNING id
       `;
 
-      const insertResult = await pool.query(insertQuery, [socket.userId, receiverId, bookingId || null, content, false]);
+      const insertResult = await pool.query(insertQuery, [
+        socket.userId,
+        receiverId,
+        bookingId || null,
+        messageType || 'text',
+        content || attachmentName || linkUrl || '',
+        attachmentUrl || null,
+        attachmentType || null,
+        attachmentName || null,
+        attachmentMimeType || null,
+        attachmentSize || null,
+        linkUrl || null,
+        linkTitle || null,
+        linkDescription || null,
+        linkImage || null
+      ]);
       const messageId = insertResult.rows[0].id;
 
       // Fetch the complete message with sender info
@@ -145,7 +178,16 @@ io.on('connection', (socket) => {
         message_type: message.message_type || 'text',
         content: message.content,
         is_read: message.is_read,
+        read_at: message.read_at,
         attachment_url: message.attachment_url,
+        attachment_type: message.attachment_type,
+        attachment_name: message.attachment_name,
+        attachment_mime_type: message.attachment_mime_type,
+        attachment_size: message.attachment_size,
+        link_url: message.link_url,
+        link_title: message.link_title,
+        link_description: message.link_description,
+        link_image: message.link_image,
         created_at: message.created_at,
         sender: {
           email: message.sender_email,
@@ -203,10 +245,34 @@ io.on('connection', (socket) => {
       }
 
       const placeholders = messageIds.map((_, i) => `$${i + 1}`).join(',');
-      const query = `UPDATE messages SET is_read = true WHERE id IN (${placeholders}) AND receiver_id = $${messageIds.length + 1}`;
+      const query = `
+        UPDATE messages
+        SET is_read = true, read_at = COALESCE(read_at, NOW())
+        WHERE id IN (${placeholders}) AND receiver_id = $${messageIds.length + 1}
+        RETURNING id, sender_id, receiver_id, read_at
+      `;
 
-      await pool.query(query, [...messageIds, socket.userId]);
-      socket.emit('messages_marked_read', { messageIds });
+      const result = await pool.query(query, [...messageIds, socket.userId]);
+      const readAt = result.rows[0]?.read_at || new Date();
+      socket.emit('messages_marked_read', { messageIds, readAt });
+
+      const readsBySender = result.rows.reduce((acc, row) => {
+        const senderId = row.sender_id.toString();
+        if (!acc[senderId]) acc[senderId] = [];
+        acc[senderId].push(row.id);
+        return acc;
+      }, {});
+
+      Object.entries(readsBySender).forEach(([senderId, ids]) => {
+        const senderSocketId = activeUsers.get(senderId);
+        if (senderSocketId) {
+          io.to(senderSocketId).emit('messages_read', {
+            messageIds: ids,
+            readBy: socket.userId,
+            readAt
+          });
+        }
+      });
     } catch (error) {
       console.error('Error in mark_read:', error);
     }
@@ -318,6 +384,15 @@ app.get('/api/conversations/:userId', async (req, res) => {
       content: m.content,
       is_read: m.is_read,
       attachment_url: m.attachment_url,
+      attachment_type: m.attachment_type,
+      attachment_name: m.attachment_name,
+      attachment_mime_type: m.attachment_mime_type,
+      attachment_size: m.attachment_size,
+      link_url: m.link_url,
+      link_title: m.link_title,
+      link_description: m.link_description,
+      link_image: m.link_image,
+      read_at: m.read_at,
       created_at: m.created_at,
       sender: {
         email: m.sender_email,
@@ -405,6 +480,62 @@ app.get('/api/conversations', async (req, res) => {
     res.json({ conversations: result.rows });
   } catch (error) {
     console.error('Error in get conversations:', error);
+    res.status(500).json({ error: 'Server error' });
+  }
+});
+
+// Mark messages as read through REST fallback
+app.post('/api/messages/read', async (req, res) => {
+  try {
+    const token = req.headers.authorization?.split(' ')[1];
+    const decoded = verifyToken(token);
+
+    if (!decoded) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    const userId = decoded.sub;
+    const messageIds = req.body.messageIds || req.body.message_ids || [];
+    if (!Array.isArray(messageIds) || messageIds.length === 0) {
+      return res.json({ message: 'No messages to mark as read', updated: 0 });
+    }
+
+    const placeholders = messageIds.map((_, i) => `$${i + 1}`).join(',');
+    const query = `
+      UPDATE messages
+      SET is_read = true, read_at = COALESCE(read_at, NOW())
+      WHERE id IN (${placeholders}) AND receiver_id = $${messageIds.length + 1}
+      RETURNING id, sender_id, receiver_id, read_at
+    `;
+    const result = await pool.query(query, [...messageIds, userId]);
+    const readAt = result.rows[0]?.read_at || new Date();
+
+    const readsBySender = result.rows.reduce((acc, row) => {
+      const senderId = row.sender_id.toString();
+      if (!acc[senderId]) acc[senderId] = [];
+      acc[senderId].push(row.id);
+      return acc;
+    }, {});
+
+    Object.entries(readsBySender).forEach(([senderId, ids]) => {
+      const senderSocketId = activeUsers.get(senderId);
+      if (senderSocketId) {
+        io.to(senderSocketId).emit('messages_read', {
+          messageIds: ids,
+          readBy: userId,
+          readAt
+        });
+      }
+    });
+
+    res.json({
+      message: 'Messages marked as read',
+      updated: result.rowCount,
+      messageIds,
+      readAt
+    });
+  } catch (error) {
+    console.error('Error in REST mark read:', error);
     res.status(500).json({ error: 'Server error' });
   }
 });

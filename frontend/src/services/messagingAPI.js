@@ -110,11 +110,17 @@ export const messagingService = {
     messagingAPI.get(`/conversations/${userId}`, { params }),
 
   // Send message through Flask fallback API when Socket.IO is unavailable
-  sendMessage: (receiverId, content, bookingId = null) =>
+  sendMessage: (receiverId, content, bookingId = null, extra = {}) =>
     mainAPI.post('/messages/', {
       receiver_id: receiverId,
       content,
-      booking_id: bookingId
+      booking_id: bookingId,
+      ...extra,
+    }),
+
+  uploadAttachment: (formData) =>
+    mainAPI.post('/messages/attachments', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
     }),
 
   // Mark messages as read
@@ -135,6 +141,12 @@ export const messagingService = {
 
   // Unblock a user (uses main API)
   unblockUser: (userId) => mainAPI.delete(`/messaging/block/${userId}`),
+
+  getVapidPublicKey: () => mainAPI.get('/messages/push/vapid-public-key'),
+  savePushSubscription: (subscription) =>
+    mainAPI.post('/messages/push-subscriptions', subscription),
+  disablePushSubscription: (endpoint) =>
+    mainAPI.delete('/messages/push-subscriptions', { data: { endpoint } }),
 };
 
 export default messagingService;

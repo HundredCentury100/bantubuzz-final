@@ -161,6 +161,22 @@ export const MessagingProvider = ({ children }) => {
         window.dispatchEvent(new CustomEvent('message_sent', { detail: message }));
       });
 
+      socketInstance.on('messages_read', ({ messageIds, readBy, readAt }) => {
+        const ids = new Set((messageIds || []).map(id => Number(id)));
+        setMessages(prev => {
+          const next = {};
+          Object.entries(prev).forEach(([conversationId, conversationMessages]) => {
+            next[conversationId] = conversationMessages.map(message => (
+              ids.has(Number(message.id))
+                ? { ...message, is_read: true, read_at: readAt }
+                : message
+            ));
+          });
+          return next;
+        });
+        window.dispatchEvent(new CustomEvent('messages_read', { detail: { messageIds, readBy, readAt } }));
+      });
+
       // User status updates
       socketInstance.on('user_status', ({ userId, status }) => {
         setOnlineUsers(prev => {
@@ -253,10 +269,10 @@ export const MessagingProvider = ({ children }) => {
   }, []);
 
   // Send a message
-  const sendMessage = useCallback(async (receiverId, content, bookingId = null) => {
+  const sendMessage = useCallback(async (receiverId, content, bookingId = null, extra = {}) => {
     if (!socketRef.current || !isConnected) {
       try {
-        const response = await messagingService.sendMessage(receiverId, content, bookingId);
+        const response = await messagingService.sendMessage(receiverId, content, bookingId, extra);
         const message = response.data.data;
 
         setMessages(prev => ({
@@ -276,7 +292,17 @@ export const MessagingProvider = ({ children }) => {
     socketRef.current.emit('send_message', {
       receiverId,
       content,
-      bookingId
+      bookingId,
+      messageType: extra.message_type,
+      attachmentUrl: extra.attachment_url,
+      attachmentType: extra.attachment_type,
+      attachmentName: extra.attachment_name,
+      attachmentMimeType: extra.attachment_mime_type,
+      attachmentSize: extra.attachment_size,
+      linkUrl: extra.link_url,
+      linkTitle: extra.link_title,
+      linkDescription: extra.link_description,
+      linkImage: extra.link_image
     });
 
     return true;
@@ -301,8 +327,52 @@ export const MessagingProvider = ({ children }) => {
     }
 
     socketRef.current.emit('mark_read', { messageIds: ids });
+    setMessages(prev => {
+      const next = {};
+      Object.entries(prev).forEach(([conversationId, conversationMessages]) => {
+        next[conversationId] = conversationMessages.map(message => (
+          ids.includes(Number(message.id))
+            ? { ...message, is_read: true, read_at: message.read_at || new Date().toISOString() }
+            : message
+        ));
+      });
+      return next;
+    });
     window.dispatchEvent(new CustomEvent('messages_marked_read', { detail: { messageIds: ids } }));
   }, [isConnected]);
+
+  const urlBase64ToUint8Array = (base64String) => {
+    const padding = '='.repeat((4 - base64String.length % 4) % 4);
+    const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+    const rawData = window.atob(base64);
+    return Uint8Array.from([...rawData].map(char => char.charCodeAt(0)));
+  };
+
+  const enablePushNotifications = useCallback(async () => {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) {
+      return { enabled: false, reason: 'unsupported' };
+    }
+
+    const permission = await Notification.requestPermission();
+    if (permission !== 'granted') {
+      return { enabled: false, reason: permission };
+    }
+
+    const keyResponse = await messagingService.getVapidPublicKey();
+    const publicKey = keyResponse.data.public_key;
+    if (!publicKey) {
+      return { enabled: false, reason: 'not_configured' };
+    }
+
+    const registration = await navigator.serviceWorker.register('/message-push-sw.js');
+    const subscription = await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(publicKey)
+    });
+
+    await messagingService.savePushSubscription(subscription.toJSON());
+    return { enabled: true };
+  }, []);
 
   // Send typing indicator
   const sendTypingIndicator = useCallback((receiverId, isTyping) => {
@@ -332,6 +402,7 @@ export const MessagingProvider = ({ children }) => {
     markMessagesAsRead,
     sendTypingIndicator,
     loadConversationMessages,
+    enablePushNotifications,
   };
 
   return (
