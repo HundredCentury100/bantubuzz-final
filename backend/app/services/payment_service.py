@@ -975,15 +975,15 @@ def check_subscription_payment_status(subscription):
         status = paynow.check_transaction_status(subscription.paynow_poll_url)
 
         if status.paid:
-            # Activate subscription
-            subscription.status = 'active'
-            subscription.last_payment_date = datetime.utcnow()
-            subscription.last_payment_amount = subscription.plan.price_monthly if subscription.billing_cycle == 'monthly' else subscription.plan.price_yearly
+            from app.services.subscription_lifecycle_service import apply_paid_subscription, subscription_amount_due
 
-            # Set billing period if not already set
-            if not subscription.current_period_end:
-                subscription.set_billing_period(subscription.billing_cycle)
-
+            apply_paid_subscription(
+                subscription,
+                payment_method='paynow',
+                payment_reference=subscription.payment_reference,
+                amount=subscription_amount_due(subscription, subscription.billing_cycle),
+                billing_cycle=subscription.billing_cycle,
+            )
             db.session.commit()
 
             return {

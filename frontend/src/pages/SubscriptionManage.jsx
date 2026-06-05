@@ -139,13 +139,14 @@ export default function SubscriptionManage() {
                 redirect_url: res.data.data.redirect_url,
                 poll_url: res.data.data.poll_url,
                 payment_reference: res.data.data.payment_reference
-              },
-              plan: plan,
-              billingCycle: billingCycle
-            }
-          });
+            },
+            plan: plan,
+            billingCycle: billingCycle,
+            amountDue: res.data.data.amount_due
+          }
+        });
         } else {
-          toast.success('Successfully upgraded subscription!');
+          toast.success(res.data.message || 'Subscription change saved.');
           await fetchData();
         }
       }
@@ -250,6 +251,7 @@ export default function SubscriptionManage() {
   const actualSubscription = hasActiveSubscription ? currentSubscription?.subscription : null;
   const currentPlan = actualSubscription?.plan || currentSubscription?.plan || plans.find(p => p.slug === 'free');
   const isActive = actualSubscription?.status === 'active';
+  const isPastDue = actualSubscription?.status === 'past_due';
   const isCancelled = actualSubscription?.cancel_at_period_end;
   const isAgencySlug = (slug) => ['agency', 'brand-agency'].includes(slug);
 
@@ -348,6 +350,20 @@ export default function SubscriptionManage() {
                   >
                     {actionLoading && <ArrowPathIcon className="h-5 w-5 animate-spin" />}
                     Reactivate Subscription
+                  </button>
+                ) : isPastDue ? (
+                  <button
+                    onClick={() => navigate('/subscription/payment', {
+                      state: {
+                        paymentData: { subscription_id: actualSubscription.id },
+                        plan: currentPlan,
+                        billingCycle: actualSubscription.billing_cycle || billingCycle,
+                      }
+                    })}
+                    disabled={actionLoading}
+                    className="bg-primary hover:bg-primary/90 text-dark px-8 py-3 rounded-full font-medium transition-colors disabled:opacity-50"
+                  >
+                    Pay Now
                   </button>
                 ) : currentPlan?.slug !== 'free' && (
                   <button

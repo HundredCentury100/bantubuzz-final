@@ -823,6 +823,17 @@ Deployment note:
   - Web Push subscriptions are stored in `push_subscriptions`; push is optional unless `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, and `pywebpush` are configured.
   - Service worker file: `frontend/public/message-push-sw.js`.
   - Deploy script: `deployment/DEPLOY-RICH-MESSAGING.bat`; it restarts Gunicorn, Apache, and the PM2 messaging service.
+- Paid subscription lifecycle:
+  - Shared `subscriptions` table is the paid tier engine for both brand and creator tier plans.
+  - `creator_subscriptions` remains for creator add-ons such as verification and featured boosts.
+  - Migration: `backend/migrations/versions/202606051200_add_subscription_lifecycle_fields.py`.
+  - Lifecycle helpers live in `backend/app/services/subscription_lifecycle_service.py`.
+  - Wallet, SmilePay, Paynow polling, and bank-transfer admin verification should all call `apply_paid_subscription(...)` so pending upgrades and normal activations behave consistently.
+  - Yearly price should be 10 months; if a paid plan has no yearly price set, API/billing logic falls back to `monthly * 10`.
+  - Downgrades are scheduled for `current_period_end`; upgrades are prorated and apply after payment.
+  - Celery Beat tasks in `backend/app/tasks/subscription_tasks.py` send 7-day renewal reminders and process wallet auto-renewals, retries, cancellations, and scheduled downgrades.
+  - SmilePay does not currently expose a reusable mandate/token in this codebase, so off-session auto-renewal is only automatic for wallet-paid subscriptions. SmilePay/bank-transfer users get reminder/retry state and must complete a new payment unless tokenized recurring billing is added.
+  - Deploy script: `deployment/DEPLOY-SUBSCRIPTION-LIFECYCLE.bat`.
 - Remaining hardening for future slices:
   - Improve team invitation onboarding so new invitees land directly back on the invite after signup/login.
   - Build tailored onboarding steps after Agency/Enterprise signup.

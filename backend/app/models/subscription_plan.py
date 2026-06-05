@@ -73,14 +73,19 @@ class SubscriptionPlan(db.Model):
     subscriptions = db.relationship('Subscription', backref='plan', lazy='dynamic')
 
     def to_dict(self):
+        monthly_price = float(self.price_monthly)
+        yearly_price = float(self.price_yearly)
+        if monthly_price > 0 and yearly_price <= 0:
+            yearly_price = monthly_price * 10
+
         base_dict = {
             'id': self.id,
             'name': self.name,
             'slug': self.slug,
             'description': self.description,
             'user_type': self.user_type,
-            'price_monthly': float(self.price_monthly),
-            'price_yearly': float(self.price_yearly),
+            'price_monthly': monthly_price,
+            'price_yearly': yearly_price,
             'platform_fee_percentage': float(self.platform_fee_percentage) if self.platform_fee_percentage else 10.00,
             'features': {
                 'max_packages': self.max_packages,

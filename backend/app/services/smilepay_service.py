@@ -575,30 +575,21 @@ class SmilePayService:
     def _complete_subscription_payment(transaction: SmilePayTransaction):
         """Complete subscription payment"""
         from app.models import Subscription
-        from app.services.agency_subscription_service import apply_brand_subscription_entitlements
+        from app.services.subscription_lifecycle_service import apply_paid_subscription, subscription_amount_due
 
         subscription = Subscription.query.get(transaction.payment_id)
         if subscription:
-            plan = subscription.plan
             billing_cycle = subscription.billing_cycle or 'monthly'
-            paid_amount = transaction.amount
+            paid_amount = transaction.amount or subscription_amount_due(subscription, billing_cycle)
 
-            if not paid_amount and plan:
-                paid_amount = plan.price_yearly if billing_cycle == 'yearly' else plan.price_monthly
-
-            subscription.status = 'active'
-            subscription.payment_status = 'paid'
-            subscription.payment_verified = True
-            subscription.payment_method = transaction.payment_method or 'smilepay'
+            apply_paid_subscription(
+                subscription,
+                payment_method=transaction.payment_method or 'smilepay',
+                payment_reference=transaction.smilepay_reference or transaction.transaction_reference or transaction.order_reference,
+                amount=paid_amount,
+                billing_cycle=billing_cycle,
+            )
             subscription.smilepay_order_reference = transaction.order_reference
-            subscription.payment_reference = transaction.smilepay_reference or transaction.transaction_reference or transaction.order_reference
-            subscription.last_payment_date = datetime.utcnow()
-            subscription.last_payment_amount = paid_amount
-            subscription.updated_at = datetime.utcnow()
-
-            subscription.set_billing_period(billing_cycle)
-
-            apply_brand_subscription_entitlements(subscription.user_id, plan)
 
             db.session.commit()
             logger.info(f"Subscription {subscription.id} activated after SmilePay payment")

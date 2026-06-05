@@ -144,6 +144,113 @@ The BantuBuzz Team
     send_email(subject, user.email, text_body, html_body)
 
 
+def send_subscription_renewal_reminder_email(user, subscription, amount):
+    """Send the 7-day subscription renewal reminder."""
+    frontend_url = current_app.config.get('FRONTEND_URL', 'https://bantubuzz.com')
+    plan_name = subscription.plan.name if subscription and subscription.plan else 'your plan'
+    renewal_date = subscription.next_payment_date.strftime('%d %b %Y') if subscription and subscription.next_payment_date else 'soon'
+    subject = f"Your {plan_name} subscription renews soon"
+    text_body = f"""
+Hi {user.username or 'there'},
+
+Your {plan_name} subscription is scheduled to renew on {renewal_date}.
+
+Amount: ${float(amount):.2f}
+
+You can manage or cancel your subscription before renewal from:
+{frontend_url}/subscription/manage
+
+Best regards,
+The BantuBuzz Team
+"""
+    html_body = f"""
+<html><body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+    <div style="background-color: #B5E61D; padding: 20px; text-align: center;">
+        <h1 style="color: #1F2937; margin: 0;">BantuBuzz</h1>
+    </div>
+    <div style="padding: 30px; background-color: white;">
+        <h2 style="color: #1F2937;">Subscription renewal reminder</h2>
+        <p>Your <strong>{plan_name}</strong> subscription renews on <strong>{renewal_date}</strong>.</p>
+        <p style="font-size: 20px;"><strong>Amount: ${float(amount):.2f}</strong></p>
+        <p>You can manage or cancel before renewal from your subscription page.</p>
+        <p><a href="{frontend_url}/subscription/manage" style="background:#B5E61D;color:#1F2937;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;">Manage Subscription</a></p>
+    </div>
+</body></html>
+"""
+    send_email(subject, user.email, text_body, html_body)
+
+
+def send_subscription_payment_failed_email(user, subscription, amount, retry_count, next_retry_at):
+    """Notify a user that renewal payment failed and will retry."""
+    frontend_url = current_app.config.get('FRONTEND_URL', 'https://bantubuzz.com')
+    plan_name = subscription.plan.name if subscription and subscription.plan else 'your plan'
+    retry_text = next_retry_at.strftime('%d %b %Y') if next_retry_at else 'soon'
+    subject = f"Payment failed for your {plan_name} subscription"
+    text_body = f"""
+Hi {user.username or 'there'},
+
+We could not renew your {plan_name} subscription.
+
+Amount: ${float(amount):.2f}
+Retry attempt: {retry_count}/3
+Next retry: {retry_text}
+
+Please update your payment method or pay manually from:
+{frontend_url}/subscription/manage
+
+If all retries fail, your account will move to the Free plan.
+
+Best regards,
+The BantuBuzz Team
+"""
+    html_body = f"""
+<html><body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+    <div style="background-color: #B5E61D; padding: 20px; text-align: center;">
+        <h1 style="color: #1F2937; margin: 0;">BantuBuzz</h1>
+    </div>
+    <div style="padding: 30px; background-color: white;">
+        <h2 style="color: #991B1B;">Subscription payment failed</h2>
+        <p>We could not renew your <strong>{plan_name}</strong> subscription.</p>
+        <p><strong>Amount:</strong> ${float(amount):.2f}<br><strong>Retry:</strong> {retry_count}/3<br><strong>Next retry:</strong> {retry_text}</p>
+        <p>If all retries fail, your account will move to the Free plan.</p>
+        <p><a href="{frontend_url}/subscription/manage" style="background:#1F2937;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;">Manage Payment</a></p>
+    </div>
+</body></html>
+"""
+    send_email(subject, user.email, text_body, html_body)
+
+
+def send_subscription_downgraded_to_free_email(user, subscription):
+    """Notify a user after retries fail and account is moved to Free."""
+    frontend_url = current_app.config.get('FRONTEND_URL', 'https://bantubuzz.com')
+    subject = "Your BantuBuzz account has moved to the Free plan"
+    text_body = f"""
+Hi {user.username or 'there'},
+
+We were unable to renew your paid subscription after 3 attempts over 7 days.
+Your account has been moved to the Free plan.
+
+You can upgrade again any time:
+{frontend_url}/pricing
+
+Best regards,
+The BantuBuzz Team
+"""
+    html_body = f"""
+<html><body style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+    <div style="background-color: #B5E61D; padding: 20px; text-align: center;">
+        <h1 style="color: #1F2937; margin: 0;">BantuBuzz</h1>
+    </div>
+    <div style="padding: 30px; background-color: white;">
+        <h2>Your account is now on Free</h2>
+        <p>We were unable to renew your paid subscription after 3 attempts over 7 days, so your account has moved to the Free plan.</p>
+        <p><a href="{frontend_url}/pricing" style="background:#B5E61D;color:#1F2937;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold;">Choose a Plan</a></p>
+    </div>
+</body></html>
+"""
+    send_email(subject, user.email, text_body, html_body)
+
+
 def send_two_factor_code_email(email, otp_code):
     """Send email-based two-factor authentication code."""
     subject = f"Your BantuBuzz login code: {otp_code}"

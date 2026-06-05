@@ -10,6 +10,15 @@ from app import db
 from app.models import BrandProfile, User, Subscription, SubscriptionPlan
 from app.services.payment_service import initiate_subscription_payment, check_subscription_payment_status
 from app.services.agency_subscription_service import apply_brand_subscription_entitlements
+from app.services.subscription_lifecycle_service import (
+    apply_paid_subscription,
+    clear_pending_change,
+    is_downgrade,
+    plan_price,
+    prepare_paid_upgrade,
+    schedule_downgrade,
+    subscription_amount_due,
+)
 
 bp = Blueprint('subscriptions', __name__)
 
@@ -18,6 +27,10 @@ ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'gif', 'pdf'}
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
+
+
+def normalize_billing_cycle(value):
+    return value if value in ['monthly', 'yearly'] else 'monthly'
 
 
 def apply_subscription_account_type(user_id, plan):
@@ -66,10 +79,10 @@ def get_my_subscription():
         user = User.query.get(user_id)
 
         # Get active subscription
-        subscription = Subscription.query.filter_by(
-            user_id=user_id,
-            status='active'
-        ).first()
+        subscription = Subscription.query.filter(
+            Subscription.user_id == user_id,
+            Subscription.status.in_(['active', 'past_due'])
+        ).order_by(Subscription.updated_at.desc()).first()
 
         if not subscription:
             # User is on free plan - get default plan based on user type
@@ -124,20 +137,22 @@ def subscribe():
     try:
         user_id = get_jwt_identity()
         user = User.query.get(user_id)
-        data = request.get_json()
+        data = request.get_json() or {}
 
         plan_id = data.get('plan_id')
-        billing_cycle = data.get('billing_cycle', 'monthly')
+        billing_cycle = normalize_billing_cycle(data.get('billing_cycle', 'monthly'))
 
         if not plan_id:
             return jsonify({'success': False, 'error': 'plan_id is required'}), 400
 
         plan = SubscriptionPlan.query.get_or_404(plan_id)
+        if plan.user_type != (user.user_type if user.user_type in ['brand', 'creator'] else 'brand'):
+            return jsonify({'success': False, 'error': 'Plan is not available for this account type'}), 400
 
         # Check if user already has active subscription
-        existing = Subscription.query.filter_by(
-            user_id=user_id,
-            status='active'
+        existing = Subscription.query.filter(
+            Subscription.user_id == user_id,
+            Subscription.status.in_(['active', 'past_due', 'pending', 'pending_payment'])
         ).first()
 
         if existing:
@@ -147,7 +162,7 @@ def subscribe():
             }), 400
 
         # For free plan, activate immediately without payment
-        if plan.slug == 'free' or (plan.price_monthly == 0 and plan.price_yearly == 0):
+        if plan.price_monthly == 0 and plan.price_yearly == 0:
             subscription = Subscription(
                 user_id=user_id,
                 plan_id=plan_id,
@@ -180,7 +195,7 @@ def subscribe():
         db.session.flush()  # Get subscription ID without committing
 
         # Calculate amount based on billing cycle
-        amount = plan.price_yearly if billing_cycle == 'yearly' else plan.price_monthly
+        amount = plan_price(plan, billing_cycle)
 
         # Initiate Paynow payment
         payment_result = initiate_subscription_payment(
@@ -231,15 +246,17 @@ def upgrade_subscription():
     try:
         user_id = get_jwt_identity()
         user = User.query.get(user_id)
-        data = request.get_json()
+        data = request.get_json() or {}
 
         new_plan_id = data.get('plan_id')
-        billing_cycle = data.get('billing_cycle', 'monthly')
+        billing_cycle = normalize_billing_cycle(data.get('billing_cycle', 'monthly'))
 
         if not new_plan_id:
             return jsonify({'success': False, 'error': 'plan_id is required'}), 400
 
         new_plan = SubscriptionPlan.query.get_or_404(new_plan_id)
+        if new_plan.user_type != (user.user_type if user.user_type in ['brand', 'creator'] else 'brand'):
+            return jsonify({'success': False, 'error': 'Plan is not available for this account type'}), 400
 
         # Get current subscription
         current_sub = Subscription.query.filter_by(
@@ -260,25 +277,41 @@ def upgrade_subscription():
                 'error': 'You are already on this plan.'
             }), 400
 
-        # Check if upgrading to free plan (not allowed)
-        if new_plan.price_monthly == 0 and new_plan.price_yearly == 0:
+        if is_downgrade(current_sub, new_plan, billing_cycle):
+            schedule_downgrade(current_sub, new_plan, billing_cycle)
+            db.session.commit()
             return jsonify({
-                'success': False,
-                'error': 'Cannot upgrade to free plan. Please cancel your current subscription instead.'
-            }), 400
+                'success': True,
+                'message': f'{new_plan.name} is scheduled for the end of your current billing period.',
+                'data': {
+                    'subscription': current_sub.to_dict(),
+                    'is_scheduled_change': True,
+                    'effective_at': current_sub.pending_change_effective_at.isoformat() if current_sub.pending_change_effective_at else None
+                }
+            }), 200
 
-        # Calculate upgrade amount
-        amount = new_plan.price_yearly if billing_cycle == 'yearly' else new_plan.price_monthly
-
-        # Update subscription to pending_payment status and new plan
-        # Store old plan ID in case payment fails
-        old_plan_id = current_sub.plan_id
-        current_sub.plan_id = new_plan_id
-        current_sub.billing_cycle = billing_cycle
-        current_sub.status = 'pending_payment'  # Will revert to active if payment fails
-        current_sub.updated_at = datetime.utcnow()
+        amount = prepare_paid_upgrade(current_sub, new_plan, billing_cycle)
 
         db.session.flush()
+
+        if amount <= 0:
+            apply_paid_subscription(
+                current_sub,
+                payment_method='credit',
+                payment_reference='PRORATED-CREDIT',
+                amount=0,
+                billing_cycle=billing_cycle
+            )
+            db.session.commit()
+            return jsonify({
+                'success': True,
+                'message': f'Successfully changed to {new_plan.name}. Your unused credit covered this change.',
+                'data': {
+                    'subscription': current_sub.to_dict(),
+                    'amount_due': 0,
+                    'is_upgrade': True
+                }
+            }), 200
 
         # Initiate Paynow payment
         payment_result = initiate_subscription_payment(
@@ -299,13 +332,13 @@ def upgrade_subscription():
                     'redirect_url': payment_result['redirect_url'],
                     'poll_url': payment_result['poll_url'],
                     'payment_reference': payment_result['payment_reference'],
+                    'amount_due': float(amount),
                     'is_upgrade': True
                 }
             }), 200
         else:
-            # Revert changes on payment initiation failure
-            current_sub.plan_id = old_plan_id
-            current_sub.status = 'active'
+            clear_pending_change(current_sub)
+            current_sub.payment_status = None
             db.session.rollback()
             return jsonify({
                 'success': False,
@@ -626,10 +659,10 @@ def pay_subscription_with_wallet():
     try:
         user_id = get_jwt_identity()
         user = User.query.get(user_id)
-        data = request.get_json()
+        data = request.get_json() or {}
 
         subscription_id = data.get('subscription_id')
-        billing_cycle = data.get('billing_cycle', 'monthly')
+        billing_cycle = normalize_billing_cycle(data.get('billing_cycle', 'monthly'))
 
         if not subscription_id:
             return jsonify({'success': False, 'error': 'subscription_id is required'}), 400
@@ -644,7 +677,9 @@ def pay_subscription_with_wallet():
             return jsonify({'success': False, 'error': 'Unauthorized'}), 403
 
         # Check subscription status
-        if subscription.status not in ['pending', 'pending_payment']:
+        if subscription.status not in ['pending', 'pending_payment', 'active', 'past_due'] or (
+            subscription.status == 'active' and subscription.pending_change_type != 'upgrade'
+        ):
             return jsonify({'success': False, 'error': 'Subscription already processed or active'}), 400
 
         # Get the plan
@@ -652,14 +687,9 @@ def pay_subscription_with_wallet():
         if not plan:
             return jsonify({'success': False, 'error': 'Subscription plan not found'}), 404
 
-        # Calculate amount based on billing cycle
-        amount = plan.price_yearly if billing_cycle == 'yearly' else plan.price_monthly
+        amount = subscription_amount_due(subscription, billing_cycle)
 
-        # Brands use the shared Wallet model with user_type='brand'.
-        from app.models import Wallet, WalletTransaction, BrandProfile
-        brand = BrandProfile.query.filter_by(user_id=user_id).first()
-        if not brand:
-            return jsonify({'success': False, 'error': 'Brand profile not found'}), 404
+        from app.models import Wallet, WalletTransaction
 
         wallet = Wallet.query.filter_by(user_id=user_id).first()
         if not wallet:
@@ -697,19 +727,13 @@ def pay_subscription_with_wallet():
         db.session.add(transaction)
         db.session.flush()
 
-        # Activate subscription
-        subscription.status = 'active'
-        subscription.payment_method = 'wallet'
-        subscription.last_payment_date = datetime.utcnow()
-        subscription.last_payment_amount = amount
-        subscription.billing_cycle = billing_cycle
-        subscription.payment_reference = f'WALLET-{transaction.id}'
-        subscription.updated_at = datetime.utcnow()
-
-        # Paid subscription periods start when the payment is completed.
-        subscription.set_billing_period(billing_cycle)
-
-        apply_subscription_account_type(user_id, plan)
+        apply_paid_subscription(
+            subscription,
+            payment_method='wallet',
+            payment_reference=f'WALLET-{transaction.id}',
+            amount=amount,
+            billing_cycle=billing_cycle
+        )
         db.session.commit()
 
         return jsonify({

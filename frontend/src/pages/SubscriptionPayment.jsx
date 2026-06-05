@@ -26,12 +26,16 @@ const SubscriptionPayment = () => {
   // Get plan info from location state
   const planInfo = location.state?.plan;
   const billingCycle = location.state?.billingCycle || 'monthly';
+  const amountDue = location.state?.amountDue;
   const stateSubscription = location.state?.subscription;
   const isAgencyPlan = (plan) => {
     const slug = plan?.slug || '';
     const workspaceLimit = plan?.restrictions?.max_client_workspaces ?? plan?.max_client_workspaces ?? 0;
     return ['agency', 'brand-agency'].includes(slug) || Number(workspaceLimit || 0) > 0;
   };
+  const isTierSubscriptionPlan = (plan) => (
+    plan && (Object.prototype.hasOwnProperty.call(plan, 'price_monthly') || Object.prototype.hasOwnProperty.call(plan, 'price_yearly'))
+  );
 
   const navigateAfterBrandPayment = async (plan) => {
     if (user?.user_type === 'brand') {
@@ -90,7 +94,7 @@ const SubscriptionPayment = () => {
       setLoadingWallet(true);
       // Use correct endpoint based on user type
       const endpoint = user?.user_type === 'creator'
-        ? '/api/creator/wallet/balance'
+        ? '/wallet/balance'
         : '/brand/wallet/balance';
       const response = await api.get(endpoint);
       if (response.data.success) {
@@ -106,7 +110,7 @@ const SubscriptionPayment = () => {
   const handleWalletPayment = async () => {
     const plan = subscription?.plan || planInfo;
     // Creator subscriptions use 'price', brand subscriptions use 'price_monthly'/'price_yearly'
-    const amount = plan?.price || (billingCycle === 'yearly' ? plan?.price_yearly : plan?.price_monthly);
+    const amount = amountDue ?? plan?.price ?? (billingCycle === 'yearly' ? plan?.price_yearly : plan?.price_monthly);
 
     if (!walletBalance || walletBalance.available_balance < amount) {
       toast.error('Insufficient wallet balance');
@@ -125,7 +129,8 @@ const SubscriptionPayment = () => {
     try {
       setPaymentLoading(true);
       // Use correct endpoint based on user type
-      const endpoint = user?.user_type === 'creator'
+      const isCreatorAddon = user?.user_type === 'creator' && !isTierSubscriptionPlan(plan);
+      const endpoint = isCreatorAddon
         ? '/creator/subscriptions/pay-with-wallet'
         : '/subscriptions/pay-with-wallet';
       const response = await api.post(endpoint, {
@@ -193,7 +198,9 @@ const SubscriptionPayment = () => {
       formData.append('subscription_id', subId);
 
       // Use different endpoint based on user type
-      const endpoint = user?.user_type === 'creator'
+      const plan = subscription?.plan || planInfo;
+      const isCreatorAddon = user?.user_type === 'creator' && !isTierSubscriptionPlan(plan);
+      const endpoint = isCreatorAddon
         ? '/creator/subscriptions/upload-proof'
         : '/subscriptions/upload-proof';
 
@@ -229,20 +236,29 @@ const SubscriptionPayment = () => {
 
     try {
       setCheckingStatus(true);
-      const response = await api.get(`/subscriptions/subscription/${subId}/payment-status`);
+      const plan = subscription?.plan || planInfo;
+      const isCreatorAddon = user?.user_type === 'creator' && !isTierSubscriptionPlan(plan);
+      const response = isCreatorAddon
+        ? await api.post(`/creator/subscriptions/${subId}/verify-payment`)
+        : await api.get(`/subscriptions/subscription/${subId}/payment-status`);
 
-      if (response.data.success && response.data.data.payment.paid) {
+      const paid = isCreatorAddon
+        ? response.data.subscription?.payment_verified || response.data.subscription?.status === 'active'
+        : response.data.success && response.data.data.payment.paid;
+
+      if (paid) {
         toast.success('Payment confirmed! Your subscription is now active.');
 
         // Check if this is a verification subscription
-        const plan = subscription?.plan || planInfo;
         if (plan?.subscription_type === 'verification' || plan?.slug?.includes('verification')) {
           navigate('/creator/verification/apply');
         } else {
           await navigateAfterBrandPayment(plan);
         }
       } else {
-        const status = response.data.data.payment.status || 'pending';
+        const status = isCreatorAddon
+          ? response.data.subscription?.status || 'pending'
+          : response.data.data.payment.status || 'pending';
         toast.info(`Payment status: ${status}`);
 
         // If still pending and it's a verification subscription, offer to go to pending page
@@ -288,7 +304,7 @@ const SubscriptionPayment = () => {
 
   const plan = subscription?.plan || planInfo;
   // Creator subscriptions use 'price', brand subscriptions use 'price_monthly'/'price_yearly'
-  const amount = plan?.price || (billingCycle === 'yearly' ? plan?.price_yearly : plan?.price_monthly);
+  const amount = amountDue ?? plan?.price ?? (billingCycle === 'yearly' ? plan?.price_yearly : plan?.price_monthly);
   // Use appropriate reference format based on subscription type
   const refId = subscription?.id || subscriptionId || paymentData?.subscription_id || 'PENDING';
   const reference = user?.user_type === 'creator' ? `CREATOR_SUB_${refId}` : `SUB-${refId}`;

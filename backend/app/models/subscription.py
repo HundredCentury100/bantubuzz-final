@@ -37,6 +37,20 @@ class Subscription(db.Model):
     last_payment_date = db.Column(db.DateTime, nullable=True)
     next_payment_date = db.Column(db.DateTime, nullable=True)
     last_payment_amount = db.Column(db.Numeric(10, 2), nullable=True)
+    auto_renew = db.Column(db.Boolean, default=True)
+    renewal_reminder_sent_at = db.Column(db.DateTime, nullable=True)
+    retry_count = db.Column(db.Integer, default=0)
+    next_retry_at = db.Column(db.DateTime, nullable=True)
+    last_retry_at = db.Column(db.DateTime, nullable=True)
+    failed_at = db.Column(db.DateTime, nullable=True)
+
+    # Pending plan changes. Upgrades apply after payment; downgrades apply at period end.
+    pending_plan_id = db.Column(db.Integer, db.ForeignKey('subscription_plans.id'), nullable=True)
+    pending_billing_cycle = db.Column(db.String(20), nullable=True)
+    pending_change_type = db.Column(db.String(20), nullable=True)  # upgrade, downgrade
+    pending_proration_amount = db.Column(db.Numeric(10, 2), nullable=True)
+    pending_change_effective_at = db.Column(db.DateTime, nullable=True)
+    pending_change_created_at = db.Column(db.DateTime, nullable=True)
 
     # Admin Actions
     admin_note = db.Column(db.Text, nullable=True)  # Internal admin notes
@@ -178,6 +192,18 @@ class Subscription(db.Model):
             'next_payment_date': self.next_payment_date.isoformat() if self.next_payment_date else None,
             'last_payment_date': self.last_payment_date.isoformat() if self.last_payment_date else None,
             'last_payment_amount': float(self.last_payment_amount) if self.last_payment_amount else None,
+            'auto_renew': self.auto_renew,
+            'renewal_reminder_sent_at': self.renewal_reminder_sent_at.isoformat() if self.renewal_reminder_sent_at else None,
+            'retry_count': self.retry_count or 0,
+            'next_retry_at': self.next_retry_at.isoformat() if self.next_retry_at else None,
+            'last_retry_at': self.last_retry_at.isoformat() if self.last_retry_at else None,
+            'failed_at': self.failed_at.isoformat() if self.failed_at else None,
+            'pending_plan_id': self.pending_plan_id,
+            'pending_billing_cycle': self.pending_billing_cycle,
+            'pending_change_type': self.pending_change_type,
+            'pending_proration_amount': float(self.pending_proration_amount) if self.pending_proration_amount else None,
+            'pending_change_effective_at': self.pending_change_effective_at.isoformat() if self.pending_change_effective_at else None,
+            'pending_change_created_at': self.pending_change_created_at.isoformat() if self.pending_change_created_at else None,
             'days_until_renewal': self.days_until_renewal(),
             'is_active': self.is_active(),
             'created_at': self.created_at.isoformat() if self.created_at else None

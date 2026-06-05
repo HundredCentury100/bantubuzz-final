@@ -27,7 +27,8 @@ def make_celery(app=None):
             'app.tasks.platform_sync',
             'app.tasks.email_tasks',
             'app.tasks.analytics_tasks',
-            'app.tasks.collaboration_tasks'
+            'app.tasks.collaboration_tasks',
+            'app.tasks.subscription_tasks'
         ]
     )
 
@@ -84,6 +85,16 @@ def make_celery(app=None):
             'send-delivery-due-reminders': {
                 'task': 'app.tasks.collaboration_tasks.send_delivery_due_reminders',
                 'schedule': crontab(minute=0),  # Hourly
+            },
+            # Send paid subscription renewal reminders daily.
+            'send-subscription-renewal-reminders': {
+                'task': 'app.tasks.subscription_tasks.send_renewal_reminders',
+                'schedule': crontab(minute=0, hour=8),
+            },
+            # Process subscription renewals/retries/cancellations hourly.
+            'process-subscription-renewals': {
+                'task': 'app.tasks.subscription_tasks.process_subscription_renewals',
+                'schedule': crontab(minute=20),
             },
         }
     )

@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 from app import db
 from app.models import Payment, Booking, User, BrandProfile, CreatorProfile, PaymentVerification, CreatorSubscription, CreatorSubscriptionPlan, Subscription, Collaboration, Package, WorkspaceAddon, CampaignPayment
 from app.services.agency_subscription_service import apply_brand_subscription_entitlements
+from app.services.subscription_lifecycle_service import apply_paid_subscription, subscription_amount_due
 from app.decorators.admin import admin_required
 from flask_jwt_extended import get_jwt_identity
 from . import bp
@@ -77,9 +78,7 @@ def ensure_direct_booking_collaboration(booking):
 def get_brand_subscription_amount(subscription):
     if not subscription or not subscription.plan:
         return 0
-    if subscription.billing_cycle == 'yearly':
-        return subscription.plan.price_yearly or 0
-    return subscription.plan.price_monthly or 0
+    return subscription_amount_due(subscription, subscription.billing_cycle or 'monthly')
 
 
 def apply_brand_subscription_account_type(subscription):
@@ -778,20 +777,16 @@ def verify_brand_subscription_payment(subscription_id):
         notes = data.get('notes', '')
         amount = get_brand_subscription_amount(subscription)
 
-        subscription.payment_verified = True
-        subscription.payment_status = 'verified'
-        subscription.status = 'active'
-        subscription.payment_method = subscription.payment_method or 'manual'
-        subscription.last_payment_date = datetime.utcnow()
-        subscription.last_payment_amount = amount
+        apply_paid_subscription(
+            subscription,
+            payment_method=subscription.payment_method or 'manual',
+            payment_reference=subscription.payment_reference,
+            amount=amount,
+            billing_cycle=subscription.billing_cycle or 'monthly'
+        )
         subscription.admin_note = notes
         subscription.modified_by_admin = admin_id
         subscription.updated_at = datetime.utcnow()
-
-        # Paid subscription periods start when admin verifies the bank transfer.
-        subscription.set_billing_period(subscription.billing_cycle or 'monthly')
-
-        apply_brand_subscription_account_type(subscription)
 
         db.session.commit()
 
