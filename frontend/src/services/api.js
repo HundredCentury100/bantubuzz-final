@@ -18,6 +18,9 @@ api.interceptors.request.use(
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    if (config.data instanceof FormData) {
+      delete config.headers['Content-Type'];
+    }
     const workspaceId = localStorage.getItem('selected_workspace_id');
     if (workspaceId && workspaceId !== 'all') {
       config.headers['X-Workspace-Id'] = workspaceId;

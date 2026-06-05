@@ -733,7 +733,7 @@ function App() {
       <Route
         path="/bookings/:id"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute requiredType="brand">
             <BookingDetails />
           </ProtectedRoute>
         }
@@ -741,7 +741,7 @@ function App() {
       <Route
         path="/bookings"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute requiredType="brand">
             <Bookings />
           </ProtectedRoute>
         }

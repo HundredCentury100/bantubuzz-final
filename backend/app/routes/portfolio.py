@@ -412,7 +412,7 @@ def create_portfolio_from_collaboration(collaboration_id):
 
         # Get brand info
         brand = BrandProfile.query.get(collaboration.brand_id)
-        brand_name = brand.business_name if brand else 'Unknown Brand'
+        brand_name = getattr(brand, 'company_name', None) or 'Unknown Brand'
 
         # Get platform info from booking if available
         platform = None

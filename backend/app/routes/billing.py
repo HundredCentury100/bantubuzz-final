@@ -170,13 +170,14 @@ def _subscription_invoice(subscription):
 
 def _creator_subscription_invoice(subscription):
     plan = subscription.plan
+    is_boost = bool(plan and plan.subscription_type == 'featured')
     return {
         'id': f'creator-subscription-{subscription.id}',
         'invoice_number': _invoice_number('INV-CRS', subscription.id),
-        'source_type': 'subscription',
+        'source_type': 'boost' if is_boost else 'subscription',
         'source_id': subscription.id,
         'title': plan.name if plan else 'Creator subscription',
-        'description': plan.description if plan else 'Creator subscription',
+        'description': (f'Creator visibility boost - {plan.description}' if is_boost and plan.description else plan.description) if plan else 'Creator subscription',
         'amount': _money(plan.price if plan else 0),
         'currency': 'USD',
         'status': 'paid' if subscription.payment_verified else 'upcoming',

@@ -47,6 +47,9 @@ const CollaborationDetails = () => {
   const [deliverableTitle, setDeliverableTitle] = useState('');
   const [deliverableUrl, setDeliverableUrl] = useState('');
   const [deliverableDescription, setDeliverableDescription] = useState('');
+  const [bulkDraftTitles, setBulkDraftTitles] = useState([]);
+  const [sharedDraftUrl, setSharedDraftUrl] = useState('');
+  const [draftLinksByTitle, setDraftLinksByTitle] = useState({});
   const [submitting, setSubmitting] = useState(false);
 
   // Revision request state
@@ -127,6 +130,42 @@ const CollaborationDetails = () => {
   };
 
   const handleSubmitDraftDeliverable = async () => {
+    if (bulkDraftTitles.length > 0) {
+      const sharedUrl = sharedDraftUrl.trim();
+      const missingTitle = bulkDraftTitles.find((title) => !sharedUrl && !draftLinksByTitle[title]?.trim());
+
+      if (missingTitle) {
+        toast.error(`Please add a Google Drive link for ${missingTitle}, or use one shared link for all items.`);
+        return;
+      }
+
+      try {
+        setSubmitting(true);
+        for (const title of bulkDraftTitles) {
+          await collaborationsAPI.submitDraftDeliverable(id, {
+            title,
+            url: sharedUrl || draftLinksByTitle[title].trim(),
+            description: sharedUrl
+              ? 'Same content submitted across all platforms via shared Google Drive link.'
+              : `Platform-specific Google Drive draft for ${title}.`
+          });
+        }
+
+        toast.success('Draft content submitted for review!');
+        setShowDeliverableModal(false);
+        setBulkDraftTitles([]);
+        setSharedDraftUrl('');
+        setDraftLinksByTitle({});
+        fetchCollaboration();
+      } catch (error) {
+        console.error('Error submitting deliverables:', error);
+        toast.error(error.response?.data?.error || 'Failed to submit draft content');
+      } finally {
+        setSubmitting(false);
+      }
+      return;
+    }
+
     if (!deliverableTitle || !deliverableUrl) {
       toast.error('Please provide both title and URL');
       return;
@@ -157,6 +196,9 @@ const CollaborationDetails = () => {
       setDeliverableTitle('');
       setDeliverableUrl('');
       setDeliverableDescription('');
+      setBulkDraftTitles([]);
+      setSharedDraftUrl('');
+      setDraftLinksByTitle({});
       setEditingDeliverable(null);
       fetchCollaboration();
     } catch (error) {
@@ -776,13 +818,19 @@ const CollaborationDetails = () => {
                       {canSubmitNewDeliverable && collaboration.deliverables && collaboration.deliverables.length > 1 && (
                         <button
                           onClick={() => {
-                            // Open modal for bulk submission
-                            setDeliverableTitle(collaboration.deliverables.filter(delivName => {
+                            const pendingTitles = collaboration.deliverables.filter(delivName => {
                               // Check if this deliverable hasn't been submitted yet
                               const alreadySubmitted = collaboration.draft_deliverables?.some(d => d.title === delivName && d.status !== 'revision_requested') ||
                                                       collaboration.submitted_deliverables?.some(d => d.title === delivName);
                               return !alreadySubmitted;
-                            })[0] || '');
+                            });
+                            setBulkDraftTitles(pendingTitles);
+                            setSharedDraftUrl('');
+                            setDraftLinksByTitle({});
+                            setDeliverableTitle('');
+                            setDeliverableUrl('');
+                            setDeliverableDescription('');
+                            setEditingDeliverable(null);
                             setShowDeliverableModal(true);
                           }}
                           className="px-6 py-3 bg-primary hover:bg-primary-dark text-white font-medium rounded-lg transition-colors flex items-center gap-2"
@@ -844,6 +892,9 @@ const CollaborationDetails = () => {
                               {!isSubmitted && !approvedVersion && (
                                 <button
                                   onClick={() => {
+                                    setBulkDraftTitles([]);
+                                    setSharedDraftUrl('');
+                                    setDraftLinksByTitle({});
                                     setDeliverableTitle(deliverableName);
                                     setDeliverableUrl('');
                                     setDeliverableDescription('');
@@ -1327,17 +1378,75 @@ const CollaborationDetails = () => {
       {/* Deliverable Submission Modal */}
       {showDeliverableModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg max-w-md w-full p-6">
+          <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6">
             <h2 className="text-2xl font-bold text-gray-900 mb-4">
-              {editingDeliverable ? 'Edit & Resubmit Deliverable' : 'Submit Deliverable for Review'}
+              {bulkDraftTitles.length > 0
+                ? 'Submit Draft Content for Review'
+                : editingDeliverable ? 'Edit & Resubmit Deliverable' : 'Submit Deliverable for Review'}
             </h2>
             <p className="text-sm text-gray-600 mb-4">
-              {editingDeliverable
+              {bulkDraftTitles.length > 0
+                ? 'Upload your draft content to Google Drive, set sharing to Anyone with the link, then submit the matching link below.'
+                : editingDeliverable
                 ? 'Update your deliverable based on the revision feedback and resubmit for review.'
                 : 'Your deliverable will be submitted for brand review before being marked as approved.'
               }
             </p>
 
+            {bulkDraftTitles.length > 0 ? (
+              <div className="space-y-5 mb-6">
+                <div className="rounded-2xl border border-gray-200 bg-gray-50 p-4">
+                  <p className="text-sm font-semibold text-gray-900 mb-3">Content items in this package</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {bulkDraftTitles.map((title) => (
+                      <div key={title} className="rounded-xl bg-white border border-gray-200 px-3 py-2 text-sm text-gray-800">
+                        {title}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="rounded-2xl border border-primary/30 bg-primary/10 p-4">
+                  <label className="block text-sm font-semibold text-gray-900 mb-2">
+                    Are you posting the same content across all platforms?
+                  </label>
+                  <p className="text-xs text-gray-700 mb-3">
+                    Upload to Google Drive, set sharing to Anyone with the link, and paste the link here.
+                  </p>
+                  <input
+                    type="url"
+                    value={sharedDraftUrl}
+                    onChange={(e) => setSharedDraftUrl(e.target.value)}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent"
+                    placeholder="https://drive.google.com/..."
+                    disabled={submitting}
+                  />
+                </div>
+
+                <div>
+                  <p className="text-sm font-semibold text-gray-900 mb-2">Different content per platform</p>
+                  <p className="text-xs text-gray-600 mb-3">
+                    Leave the shared link empty and paste a separate Google Drive link for each item. Make sure each file is shared with Anyone with the link.
+                  </p>
+                  <div className="space-y-3">
+                    {bulkDraftTitles.map((title) => (
+                      <div key={title}>
+                        <label className="block text-xs font-medium text-gray-700 mb-1">{title}</label>
+                        <input
+                          type="url"
+                          value={draftLinksByTitle[title] || ''}
+                          onChange={(e) => setDraftLinksByTitle((current) => ({ ...current, [title]: e.target.value }))}
+                          className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent"
+                          placeholder="https://drive.google.com/..."
+                          disabled={submitting || !!sharedDraftUrl.trim()}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <>
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-2">
                 Title <span className="text-red-500">*</span>
@@ -1353,15 +1462,18 @@ const CollaborationDetails = () => {
 
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                URL <span className="text-red-500">*</span>
+                Google Drive Link <span className="text-red-500">*</span>
               </label>
               <input
                 type="url"
                 value={deliverableUrl}
                 onChange={(e) => setDeliverableUrl(e.target.value)}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                placeholder="https://..."
+                placeholder="https://drive.google.com/..."
               />
+              <p className="mt-2 text-xs text-gray-500">
+                Upload your draft to Google Drive and set sharing to Anyone with the link before submitting.
+              </p>
             </div>
 
             <div className="mb-6">
@@ -1376,6 +1488,8 @@ const CollaborationDetails = () => {
                 placeholder="Add any notes about this deliverable..."
               />
             </div>
+              </>
+            )}
 
             <div className="flex gap-3">
               <button
@@ -1391,6 +1505,9 @@ const CollaborationDetails = () => {
                   setDeliverableTitle('');
                   setDeliverableUrl('');
                   setDeliverableDescription('');
+                  setBulkDraftTitles([]);
+                  setSharedDraftUrl('');
+                  setDraftLinksByTitle({});
                   setEditingDeliverable(null);
                 }}
                 disabled={submitting}

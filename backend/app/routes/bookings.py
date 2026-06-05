@@ -135,9 +135,18 @@ def get_bookings():
 def get_booking(booking_id):
     """Get a specific booking"""
     try:
+        user_id = int(get_jwt_identity())
+        user = User.query.get(user_id)
+        if not user or user.user_type != 'brand':
+            return jsonify({'error': 'Bookings are only available to brand accounts'}), 403
+
         booking = Booking.query.get(booking_id)
         if not booking:
             return jsonify({'error': 'Booking not found'}), 404
+
+        brand = BrandProfile.query.filter_by(user_id=user_id).first()
+        if not brand or booking.brand_id != brand.id:
+            return jsonify({'error': 'Unauthorized'}), 403
 
         return jsonify(booking.to_dict(include_relations=True)), 200
 

@@ -126,7 +126,7 @@ const SubscriptionPayment = () => {
       setPaymentLoading(true);
       // Use correct endpoint based on user type
       const endpoint = user?.user_type === 'creator'
-        ? '/api/creator/subscriptions/pay-with-wallet'
+        ? '/creator/subscriptions/pay-with-wallet'
         : '/subscriptions/pay-with-wallet';
       const response = await api.post(endpoint, {
         subscription_id: subId,
@@ -194,10 +194,9 @@ const SubscriptionPayment = () => {
 
       // Use different endpoint based on user type
       const endpoint = user?.user_type === 'creator'
-        ? '/api/creator/subscriptions/upload-proof'
+        ? '/creator/subscriptions/upload-proof'
         : '/subscriptions/upload-proof';
 
-      // Don't set Content-Type header - browser will set it automatically with boundary for multipart/form-data
       const response = await api.post(endpoint, formData);
 
       if (response.data.success) {
