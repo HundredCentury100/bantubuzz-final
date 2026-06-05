@@ -11,7 +11,8 @@ Provides comprehensive analytics for brand campaigns including:
 from app import db
 from app.models import (
     Collaboration, PostMetrics, User, CreatorProfile,
-    BrandProfile, CollaborationMilestone, PackageDeliverable
+    BrandProfile, CollaborationMilestone, PackageDeliverable,
+    CampaignCartItem, Campaign
 )
 from sqlalchemy import func, desc
 from datetime import datetime, timedelta
@@ -92,6 +93,10 @@ class AnalyticsService:
                 })
 
             simple_analytics = AnalyticsService._calculate_collaboration_totals(metrics_records)
+            platform_breakdown = AnalyticsService._calculate_platform_breakdown(metrics_records)
+            is_campaign_collaboration = CampaignCartItem.query.filter_by(
+                collaboration_id=collaboration.id
+            ).first()
 
             return {
                 **simple_analytics,
@@ -100,6 +105,8 @@ class AnalyticsService:
                     'status': collaboration.status,
                     'created_at': collaboration.created_at.isoformat(),
                     'package_price': float(collaboration.amount) if collaboration.amount else 0,
+                    'type': 'campaign_collaboration' if is_campaign_collaboration else 'package_collaboration',
+                    'type_label': 'Campaign Collaboration' if is_campaign_collaboration else 'Package Collaboration',
                 },
                 'creator': {
                     'id': creator.id if creator else None,
@@ -109,6 +116,8 @@ class AnalyticsService:
                 },
                 'deliverables': deliverable_details,
                 'raw_data': raw_data,
+                'platform_breakdown': platform_breakdown,
+                'by_platform': list(platform_breakdown.values()),
                 'insights': insights,
                 'sentiment': sentiment,
                 'mentions': mentions,
@@ -226,6 +235,72 @@ class AnalyticsService:
         }
 
         return analytics
+
+    @staticmethod
+    def _empty_metric_bucket(label=None) -> Dict:
+        """Create a metrics bucket used for platform and creator analytics."""
+        return {
+            'platform': label,
+            'post_count': 0,
+            'reach': 0,
+            'impressions': 0,
+            'likes': 0,
+            'comments': 0,
+            'shares': 0,
+            'saves': 0,
+            'video_views': 0,
+            'total_engagement': 0,
+            'avg_engagement_rate': 0,
+            'sentiment': {
+                'positive': 0,
+                'negative': 0,
+                'neutral': 0,
+                'critical': 0
+            }
+        }
+
+    @staticmethod
+    def _finalize_metric_bucket(bucket: Dict, engagement_rates: List = None) -> Dict:
+        rates = engagement_rates or []
+        bucket['avg_engagement_rate'] = round(sum(rates) / len(rates), 2) if rates else 0
+        return bucket
+
+    @staticmethod
+    def _add_metrics_to_bucket(bucket: Dict, metrics: PostMetrics) -> None:
+        bucket['post_count'] += 1
+        bucket['reach'] += metrics.reach or 0
+        bucket['impressions'] += metrics.impressions or 0
+        bucket['likes'] += metrics.likes or 0
+        bucket['comments'] += metrics.comments or 0
+        bucket['shares'] += metrics.shares or 0
+        bucket['saves'] += metrics.saves or 0
+        bucket['video_views'] += metrics.video_views or 0
+        bucket['total_engagement'] += metrics.total_engagement or 0
+        bucket['sentiment']['positive'] += metrics.positive_comments or 0
+        bucket['sentiment']['negative'] += metrics.negative_comments or 0
+        bucket['sentiment']['neutral'] += metrics.neutral_comments or 0
+        bucket['sentiment']['critical'] += metrics.critical_comments or 0
+
+    @staticmethod
+    def _calculate_platform_breakdown(metrics_records: List[PostMetrics]) -> Dict:
+        """Aggregate analytics by actual submitted post platform."""
+        breakdown = {}
+        rates_by_platform = {}
+
+        for metrics in metrics_records:
+            platform = (metrics.post_platform or 'unknown').lower()
+            if platform not in breakdown:
+                breakdown[platform] = AnalyticsService._empty_metric_bucket(platform)
+                rates_by_platform[platform] = []
+
+            AnalyticsService._add_metrics_to_bucket(breakdown[platform], metrics)
+            if metrics.engagement_rate is not None and metrics.engagement_rate > 0:
+                rates_by_platform[platform].append(float(metrics.engagement_rate))
+
+        for platform, bucket in breakdown.items():
+            AnalyticsService._finalize_metric_bucket(bucket, rates_by_platform.get(platform, []))
+
+        return breakdown
 
     @staticmethod
     def _calculate_raw_data(metrics_records: List[PostMetrics]) -> Dict:
@@ -427,6 +502,14 @@ class AnalyticsService:
             if workspace_id:
                 collaborations_query = collaborations_query.filter_by(workspace_id=workspace_id)
             collaborations = collaborations_query.all()
+            campaign_cart_items = CampaignCartItem.query.filter(
+                CampaignCartItem.collaboration_id.in_([c.id for c in collaborations])
+            ).all() if collaborations else []
+            campaign_by_collaboration = {
+                item.collaboration_id: item.campaign
+                for item in campaign_cart_items
+                if item.collaboration_id
+            }
 
             if not collaborations:
                 return {
@@ -448,6 +531,13 @@ class AnalyticsService:
                     'avg_cost_per_reach': 0,
                     'overall_roi': 0,
                     'campaigns': [],
+                    'normal_collaborations': [],
+                    'campaign_collaborations': [],
+                    'collaboration_types': {
+                        'package_collaborations': 0,
+                        'campaign_collaborations': 0
+                    },
+                    'platform_breakdown': {},
                     'top_performing_collaborations': [],
                     'sentiment_overview': {
                         'overall': 'neutral',
@@ -514,6 +604,8 @@ class AnalyticsService:
 
             # Build detailed campaigns list
             campaigns_list = []
+            normal_collaborations = []
+            campaign_collaborations = []
             for collab in collaborations:
                 collab_metrics = [
                     m for m in all_metrics
@@ -533,12 +625,21 @@ class AnalyticsService:
                     sum(collab_engagement_rates) / len(collab_engagement_rates)
                     if collab_engagement_rates else 0
                 )
+                campaign = campaign_by_collaboration.get(collab.id)
+                collab_type = 'campaign_collaboration' if campaign else 'package_collaboration'
 
-                campaigns_list.append({
+                collab_item = {
                     'id': collab.id,
                     'status': collab.status,
                     'created_at': collab.created_at.isoformat(),
                     'amount': float(collab.amount) if collab.amount else 0,
+                    'type': collab_type,
+                    'type_label': 'Campaign Collaboration' if campaign else 'Package Collaboration',
+                    'campaign': {
+                        'id': campaign.id,
+                        'title': campaign.title,
+                        'status': campaign.status,
+                    } if campaign else None,
                     'creator': {
                         'id': creator_user.id if creator_user else None,
                         'username': creator_profile.username if creator_profile else None,
@@ -551,10 +652,17 @@ class AnalyticsService:
                         'engagement': collab_engagement,
                         'avg_engagement_rate': round(collab_avg_engagement_rate, 2)
                     }
-                })
+                }
+                campaigns_list.append(collab_item)
+                if campaign:
+                    campaign_collaborations.append(collab_item)
+                else:
+                    normal_collaborations.append(collab_item)
 
             # Sort campaigns by engagement
             campaigns_list.sort(key=lambda x: x['metrics']['engagement'], reverse=True)
+            normal_collaborations.sort(key=lambda x: x['metrics']['engagement'], reverse=True)
+            campaign_collaborations.sort(key=lambda x: x['metrics']['engagement'], reverse=True)
 
             # Get top performing collaborations
             top_performing = [
@@ -597,6 +705,13 @@ class AnalyticsService:
                 'avg_cost_per_reach': avg_cost_per_reach,
                 'overall_roi': overall_roi,
                 'campaigns': campaigns_list,
+                'normal_collaborations': normal_collaborations,
+                'campaign_collaborations': campaign_collaborations,
+                'collaboration_types': {
+                    'package_collaborations': len(normal_collaborations),
+                    'campaign_collaborations': len(campaign_collaborations)
+                },
+                'platform_breakdown': AnalyticsService._calculate_platform_breakdown(all_metrics),
                 'top_performing_collaborations': top_performing,
                 'sentiment_overview': {
                     'overall': overall_sentiment,

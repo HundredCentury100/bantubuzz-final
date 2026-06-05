@@ -51,6 +51,7 @@ const BrandAnalyticsOverview = () => {
   const [loading, setLoading] = useState(true);
   const [audienceData, setAudienceData] = useState(null);
   const [audienceLoading, setAudienceLoading] = useState(true);
+  const [collaborationFilter, setCollaborationFilter] = useState('all');
 
   useEffect(() => {
     fetchOverallAnalytics();
@@ -101,6 +102,18 @@ const BrandAnalyticsOverview = () => {
 
   const formatCurrency = (amount) => {
     return `$${parseFloat(amount || 0).toFixed(2)}`;
+  };
+
+  const formatPlatformName = (platform) => {
+    if (!platform) return 'Unknown';
+    return platform.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  };
+
+  const getVisibleCollaborations = () => {
+    if (!analytics) return [];
+    if (collaborationFilter === 'package') return analytics.normal_collaborations || [];
+    if (collaborationFilter === 'campaign') return analytics.campaign_collaborations || [];
+    return analytics.campaigns || [];
   };
 
   // Chart configurations
@@ -338,12 +351,34 @@ const BrandAnalyticsOverview = () => {
               <ArrowLeftIcon className="w-6 h-6 text-gray-600" />
             </button>
             <div>
-              <h1 className="text-4xl font-bold text-dark">Analytics Overview</h1>
+              <h1 className="text-4xl font-bold text-dark">Brand Analytics Overview</h1>
               <p className="text-gray-600 mt-1">
-                Performance across all {analytics.total_collaborations} campaigns
+                Performance across {analytics.total_collaborations} collaborations
               </p>
             </div>
           </div>
+        </div>
+
+        {/* Collaboration Type Summary */}
+        <div className="mb-8 grid grid-cols-1 md:grid-cols-3 gap-4">
+          {[
+            { key: 'all', label: 'All Collaborations', count: analytics.total_collaborations },
+            { key: 'package', label: 'Package Collaborations', count: analytics.collaboration_types?.package_collaborations || 0 },
+            { key: 'campaign', label: 'Campaign Collaborations', count: analytics.collaboration_types?.campaign_collaborations || 0 },
+          ].map((item) => (
+            <button
+              key={item.key}
+              onClick={() => setCollaborationFilter(item.key)}
+              className={`text-left bg-white rounded-3xl shadow-sm p-5 border transition-colors ${
+                collaborationFilter === item.key
+                  ? 'border-primary bg-primary/5'
+                  : 'border-transparent hover:border-primary/40'
+              }`}
+            >
+              <p className="text-sm text-gray-600 mb-1">{item.label}</p>
+              <p className="text-3xl font-bold text-dark">{item.count}</p>
+            </button>
+          ))}
         </div>
 
         {/* Key Metrics Summary */}
@@ -402,7 +437,7 @@ const BrandAnalyticsOverview = () => {
                   <EyeIcon className="w-7 h-7 text-primary" />
                 </div>
               </div>
-              <p className="text-xs text-gray-500">Total impressions across campaigns</p>
+              <p className="text-xs text-gray-500">Total impressions across collaborations</p>
             </div>
           </div>
         </div>
@@ -448,7 +483,7 @@ const BrandAnalyticsOverview = () => {
               </div>
               <div>
                 <h3 className="text-lg font-bold text-dark">Performance Metrics</h3>
-                <p className="text-sm text-gray-500">Overall campaign performance</p>
+                <p className="text-sm text-gray-500">Overall collaboration performance</p>
               </div>
             </div>
             <div className="h-80">
@@ -459,14 +494,14 @@ const BrandAnalyticsOverview = () => {
 
         {/* Charts Row 2 */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
-          {/* Top Campaigns Chart */}
+          {/* Top Collaborations Chart */}
           <div className="lg:col-span-2 bg-white rounded-3xl shadow-sm hover:shadow-md p-6 transition-shadow">
             <div className="flex items-center gap-3 mb-6">
               <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center">
                 <SparklesIcon className="w-5 h-5 text-primary" />
               </div>
               <div>
-                <h3 className="text-lg font-bold text-dark">Top Performing Campaigns</h3>
+                <h3 className="text-lg font-bold text-dark">Top Performing Collaborations</h3>
                 <p className="text-sm text-gray-500">By total engagement</p>
               </div>
             </div>
@@ -494,13 +529,13 @@ const BrandAnalyticsOverview = () => {
           )}
         </div>
 
-        {/* Campaign Statistics Cards */}
+        {/* Collaboration Statistics Cards */}
         <div className="mb-8">
-          <h2 className="text-2xl font-bold text-dark mb-4">Campaign Statistics</h2>
+          <h2 className="text-2xl font-bold text-dark mb-4">Collaboration Statistics</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Total Campaigns */}
+            {/* Total Collaborations */}
             <div className="bg-white rounded-3xl shadow-sm p-6">
-              <p className="text-sm text-gray-600 mb-2">Total Campaigns</p>
+              <p className="text-sm text-gray-600 mb-2">Total Collaborations</p>
               <p className="text-4xl font-bold text-dark mb-2">{analytics.total_collaborations}</p>
               <div className="flex items-center gap-2 text-xs">
                 <span className="text-primary font-medium">{analytics.active_collaborations} active</span>
@@ -525,11 +560,52 @@ const BrandAnalyticsOverview = () => {
           </div>
         </div>
 
-        {/* Individual Campaigns */}
+        {/* Platform Breakdown */}
+        {analytics.platform_breakdown && Object.keys(analytics.platform_breakdown).length > 0 && (
+          <div className="mb-8">
+            <h2 className="text-2xl font-bold text-dark mb-4">Performance by Platform</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+              {Object.entries(analytics.platform_breakdown).map(([platform, data]) => (
+                <div key={platform} className="bg-white rounded-3xl shadow-sm p-5">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="font-semibold text-dark">{formatPlatformName(platform)}</p>
+                    <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full">
+                      {data.post_count || 0} posts
+                    </span>
+                  </div>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Reach</span>
+                      <span className="font-medium text-dark">{formatNumber(data.reach)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Views</span>
+                      <span className="font-medium text-dark">{formatNumber(data.video_views || data.impressions)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Engagement</span>
+                      <span className="font-medium text-dark">{formatNumber(data.total_engagement)}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-gray-500">Eng. Rate</span>
+                      <span className="font-medium text-primary">{data.avg_engagement_rate || 0}%</span>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Individual Collaborations */}
         <div className="mb-8">
-          <h2 className="text-2xl font-bold text-dark mb-4">Campaign Details</h2>
+          <h2 className="text-2xl font-bold text-dark mb-4">
+            {collaborationFilter === 'package' && 'Package Collaboration Details'}
+            {collaborationFilter === 'campaign' && 'Campaign Collaboration Details'}
+            {collaborationFilter === 'all' && 'Collaboration Details'}
+          </h2>
           <div className="space-y-4">
-            {analytics.campaigns.map((campaign) => (
+            {getVisibleCollaborations().map((campaign) => (
               <div key={campaign.id} className="bg-white rounded-3xl shadow-sm hover:shadow-md p-6 transition-shadow">
                 <div className="flex items-center justify-between flex-wrap gap-4">
                   {/* Creator Info */}
@@ -542,6 +618,10 @@ const BrandAnalyticsOverview = () => {
                     />
                     <div>
                       <p className="font-semibold text-dark">{campaign.creator.display_name}</p>
+                      <p className="text-xs text-primary font-medium">
+                        {campaign.type_label || 'Package Collaboration'}
+                        {campaign.campaign?.title ? ` • ${campaign.campaign.title}` : ''}
+                      </p>
                       <p className="text-sm text-gray-500">
                         {new Date(campaign.created_at).toLocaleDateString()} •{' '}
                         <span className={`capitalize font-medium ${

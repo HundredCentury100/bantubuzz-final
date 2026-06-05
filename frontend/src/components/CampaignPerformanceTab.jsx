@@ -35,6 +35,11 @@ const CampaignPerformanceTab = ({ campaignId }) => {
     return `R${Number(amount).toFixed(2)}`;
   };
 
+  const formatPlatformName = (platform) => {
+    if (!platform) return 'Unknown';
+    return platform.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -58,7 +63,7 @@ const CampaignPerformanceTab = ({ campaignId }) => {
     );
   }
 
-  const { overview, creators, platforms } = performance;
+  const { overview, creators, platforms, by_creator_platform } = performance;
 
   return (
     <div className="space-y-6">
@@ -81,7 +86,7 @@ const CampaignPerformanceTab = ({ campaignId }) => {
             <span className="text-xs text-gray-500">Total Reach</span>
           </div>
           <p className="text-3xl font-bold text-gray-900">{formatNumber(overview.total_reach)}</p>
-          <p className="text-sm text-gray-600 mt-1">followers reached</p>
+          <p className="text-sm text-gray-600 mt-1">tracked post reach</p>
         </div>
 
         {/* Total Engagements */}
@@ -225,7 +230,7 @@ const CampaignPerformanceTab = ({ campaignId }) => {
                         )}
                         <div>
                           <p className="text-sm font-medium text-gray-900">{creator.creator_name}</p>
-                          <p className="text-xs text-gray-500">{creator.platform}</p>
+                          <p className="text-xs text-gray-500">{creator.platform || 'Tracked platforms'}</p>
                         </div>
                       </div>
                     </td>
@@ -259,9 +264,9 @@ const CampaignPerformanceTab = ({ campaignId }) => {
             {Object.values(platforms).map((platform, idx) => (
               <div key={idx} className="border border-gray-200 rounded-xl p-4">
                 <div className="flex items-center justify-between mb-3">
-                  <h4 className="font-semibold text-gray-900">{platform.platform}</h4>
+                  <h4 className="font-semibold text-gray-900">{formatPlatformName(platform.platform)}</h4>
                   <span className="text-xs bg-gray-100 px-2 py-1 rounded">
-                    {platform.creators_count} creator{platform.creators_count > 1 ? 's' : ''}
+                    {platform.creators_count} creator{platform.creators_count > 1 ? 's' : ''} • {platform.posts_count || 0} post{(platform.posts_count || 0) === 1 ? '' : 's'}
                   </span>
                 </div>
                 <div className="space-y-2">
@@ -294,6 +299,56 @@ const CampaignPerformanceTab = ({ campaignId }) => {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* Creator by Platform Breakdown */}
+      {by_creator_platform && by_creator_platform.length > 0 && (
+        <div className="bg-white rounded-2xl p-6 shadow-md border border-gray-200">
+          <h3 className="text-lg font-bold text-gray-900 mb-4">Creator Performance by Platform</h3>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-gray-200">
+                  <th className="text-left py-3 px-2 text-sm font-semibold text-gray-700">Creator</th>
+                  <th className="text-left py-3 px-2 text-sm font-semibold text-gray-700">Platform</th>
+                  <th className="text-right py-3 px-2 text-sm font-semibold text-gray-700">Posts</th>
+                  <th className="text-right py-3 px-2 text-sm font-semibold text-gray-700">Reach</th>
+                  <th className="text-right py-3 px-2 text-sm font-semibold text-gray-700">Views</th>
+                  <th className="text-right py-3 px-2 text-sm font-semibold text-gray-700">Engagements</th>
+                  <th className="text-right py-3 px-2 text-sm font-semibold text-gray-700">Eng. Rate</th>
+                </tr>
+              </thead>
+              <tbody>
+                {by_creator_platform.map((row, idx) => (
+                  <tr key={`${row.creator_id}-${row.platform}-${idx}`} className="border-b border-gray-100 hover:bg-gray-50">
+                    <td className="py-3 px-2">
+                      <div className="flex items-center gap-2">
+                        {row.creator_picture ? (
+                          <img
+                            src={row.creator_picture}
+                            alt={row.creator_name}
+                            className="w-8 h-8 rounded-full object-cover"
+                          />
+                        ) : (
+                          <div className="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center">
+                            <span className="text-xs text-gray-600">{row.creator_name?.charAt(0)}</span>
+                          </div>
+                        )}
+                        <span className="text-sm font-medium text-gray-900">{row.creator_name}</span>
+                      </div>
+                    </td>
+                    <td className="py-3 px-2 text-sm text-gray-900">{formatPlatformName(row.platform)}</td>
+                    <td className="py-3 px-2 text-right text-sm text-gray-900">{formatNumber(row.posts_count)}</td>
+                    <td className="py-3 px-2 text-right text-sm text-gray-900">{formatNumber(row.reach)}</td>
+                    <td className="py-3 px-2 text-right text-sm text-gray-900">{formatNumber(row.views)}</td>
+                    <td className="py-3 px-2 text-right text-sm text-gray-900">{formatNumber(row.engagements)}</td>
+                    <td className="py-3 px-2 text-right text-sm font-medium text-primary">{row.engagement_rate}%</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       )}

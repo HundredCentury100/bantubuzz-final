@@ -807,6 +807,12 @@ Deployment note:
   - Creator dashboard has a CTA between stats/profile status and My Packages linking to `/creator/campaigns` with the message `Looking for your next collaboration? Browse open opportunities`.
   - Creator `/billing` is protected for creators and uses the shared billing endpoint.
   - Creator billing invoices include creator subscriptions; featured/visibility purchases are categorized as `boost` invoices by `backend/app/routes/billing.py`.
+- Brand analytics naming and grouping:
+  - Brand analytics pages must distinguish `Package Collaborations` from `Campaign Collaborations`; do not label all collaborations as campaigns.
+  - `backend/app/services/analytics_service.py` now returns `normal_collaborations`, `campaign_collaborations`, `collaboration_types`, and `platform_breakdown` for `/api/collaborations/analytics/summary`.
+  - Single collaboration analytics returns `collaboration.type`, `collaboration.type_label`, `platform_breakdown`, and `by_platform`.
+  - Campaign performance analytics in `backend/app/services/campaign_analytics_service.py` must group by actual submitted `PostMetrics.post_platform`, not package/cart labels, so multi-platform packages split into separate channel buckets.
+  - Campaign analytics exposes `by_creator`, `by_platform`, and `by_creator_platform` for product reporting: overall campaign, best performing creator, platform performance, and creator-per-platform performance.
 - Remaining hardening for future slices:
   - Improve team invitation onboarding so new invitees land directly back on the invite after signup/login.
   - Build tailored onboarding steps after Agency/Enterprise signup.

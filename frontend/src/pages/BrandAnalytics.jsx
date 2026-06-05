@@ -110,6 +110,11 @@ const BrandAnalytics = () => {
     return `$${parseFloat(amount || 0).toFixed(2)}`;
   };
 
+  const formatPlatformName = (platform) => {
+    if (!platform) return 'Unknown';
+    return platform.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-light">
@@ -145,6 +150,8 @@ const BrandAnalytics = () => {
   }
 
   const { raw_data, insights, sentiment, mentions, deliverables } = analytics;
+  const platformBreakdown = analytics.platform_breakdown || {};
+  const collaborationTypeLabel = analytics.collaboration?.type_label || 'Package Collaboration';
 
   return (
     <div className="min-h-screen bg-light">
@@ -161,7 +168,12 @@ const BrandAnalytics = () => {
               <ArrowLeftIcon className="w-6 h-6 text-gray-600" />
             </button>
             <div>
-              <h1 className="text-4xl font-bold text-dark">Campaign Analytics</h1>
+              <div className="flex flex-wrap items-center gap-3">
+                <h1 className="text-4xl font-bold text-dark">{collaborationTypeLabel} Analytics</h1>
+                <span className="px-3 py-1 bg-primary/10 text-dark rounded-full text-sm font-medium">
+                  {analytics.raw_data?.platforms?.length || analytics.total_posts || 0} platform source{(analytics.raw_data?.platforms?.length || analytics.total_posts || 0) === 1 ? '' : 's'}
+                </span>
+              </div>
               <p className="text-gray-600 mt-1">
                 {analytics.creator.display_name} - {collaboration?.title || 'Collaboration'}
               </p>
@@ -242,6 +254,48 @@ const BrandAnalytics = () => {
             </div>
           </div>
         </div>
+
+        {/* Platform Performance */}
+        {Object.keys(platformBreakdown).length > 0 && (
+          <div className="mb-8">
+            <h2 className="text-2xl font-bold text-dark mb-4">Performance by Platform</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+              {Object.entries(platformBreakdown).map(([platform, data]) => (
+                <div key={platform} className="card">
+                  <div className="flex items-start justify-between mb-4">
+                    <div>
+                      <h3 className="text-lg font-semibold text-dark">{formatPlatformName(platform)}</h3>
+                      <p className="text-sm text-gray-500">
+                        {data.post_count || 0} post{(data.post_count || 0) === 1 ? '' : 's'} tracked
+                      </p>
+                    </div>
+                    <span className="px-3 py-1 bg-primary/10 text-primary rounded-full text-xs font-medium">
+                      {data.avg_engagement_rate || 0}% ER
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-xs text-gray-500">Reach</p>
+                      <p className="text-lg font-bold text-dark">{formatNumber(data.reach)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">Views</p>
+                      <p className="text-lg font-bold text-dark">{formatNumber(data.video_views || data.impressions)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">Engagement</p>
+                      <p className="text-lg font-bold text-dark">{formatNumber(data.total_engagement)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500">Comments</p>
+                      <p className="text-lg font-bold text-dark">{formatNumber(data.comments)}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Engagement Visualization */}
         <div className="mb-8">

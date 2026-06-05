@@ -31,6 +31,9 @@ class CampaignAnalyticsService:
                 'overview': CampaignAnalyticsService._get_empty_overview(),
                 'creators': [],
                 'platforms': {},
+                'by_creator': [],
+                'by_platform': [],
+                'by_creator_platform': [],
                 'timeline': [],
                 'campaign_info': {
                     'title': campaign.title,
@@ -45,12 +48,16 @@ class CampaignAnalyticsService:
         overview = CampaignAnalyticsService._calculate_overview(campaign, all_collaborations)
         creators = CampaignAnalyticsService._calculate_creator_performance(all_collaborations)
         platforms = CampaignAnalyticsService._calculate_platform_breakdown(all_collaborations)
+        creator_platforms = CampaignAnalyticsService._calculate_creator_platform_breakdown(all_collaborations)
         timeline = CampaignAnalyticsService._calculate_timeline(all_collaborations)
 
         return {
             'overview': overview,
             'creators': creators,
             'platforms': platforms,
+            'by_creator': creators,
+            'by_platform': list(platforms.values()),
+            'by_creator_platform': creator_platforms,
             'timeline': timeline,
             'campaign_info': {
                 'title': campaign.title,
@@ -65,7 +72,7 @@ class CampaignAnalyticsService:
     def _calculate_overview(campaign, collaborations):
         """Calculate campaign overview metrics"""
         total_spend = 0
-        total_creators = len(collaborations)
+        total_creators = len({collab.creator_id for collab in collaborations})
 
         # Aggregate metrics from all creators
         total_reach = 0
@@ -84,12 +91,10 @@ class CampaignAnalyticsService:
 
             total_spend += float(collab.amount or 0)
 
-            # Use creator's audience metrics
-            total_reach += creator.follower_count or 0
-
             post_metrics = PostMetrics.query.filter_by(collaboration_id=collab.id).all()
 
             for metric in post_metrics:
+                total_reach += metric.reach or 0
                 total_impressions += metric.impressions or 0
                 total_views += (metric.video_views or 0) or (metric.impressions or 0)
                 total_likes += metric.likes or 0
@@ -131,7 +136,8 @@ class CampaignAnalyticsService:
     @staticmethod
     def _calculate_creator_performance(collaborations):
         """Calculate individual creator performance"""
-        creators_data = []
+        creators_data = {}
+        rates_by_creator = {}
 
         for collab in collaborations:
             # Get creator profile
@@ -140,46 +146,74 @@ class CampaignAnalyticsService:
                 continue
 
             cart_item = CampaignAnalyticsService._get_cart_item_for_collaboration(collab.id)
-            platform = CampaignAnalyticsService._platform_for_cart_item(cart_item)
 
             # Get post metrics
             post_metrics = PostMetrics.query.filter_by(collaboration_id=collab.id).all()
+            creator_key = creator.id
+            if creator_key not in creators_data:
+                creators_data[creator_key] = {
+                    'creator_id': creator.id,
+                    'creator_name': creator.display_name,
+                    'creator_picture': creator.profile_picture,
+                    'platform': 'Multiple platforms',
+                    'platforms': set(),
+                    'reach': 0,
+                    'impressions': 0,
+                    'views': 0,
+                    'engagements': 0,
+                    'likes': 0,
+                    'comments': 0,
+                    'shares': 0,
+                    'engagement_rate': 0,
+                    'cost': 0,
+                    'cost_per_engagement': 0,
+                    'posts_count': 0,
+                    'status': collab.status,
+                    'source_count': 0,
+                    'source_types': set()
+                }
+                rates_by_creator[creator_key] = []
 
-            reach = creator.follower_count or 0
-            impressions = sum(m.impressions or 0 for m in post_metrics)
-            views = sum((m.video_views or 0) or (m.impressions or 0) for m in post_metrics)
-            likes = sum(m.likes or 0 for m in post_metrics)
-            comments = sum(m.comments or 0 for m in post_metrics)
-            shares = sum(m.shares or 0 for m in post_metrics)
-            engagements = likes + comments + shares
-
-            engagement_rate = (engagements / reach * 100) if reach > 0 else 0
+            row = creators_data[creator_key]
+            row['reach'] += sum(m.reach or 0 for m in post_metrics)
+            row['impressions'] += sum(m.impressions or 0 for m in post_metrics)
+            row['views'] += sum((m.video_views or 0) or (m.impressions or 0) for m in post_metrics)
+            row['likes'] += sum(m.likes or 0 for m in post_metrics)
+            row['comments'] += sum(m.comments or 0 for m in post_metrics)
+            row['shares'] += sum(m.shares or 0 for m in post_metrics)
+            row['engagements'] += sum((m.likes or 0) + (m.comments or 0) + (m.shares or 0) for m in post_metrics)
             cost = float(collab.amount or 0)
-            cpe = (cost / engagements) if engagements > 0 else 0
+            row['cost'] += cost
+            row['posts_count'] += len(post_metrics)
+            row['source_count'] += 1
+            if cart_item:
+                row['source_types'].add(cart_item.item_type)
+            for metric in post_metrics:
+                if metric.post_platform:
+                    row['platforms'].add(metric.post_platform)
+                if metric.engagement_rate is not None and metric.engagement_rate > 0:
+                    rates_by_creator[creator_key].append(float(metric.engagement_rate))
 
-            creators_data.append({
-                'creator_id': creator.id,
-                'creator_name': creator.display_name,
-                'creator_picture': creator.profile_picture,
-                'platform': platform,
-                'reach': reach,
-                'impressions': impressions,
-                'views': views,
-                'engagements': engagements,
-                'likes': likes,
-                'comments': comments,
-                'shares': shares,
-                'engagement_rate': round(engagement_rate, 2),
-                'cost': cost,
-                'cost_per_engagement': round(cpe, 2),
-                'posts_count': len(post_metrics),
-                'status': collab.status
-            })
+        creator_rows = []
+        for creator_id, row in creators_data.items():
+            rates = rates_by_creator.get(creator_id, [])
+            if rates:
+                row['engagement_rate'] = round(sum(rates) / len(rates), 2)
+            elif row['reach'] > 0:
+                row['engagement_rate'] = round(row['engagements'] / row['reach'] * 100, 2)
+            row['cost_per_engagement'] = round(row['cost'] / row['engagements'], 2) if row['engagements'] > 0 else 0
+            platforms = sorted(row['platforms'])
+            row['platforms'] = platforms
+            row['platform'] = ', '.join(platforms) if platforms else CampaignAnalyticsService._platform_for_cart_item(
+                CampaignAnalyticsService._get_cart_item_for_creator(collaborations, creator_id)
+            )
+            row['source_types'] = sorted(row['source_types'])
+            creator_rows.append(row)
 
         # Sort by engagements (descending)
-        creators_data.sort(key=lambda x: x['engagements'], reverse=True)
+        creator_rows.sort(key=lambda x: x['engagements'], reverse=True)
 
-        return creators_data
+        return creator_rows
 
     @staticmethod
     def _calculate_platform_breakdown(collaborations):
@@ -188,6 +222,146 @@ class CampaignAnalyticsService:
 
         for collab in collaborations:
             # Get creator profile
+            creator = CreatorProfile.query.get(collab.creator_id)
+            if not creator:
+                continue
+
+            post_metrics = PostMetrics.query.filter_by(collaboration_id=collab.id).all()
+            metrics_by_platform = {}
+            for metric in post_metrics:
+                platform = (metric.post_platform or 'unknown').lower()
+                metrics_by_platform.setdefault(platform, []).append(metric)
+
+            if not metrics_by_platform:
+                fallback_platform = CampaignAnalyticsService._platform_for_cart_item(
+                    CampaignAnalyticsService._get_cart_item_for_collaboration(collab.id)
+                )
+                metrics_by_platform[fallback_platform] = []
+
+            for platform, platform_metrics in metrics_by_platform.items():
+                if platform not in platforms:
+                    platforms[platform] = {
+                        'platform': platform,
+                        'creators': set(),
+                        'creators_count': 0,
+                        'total_spend': 0,
+                        'total_reach': 0,
+                        'total_impressions': 0,
+                        'total_engagements': 0,
+                        'total_views': 0,
+                        'total_likes': 0,
+                        'total_comments': 0,
+                        'total_shares': 0,
+                        'posts_count': 0,
+                        '_engagement_rates': []
+                    }
+
+                platforms[platform]['creators'].add(creator.id)
+                platforms[platform]['total_spend'] += float(collab.amount or 0)
+                platforms[platform]['posts_count'] += len(platform_metrics)
+                platforms[platform]['total_reach'] += sum(m.reach or 0 for m in platform_metrics)
+                platforms[platform]['total_impressions'] += sum(m.impressions or 0 for m in platform_metrics)
+                platforms[platform]['total_views'] += sum((m.video_views or 0) or (m.impressions or 0) for m in platform_metrics)
+                platforms[platform]['total_likes'] += sum(m.likes or 0 for m in platform_metrics)
+                platforms[platform]['total_comments'] += sum(m.comments or 0 for m in platform_metrics)
+                platforms[platform]['total_shares'] += sum(m.shares or 0 for m in platform_metrics)
+                platforms[platform]['total_engagements'] += sum(
+                    (m.likes or 0) + (m.comments or 0) + (m.shares or 0)
+                    for m in platform_metrics
+                )
+                platforms[platform]['_engagement_rates'].extend(
+                    float(m.engagement_rate)
+                    for m in platform_metrics
+                    if m.engagement_rate is not None and m.engagement_rate > 0
+                )
+
+        # Calculate engagement rates and cost per engagement
+        for platform_data in platforms.values():
+            platform_data['creators_count'] = len(platform_data.pop('creators', []))
+            rates = platform_data.pop('_engagement_rates', [])
+            if rates:
+                platform_data['engagement_rate'] = round(sum(rates) / len(rates), 2)
+            elif platform_data['total_reach'] > 0:
+                platform_data['engagement_rate'] = round(
+                    platform_data['total_engagements'] / platform_data['total_reach'] * 100,
+                    2
+                )
+            else:
+                platform_data['engagement_rate'] = 0
+
+            platform_data['cost_per_engagement'] = round(
+                platform_data['total_spend'] / platform_data['total_engagements'],
+                2
+            ) if platform_data['total_engagements'] > 0 else 0
+
+        return platforms
+
+    @staticmethod
+    def _calculate_creator_platform_breakdown(collaborations):
+        """Calculate performance per creator per actual post platform."""
+        rows = {}
+        rates = {}
+
+        for collab in collaborations:
+            creator = CreatorProfile.query.get(collab.creator_id)
+            if not creator:
+                continue
+
+            post_metrics = PostMetrics.query.filter_by(collaboration_id=collab.id).all()
+            for metric in post_metrics:
+                platform = (metric.post_platform or 'unknown').lower()
+                key = (creator.id, platform)
+                if key not in rows:
+                    rows[key] = {
+                        'creator_id': creator.id,
+                        'creator_name': creator.display_name,
+                        'creator_picture': creator.profile_picture,
+                        'platform': platform,
+                        'posts_count': 0,
+                        'reach': 0,
+                        'impressions': 0,
+                        'views': 0,
+                        'engagements': 0,
+                        'likes': 0,
+                        'comments': 0,
+                        'shares': 0,
+                        'engagement_rate': 0,
+                        'collaboration_ids': set()
+                    }
+                    rates[key] = []
+
+                row = rows[key]
+                row['posts_count'] += 1
+                row['reach'] += metric.reach or 0
+                row['impressions'] += metric.impressions or 0
+                row['views'] += (metric.video_views or 0) or (metric.impressions or 0)
+                row['likes'] += metric.likes or 0
+                row['comments'] += metric.comments or 0
+                row['shares'] += metric.shares or 0
+                row['engagements'] += (metric.likes or 0) + (metric.comments or 0) + (metric.shares or 0)
+                row['collaboration_ids'].add(collab.id)
+                if metric.engagement_rate is not None and metric.engagement_rate > 0:
+                    rates[key].append(float(metric.engagement_rate))
+
+        result = []
+        for key, row in rows.items():
+            row_rates = rates.get(key, [])
+            if row_rates:
+                row['engagement_rate'] = round(sum(row_rates) / len(row_rates), 2)
+            elif row['reach'] > 0:
+                row['engagement_rate'] = round(row['engagements'] / row['reach'] * 100, 2)
+            row['collaboration_ids'] = sorted(row['collaboration_ids'])
+            result.append(row)
+
+        result.sort(key=lambda item: item['engagements'], reverse=True)
+        return result
+
+    @staticmethod
+    def _legacy_calculate_platform_breakdown(collaborations):
+        """Deprecated package-label platform breakdown kept for reference."""
+        platforms = {}
+
+        for collab in collaborations:
             creator = CreatorProfile.query.get(collab.creator_id)
             if not creator:
                 continue
@@ -329,6 +503,18 @@ class CampaignAnalyticsService:
     @staticmethod
     def _get_cart_item_for_collaboration(collaboration_id):
         return CampaignCartItem.query.filter_by(collaboration_id=collaboration_id).first()
+
+    @staticmethod
+    def _get_cart_item_for_creator(collaborations, creator_id):
+        collaboration_ids = [
+            collab.id for collab in collaborations
+            if collab.creator_id == creator_id
+        ]
+        if not collaboration_ids:
+            return None
+        return CampaignCartItem.query.filter(
+            CampaignCartItem.collaboration_id.in_(collaboration_ids)
+        ).first()
 
     @staticmethod
     def _platform_for_cart_item(cart_item):
