@@ -21,6 +21,7 @@ const CampaignCartPaymentModal = ({
   const [proofFile, setProofFile] = useState(null);
   const [uploadingProof, setUploadingProof] = useState(false);
   const [showSmilePayModal, setShowSmilePayModal] = useState(false);
+  const [campaignPaymentId, setCampaignPaymentId] = useState(null);
 
   const handlePayment = async () => {
     try {
@@ -53,6 +54,7 @@ const CampaignCartPaymentModal = ({
           onClose();
         }
       } else if (paymentMethod === 'bank_transfer') {
+        setCampaignPaymentId(response.data.payment_id);
         // Show bank details
         setBankDetails(response.data.bank_details || {
           bank_name: 'Steward Bank',
@@ -63,6 +65,7 @@ const CampaignCartPaymentModal = ({
         });
         toast.success('Bank transfer initiated. Please complete payment and upload proof.');
       } else if (paymentMethod === 'smilepay') {
+        setCampaignPaymentId(response.data.payment_id);
         // SmilePay handled by modal
         setShowSmilePayModal(true);
       }
@@ -86,14 +89,17 @@ const CampaignCartPaymentModal = ({
       toast.error('Please select a proof of payment file');
       return;
     }
+    if (!campaignPaymentId) {
+      toast.error('Payment reference not found. Please start the bank transfer again.');
+      return;
+    }
 
     try {
       setUploadingProof(true);
       const formData = new FormData();
       formData.append('proof', proofFile);
 
-      // TODO: Implement proof upload endpoint
-      // await campaignsAPI.uploadCartPaymentProof(campaignId, formData);
+      await campaignsAPI.uploadCartPaymentProof(campaignId, campaignPaymentId, formData);
       toast.success('Proof of payment uploaded. Pending admin verification.');
       if (onPaymentSuccess) onPaymentSuccess();
       onClose();
@@ -314,7 +320,7 @@ const CampaignCartPaymentModal = ({
         amount={totalAmount}
         currency="USD"
         paymentType="campaign_cart"
-        paymentId={campaignId}
+        paymentId={campaignPaymentId}
         itemName="Campaign Cart Payment"
         itemDescription={getTitle()}
         onSuccess={handleSmilePaySuccess}

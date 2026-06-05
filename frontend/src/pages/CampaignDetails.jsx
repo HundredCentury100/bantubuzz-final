@@ -737,7 +737,7 @@ const CampaignDetails = () => {
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-bold text-gray-900">Added Packages</h2>
               <Link
-                to="/browse/packages"
+                to={`/brand/campaigns/${campaign.id}/browse-packages`}
                 className="px-4 py-2 bg-primary text-white rounded-xl hover:bg-primary-dark transition-colors"
               >
                 Browse Packages
@@ -751,7 +751,7 @@ const CampaignDetails = () => {
                   Browse and add pre-made creator packages to your campaign
                 </p>
                 <Link
-                  to="/browse/packages"
+                  to={`/brand/campaigns/${campaign.id}/browse-packages`}
                   className="inline-block px-6 py-3 bg-primary text-white rounded-xl hover:bg-primary-dark transition-colors"
                 >
                   Browse Packages

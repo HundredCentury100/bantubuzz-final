@@ -199,6 +199,14 @@ export const campaignsAPI = {
   payAllCart: (campaignId, data) => api.post(`/campaigns/${campaignId}/cart/pay-all`, data),
   paySelectedCart: (campaignId, data) => api.post(`/campaigns/${campaignId}/cart/pay-selected`, data),
   payIndividualCart: (campaignId, cartItemId, data) => api.post(`/campaigns/${campaignId}/cart/${cartItemId}/pay`, data),
+  uploadCartPaymentProof: (campaignId, paymentId, formData) =>
+    api.post(`/campaigns/${campaignId}/cart/payments/${paymentId}/upload-proof`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }),
+  downloadCartProformaInvoice: (campaignId, cartItemIds) =>
+    api.post(`/campaigns/${campaignId}/cart/invoice/pro-forma`, { cart_item_ids: cartItemIds }, {
+      responseType: 'blob',
+    }),
 };
 
 // Opportunities API - Creator Side

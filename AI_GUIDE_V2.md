@@ -756,12 +756,24 @@ Deployment note:
   - Creator discovery uses `GET /api/campaigns/browse`; it matches active application campaigns against the logged-in creator's categories, location/city/country, and connected-platform follower count, then sorts by application deadline soonest first.
   - Creator opportunity cards show brand, budget, campaign dates, red application deadline, milestone count, and separate View Details / Apply actions.
   - Creator applications use locked campaign milestones/deliverables. Creators can only add proposed due dates, choose total vs per-milestone pricing, write a cover letter, and optionally set an overall timeline.
-  - Campaign proposal statuses are:
+- Campaign proposal statuses are:
     - `pending`: creator submitted, brand reviewing.
     - `awaiting_payment`: brand added the proposal to campaign cart.
     - `accepted`: payment confirmed and collaboration started.
     - `rejected`: brand did not select the proposal.
   - Campaign cart application items must point to `campaign_proposals`, not the older brief `proposals` table. Migration: `backend/migrations/versions/202606041700_fix_campaign_cart_proposal_fk.py`.
+- Campaign cart/payments production flow:
+  - Campaign cart checkout now creates a real `CampaignPayment` before any payment method completes.
+  - Shared activation logic lives in `backend/app/services/campaign_cart_payment_service.py`.
+  - Wallet campaign cart payments must debit the brand wallet in the same DB transaction that creates collaborations and marks cart items paid; do not use helpers that commit early or partial wallet-loss bugs can return.
+  - Smile&Pay campaign cart payments use `paymentType="campaign_cart"` and must pass the `CampaignPayment.id`, not the campaign id.
+  - Bank-transfer cart payments upload proof to `POST /api/campaigns/<campaign_id>/cart/payments/<payment_id>/upload-proof`.
+  - Admin verification for bank-transfer campaign cart payments is `PUT /api/admin/payments/campaign-cart/<payment_id>/verify`.
+  - Campaign cart invoices:
+    - Pro-forma PDF: `POST /api/campaigns/<campaign_id>/cart/invoice/pro-forma`.
+    - Paid invoice attachment is generated from `send_campaign_payment_notification_email()` once the `CampaignPayment` is completed.
+  - `Campaign` completion is inferred through paid `CampaignCartItem.collaboration_id` rows because `Collaborations` does not have a direct `campaign_id` column.
+  - Campaign performance analytics should aggregate `PostMetrics` by `collaboration_id` for paid campaign cart collaborations, never by all posts from a creator.
 - Agency subscription onboarding and activation flow:
   - Deploy script: `deployment/DEPLOY-AGENCY-PLAN-FLOW.bat`.
   - Commit: `c344abf Implement agency subscription onboarding flow`.

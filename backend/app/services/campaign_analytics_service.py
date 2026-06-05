@@ -3,7 +3,7 @@ Campaign Analytics Service
 Calculates campaign performance metrics and analytics
 """
 from app import db
-from app.models import Campaign, Collaboration, PostMetrics, CampaignProposal, CreatorProfile
+from app.models import Campaign, Collaboration, PostMetrics, CampaignProposal, CreatorProfile, CampaignCartItem
 from app.utils.campaign_helpers import get_campaign_collaborations
 from sqlalchemy import func
 from datetime import datetime, timedelta
@@ -24,11 +24,7 @@ class CampaignAnalyticsService:
         if not campaign:
             return None
 
-        # Get all collaborations using helper (handles multi-hop relationship)
-        collaborations = get_campaign_collaborations(campaign_id, status='active')
-
-        # Also include pending and completed collaborations for full picture
-        all_collaborations = get_campaign_collaborations(campaign_id)
+        all_collaborations = CampaignAnalyticsService._get_campaign_collaborations(campaign_id)
 
         if not all_collaborations:
             return {
@@ -86,22 +82,16 @@ class CampaignAnalyticsService:
             if not creator:
                 continue
 
-            # Calculate spend from agreed_amount
-            total_spend += float(collab.agreed_amount) if collab.agreed_amount else 0
+            total_spend += float(collab.amount or 0)
 
             # Use creator's audience metrics
             total_reach += creator.follower_count or 0
 
-            # Get post metrics for this collaboration
-            # Note: PostMetrics may need to be linked differently
-            # For now, use creator_id to get their posts
-            post_metrics = PostMetrics.query.filter_by(
-                creator_id=creator.id
-            ).all()
+            post_metrics = PostMetrics.query.filter_by(collaboration_id=collab.id).all()
 
             for metric in post_metrics:
                 total_impressions += metric.impressions or 0
-                total_views += metric.views or 0
+                total_views += (metric.video_views or 0) or (metric.impressions or 0)
                 total_likes += metric.likes or 0
                 total_comments += metric.comments or 0
                 total_shares += metric.shares or 0
@@ -149,32 +139,29 @@ class CampaignAnalyticsService:
             if not creator:
                 continue
 
-            # Get campaign proposal to find package details
-            proposal = CampaignProposal.query.get(collab.campaign_application_id)
-            package = proposal.package if proposal and proposal.package else None
+            cart_item = CampaignAnalyticsService._get_cart_item_for_collaboration(collab.id)
+            platform = CampaignAnalyticsService._platform_for_cart_item(cart_item)
 
             # Get post metrics
-            post_metrics = PostMetrics.query.filter_by(
-                creator_id=creator.id
-            ).all()
+            post_metrics = PostMetrics.query.filter_by(collaboration_id=collab.id).all()
 
             reach = creator.follower_count or 0
             impressions = sum(m.impressions or 0 for m in post_metrics)
-            views = sum(m.views or 0 for m in post_metrics)
+            views = sum((m.video_views or 0) or (m.impressions or 0) for m in post_metrics)
             likes = sum(m.likes or 0 for m in post_metrics)
             comments = sum(m.comments or 0 for m in post_metrics)
             shares = sum(m.shares or 0 for m in post_metrics)
             engagements = likes + comments + shares
 
             engagement_rate = (engagements / reach * 100) if reach > 0 else 0
-            cost = float(collab.agreed_amount) if collab.agreed_amount else 0
+            cost = float(collab.amount or 0)
             cpe = (cost / engagements) if engagements > 0 else 0
 
             creators_data.append({
                 'creator_id': creator.id,
                 'creator_name': creator.display_name,
                 'creator_picture': creator.profile_picture,
-                'platform': package.platform_type if package else 'Unknown',
+                'platform': platform,
                 'reach': reach,
                 'impressions': impressions,
                 'views': views,
@@ -205,10 +192,8 @@ class CampaignAnalyticsService:
             if not creator:
                 continue
 
-            # Get campaign proposal to find package details
-            proposal = CampaignProposal.query.get(collab.campaign_application_id)
-            package = proposal.package if proposal and proposal.package else None
-            platform = package.platform_type if package else 'Unknown'
+            cart_item = CampaignAnalyticsService._get_cart_item_for_collaboration(collab.id)
+            platform = CampaignAnalyticsService._platform_for_cart_item(cart_item)
 
             if platform not in platforms:
                 platforms[platform] = {
@@ -220,14 +205,12 @@ class CampaignAnalyticsService:
                     'total_views': 0
                 }
 
-            post_metrics = PostMetrics.query.filter_by(
-                creator_id=creator.id
-            ).all()
+            post_metrics = PostMetrics.query.filter_by(collaboration_id=collab.id).all()
 
             platforms[platform]['creators_count'] += 1
-            platforms[platform]['total_spend'] += float(collab.agreed_amount) if collab.agreed_amount else 0
+            platforms[platform]['total_spend'] += float(collab.amount or 0)
             platforms[platform]['total_reach'] += creator.follower_count or 0
-            platforms[platform]['total_views'] += sum(m.views or 0 for m in post_metrics)
+            platforms[platform]['total_views'] += sum((m.video_views or 0) or (m.impressions or 0) for m in post_metrics)
 
             engagements = sum(
                 (m.likes or 0) + (m.comments or 0) + (m.shares or 0)
@@ -294,14 +277,13 @@ class CampaignAnalyticsService:
                     # Get creator profile
                     creator = CreatorProfile.query.get(collab.creator_id)
                     if creator:
-                        # Get post metrics for this date
                         post_metrics = PostMetrics.query.filter(
-                            PostMetrics.creator_id == creator.id,
+                            PostMetrics.collaboration_id == collab.id,
                             func.date(PostMetrics.created_at) == current_date
                         ).all()
 
                         for metric in post_metrics:
-                            day_metrics['views'] += metric.views or 0
+                            day_metrics['views'] += (metric.video_views or 0) or (metric.impressions or 0)
                             day_metrics['engagements'] += (
                                 (metric.likes or 0) +
                                 (metric.comments or 0) +
@@ -332,6 +314,40 @@ class CampaignAnalyticsService:
             'estimated_roi': 0,
             'avg_cost_per_creator': 0
         }
+
+    @staticmethod
+    def _get_campaign_collaborations(campaign_id):
+        cart_items = CampaignCartItem.query.filter(
+            CampaignCartItem.campaign_id == campaign_id,
+            CampaignCartItem.collaboration_id.isnot(None),
+        ).all()
+        collaboration_ids = [item.collaboration_id for item in cart_items]
+        if not collaboration_ids:
+            return []
+        return Collaboration.query.filter(Collaboration.id.in_(collaboration_ids)).all()
+
+    @staticmethod
+    def _get_cart_item_for_collaboration(collaboration_id):
+        return CampaignCartItem.query.filter_by(collaboration_id=collaboration_id).first()
+
+    @staticmethod
+    def _platform_for_cart_item(cart_item):
+        if not cart_item:
+            return 'Campaign'
+        if cart_item.package:
+            if cart_item.package.platform_type:
+                return cart_item.package.platform_type
+            platforms = cart_item.package.platforms or []
+            return ', '.join(platforms) if platforms else 'Package'
+        if cart_item.proposal:
+            platforms = []
+            for milestone in cart_item.proposal.milestones or []:
+                for deliverable in milestone.get('deliverables') or []:
+                    platform = deliverable.get('platform')
+                    if platform and platform not in platforms:
+                        platforms.append(platform)
+            return ', '.join(platforms) if platforms else 'Proposal'
+        return 'Campaign'
 
 
 # Singleton instance

@@ -1048,9 +1048,48 @@ def send_campaign_payment_notification_email(payment_id, recipient_email, recipi
         return
 
     frontend_url = current_app.config.get('FRONTEND_URL', 'https://bantubuzz.com')
+    attachments = []
+
+    if is_brand and payment.status == 'completed':
+        try:
+            from io import BytesIO
+            from PIL import Image, ImageDraw, ImageFont
+
+            page = Image.new('RGB', (1240, 1754), 'white')
+            draw = ImageDraw.Draw(page)
+            font = ImageFont.load_default()
+            y = 80
+            draw.text((80, y), 'BantuBuzz Campaign Invoice', fill='#111827', font=font)
+            draw.text((80, y + 40), 'Status: Paid', fill='#111827', font=font)
+            draw.text((80, y + 80), f'Campaign: {campaign.title}', fill='#111827', font=font)
+            draw.text((80, y + 120), f'Payment date: {(payment.completed_at or payment.updated_at).strftime("%Y-%m-%d")}', fill='#111827', font=font)
+            draw.text((80, y + 160), f'Method: {payment.payment_method}', fill='#111827', font=font)
+            draw.text((80, y + 200), f'Reference: {payment.payment_reference or payment.id}', fill='#111827', font=font)
+            y += 280
+            draw.line((80, y, 1160, y), fill='#D1D5DB', width=2)
+            y += 30
+            for index, item in enumerate(payment.items.all(), start=1):
+                creator_name = item.creator.email if item.creator else 'Creator'
+                if item.creator and getattr(item.creator, 'creator_profile', None):
+                    creator_name = item.creator.creator_profile.display_name or item.creator.creator_profile.username or creator_name
+                draw.text((80, y), f'{index}. {creator_name}', fill='#111827', font=font)
+                draw.text((980, y), f'${float(item.amount):,.2f}', fill='#111827', font=font)
+                y += 55
+            draw.line((80, y, 1160, y), fill='#D1D5DB', width=2)
+            y += 35
+            draw.text((80, y), f'Subtotal: ${float(payment.net_amount):,.2f}', fill='#111827', font=font)
+            draw.text((80, y + 35), f'Service fee: ${float(payment.platform_fee or 0):,.2f}', fill='#111827', font=font)
+            draw.text((80, y + 70), f'Total paid: ${float(payment.total_amount):,.2f}', fill='#111827', font=font)
+            draw.text((80, 1650), 'Powered by BantuBuzz', fill='#6B7280', font=font)
+
+            output = BytesIO()
+            page.save(output, format='PDF')
+            attachments.append((f'campaign-{campaign.id}-paid-invoice.pdf', 'application/pdf', output.getvalue()))
+        except Exception as error:
+            print(f'Failed to generate campaign invoice attachment: {error}')
 
     if is_brand:
-        subject = f"Payment Initiated - {campaign.title}"
+        subject = f"{'Paid Invoice' if payment.status == 'completed' else 'Payment Initiated'} - {campaign.title}"
 
         text_body = f"""
         Hello {recipient_name},
@@ -1061,7 +1100,7 @@ def send_campaign_payment_notification_email(payment_id, recipient_email, recipi
         - Amount: R{float(payment.total_amount):.2f}
         - Method: {payment.payment_method}
         - Status: {payment.status}
-        - Creators: {len(payment.items) if hasattr(payment, 'items') else 'Multiple'}
+        - Creators: {payment.items.count() if hasattr(payment, 'items') else 'Multiple'}
 
         The payment will be processed shortly. You will receive a confirmation once completed.
 
@@ -1174,7 +1213,7 @@ def send_campaign_payment_notification_email(payment_id, recipient_email, recipi
         </html>
         """
 
-    send_email(subject, recipient_email, text_body, html_body)
+    send_email(subject, recipient_email, text_body, html_body, attachments=attachments)
 
 
 def send_campaign_chat_message_notification_email(recipient_email, recipient_name, sender_name, campaign_title, message_preview, chat_url):

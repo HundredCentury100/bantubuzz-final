@@ -106,7 +106,7 @@ const Campaigns = () => {
             { value: 'draft', label: 'Draft' },
             { value: 'active', label: 'Active' },
             { value: 'paused', label: 'Paused' },
-            { value: 'completed', label: 'Completed' }
+            { value: 'completed', label: 'Complete' }
           ].map((tab) => (
             <button
               key={tab.value}

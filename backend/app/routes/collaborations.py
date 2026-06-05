@@ -991,6 +991,9 @@ def complete_collaboration(collab_id):
                 booking.escrow_status = 'escrowed'
                 booking.escrowed_at = datetime.utcnow()
 
+        from app.services.campaign_completion_service import update_campaign_completion_for_collaboration
+        update_campaign_completion_for_collaboration(collaboration)
+
         db.session.commit()
 
         # Release escrow to creator wallet with 24-hour countdown
@@ -1124,6 +1127,9 @@ def mark_collaboration_complete(collab_id):
                 booking.completion_date = datetime.utcnow()
                 booking.escrow_status = 'escrowed'
                 booking.escrowed_at = datetime.utcnow()
+
+        from app.services.campaign_completion_service import update_campaign_completion_for_collaboration
+        update_campaign_completion_for_collaboration(collaboration)
 
         db.session.commit()
 
@@ -1610,6 +1616,8 @@ def approve_milestone_deliverable(collab_id, milestone_id, deliverable_id):
                 collaboration.actual_completion_date = datetime.utcnow()
                 collaboration.progress_percentage = 100
                 completed_all_milestones = True
+                from app.services.campaign_completion_service import update_campaign_completion_for_collaboration
+                update_campaign_completion_for_collaboration(collaboration)
 
         db.session.commit()
 

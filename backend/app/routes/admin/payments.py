@@ -6,7 +6,7 @@ Handles verification, viewing, and management of all payments and bookings
 from flask import jsonify, request
 from datetime import datetime, timedelta
 from app import db
-from app.models import Payment, Booking, User, BrandProfile, CreatorProfile, PaymentVerification, CreatorSubscription, CreatorSubscriptionPlan, Subscription, Collaboration, Package, WorkspaceAddon
+from app.models import Payment, Booking, User, BrandProfile, CreatorProfile, PaymentVerification, CreatorSubscription, CreatorSubscriptionPlan, Subscription, Collaboration, Package, WorkspaceAddon, CampaignPayment
 from app.services.agency_subscription_service import apply_brand_subscription_entitlements
 from app.decorators.admin import admin_required
 from flask_jwt_extended import get_jwt_identity
@@ -187,6 +187,11 @@ def get_pending_payments():
             WorkspaceAddon.payment_proof_path.isnot(None)
         ).all()
 
+        pending_campaign_cart_payments = CampaignPayment.query.filter(
+            CampaignPayment.payment_method == 'bank_transfer',
+            CampaignPayment.status == 'processing'
+        ).order_by(CampaignPayment.created_at.desc()).all()
+
         # Format payment data with user information
         payments_data = []
         for payment in payments:
@@ -298,6 +303,31 @@ def get_pending_payments():
                 'workspace_name': workspace.name if workspace else 'Unknown',
             })
 
+        for campaign_payment in pending_campaign_cart_payments:
+            metadata = campaign_payment.payment_metadata or {}
+            if not metadata.get('proof_path'):
+                continue
+            brand_user = User.query.get(campaign_payment.brand_user_id)
+            brand = BrandProfile.query.filter_by(user_id=campaign_payment.brand_user_id).first()
+            campaign = campaign_payment.campaign
+
+            payments_data.append({
+                'id': f'campaign_cart_{campaign_payment.id}',
+                'campaign_payment_id': campaign_payment.id,
+                'user_id': brand_user.id if brand_user else None,
+                'user_name': brand_user.name if brand_user and hasattr(brand_user, 'name') else (brand_user.email if brand_user else 'Unknown'),
+                'user_email': brand_user.email if brand_user else 'unknown@email.com',
+                'user_type': 'brand',
+                'amount': float(campaign_payment.total_amount or 0),
+                'payment_method': campaign_payment.payment_method,
+                'payment_proof_url': metadata.get('proof_path'),
+                'status': 'pending_verification',
+                'payment_category': 'campaign_cart',
+                'campaign_name': campaign.title if campaign else 'Campaign',
+                'brand_name': brand.company_name if brand else 'Unknown',
+                'created_at': campaign_payment.created_at.isoformat() if campaign_payment.created_at else None,
+            })
+
         return jsonify({
             'success': True,
             'payments': payments_data
@@ -332,6 +362,13 @@ def get_payment_statistics():
         ).all()
         pending_count += len(pending_bookings)
         pending_amount += sum(float(b.amount) for b in pending_bookings)
+
+        pending_campaign_cart_payments = CampaignPayment.query.filter(
+            CampaignPayment.payment_method == 'bank_transfer',
+            CampaignPayment.status == 'processing'
+        ).all()
+        pending_count += len(pending_campaign_cart_payments)
+        pending_amount += sum(float(p.total_amount or 0) for p in pending_campaign_cart_payments)
 
         # Verified today
         verified_today = Payment.query.filter(
@@ -913,6 +950,75 @@ def reject_workspace_addon_payment(addon_id):
             'success': False,
             'error': str(e)
         }), 500
+
+
+@bp.route('/payments/campaign-cart/<int:payment_id>/verify', methods=['PUT'])
+@admin_required
+def verify_campaign_cart_payment(payment_id):
+    """Verify a campaign cart bank-transfer payment and activate its collaborations."""
+    try:
+        admin_id = int(get_jwt_identity())
+        payment = CampaignPayment.query.get(payment_id)
+
+        if not payment:
+            return jsonify({'success': False, 'error': 'Campaign payment not found'}), 404
+
+        data = request.get_json() or {}
+        metadata = payment.payment_metadata or {}
+        metadata['verified_by'] = admin_id
+        metadata['verification_notes'] = data.get('notes', '')
+        payment.payment_metadata = metadata
+
+        from app.services.campaign_cart_payment_service import complete_campaign_cart_payment
+        complete_campaign_cart_payment(
+            payment,
+            data.get('transaction_reference') or payment.payment_reference,
+            'bank_transfer',
+        )
+        db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'message': 'Campaign cart payment verified successfully',
+            'payment': payment.to_dict(),
+        }), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@bp.route('/payments/campaign-cart/<int:payment_id>/reject', methods=['PUT'])
+@admin_required
+def reject_campaign_cart_payment(payment_id):
+    """Reject a campaign cart bank-transfer proof."""
+    try:
+        admin_id = int(get_jwt_identity())
+        payment = CampaignPayment.query.get(payment_id)
+
+        if not payment:
+            return jsonify({'success': False, 'error': 'Campaign payment not found'}), 404
+
+        data = request.get_json() or {}
+        notes = data.get('notes')
+        if not notes:
+            return jsonify({'success': False, 'error': 'Rejection notes are required'}), 400
+
+        metadata = payment.payment_metadata or {}
+        metadata['rejected_by'] = admin_id
+        metadata['rejection_notes'] = notes
+        payment.payment_metadata = metadata
+        payment.status = 'failed'
+        payment.failed_reason = notes
+        db.session.commit()
+
+        return jsonify({
+            'success': True,
+            'message': 'Campaign cart payment rejected',
+            'payment': payment.to_dict(),
+        }), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'success': False, 'error': str(e)}), 500
 
 
 @bp.route('/bookings', methods=['GET'])

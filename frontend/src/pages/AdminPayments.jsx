@@ -78,6 +78,11 @@ export default function AdminPayments() {
         await api.put(`/admin/payments/brand-subscription/${selectedPayment.brand_subscription_id}/verify`, { notes: verifyData.notes });
       } else if (selectedPayment.workspace_addon_id) {
         await api.put(`/admin/payments/workspace-addon/${selectedPayment.workspace_addon_id}/verify`, { notes: verifyData.notes });
+      } else if (selectedPayment.campaign_payment_id) {
+        await api.put(`/admin/payments/campaign-cart/${selectedPayment.campaign_payment_id}/verify`, {
+          notes: verifyData.notes,
+          transaction_reference: verifyData.transaction_reference,
+        });
       } else {
         // Regular payment/booking
         await api.put(`/admin/payments/${selectedPayment.id}/verify`, verifyData);
@@ -143,6 +148,10 @@ export default function AdminPayments() {
 
     if (payment.payment_category === 'workspace_addon') {
       return payment.workspace_name ? `Extra Workspace - ${payment.workspace_name}` : 'Extra Workspace Add-on';
+    }
+
+    if (payment.payment_category === 'campaign_cart') {
+      return payment.campaign_name ? `Campaign Cart - ${payment.campaign_name}` : 'Campaign Cart Payment';
     }
 
     // Handle bookings

@@ -65,29 +65,14 @@ const InviteToCampaignModal = ({ creatorId, creatorName, isOpen, onClose }) => {
     try {
       setLoading(true);
 
-      // Add package to campaign (creates booking on backend)
-      const response = await campaignsAPI.addPackageToCampaign(selectedCampaign.id, pkg.id);
+      await campaignsAPI.addPackageToCart(selectedCampaign.id, {
+        package_id: pkg.id,
+        creator_id: creatorId,
+      });
 
-      if (response.data.booking_id) {
-        // Store payment context
-        localStorage.setItem('payment_context', JSON.stringify({
-          package_id: pkg.id,
-          campaign_id: selectedCampaign.id,
-          booking_id: response.data.booking_id,
-          creator_id: creatorId,
-          type: 'campaign_package',
-          amount: pkg.price,
-          payment_category: 'package',
-          booking_type: 'campaign_invitation'
-        }));
-
-        // Navigate to payment page
-        toast.success('Proceeding to payment...');
-        navigate(`/brand/campaigns/payment/${response.data.booking_id}`);
-        onClose();
-      } else {
-        toast.error('Failed to create invitation booking');
-      }
+      toast.success('Package added to campaign cart');
+      navigate(`/brand/campaigns/${selectedCampaign.id}?tab=cart`);
+      onClose();
     } catch (error) {
       console.error('Error creating invitation:', error);
       toast.error(error.response?.data?.error || 'Failed to create invitation');

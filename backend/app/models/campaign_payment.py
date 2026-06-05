@@ -155,8 +155,7 @@ class CampaignPayment(db.Model):
 
             # Update collaboration payment status
             if item.collaboration:
-                item.collaboration.payment_status = 'paid'
-                item.collaboration.payment_id = self.id
+                item.collaboration.escrow_status = item.collaboration.escrow_status or 'escrowed'
 
         db.session.commit()
 

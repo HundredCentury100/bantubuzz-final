@@ -558,7 +558,7 @@ class SmilePayService:
                 SmilePayService._complete_booking_payment(transaction)
             elif transaction.payment_type == 'campaign':
                 SmilePayService._complete_campaign_payment(transaction)
-            elif transaction.payment_type == 'cart':
+            elif transaction.payment_type in ['cart', 'campaign_cart']:
                 SmilePayService._complete_cart_payment(transaction)
             elif transaction.payment_type == 'collaboration':
                 SmilePayService._complete_collaboration_payment(transaction)
@@ -622,17 +622,30 @@ class SmilePayService:
 
         payment = CampaignPayment.query.get(transaction.payment_id)
         if payment:
-            payment.payment_status = 'paid'
-            payment.smilepay_order_reference = transaction.order_reference
+            payment.payment_method = transaction.payment_method or 'smilepay'
+            payment.payment_reference = transaction.smilepay_reference or transaction.transaction_reference or transaction.order_reference
+            metadata = payment.payment_metadata or {}
+            if metadata.get('source') == 'campaign_cart':
+                from app.services.campaign_cart_payment_service import complete_campaign_cart_payment
+                complete_campaign_cart_payment(payment, payment.payment_reference, payment.payment_method)
+            else:
+                payment.mark_as_completed()
             db.session.commit()
             logger.info(f"Campaign payment {payment.id} marked as paid")
 
     @staticmethod
     def _complete_cart_payment(transaction: SmilePayTransaction):
         """Complete cart payment"""
-        # Handle campaign cart payments
-        logger.info(f"Processing cart payment for {transaction.order_reference}")
-        # TODO: Implement cart-specific logic
+        from app.models import CampaignPayment
+        from app.services.campaign_cart_payment_service import complete_campaign_cart_payment
+
+        payment = CampaignPayment.query.get(transaction.payment_id)
+        if payment:
+            payment.payment_method = transaction.payment_method or 'smilepay'
+            payment.payment_reference = transaction.smilepay_reference or transaction.transaction_reference or transaction.order_reference
+            complete_campaign_cart_payment(payment, payment.payment_reference, payment.payment_method)
+            db.session.commit()
+            logger.info(f"Campaign cart payment {payment.id} marked as paid")
 
     @staticmethod
     def _complete_collaboration_payment(transaction: SmilePayTransaction):
