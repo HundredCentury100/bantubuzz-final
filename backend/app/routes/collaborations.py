@@ -354,15 +354,15 @@ def approve_deliverable(collab_id, deliverable_id):
 
         # Auto-complete if progress reaches 100%
         # NOTE: Changed behavior - NO longer auto-completes on deliverable approval
-        # Now waits for live URLs to be submitted before triggering 3-day timer
+        # Now waits for live URLs to be submitted before triggering the 7-day timer
         if collaboration.progress_percentage >= 100 and collaboration.status == 'in_progress':
             print(f"[APPROVE_DELIVERABLE] Progress reached 100% for collaboration {collaboration.id}")
 
-            # Content review required (YES): Wait for live URLs, then 3-day timer
-            # Content review NOT required (NO): Wait for live URLs, then 3-day timer
-            # Both paths now go through URL submission → 3-day timer flow
+            # Content review required (YES): Wait for live URLs, then 7-day timer
+            # Content review NOT required (NO): Wait for live URLs, then 7-day timer
+            # Both paths now go through URL submission, then the 7-day timer flow
             collaboration.last_update = "All deliverables approved - Awaiting live post URLs from creator"
-            print(f"[APPROVE_DELIVERABLE] Awaiting live URLs. 3-day timer will start when URLs submitted.")
+            print("[APPROVE_DELIVERABLE] Awaiting live URLs. 7-day timer will start when URLs submitted.")
         else:
             # Normal update
             collaboration.last_update = f"Deliverable approved: {deliverable_to_approve.title}"
@@ -453,7 +453,7 @@ def approve_all_deliverables(collab_id):
         if collaboration.progress_percentage >= 100 and collaboration.status == 'in_progress':
             print(f"[APPROVE_ALL] Progress reached 100% for collaboration {collaboration.id}")
             collaboration.last_update = "All deliverables approved - Awaiting live post URLs from creator"
-            print(f"[APPROVE_ALL] Awaiting live URLs. 3-day timer will start when URLs submitted.")
+            print("[APPROVE_ALL] Awaiting live URLs. 7-day timer will start when URLs submitted.")
         else:
             collaboration.last_update = f"Approved {approved_count} deliverable(s)"
             print(f"[APPROVE_ALL] Approved {approved_count} deliverables (progress at {collaboration.progress_percentage}%)")
@@ -1000,13 +1000,14 @@ def complete_collaboration(collab_id):
         escrow_released = False
         escrow_error = None
         try:
-            from app.services.payment_service import release_escrow_to_wallet
-            from app.utils.subscription_helper import get_brand_platform_fee_percentage
+            from app.services.payment_service import release_collaboration_escrow
 
-            # Get brand's platform fee based on subscription tier
-            platform_fee = get_brand_platform_fee_percentage(collaboration.brand.user_id)
-
-            transaction = release_escrow_to_wallet(collaboration.id, platform_fee_percentage=platform_fee)
+            result = release_collaboration_escrow(
+                collaboration.id,
+                payout_percentage=100,
+                reason='approved'
+            )
+            transaction = result['creator_transaction']
             escrow_released = True
 
             # Update escrow status
@@ -1014,7 +1015,7 @@ def complete_collaboration(collab_id):
             collaboration.last_update = "Your collaboration is complete"
             db.session.commit()
 
-            print(f"Escrow released to wallet for collaboration {collaboration.id}. Fee: {platform_fee}%. Transaction ID: {transaction.id}")
+            print(f"Escrow released to wallet for collaboration {collaboration.id}. Transaction ID: {transaction.id}")
 
         except Exception as e:
             escrow_error = str(e)
@@ -1137,14 +1138,15 @@ def mark_collaboration_complete(collab_id):
         escrow_released = False
         escrow_error = None
         try:
-            from app.services.payment_service import release_escrow_to_wallet
-            from app.utils.subscription_helper import get_brand_platform_fee_percentage
+            from app.services.payment_service import release_collaboration_escrow
 
-            # Get brand's platform fee based on subscription tier
-            platform_fee = get_brand_platform_fee_percentage(collaboration.brand.user_id)
-
-            print(f"[MARK_COMPLETE] Attempting to release escrow with fee {platform_fee}%")
-            transaction = release_escrow_to_wallet(collaboration.id, platform_fee_percentage=platform_fee)
+            print(f"[MARK_COMPLETE] Attempting to release escrow")
+            result = release_collaboration_escrow(
+                collaboration.id,
+                payout_percentage=100,
+                reason='approved'
+            )
+            transaction = result['creator_transaction']
             escrow_released = True
 
             # Update escrow status
@@ -1709,19 +1711,25 @@ def submit_package_deliverable_url(collab_id, deliverable_id):
 
             print(f"[SUBMIT_URL] Live URLs: {live_url_count}/{expected_count}")
 
-            # If ALL deliverables have live URLs → trigger 3-day timer
+            # If ALL deliverables have live URLs, start the 7-day auto-release timer.
             # This applies to BOTH content review YES and NO cases (User Stories 10 & 12)
             if live_url_count >= expected_count:
-                print(f"[SUBMIT_URL] All live URLs submitted → Starting 3-day auto-complete timer")
+                print("[SUBMIT_URL] All live URLs submitted - starting 7-day auto-release timer")
                 try:
                     from app.tasks.collaboration_tasks import set_auto_complete_date
                     set_auto_complete_date.delay(collaboration.id)
                 except Exception as e:
                     print(f"[SUBMIT_URL] WARNING: Failed to set auto-complete date: {str(e)}")
                     # Set directly if Celery fails
-                    collaboration.auto_complete_eligible_at = datetime.utcnow() + timedelta(days=3)
+                    collaboration.auto_complete_eligible_at = datetime.utcnow() + timedelta(days=7)
+                    from app.models import Payment
+                    payment = Payment.query.filter_by(collaboration_id=collaboration.id).first()
+                    if not payment and collaboration.booking_id:
+                        payment = Payment.query.filter_by(booking_id=collaboration.booking_id).first()
+                    if payment:
+                        payment.release_due_at = collaboration.auto_complete_eligible_at
 
-                collaboration.last_update = "All live posts submitted - 3 day review period started"
+                collaboration.last_update = "All live posts submitted - 7 day review period started"
                 collaboration.updated_at = datetime.utcnow()
             else:
                 collaboration.updated_at = datetime.utcnow()

@@ -1,7 +1,7 @@
 """
 Wallet Service - Handles all wallet-related operations
 """
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from sqlalchemy import func
 from app import db
 from app.models import (
@@ -27,7 +27,7 @@ def calculate_wallet_balances(user_id):
     wallet = get_or_create_wallet(user_id)
 
     # Calculate pending clearance
-    now = datetime.now(timezone.utc)
+    now = datetime.utcnow()
     pending_clearance = db.session.query(
         func.coalesce(func.sum(WalletTransaction.amount), 0)
     ).filter(
@@ -65,7 +65,7 @@ def calculate_wallet_balances(user_id):
     wallet.available_balance = float(available_balance)
     wallet.withdrawn_total = float(withdrawn_total)
     wallet.total_earned = float(total_earned)
-    wallet.updated_at = datetime.now(timezone.utc)
+    wallet.updated_at = datetime.utcnow()
 
     db.session.commit()
 
@@ -74,7 +74,7 @@ def calculate_wallet_balances(user_id):
 
 def get_pending_clearance_transactions(user_id):
     """Get all transactions in pending clearance with progress"""
-    now = datetime.now(timezone.utc)
+    now = datetime.utcnow()
     transactions = WalletTransaction.query.filter(
         WalletTransaction.user_id == user_id,
         WalletTransaction.status == 'pending_clearance',
@@ -149,7 +149,7 @@ def clear_pending_transactions():
     Scheduled job: Clear transactions that have passed 30-day period
     Should be run daily
     """
-    now = datetime.now(timezone.utc)
+    now = datetime.utcnow()
 
     # Find all transactions ready to clear
     ready_transactions = WalletTransaction.query.filter(
@@ -216,7 +216,7 @@ def credit_brand_wallet(user_id, amount, transaction_type, description, metadata
 
     # Update wallet balance
     wallet.available_balance = float(wallet.available_balance or 0) + float(amount)
-    wallet.updated_at = datetime.now(timezone.utc)
+    wallet.updated_at = datetime.utcnow()
 
     db.session.commit()
     return transaction

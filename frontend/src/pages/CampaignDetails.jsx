@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link, useLocation } from 'react-router-dom';
-import { campaignsAPI, analyticsAPI } from '../services/api';
+import { campaignsAPI, analyticsAPI, brandWalletAPI, spotlightBoostsAPI } from '../services/api';
 import Navbar from '../components/Navbar';
 import AudienceCharts from '../components/AudienceCharts';
 import CreatorPackageCard from '../components/CreatorPackageCard';
@@ -11,7 +11,7 @@ import CampaignChatPanel from '../components/CampaignChatPanel';
 import CampaignChatWindow from '../components/CampaignChatWindow';
 import CampaignCart from '../components/CampaignCart';
 import toast from 'react-hot-toast';
-import { Megaphone, PackagePlus, Send } from 'lucide-react';
+import { Bolt, Megaphone, PackagePlus, Send } from 'lucide-react';
 
 const CampaignDetails = () => {
   const { id } = useParams();
@@ -34,12 +34,15 @@ const CampaignDetails = () => {
   const [selectedChat, setSelectedChat] = useState(null);
   const [currentUser, setCurrentUser] = useState(null);
   const [cartPendingCount, setCartPendingCount] = useState(0);
+  const [walletBalance, setWalletBalance] = useState(null);
+  const [boostLoading, setBoostLoading] = useState(null);
 
   useEffect(() => {
     fetchCampaignDetails();
     // Get current user from localStorage
     const user = JSON.parse(localStorage.getItem('user') || '{}');
     setCurrentUser(user);
+    fetchWalletBalance();
 
     // Check for tab parameter in URL
     const searchParams = new URLSearchParams(location.search);
@@ -71,6 +74,41 @@ const CampaignDetails = () => {
       toast.error('Failed to load campaign details');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchWalletBalance = async () => {
+    try {
+      const response = await brandWalletAPI.getBalance();
+      setWalletBalance(response.data.wallet);
+    } catch (error) {
+      setWalletBalance(null);
+    }
+  };
+
+  const handleBoostPurchase = async (durationDays) => {
+    try {
+      setBoostLoading(durationDays);
+      const response = await spotlightBoostsAPI.purchase({
+        target_type: 'campaign',
+        target_id: Number(id),
+        duration_days: durationDays,
+        payment_method: 'wallet',
+      });
+
+      toast.success(response.data.message || 'Spotlight Boost is active');
+      setCampaign((current) => current ? {
+        ...current,
+        active_spotlight_boost: response.data.boost,
+      } : current);
+      setWalletBalance((current) => current ? {
+        ...current,
+        available_balance: response.data.wallet_balance,
+      } : current);
+    } catch (error) {
+      toast.error(error.response?.data?.error || 'Failed to purchase boost');
+    } finally {
+      setBoostLoading(null);
     }
   };
 
@@ -287,6 +325,46 @@ const CampaignDetails = () => {
               >
                 Edit
               </Link>
+            </div>
+          </div>
+        </div>
+
+        <div className="mb-6 rounded-3xl bg-white p-5 shadow-sm">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-primary-dark">
+                <Bolt className="h-4 w-4" />
+                Spotlight Boost
+              </div>
+              <h2 className="text-lg font-bold text-dark">Boost campaign visibility</h2>
+              <p className="text-sm text-gray-600">
+                {campaign.active_spotlight_boost
+                  ? `Active until ${new Date(campaign.active_spotlight_boost.ends_at).toLocaleDateString()}`
+                  : 'Promote this campaign immediately with wallet balance.'}
+              </p>
+              {walletBalance && (
+                <p className="mt-1 text-xs text-gray-500">
+                  Wallet balance: ${Number(walletBalance.available_balance || 0).toFixed(2)}
+                </p>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {[
+                { durationDays: 3, label: '3-Day', price: 3 },
+                { durationDays: 7, label: '7-Day', price: 6 },
+                { durationDays: 30, label: '30-Day', price: 18 },
+              ].map((option) => (
+                <button
+                  key={option.durationDays}
+                  type="button"
+                  onClick={() => handleBoostPurchase(option.durationDays)}
+                  disabled={boostLoading === option.durationDays || (walletBalance && Number(walletBalance.available_balance || 0) < option.price)}
+                  className="inline-flex items-center gap-2 rounded-full border border-gray-300 px-4 py-2 text-sm font-semibold text-dark transition-colors hover:border-primary hover:bg-primary/10 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <Bolt className="h-4 w-4 text-primary" />
+                  {boostLoading === option.durationDays ? 'Processing...' : `${option.label} $${option.price}`}
+                </button>
+              ))}
             </div>
           </div>
         </div>

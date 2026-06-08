@@ -20,6 +20,7 @@ from app.models.creator_profile import CreatorProfile
 from app.models.package import Package
 from app.models.booking import Booking
 from app.models.collaboration import Collaboration
+from app.models.spotlight_boost import SpotlightBoost
 from app.services.workspace_service import get_request_workspace_id, require_workspace_access, scope_query_to_workspace
 from app.utils.notifications import create_notification
 
@@ -544,6 +545,15 @@ def browse_campaigns():
             Campaign.created_at.desc()
         ).all()
 
+        active_boost_campaign_ids = {
+            boost.target_id
+            for boost in SpotlightBoost.query.filter(
+                SpotlightBoost.target_type == 'campaign',
+                SpotlightBoost.status == 'active',
+                SpotlightBoost.ends_at > datetime.utcnow()
+            ).all()
+        }
+
         matched_campaigns = []
         for campaign in campaigns:
             target_categories = set(campaign.target_categories or [])
@@ -575,6 +585,10 @@ def browse_campaigns():
             campaign_data['has_applied'] = proposal is not None
             campaign_data['application_status'] = proposal.status if proposal else None
             matched_campaigns.append(campaign_data)
+
+        matched_campaigns.sort(
+            key=lambda item: 0 if item.get('id') in active_boost_campaign_ids else 1
+        )
 
         return jsonify({
             'campaigns': matched_campaigns

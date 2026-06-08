@@ -123,6 +123,7 @@ class Campaign(db.Model):
             'target_min_followers': self.target_min_followers,
             'target_max_followers': self.target_max_followers,
             'status': self.status,
+            'active_spotlight_boost': self.get_active_spotlight_boost(),
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,
         }
@@ -139,6 +140,11 @@ class Campaign(db.Model):
 
     def __repr__(self):
         return f'<Campaign {self.id}: {self.title}>'
+
+    def get_active_spotlight_boost(self):
+        from app.services.spotlight_boost_service import boost_payload_for
+
+        return boost_payload_for('campaign', self.id)
 
 
 class CampaignMilestone(db.Model):

@@ -7,7 +7,7 @@ import CreatorBadge from '../components/CreatorBadge';
 import toast from 'react-hot-toast';
 import Avatar from '../components/Avatar';
 import SEO from '../components/SEO';
-import { Search, Filter, X } from 'lucide-react';
+import { Bolt, Search, Filter, X } from 'lucide-react';
 import { ZIMBABWE_LANGUAGES } from '../constants/options';
 
 const BrowseCreators = () => {
@@ -700,9 +700,16 @@ const BrowseCreators = () => {
                         </div>
                       )}
                       {/* Badge Overlays on Image */}
-                      {creator.badges && creator.badges.length > 0 && (
+                      {(creator.active_spotlight_boost || (creator.badges && creator.badges.length > 0)) && (
                         <div className="absolute top-2 left-2 flex flex-wrap gap-1.5">
+                          {creator.active_spotlight_boost && (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-amber-400 px-2.5 py-1 text-xs font-semibold text-gray-950 shadow-sm">
+                              <Bolt className="h-3 w-3" />
+                              Boosted
+                            </span>
+                          )}
                           {creator.badges
+                            ?.slice()
                             .sort((a, b) => {
                               const priority = { 'top_creator': 1, 'verified_creator': 2, 'responds_fast': 3, 'creator': 4 };
                               return (priority[a] || 99) - (priority[b] || 99);

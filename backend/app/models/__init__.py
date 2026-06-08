@@ -61,6 +61,7 @@ from .campaign_invitation import CampaignInvitation
 from .campaign_payment import CampaignPayment, CampaignPaymentItem
 from .campaign_chat import CampaignChat, CampaignChatParticipant, CampaignChatMessage
 from .campaign_cart import CampaignCartItem
+from .spotlight_boost import SpotlightBoost
 
 __all__ = [
     'User',
@@ -118,6 +119,7 @@ __all__ = [
     'CampaignChatParticipant',
     'CampaignChatMessage',
     'CampaignCartItem',
+    'SpotlightBoost',
     'PortfolioItem',
     'SmilePayTransaction',
     'ClientWorkspace',

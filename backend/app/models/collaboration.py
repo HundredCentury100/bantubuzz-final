@@ -66,7 +66,7 @@ class Collaboration(db.Model):
     rules = db.Column(db.Text)  # Rules & Expectations (optional)
     additional_notes = db.Column(db.Text)  # Additional Notes (optional)
     live_urls_submitted_at = db.Column(db.DateTime)  # When creator submits live post URLs (both YES and NO track)
-    auto_complete_eligible_at = db.Column(db.DateTime)  # Set when 100% complete, auto-complete after 3 days
+    auto_complete_eligible_at = db.Column(db.DateTime)  # Set when final delivery is submitted, auto-release after 7 days
 
     # Timestamps
     created_at = db.Column(db.DateTime, default=datetime.utcnow)

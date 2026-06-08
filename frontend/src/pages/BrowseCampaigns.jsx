@@ -5,6 +5,7 @@ import Navbar from '../components/Navbar';
 import toast from 'react-hot-toast';
 import Avatar from '../components/Avatar';
 import SEO from '../components/SEO';
+import { Bolt } from 'lucide-react';
 
 const BrowseCampaigns = () => {
   const [campaigns, setCampaigns] = useState([]);
@@ -133,6 +134,12 @@ const BrowseCampaigns = () => {
                   {/* Header: Category, Mode, Status */}
                   <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center gap-2">
+                      {campaign.active_spotlight_boost && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">
+                          <Bolt className="h-3 w-3" />
+                          Boosted
+                        </span>
+                      )}
                       <span className="px-3 py-1 bg-gray-100 text-gray-700 rounded-full text-xs font-medium">
                         {campaign.category}
                       </span>

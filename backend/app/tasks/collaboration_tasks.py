@@ -2,7 +2,7 @@
 Collaboration-related Celery tasks for BantuBuzz.
 
 Handles:
-- 3-day auto-complete for collaborations without content review
+- 7-day auto-release for submitted collaboration delivery
 - Periodic checks for eligible collaborations
 """
 from datetime import datetime, timedelta
@@ -20,12 +20,12 @@ from sqlalchemy import and_
 @celery.task(name='app.tasks.collaboration_tasks.check_auto_complete_eligible')
 def check_auto_complete_eligible():
     """
-    Check for collaborations eligible for 3-day auto-complete.
+    Check for collaborations eligible for 7-day auto-release.
 
     Criteria:
-    - requires_content_review = False
     - status = 'in_progress'
     - auto_complete_eligible_at is set and <= now
+    - live URLs/final delivery have been submitted
     - progress_percentage = 100%
 
     Runs daily via Celery Beat.
@@ -36,10 +36,10 @@ def check_auto_complete_eligible():
         # Find eligible collaborations
         eligible_collaborations = Collaboration.query.filter(
             and_(
-                Collaboration.requires_content_review == False,
                 Collaboration.status == 'in_progress',
                 Collaboration.auto_complete_eligible_at != None,
                 Collaboration.auto_complete_eligible_at <= now,
+                Collaboration.live_urls_submitted_at != None,
                 Collaboration.progress_percentage == 100
             )
         ).all()
@@ -50,10 +50,18 @@ def check_auto_complete_eligible():
                 # Mark as completed
                 collab.status = 'completed'
                 collab.actual_completion_date = now
-                collab.last_update = 'Auto-completed after 3-day review period'
+                collab.last_update = 'Auto-released after 7-day review period'
                 collab.last_update_date = now
+                collab.escrow_status = 'escrowed'
 
                 db.session.commit()
+
+                from app.services.payment_service import release_collaboration_escrow
+                release_collaboration_escrow(
+                    collab.id,
+                    payout_percentage=100,
+                    reason='auto_release'
+                )
                 completed_count += 1
 
                 notify_collaboration_completed(collab, auto_completed=True)
@@ -117,10 +125,23 @@ def send_delivery_due_reminders():
         return {'success': False, 'error': str(e)}
 
 
+@celery.task(name='app.tasks.collaboration_tasks.clear_ready_wallet_transactions')
+def clear_ready_wallet_transactions():
+    """Move creator earnings from pending clearance to available when their hold expires."""
+    try:
+        from app.services.wallet_service import clear_pending_transactions
+        cleared_count = clear_pending_transactions()
+        return {'success': True, 'cleared_count': cleared_count}
+    except Exception as e:
+        db.session.rollback()
+        print(f"Error clearing ready wallet transactions: {str(e)}")
+        return {'success': False, 'error': str(e)}
+
+
 @celery.task(name='app.tasks.collaboration_tasks.set_auto_complete_date')
 def set_auto_complete_date(collaboration_id):
     """
-    Set the auto_complete_eligible_at date for a collaboration.
+    Set the auto-release date for a collaboration.
     Called when all deliverables are submitted.
 
     Args:
@@ -131,21 +152,21 @@ def set_auto_complete_date(collaboration_id):
         if not collab:
             return {'success': False, 'error': 'Collaboration not found'}
 
-        # Only set if content review is not required
-        if not collab.requires_content_review:
-            # Set to 3 days from now
-            collab.auto_complete_eligible_at = datetime.utcnow() + timedelta(days=3)
-            db.session.commit()
+        collab.auto_complete_eligible_at = datetime.utcnow() + timedelta(days=7)
 
-            return {
-                'success': True,
-                'auto_complete_at': collab.auto_complete_eligible_at.isoformat()
-            }
-        else:
-            return {
-                'success': False,
-                'error': 'Content review is required, no auto-complete'
-            }
+        from app.models.payment import Payment
+        payment = Payment.query.filter_by(collaboration_id=collab.id).first()
+        if not payment and collab.booking_id:
+            payment = Payment.query.filter_by(booking_id=collab.booking_id).first()
+        if payment:
+            payment.release_due_at = collab.auto_complete_eligible_at
+
+        db.session.commit()
+
+        return {
+            'success': True,
+            'auto_complete_at': collab.auto_complete_eligible_at.isoformat()
+        }
 
     except Exception as e:
         db.session.rollback()

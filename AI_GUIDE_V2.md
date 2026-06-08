@@ -887,6 +887,33 @@ Deployment note:
     - Fix in `backend/app/models/subscription_plan.py`: relationship must specify `foreign_keys='Subscription.plan_id'`.
     - Health endpoint still returned 200 because it does not force mapper configuration. Deployment scripts that touch models should run `configure_mappers()` after migration/compile checks.
     - Production Celery services discovered by diagnostics are `celery-worker.service` and `celery-beat.service`; the older `celery`/`celerybeat` names may not exist.
+- Campaign escrow and payouts:
+  - Deploy script: `deployment/DEPLOY-CAMPAIGN-ESCROW-PAYOUTS.bat`.
+  - Migration: `backend/migrations/versions/202606051430_add_escrow_release_audit_fields.py`.
+  - Payment audit fields now include `release_due_at`, `released_at`, and `refunded_at`.
+  - Shared escrow release/refund helpers live in `backend/app/services/payment_service.py`:
+    - `release_collaboration_escrow(...)`
+    - `refund_collaboration_escrow_to_brand(...)`
+    - `get_creator_commission_percentage(...)`
+  - Manual brand completion now releases escrow through `release_collaboration_escrow(...)` so creator payouts use the creator plan commission percentage, not the brand checkout service fee.
+  - Final/live post submission starts a 7-day auto-release timer. The timer is stored on `collaborations.auto_complete_eligible_at` and mirrored to `payments.release_due_at` when a payment exists.
+  - `check_auto_complete_eligible` now completes eligible submitted collaborations and releases escrow, unless a dispute is open or under review.
+  - Opening a dispute clears the auto-release timer and pauses escrow release.
+  - Admin dispute resolution now performs money movement:
+    - `release_funds` pays the creator.
+    - `partial_release` pays the requested creator percentage and refunds the remainder to the brand wallet.
+    - `refund` refunds held escrow to the brand wallet.
+  - Creator wallet pending-clearance cleanup is scheduled hourly through Celery Beat via `clear_ready_wallet_transactions`.
+- Spotlight Boost purchases:
+  - Deploy script: `deployment/DEPLOY-SPOTLIGHT-BOOSTS.bat`.
+  - Migration: `backend/migrations/versions/202606051530_add_spotlight_boosts.py`.
+  - Boost products are fixed-duration wallet purchases: 3 days for $3, 7 days for $6, and 30 days for $18.
+  - `backend/app/models/spotlight_boost.py` stores profile and campaign boosts with `target_type` values `creator_profile` and `campaign`.
+  - Purchase API: `POST /api/spotlight-boosts/purchase`; history/options API: `GET /api/spotlight-boosts/my` and `GET /api/spotlight-boosts/options`.
+  - Active boosts are surfaced through `Campaign.to_dict()` and `CreatorProfile.to_dict()` as `active_spotlight_boost`.
+  - Creator discovery, creator profiles, brand campaign lists, and creator campaign browsing show a Boosted badge while the boost is active.
+  - Creator campaign browsing prioritizes active boosted campaigns before normal deadline/date ordering.
+  - Billing invoices include Spotlight Boost receipts through `backend/app/routes/billing.py` with source type `boost`.
 - Remaining hardening for future slices:
   - Improve team invitation onboarding so new invitees land directly back on the invite after signup/login.
   - Build tailored onboarding steps after Agency/Enterprise signup.

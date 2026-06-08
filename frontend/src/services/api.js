@@ -209,6 +209,12 @@ export const campaignsAPI = {
     }),
 };
 
+export const spotlightBoostsAPI = {
+  getOptions: () => api.get('/spotlight-boosts/options'),
+  getMine: () => api.get('/spotlight-boosts/my'),
+  purchase: (data) => api.post('/spotlight-boosts/purchase', data),
+};
+
 // Opportunities API - Creator Side
 // Same backend endpoints, different naming for creator UX
 export const opportunitiesAPI = {

@@ -2,6 +2,7 @@
 Payment Service - Handles payment verification and management
 """
 from datetime import datetime, timedelta
+from decimal import Decimal, ROUND_HALF_UP
 from app import db
 from app.models import Payment, PaymentVerification, Booking, WalletTransaction, Collaboration, User, BrandProfile, Subscription
 from app.services.wallet_service import get_or_create_wallet
@@ -298,7 +299,7 @@ def add_manual_payment(admin_user_id, payment_data):
     return payment
 
 
-def release_escrow_to_wallet(collaboration_id, platform_fee_percentage=15):
+def release_escrow_to_wallet(collaboration_id, platform_fee_percentage=None):
     """
     Release money to creator wallet with 24-hour clearance
     Works with both booking-based and collaboration-based payments
@@ -350,26 +351,12 @@ def release_escrow_to_wallet(collaboration_id, platform_fee_percentage=15):
     if payment.escrow_status not in ['escrowed', 'pending']:
         raise ValueError(f"Payment escrow status invalid - '{payment.escrow_status}'")
 
-    # Get the brand to determine their platform fee (for upfront calculation)
-    brand_platform_fee_pct = PaymentService.get_brand_platform_fee(collaboration.brand_id)
+    if platform_fee_percentage is None:
+        platform_fee_percentage = get_creator_commission_percentage(collaboration.creator.user_id)
 
-    # Calculate amounts
-    # payment.amount = total paid by brand (collaboration_price + upfront_platform_fee)
-    # We need to extract the original collaboration_price
-    total_paid = float(payment.amount)
-
-    # Original collaboration price = total_paid / (1 + brand_platform_fee_pct/100)
-    original_collab_price = total_paid / (1 + brand_platform_fee_pct / 100)
-    upfront_platform_fee = total_paid - original_collab_price
-
-    # Platform takes 10% commission from the ORIGINAL collaboration price
-    platform_commission = original_collab_price * (platform_fee_percentage / 100)
-
-    # Creator receives: original price - 10% commission
-    creator_amount = original_collab_price - platform_commission
-
-    # Total platform revenue = upfront fee + commission
-    total_platform_revenue = upfront_platform_fee + platform_commission
+    original_collab_price = _money(payment.held_amount or collaboration.amount)
+    platform_commission = _money(original_collab_price * _money(platform_fee_percentage) / Decimal("100"))
+    creator_amount = _money(original_collab_price - platform_commission)
 
     creator = collaboration.creator
 
@@ -420,24 +407,23 @@ def release_escrow_to_wallet(collaboration_id, platform_fee_percentage=15):
         description=description,
         transaction_metadata={
             **metadata,
-            'upfront_platform_fee': upfront_platform_fee,
-            'brand_platform_fee_pct': brand_platform_fee_pct,
-            'total_platform_revenue': total_platform_revenue,
-            'breakdown': f'Brand paid ${total_paid:.2f} (${original_collab_price:.2f} + ${upfront_platform_fee:.2f} upfront fee). Platform takes ${platform_commission:.2f} commission. Creator receives ${creator_amount:.2f}.'
+            'creator_commission_pct': float(platform_fee_percentage),
+            'breakdown': f'Escrow gross ${original_collab_price:.2f}. Platform takes ${platform_commission:.2f} commission. Creator receives ${creator_amount:.2f}.'
         }
     )
     db.session.add(transaction)
 
     # Update payment escrow status to released
     payment.escrow_status = 'released'
+    payment.released_at = datetime.utcnow()
 
     # Update booking if it exists
     if booking:
         booking.escrow_status = 'released'
 
     # Update wallet balances
-    wallet.pending_clearance = float(wallet.pending_clearance or 0) + creator_amount
-    wallet.total_earned = float(wallet.total_earned or 0) + creator_amount
+    wallet.pending_clearance = float(wallet.pending_clearance or 0) + float(creator_amount)
+    wallet.total_earned = float(wallet.total_earned or 0) + float(creator_amount)
     wallet.updated_at = datetime.utcnow()
 
     # Commit all changes
@@ -453,6 +439,233 @@ def release_escrow_to_wallet(collaboration_id, platform_fee_percentage=15):
         )
     except Exception as email_error:
         print(f"Failed to queue payment release notification: {str(email_error)}")
+
+    return transaction
+
+
+def _money(value):
+    return Decimal(str(value or 0)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+
+def get_creator_commission_percentage(creator_user_id):
+    """Get creator-side commission from the active creator subscription plan."""
+    from app.models import Subscription
+
+    subscription = Subscription.query.filter_by(
+        user_id=creator_user_id,
+        status='active'
+    ).first()
+
+    if subscription and subscription.plan:
+        return subscription.get_commission_rate()
+
+    return 15.0
+
+
+def _find_payment_for_collaboration(collaboration):
+    payment = Payment.query.filter_by(collaboration_id=collaboration.id).first()
+    if not payment and collaboration.booking_id:
+        payment = Payment.query.filter_by(booking_id=collaboration.booking_id).first()
+    return payment
+
+
+def _has_open_dispute(collaboration_id):
+    from app.models.dispute import Dispute
+
+    return Dispute.query.filter(
+        Dispute.collaboration_id == collaboration_id,
+        Dispute.status.in_(['open', 'under_review'])
+    ).first() is not None
+
+
+def release_collaboration_escrow(collaboration_id, payout_percentage=100, reason='approved', clearance_days=1):
+    """
+    Final escrow release helper used by manual approval, auto-release, and dispute mediation.
+    payout_percentage controls how much of the held collaboration amount is treated as earned by
+    the creator before their creator-tier commission is deducted.
+    """
+    collaboration = Collaboration.query.get(collaboration_id)
+    if not collaboration:
+        raise ValueError("Collaboration not found")
+
+    if payout_percentage is None:
+        payout_percentage = 100
+
+    payout_percentage = _money(payout_percentage)
+    if payout_percentage < 0 or payout_percentage > 100:
+        raise ValueError("payout_percentage must be between 0 and 100")
+
+    if _has_open_dispute(collaboration_id) and reason != 'dispute_resolution':
+        raise ValueError("Escrow cannot be released while a dispute is open")
+
+    if collaboration.status != 'completed':
+        raise ValueError("Collaboration must be completed before releasing funds")
+
+    existing_transaction = WalletTransaction.query.filter_by(
+        collaboration_id=collaboration_id,
+        transaction_type='earning'
+    ).first()
+    if existing_transaction:
+        raise ValueError("Funds already released to wallet")
+
+    payment = _find_payment_for_collaboration(collaboration)
+    if not payment:
+        raise ValueError("No payment found for this collaboration")
+
+    if payment.status not in ['paid', 'completed']:
+        raise ValueError(f"Payment not ready - status is '{payment.status}', expected 'paid' or 'completed'")
+
+    if payment.escrow_status not in ['escrowed', 'pending']:
+        raise ValueError(f"Payment escrow status invalid - '{payment.escrow_status}'")
+
+    held_amount = _money(payment.held_amount or collaboration.amount)
+    creator_gross = _money(held_amount * payout_percentage / Decimal("100"))
+    refund_amount = _money(held_amount - creator_gross)
+
+    transaction = None
+    if creator_gross > 0:
+        creator = collaboration.creator
+        commission_percentage = get_creator_commission_percentage(creator.user_id)
+        platform_commission = _money(creator_gross * _money(commission_percentage) / Decimal("100"))
+        creator_amount = _money(creator_gross - platform_commission)
+
+        wallet = get_or_create_wallet(creator.user_id)
+        completed_at = datetime.utcnow()
+        available_at = completed_at + timedelta(days=clearance_days)
+
+        booking = collaboration.booking if hasattr(collaboration, 'booking') and collaboration.booking else None
+        description = f"Earnings from collaboration with {collaboration.brand.company_name if collaboration.brand else 'brand'}"
+        transaction = WalletTransaction(
+            wallet_id=wallet.id,
+            user_id=creator.user_id,
+            transaction_type='earning',
+            amount=creator_amount,
+            status='pending_clearance',
+            clearance_required=True,
+            clearance_days=clearance_days,
+            completed_at=completed_at,
+            available_at=available_at,
+            collaboration_id=collaboration.id,
+            booking_id=booking.id if booking else None,
+            gross_amount=creator_gross,
+            platform_fee=platform_commission,
+            platform_fee_percentage=commission_percentage,
+            net_amount=creator_amount,
+            description=description,
+            transaction_metadata={
+                'brand_name': collaboration.brand.company_name if collaboration.brand else 'Unknown',
+                'collaboration_id': collaboration.id,
+                'collaboration_title': collaboration.title,
+                'creator_commission_pct': commission_percentage,
+                'escrow_held_amount': float(held_amount),
+                'payout_percentage': float(payout_percentage),
+                'release_reason': reason,
+                'breakdown': f'Escrow gross ${creator_gross:.2f}. Platform takes ${platform_commission:.2f} commission. Creator receives ${creator_amount:.2f}.'
+            }
+        )
+        db.session.add(transaction)
+
+        wallet.pending_clearance = float(wallet.pending_clearance or 0) + float(creator_amount)
+        wallet.total_earned = float(wallet.total_earned or 0) + float(creator_amount)
+        wallet.updated_at = datetime.utcnow()
+
+    refund_transaction = None
+    if refund_amount > 0:
+        refund_transaction = refund_collaboration_escrow_to_brand(
+            collaboration_id,
+            reason=f'Escrow refund after {reason}',
+            amount=refund_amount,
+            commit=False
+        )
+
+    payment.escrow_status = 'partial_released' if refund_amount > 0 and creator_gross > 0 else 'released'
+    payment.released_at = datetime.utcnow() if creator_gross > 0 else payment.released_at
+    payment.refunded_at = datetime.utcnow() if refund_amount > 0 else payment.refunded_at
+    collaboration.escrow_status = payment.escrow_status
+    collaboration.auto_complete_eligible_at = None
+
+    if collaboration.booking:
+        collaboration.booking.escrow_status = payment.escrow_status
+
+    db.session.commit()
+
+    if transaction:
+        try:
+            from app.tasks.email_tasks import send_payment_release_notification
+            send_payment_release_notification.delay(
+                creator_user_id=collaboration.creator.user_id,
+                amount=float(transaction.amount),
+                collaboration_id=collaboration.id
+            )
+        except Exception as email_error:
+            print(f"Failed to queue payment release notification: {str(email_error)}")
+
+    return {
+        'creator_transaction': transaction,
+        'refund_transaction': refund_transaction,
+        'payout_percentage': float(payout_percentage),
+        'creator_gross': float(creator_gross),
+        'refund_amount': float(refund_amount)
+    }
+
+
+def refund_collaboration_escrow_to_brand(collaboration_id, reason, amount=None, commit=True):
+    """Refund held collaboration escrow to the brand wallet."""
+    from app.services.brand_wallet_service import get_or_create_brand_wallet
+
+    collaboration = Collaboration.query.get(collaboration_id)
+    if not collaboration:
+        raise ValueError("Collaboration not found")
+
+    brand = collaboration.brand
+    if not brand:
+        raise ValueError("Brand not found")
+
+    payment = _find_payment_for_collaboration(collaboration)
+    if not payment:
+        raise ValueError("No payment found for this collaboration")
+
+    if payment.escrow_status not in ['escrowed', 'pending', 'partial_released']:
+        raise ValueError(f"Payment escrow status invalid - '{payment.escrow_status}'")
+
+    refund_amount = _money(amount if amount is not None else (payment.held_amount or collaboration.amount))
+    if refund_amount <= 0:
+        raise ValueError("Refund amount must be greater than zero")
+
+    wallet = get_or_create_brand_wallet(brand.user_id)
+    transaction = WalletTransaction(
+        wallet_id=wallet.id,
+        user_id=brand.user_id,
+        transaction_type='refund',
+        amount=refund_amount,
+        status='available',
+        clearance_required=False,
+        collaboration_id=collaboration.id,
+        booking_id=collaboration.booking_id,
+        description=reason,
+        transaction_metadata={
+            'collaboration_id': collaboration.id,
+            'creator_id': collaboration.creator_id,
+            'original_amount': float(payment.held_amount or collaboration.amount),
+            'refund_reason': reason
+        }
+    )
+    db.session.add(transaction)
+
+    wallet.available_balance = float(wallet.available_balance or 0) + float(refund_amount)
+    wallet.updated_at = datetime.utcnow()
+
+    if amount is None or refund_amount >= _money(payment.held_amount or collaboration.amount):
+        payment.status = 'refunded'
+        payment.escrow_status = 'refunded'
+        payment.refunded_at = datetime.utcnow()
+        collaboration.escrow_status = 'refunded'
+        collaboration.refund_processed = True
+        if collaboration.booking:
+            collaboration.booking.escrow_status = 'refunded'
+
+    if commit:
+        db.session.commit()
 
     return transaction
 

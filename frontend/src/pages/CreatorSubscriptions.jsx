@@ -21,6 +21,9 @@ export default function CreatorSubscriptions() {
   const [plans, setPlans] = useState([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+  const [boostLoading, setBoostLoading] = useState(null);
+  const [creatorProfile, setCreatorProfile] = useState(null);
+  const [walletBalance, setWalletBalance] = useState(null);
   const [billingCycle, setBillingCycle] = useState('monthly');
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -39,11 +42,53 @@ export default function CreatorSubscriptions() {
 
       setCurrentSubscription(subsRes.data.data);
       setPlans(plansRes.data.data);
+
+      const [profileRes, walletRes] = await Promise.allSettled([
+        api.get('/creators/profile'),
+        api.get('/wallet/balance'),
+      ]);
+      if (profileRes.status === 'fulfilled') {
+        setCreatorProfile(profileRes.value.data.creator || profileRes.value.data);
+      }
+      if (walletRes.status === 'fulfilled') {
+        setWalletBalance(walletRes.value.data.wallet);
+      }
     } catch (error) {
       console.error('Error fetching subscription data:', error);
       toast.error('Failed to load subscription information');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleBoostPurchase = async (durationDays) => {
+    if (!creatorProfile?.id) {
+      toast.error('Creator profile not found');
+      return;
+    }
+
+    try {
+      setBoostLoading(durationDays);
+      const res = await api.post('/spotlight-boosts/purchase', {
+        target_type: 'creator_profile',
+        target_id: creatorProfile.id,
+        duration_days: durationDays,
+        payment_method: 'wallet',
+      });
+
+      toast.success(res.data.message || 'Spotlight Boost is active');
+      setCreatorProfile((current) => ({
+        ...current,
+        active_spotlight_boost: res.data.boost,
+      }));
+      setWalletBalance((current) => current ? {
+        ...current,
+        available_balance: res.data.wallet_balance,
+      } : current);
+    } catch (error) {
+      toast.error(error.response?.data?.error || 'Failed to purchase boost');
+    } finally {
+      setBoostLoading(null);
     }
   };
 
@@ -503,16 +548,15 @@ export default function CreatorSubscriptions() {
                 <div className="text-lg font-bold text-dark mb-1">{boost.days}</div>
                 <div className="text-sm text-gray-600 mb-6">{boost.note}</div>
                 <button
-                  onClick={() => {
-                    toast.info('Spotlight Boost coming soon! This feature is under development.');
-                  }}
+                  onClick={() => handleBoostPurchase(boost.days === '3 Days' ? 3 : boost.days === '7 Days' ? 7 : 30)}
+                  disabled={boostLoading === (boost.days === '3 Days' ? 3 : boost.days === '7 Days' ? 7 : 30) || (walletBalance && Number(walletBalance.available_balance || 0) < boost.price)}
                   className={`w-full py-2.5 rounded-full text-sm font-semibold transition-all ${
                     boost.best
                       ? 'bg-primary hover:bg-primary-dark text-dark'
                       : 'border-2 border-gray-300 hover:border-dark text-dark hover:bg-gray-50'
-                  }`}
+                  } disabled:cursor-not-allowed disabled:opacity-60`}
                 >
-                  Get Boost
+                  {boostLoading === (boost.days === '3 Days' ? 3 : boost.days === '7 Days' ? 7 : 30) ? 'Processing...' : 'Get Boost'}
                 </button>
               </div>
             ))}

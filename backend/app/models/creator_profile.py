@@ -225,6 +225,7 @@ class CreatorProfile(db.Model):
             'cancelled_collaborations_count': getattr(self, 'cancelled_collaborations_count', 0) or 0,
             'effective_rating': self.get_effective_rating(),
             'review_stats': review_stats,
+            'active_spotlight_boost': self.get_active_spotlight_boost(),
             'created_at': self.created_at.isoformat(),
             'updated_at': self.updated_at.isoformat()
         }
@@ -246,6 +247,11 @@ class CreatorProfile(db.Model):
 
         penalty = getattr(self, 'rating_penalty', 0.0) or 0.0
         return max(0.0, float(base_rating) - float(penalty))
+
+    def get_active_spotlight_boost(self):
+        from app.services.spotlight_boost_service import boost_payload_for
+
+        return boost_payload_for('creator_profile', self.id)
 
     def __repr__(self):
         return f'<CreatorProfile {self.user_id}>'

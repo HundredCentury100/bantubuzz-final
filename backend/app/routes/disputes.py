@@ -21,7 +21,7 @@ def raise_dispute():
     Body: { collaboration_id, issue_type, description, evidence_urls }
     """
     try:
-        current_user_id = get_jwt_identity()
+        current_user_id = int(get_jwt_identity())
         data = request.get_json()
 
         collab_id = data.get('collaboration_id')
@@ -41,8 +41,11 @@ def raise_dispute():
             if not collab:
                 return jsonify({'success': False, 'error': 'Collaboration not found'}), 404
 
+            brand_user_id = collab.brand.user_id if collab.brand else None
+            creator_user_id = collab.creator.user_id if collab.creator else None
+
             # Only parties in the collaboration can raise a dispute
-            if current_user_id not in [collab.brand_id, collab.creator_id]:
+            if current_user_id not in [brand_user_id, creator_user_id]:
                 return jsonify({'success': False, 'error': 'You are not a party to this collaboration'}), 403
 
             # Check no open dispute already exists for this collaboration
@@ -56,7 +59,7 @@ def raise_dispute():
                     'error': f'An open dispute ({existing.reference}) already exists for this collaboration'
                 }), 409
 
-            against_user_id = collab.creator_id if current_user_id == collab.brand_id else collab.brand_id
+            against_user_id = creator_user_id if current_user_id == brand_user_id else brand_user_id
         else:
             against_user_id = data.get('against_user_id')
             if not against_user_id:
@@ -75,6 +78,19 @@ def raise_dispute():
             status='open',
         )
         db.session.add(dispute)
+
+        if collab_id and collab:
+            collab.auto_complete_eligible_at = None
+            collab.last_update = f'Dispute {reference} opened - escrow release paused'
+            collab.updated_at = datetime.utcnow()
+
+            from app.models import Payment
+            payment = Payment.query.filter_by(collaboration_id=collab.id).first()
+            if not payment and collab.booking_id:
+                payment = Payment.query.filter_by(booking_id=collab.booking_id).first()
+            if payment:
+                payment.release_due_at = None
+
         db.session.commit()
 
         # Notify admin (user_type=admin)
@@ -116,7 +132,7 @@ def raise_dispute():
 def my_disputes():
     """List all disputes I am involved in (raised or against me)"""
     try:
-        current_user_id = get_jwt_identity()
+        current_user_id = int(get_jwt_identity())
 
         disputes = Dispute.query.filter(
             (Dispute.raised_by_user_id == current_user_id) |
@@ -137,7 +153,7 @@ def my_disputes():
 def get_dispute(dispute_id):
     """Get a single dispute (must be a party to it)"""
     try:
-        current_user_id = get_jwt_identity()
+        current_user_id = int(get_jwt_identity())
         dispute = Dispute.query.get_or_404(dispute_id)
 
         if current_user_id not in [dispute.raised_by_user_id, dispute.against_user_id]:

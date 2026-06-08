@@ -10,6 +10,7 @@ from app.models import (
     CampaignPayment,
     CreatorProfile,
     CreatorSubscription,
+    SpotlightBoost,
     Subscription,
     User,
 )
@@ -191,6 +192,27 @@ def _creator_subscription_invoice(subscription):
     }
 
 
+def _spotlight_boost_invoice(boost):
+    return {
+        'id': f'spotlight-boost-{boost.id}',
+        'invoice_number': _invoice_number('INV-BST', boost.id),
+        'source_type': 'boost',
+        'source_id': boost.id,
+        'title': f'{boost.duration_days}-Day Spotlight Boost',
+        'description': f'{boost.target_type.replace("_", " ").title()} visibility boost',
+        'amount': _money(boost.amount),
+        'currency': boost.currency or 'USD',
+        'status': 'paid',
+        'payment_status': boost.status,
+        'payment_method': boost.payment_method,
+        'issued_at': _date(boost.created_at),
+        'paid_at': _date(boost.starts_at),
+        'due_at': _date(boost.ends_at),
+        'direction': 'paid',
+        'download_url': f'/api/billing/invoices/spotlight-boost/{boost.id}/download',
+    }
+
+
 def _get_user_invoices(user, workspace_id=None):
     invoices = []
 
@@ -217,6 +239,9 @@ def _get_user_invoices(user, workspace_id=None):
         if creator:
             creator_subscriptions = CreatorSubscription.query.filter_by(creator_id=creator.id).order_by(CreatorSubscription.created_at.desc()).all()
             invoices.extend(_creator_subscription_invoice(subscription) for subscription in creator_subscriptions)
+
+    boosts = SpotlightBoost.query.filter_by(user_id=user.id).order_by(SpotlightBoost.created_at.desc()).all()
+    invoices.extend(_spotlight_boost_invoice(boost) for boost in boosts)
 
     invoices.sort(key=lambda item: item.get('issued_at') or '', reverse=True)
     return invoices
@@ -319,7 +344,7 @@ def download_invoice(source_type, source_id):
     invoice = next(
         (
             item for item in _get_user_invoices(user, workspace_id=get_request_workspace_id())
-            if item['source_type'] in ['collaboration', 'campaign'] and item['download_url'] and item['download_url'].endswith(f'/{source_type}/{source_id}/download')
+            if item['download_url'] and item['download_url'].endswith(f'/{source_type}/{source_id}/download')
         ),
         None
     )

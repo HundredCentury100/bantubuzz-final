@@ -188,6 +188,46 @@ def resolve_dispute(dispute_id):
         if resolution not in valid_resolutions:
             return jsonify({'success': False, 'error': f'Invalid resolution. Choose from: {valid_resolutions}'}), 400
 
+        money_result = None
+        collaboration = dispute.collaboration
+        if collaboration and resolution in ['release_funds', 'partial_release', 'refund']:
+            if resolution in ['release_funds', 'partial_release']:
+                payout_percentage = 100
+                if resolution == 'partial_release':
+                    payout_percentage = data.get('payout_percentage')
+                    if payout_percentage is None:
+                        return jsonify({'success': False, 'error': 'payout_percentage is required for partial_release'}), 400
+                    payout_percentage = float(payout_percentage)
+                    if payout_percentage <= 0 or payout_percentage >= 100:
+                        return jsonify({'success': False, 'error': 'payout_percentage must be greater than 0 and less than 100'}), 400
+
+                if collaboration.status != 'completed':
+                    collaboration.status = 'completed'
+                    collaboration.actual_completion_date = datetime.utcnow()
+                    collaboration.progress_percentage = 100
+                    collaboration.last_update = 'Completed through BantuBuzz dispute mediation'
+                    collaboration.last_update_date = datetime.utcnow()
+
+                from app.services.payment_service import release_collaboration_escrow
+                money_result = release_collaboration_escrow(
+                    collaboration.id,
+                    payout_percentage=payout_percentage,
+                    reason='dispute_resolution'
+                )
+
+            elif resolution == 'refund':
+                from app.services.payment_service import refund_collaboration_escrow_to_brand
+                refund_transaction = refund_collaboration_escrow_to_brand(
+                    collaboration.id,
+                    reason=f'Dispute {dispute.reference} resolved as refund',
+                    commit=False
+                )
+                collaboration.status = 'cancelled'
+                collaboration.auto_complete_eligible_at = None
+                collaboration.last_update = 'Refunded through BantuBuzz dispute mediation'
+                collaboration.last_update_date = datetime.utcnow()
+                money_result = {'refund_transaction': refund_transaction}
+
         dispute.resolution = resolution
         dispute.resolution_notes = data.get('resolution_notes', '')
         dispute.payout_percentage = data.get('payout_percentage')
@@ -212,7 +252,13 @@ def resolve_dispute(dispute_id):
 
         return jsonify({
             'success': True,
-            'message': f'Dispute {dispute.reference} resolved as: {resolution_label}'
+            'message': f'Dispute {dispute.reference} resolved as: {resolution_label}',
+            'money_result': {
+                'creator_transaction_id': money_result.get('creator_transaction').id if money_result and money_result.get('creator_transaction') else None,
+                'refund_transaction_id': money_result.get('refund_transaction').id if money_result and money_result.get('refund_transaction') else None,
+                'payout_percentage': money_result.get('payout_percentage') if money_result else None,
+                'refund_amount': money_result.get('refund_amount') if money_result else None,
+            } if money_result else None
         }), 200
 
     except Exception as e:

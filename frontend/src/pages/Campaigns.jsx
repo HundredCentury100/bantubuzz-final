@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { campaignsAPI } from '../services/api';
 import Navbar from '../components/Navbar';
 import toast from 'react-hot-toast';
+import { Bolt } from 'lucide-react';
 
 const Campaigns = () => {
   const navigate = useNavigate();
@@ -156,13 +157,21 @@ const Campaigns = () => {
                     <h3 className="text-lg font-bold text-gray-900 line-clamp-2">
                       {campaign.title}
                     </h3>
-                    <span
-                      className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusBadgeClass(
-                        campaign.status
-                      )}`}
-                    >
-                      {campaign.status}
-                    </span>
+                    <div className="flex flex-wrap justify-end gap-2">
+                      {campaign.active_spotlight_boost && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-800">
+                          <Bolt className="h-3 w-3" />
+                          Boosted
+                        </span>
+                      )}
+                      <span
+                        className={`px-3 py-1 rounded-full text-xs font-medium ${getStatusBadgeClass(
+                          campaign.status
+                        )}`}
+                      >
+                        {campaign.status}
+                      </span>
+                    </div>
                   </div>
 
                   <p className="text-gray-600 text-sm line-clamp-2 mb-4">

@@ -64,11 +64,29 @@ def get_featured_creators():
 
         # Try to get featured creators
         try:
+            from app.models import SpotlightBoost
+            active_boost_creator_ids = [
+                row.target_id for row in SpotlightBoost.query.filter(
+                    SpotlightBoost.target_type == 'creator_profile',
+                    SpotlightBoost.status == 'active',
+                    SpotlightBoost.ends_at > datetime.utcnow()
+                ).all()
+            ]
+
             query = CreatorProfile.query.join(User).filter(
-                CreatorProfile.is_featured == True,
                 User.is_active == True,
                 User.is_verified == True
             )
+
+            if active_boost_creator_ids:
+                query = query.filter(
+                    or_(
+                        CreatorProfile.id.in_(active_boost_creator_ids),
+                        CreatorProfile.is_featured == True,
+                    )
+                )
+            else:
+                query = query.filter(CreatorProfile.is_featured == True)
 
             # Filter by featured_type if provided
             if featured_type:
@@ -368,10 +386,18 @@ def get_creators():
         # Featured creators get priority ONLY when user hasn't explicitly selected another sort
         if sort_by in ['relevance', ''] or not sort_by:
             # Get active featured subscriptions
-            from app.models import CreatorSubscription, CreatorSubscriptionPlan
+            from app.models import CreatorSubscription, CreatorSubscriptionPlan, SpotlightBoost
             from datetime import datetime
 
             featured_creator_ids = set()
+            active_boosts = SpotlightBoost.query.filter(
+                SpotlightBoost.target_type == 'creator_profile',
+                SpotlightBoost.status == 'active',
+                SpotlightBoost.ends_at > datetime.utcnow()
+            ).all()
+            for boost in active_boosts:
+                featured_creator_ids.add(boost.target_id)
+
             active_featured_subs = CreatorSubscription.query.join(
                 CreatorSubscriptionPlan
             ).filter(

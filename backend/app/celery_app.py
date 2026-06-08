@@ -86,6 +86,11 @@ def make_celery(app=None):
                 'task': 'app.tasks.collaboration_tasks.send_delivery_due_reminders',
                 'schedule': crontab(minute=0),  # Hourly
             },
+            # Move matured creator earnings from pending clearance to available
+            'clear-ready-wallet-transactions': {
+                'task': 'app.tasks.collaboration_tasks.clear_ready_wallet_transactions',
+                'schedule': crontab(minute=30),  # Hourly
+            },
             # Send paid subscription renewal reminders daily.
             'send-subscription-renewal-reminders': {
                 'task': 'app.tasks.subscription_tasks.send_renewal_reminders',

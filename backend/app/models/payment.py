@@ -39,8 +39,11 @@ class Payment(db.Model):
     payment_instructions = db.Column(db.Text)
 
     # Escrow status
-    escrow_status = db.Column(db.String(20), default='pending')  # 'pending', 'escrowed', 'released', 'refunded'
+    escrow_status = db.Column(db.String(20), default='pending')  # 'pending', 'escrowed', 'released', 'partial_released', 'refunded'
     held_amount = db.Column(db.Numeric(10, 2))
+    release_due_at = db.Column(db.DateTime)
+    released_at = db.Column(db.DateTime)
+    refunded_at = db.Column(db.DateTime)
 
     # Timestamps
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -71,6 +74,10 @@ class Payment(db.Model):
             'verified_at': self.verified_at.isoformat() if self.verified_at else None,
             'verification_notes': self.verification_notes,
             'escrow_status': self.escrow_status,
+            'held_amount': float(self.held_amount) if self.held_amount is not None else None,
+            'release_due_at': self.release_due_at.isoformat() if self.release_due_at else None,
+            'released_at': self.released_at.isoformat() if self.released_at else None,
+            'refunded_at': self.refunded_at.isoformat() if self.refunded_at else None,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,
             'completed_at': self.completed_at.isoformat() if self.completed_at else None
