@@ -28,6 +28,8 @@ from .verification_application import VerificationApplication
 from .thunzi_account import ThunziAccount
 from .connected_platform import ConnectedPlatform
 from .post_metrics import PostMetrics
+from .post_metrics_snapshot import PostMetricsSnapshot
+from .post_sentiment_comment import PostSentimentComment
 from .portfolio_item import PortfolioItem
 from .smilepay_transaction import SmilePayTransaction
 from .client_workspace import ClientWorkspace, WorkspaceAddon, WorkspaceAuditLog, WorkspaceInvitation, WorkspaceMemberPermission
@@ -104,6 +106,8 @@ __all__ = [
     'ThunziAccount',
     'ConnectedPlatform',
     'PostMetrics',
+    'PostMetricsSnapshot',
+    'PostSentimentComment',
     'UserBlock',
     'MessageRiskSignal',
     'MessageSafetyWarning',

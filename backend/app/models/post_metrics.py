@@ -36,6 +36,8 @@ class PostMetrics(db.Model):
     comments = db.Column(db.Integer, default=0)
     shares = db.Column(db.Integer, default=0)
     saves = db.Column(db.Integer, default=0)
+    clicks = db.Column(db.Integer, default=0)
+    conversions = db.Column(db.Integer, default=0)
 
     # Calculated Metrics
     total_engagement = db.Column(db.Integer, default=0)  # likes + comments + shares + saves
@@ -123,6 +125,8 @@ class PostMetrics(db.Model):
                 'comments': self.comments,
                 'shares': self.shares,
                 'saves': self.saves,
+                'clicks': self.clicks,
+                'conversions': self.conversions,
                 'total_engagement': self.total_engagement,
                 'engagement_rate': float(self.engagement_rate) if self.engagement_rate else 0,
                 'video_views': self.video_views,

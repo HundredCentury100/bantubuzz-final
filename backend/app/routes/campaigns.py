@@ -7,7 +7,7 @@ CRITICAL RULES:
 4. Payment-gated flow: Accept proposal → Create booking → Payment → Create collaboration
 """
 
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from datetime import datetime, timezone
 from decimal import Decimal
@@ -1308,19 +1308,96 @@ def get_campaign_performance(campaign_id):
             if workspace_error:
                 return jsonify({'error': workspace_error}), workspace_status
 
+        from app.utils.subscription_helper import get_brand_analytics_entitlements
+        entitlements = get_brand_analytics_entitlements(user_id)
+        if not entitlements['enabled']:
+            from app.services.subscription_enforcement_service import SubscriptionEnforcementService
+            return jsonify({
+                'error': 'Live campaign analytics requires a Pro or higher brand plan',
+                'feature': 'advanced_analytics',
+                'upgrade_prompt': SubscriptionEnforcementService.get_upgrade_prompt(
+                    user_id,
+                    'brand',
+                    'advanced_analytics',
+                ),
+            }), 403
+
+        days = request.args.get('days', 30, type=int)
+        if days not in {7, 30, 90}:
+            days = 30
+
         # Get performance analytics
         from app.services.campaign_analytics_service import campaign_analytics_service
-        performance = campaign_analytics_service.get_campaign_performance(campaign_id)
+        performance = campaign_analytics_service.get_campaign_performance(
+            campaign_id,
+            days=days,
+            include_sentiment_comments=entitlements['full_sentiment'],
+        )
 
         if not performance:
             return jsonify({'error': 'Campaign not found'}), 404
 
+        performance['access'] = {
+            'plan_name': entitlements['plan_name'],
+            'full_sentiment': entitlements['full_sentiment'],
+            'pdf_export': entitlements['full_sentiment'],
+        }
         return jsonify(performance), 200
 
     except Exception as e:
         print(f"Error getting campaign performance: {str(e)}")
         import traceback
         traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@bp.route('/<int:campaign_id>/performance/sentiment-report', methods=['GET'])
+@jwt_required()
+def export_campaign_sentiment_report(campaign_id):
+    """Download the Premium campaign sentiment report as PDF."""
+    try:
+        user_id = int(get_jwt_identity())
+        brand = BrandProfile.query.filter_by(user_id=user_id).first()
+        campaign = Campaign.query.get(campaign_id)
+        if not brand or not campaign or campaign.brand_id != brand.id:
+            return jsonify({'error': 'Campaign not found or unauthorized'}), 404
+        if campaign.workspace_id:
+            _, workspace_error, workspace_status = require_workspace_access(
+                user_id,
+                campaign.workspace_id,
+                'can_view_analytics',
+            )
+            if workspace_error:
+                return jsonify({'error': workspace_error}), workspace_status
+
+        from app.utils.subscription_helper import get_brand_analytics_entitlements
+        entitlements = get_brand_analytics_entitlements(user_id)
+        if not entitlements['full_sentiment']:
+            return jsonify({
+                'error': 'Sentiment PDF export requires a Premium or higher brand plan',
+                'feature': 'advanced_analytics',
+            }), 403
+
+        days = request.args.get('days', 30, type=int)
+        if days not in {7, 30, 90}:
+            days = 30
+
+        from app.services.campaign_analytics_service import campaign_analytics_service
+        from app.services.white_label_report_service import generate_campaign_sentiment_pdf
+
+        performance = campaign_analytics_service.get_campaign_performance(
+            campaign_id,
+            days=days,
+            include_sentiment_comments=True,
+        )
+        pdf_bytes = generate_campaign_sentiment_pdf(brand, campaign, performance)
+        response = current_app.response_class(pdf_bytes, mimetype='application/pdf')
+        response.headers['Content-Disposition'] = (
+            f'attachment; filename="campaign-{campaign.id}-sentiment-report.pdf"'
+        )
+        return response
+    except Exception as e:
+        current_app.logger.error('Campaign sentiment report failed', exc_info=True)
         return jsonify({'error': str(e)}), 500
 
 

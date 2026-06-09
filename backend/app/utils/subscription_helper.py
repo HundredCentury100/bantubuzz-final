@@ -63,3 +63,34 @@ def get_brand_service_fee_percentage(brand_user_id):
 
     fee_percentage = subscription.plan.service_fee_percentage
     return float(fee_percentage) if fee_percentage is not None else 12.0
+
+
+def get_brand_analytics_entitlements(brand_user_id):
+    """Return campaign analytics access for the active brand subscription."""
+    plan = get_brand_subscription_plan(brand_user_id)
+    if not plan:
+        return {
+            'enabled': False,
+            'full_sentiment': False,
+            'plan_name': 'Free',
+            'plan_slug': 'free',
+        }
+
+    slug = (plan.slug or '').lower()
+    name = (plan.name or '').lower()
+    pro_or_higher = (
+        bool(plan.analytics_access or plan.has_advanced_analytics)
+        or any(token in slug for token in ('pro', 'premium', 'agency', 'enterprise'))
+        or any(token in name for token in ('pro', 'premium', 'agency', 'enterprise'))
+    )
+    full_sentiment = (
+        any(token in slug for token in ('premium', 'agency', 'enterprise'))
+        or any(token in name for token in ('premium', 'agency', 'enterprise'))
+    )
+
+    return {
+        'enabled': pro_or_higher,
+        'full_sentiment': full_sentiment,
+        'plan_name': plan.name,
+        'plan_slug': plan.slug,
+    }

@@ -10,6 +10,8 @@ from app.models import (
     MilestoneDeliverable,
     PackageDeliverable,
     PostMetrics,
+    PostMetricsSnapshot,
+    PostSentimentComment,
     ConnectedPlatform,
     User,
     CreatorProfile
@@ -17,11 +19,47 @@ from app.models import (
 from app.services.thunzi_service import thunzi_service
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Union
+import hashlib
+import re
 import traceback
 
 
 class PostMetricsService:
     """Service for syncing post metrics from ThunziAI"""
+
+    THEME_KEYWORDS = {
+        'product_quality': {
+            'quality', 'beautiful', 'amazing', 'perfect', 'broken', 'poor',
+            'fake', 'zvakanaka', 'kunaka', 'kubi', 'kuhle', 'enhle', 'mooi', 'sleg'
+        },
+        'price_value': {
+            'price', 'cost', 'expensive', 'cheap', 'value', 'affordable',
+            'inodhura', 'mutengo', 'duur', 'goedkoop', 'ibiza'
+        },
+        'customer_service': {
+            'service', 'support', 'helpful', 'rude', 'response', 'delivery',
+            'rubatsiro', 'inkonzo', 'usizo', 'diens', 'aflewering'
+        },
+        'trust_authenticity': {
+            'trust', 'trusted', 'authentic', 'real', 'scam', 'fraud', 'legit',
+            'chokwadi', 'ukuthembeka', 'betroubaar', 'egte'
+        },
+        'campaign_creative': {
+            'creative', 'content', 'video', 'music', 'funny', 'boring',
+            'ad', 'advert', 'creator', 'umculo', 'ividiyo', 'vhidhiyo'
+        },
+        'purchase_intent': {
+            'buy', 'bought', 'order', 'want', 'need', 'where can i get',
+            'ndinoda', 'ngifuna', 'ukuthenga', 'bestel', 'koop'
+        },
+    }
+
+    LANGUAGE_HINTS = {
+        'shona': {'zvakanaka', 'ndinoda', 'mutengo', 'chokwadi', 'rubatsiro', 'vhidhiyo', 'inodhura'},
+        'ndebele': {'kuhle', 'ngifuna', 'inkonzo', 'ukuthenga', 'kubi'},
+        'zulu': {'ngiyathanda', 'kuhle', 'ngifuna', 'usizo', 'ukuthenga', 'kubi'},
+        'afrikaans': {'lekker', 'mooi', 'duur', 'goedkoop', 'diens', 'aflewering', 'betroubaar', 'koop'},
+    }
 
     @staticmethod
     def _first_dict(value):
@@ -30,6 +68,159 @@ class PostMetricsService:
         if isinstance(value, list):
             return next((item for item in value if isinstance(item, dict)), None)
         return None
+
+    @staticmethod
+    def _normalize_sentiment(value):
+        sentiment = str(value or 'neutral').strip().lower()
+        if sentiment in {'positive', 'negative', 'neutral'}:
+            return sentiment
+        if sentiment == 'critical':
+            return 'negative'
+        return 'neutral'
+
+    @staticmethod
+    def _detect_language(content, supplied_language=None):
+        supplied = str(supplied_language or '').strip().lower()
+        aliases = {
+            'en': 'english',
+            'eng': 'english',
+            'sn': 'shona',
+            'nd': 'ndebele',
+            'zu': 'zulu',
+            'af': 'afrikaans',
+        }
+        supplied = aliases.get(supplied, supplied)
+        if supplied in {'english', 'shona', 'ndebele', 'zulu', 'afrikaans'}:
+            return supplied
+
+        words = set(re.findall(r"[a-z']+", (content or '').lower()))
+        scores = {
+            language: len(words.intersection(hints))
+            for language, hints in PostMetricsService.LANGUAGE_HINTS.items()
+        }
+        language, score = max(scores.items(), key=lambda item: item[1])
+        return language if score > 0 else 'english'
+
+    @staticmethod
+    def _extract_themes(content):
+        normalized = (content or '').lower()
+        words = set(re.findall(r"[a-z']+", normalized))
+        themes = []
+        for theme, keywords in PostMetricsService.THEME_KEYWORDS.items():
+            if words.intersection(keywords) or any(
+                ' ' in keyword and keyword in normalized
+                for keyword in keywords
+            ):
+                themes.append(theme)
+        return themes
+
+    @staticmethod
+    def _parse_datetime(value):
+        if not value:
+            return None
+        try:
+            return datetime.fromisoformat(str(value).replace('Z', '+00:00')).replace(tzinfo=None)
+        except (TypeError, ValueError):
+            return None
+
+    @staticmethod
+    def _sync_sentiment_comments(metrics, original_post_id):
+        """Best-effort comment cache used by Premium sentiment analytics."""
+        from flask import current_app
+
+        try:
+            response = thunzi_service.get_post_comments_by_original_id(original_post_id)
+            if isinstance(response, dict):
+                comments = response.get('comments') or response.get('data') or []
+            elif isinstance(response, list):
+                comments = response
+            else:
+                comments = []
+
+            if not isinstance(comments, list):
+                return 0
+
+            normalized_comments = []
+            for comment in comments:
+                if not isinstance(comment, dict):
+                    continue
+                content = str(comment.get('content') or comment.get('text') or '').strip()
+                if not content:
+                    continue
+                author = str(comment.get('username') or comment.get('author') or '').strip()
+                published_at_value = comment.get('publishedAt') or comment.get('createdAt')
+                external_id = comment.get('id') or comment.get('commentId')
+                if external_id is None:
+                    fingerprint = f'{author}|{content}|{published_at_value}'.encode('utf-8')
+                    external_id = hashlib.sha1(fingerprint).hexdigest()
+                normalized_comments.append({
+                    'external_id': str(external_id),
+                    'platform': comment.get('platform') or metrics.post_platform,
+                    'author': author or None,
+                    'content': content,
+                    'sentiment': PostMetricsService._normalize_sentiment(comment.get('sentiment')),
+                    'sentiment_score': comment.get('sentimentScore'),
+                    'language': PostMetricsService._detect_language(
+                        content,
+                        comment.get('language') or comment.get('languageCode')
+                    ),
+                    'likes': int(comment.get('likes') or comment.get('likeCount') or 0),
+                    'views': int(comment.get('views') or 0),
+                    'themes': PostMetricsService._extract_themes(content),
+                    'published_at': PostMetricsService._parse_datetime(published_at_value),
+                })
+
+            normalized_comments.sort(
+                key=lambda item: (
+                    item['likes'],
+                    abs(float(item['sentiment_score'] or 0)),
+                ),
+                reverse=True,
+            )
+
+            for comment in normalized_comments[:100]:
+                record = PostSentimentComment.query.filter_by(
+                    post_metrics_id=metrics.id,
+                    external_id=comment['external_id'],
+                ).first()
+                if not record:
+                    record = PostSentimentComment(
+                        post_metrics_id=metrics.id,
+                        external_id=comment['external_id'],
+                    )
+                    db.session.add(record)
+                for field, value in comment.items():
+                    if field != 'external_id':
+                        setattr(record, field, value)
+
+            return min(len(normalized_comments), 100)
+        except Exception:
+            current_app.logger.warning(
+                'Unable to sync sentiment comments for post %s',
+                original_post_id,
+                exc_info=True,
+            )
+            return 0
+
+    @staticmethod
+    def _add_metrics_snapshot(metrics):
+        db.session.add(PostMetricsSnapshot(
+            post_metrics_id=metrics.id,
+            reach=metrics.reach or 0,
+            impressions=metrics.impressions or 0,
+            video_views=metrics.video_views or 0,
+            likes=metrics.likes or 0,
+            comments=metrics.comments or 0,
+            shares=metrics.shares or 0,
+            saves=metrics.saves or 0,
+            clicks=metrics.clicks or 0,
+            conversions=metrics.conversions or 0,
+            total_engagement=metrics.total_engagement or 0,
+            positive_comments=metrics.positive_comments or 0,
+            negative_comments=metrics.negative_comments or 0,
+            neutral_comments=metrics.neutral_comments or 0,
+            captured_at=datetime.utcnow(),
+        ))
 
     @staticmethod
     def sync_deliverable_metrics(deliverable_id: int, deliverable_type: str = 'milestone') -> Dict:
@@ -276,8 +467,8 @@ class PostMetricsService:
                 db.session.add(metrics)
 
             # Update metrics from ThunziAI data
-            post_data = insights.get('post', matching_post)
-            sentiment_data = insights.get('commentSentiment', {})
+            post_data = insights.get('post') or matching_post or {}
+            sentiment_data = insights.get('commentSentiment') or {}
 
             # Update ThunziAI post ID from insights or matching post
             thunzi_post_id = insights.get('postId') or matching_post.get('id')
@@ -306,7 +497,12 @@ class PostMetricsService:
             reach_value = post_data.get('reach')
             if reach_value is not None:
                 metrics.reach = reach_value
-                metrics.impressions = reach_value  # Use reach for impressions
+
+            impressions_value = post_data.get('impressions')
+            if impressions_value is not None:
+                metrics.impressions = impressions_value
+            elif reach_value is not None:
+                metrics.impressions = reach_value
 
             likes_value = post_data.get('likes')
             if likes_value is not None:
@@ -324,6 +520,22 @@ class PostMetricsService:
             if saves_value is not None:
                 metrics.saves = saves_value
 
+            clicks_value = (
+                post_data.get('clicks')
+                if post_data.get('clicks') is not None
+                else post_data.get('linkClicks', post_data.get('websiteClicks'))
+            )
+            if clicks_value is not None:
+                metrics.clicks = clicks_value
+
+            conversions_value = (
+                post_data.get('conversions')
+                if post_data.get('conversions') is not None
+                else post_data.get('conversionCount')
+            )
+            if conversions_value is not None:
+                metrics.conversions = conversions_value
+
             # Store ThunziAI's engagement rate if available (TikTok, Facebook, Instagram)
             engagement_rate_value = post_data.get('engagementRate')
             if engagement_rate_value is not None:
@@ -340,17 +552,19 @@ class PostMetricsService:
             # Sentiment analysis (YouTube-only has sentiment score)
             sentiment_value = post_data.get('sentiment')
             if sentiment_value is not None:
-                # ThunziAI returns sentiment as a percentage (0-100)
-                # Convert to -100 to 100 scale: negative (0-33), neutral (34-66), positive (67-100)
-                if sentiment_value <= 33:
-                    metrics.sentiment = 'negative'
-                    metrics.sentiment_score = sentiment_value - 50  # Map to -50 to -17
-                elif sentiment_value <= 66:
-                    metrics.sentiment = 'neutral'
-                    metrics.sentiment_score = 0
+                if isinstance(sentiment_value, (int, float)):
+                    # ThunziAI sometimes returns sentiment as a percentage.
+                    if sentiment_value <= 33:
+                        metrics.sentiment = 'negative'
+                        metrics.sentiment_score = sentiment_value - 50
+                    elif sentiment_value <= 66:
+                        metrics.sentiment = 'neutral'
+                        metrics.sentiment_score = 0
+                    else:
+                        metrics.sentiment = 'positive'
+                        metrics.sentiment_score = sentiment_value - 50
                 else:
-                    metrics.sentiment = 'positive'
-                    metrics.sentiment_score = sentiment_value - 50  # Map to 17 to 50
+                    metrics.sentiment = PostMetricsService._normalize_sentiment(sentiment_value)
 
             # Handle ThunziAI's typo: they return "postive" instead of "positive"
             metrics.positive_comments = sentiment_data.get('positive', sentiment_data.get('postive', 0))
@@ -364,6 +578,12 @@ class PostMetricsService:
             metrics.sync_error = None
             metrics.updated_at = datetime.utcnow()
 
+            db.session.flush()
+            comments_synced = PostMetricsService._sync_sentiment_comments(
+                metrics,
+                original_post_id,
+            )
+            PostMetricsService._add_metrics_snapshot(metrics)
             db.session.commit()
 
             current_app.logger.info(
@@ -375,6 +595,7 @@ class PostMetricsService:
                 'success': True,
                 'message': 'Metrics synced successfully',
                 'metrics': metrics.to_dict(),
+                'comments_synced': comments_synced,
                 'error': None
             }
 

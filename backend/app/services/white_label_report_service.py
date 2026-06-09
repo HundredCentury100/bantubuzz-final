@@ -169,3 +169,110 @@ def generate_master_dashboard_pdf(brand, payload):
     pages[0].save(output, format='PDF', save_all=True, append_images=pages[1:])
     output.seek(0)
     return output.getvalue()
+
+
+def generate_campaign_sentiment_pdf(brand, campaign, performance):
+    """Generate a branded Premium sentiment report for one campaign."""
+    date_label = f"Generated {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}"
+    title = f"{campaign.title} Sentiment Report"
+    pages = []
+    page, draw, primary, secondary = _new_page(brand, title, date_label)
+    pages.append(page)
+    y = 220
+
+    sentiment = performance.get('sentiment') or {}
+    percentages = sentiment.get('percentages') or {}
+    overview = performance.get('overview') or {}
+
+    draw.text((MARGIN, y), 'Campaign overview', font=_font(25, True), fill=secondary)
+    y += 52
+    stats = [
+        ('Reach', f"{int(overview.get('total_reach') or 0):,}"),
+        ('Engagement', f"{int(overview.get('total_engagements') or 0):,}"),
+        ('Comments analysed', f"{int(sentiment.get('total_analyzed') or 0):,}"),
+        ('Overall sentiment', str(sentiment.get('overall') or 'neutral').title()),
+    ]
+    card_width = 250
+    for index, (label, value) in enumerate(stats):
+        x = MARGIN + index * (card_width + 24)
+        draw.rounded_rectangle(
+            (x, y, x + card_width, y + 128),
+            radius=16,
+            outline=(229, 231, 235),
+            width=2,
+            fill=(249, 250, 251),
+        )
+        draw.text((x + 20, y + 20), label, font=_font(16), fill=(99, 102, 111))
+        draw.text((x + 20, y + 60), value, font=_font(25, True), fill=secondary)
+    y += 184
+
+    draw.text((MARGIN, y), 'Sentiment distribution', font=_font(25, True), fill=secondary)
+    y += 48
+    for label, color in (
+        ('positive', (34, 197, 94)),
+        ('neutral', (107, 114, 128)),
+        ('negative', (239, 68, 68)),
+    ):
+        percentage = float(percentages.get(label) or 0)
+        draw.text((MARGIN, y), label.title(), font=_font(18, True), fill=secondary)
+        draw.rounded_rectangle(
+            (300, y + 2, PAGE_SIZE[0] - MARGIN, y + 28),
+            radius=10,
+            fill=(229, 231, 235),
+        )
+        width = int((PAGE_SIZE[0] - MARGIN - 300) * min(percentage, 100) / 100)
+        if width > 0:
+            draw.rounded_rectangle((300, y + 2, 300 + width, y + 28), radius=10, fill=color)
+        draw.text((PAGE_SIZE[0] - 150, y), f'{percentage:.1f}%', font=_font(18, True), fill=secondary)
+        y += 52
+
+    y += 22
+    draw.text((MARGIN, y), 'Sentiment drivers', font=_font(25, True), fill=secondary)
+    y += 46
+    drivers = sentiment.get('drivers') or {}
+    for group, color in (('positive', (22, 101, 52)), ('negative', (185, 28, 28))):
+        draw.text((MARGIN, y), f'{group.title()} themes', font=_font(19, True), fill=color)
+        y += 34
+        items = drivers.get(group) or []
+        if not items:
+            draw.text((MARGIN + 20, y), 'No recurring themes detected yet.', font=_font(16), fill=(99, 102, 111))
+            y += 32
+        for item in items:
+            label = str(item.get('theme') or '').replace('_', ' ').title()
+            draw.text((MARGIN + 20, y), f"- {label}: {item.get('count') or 0}", font=_font(17), fill=secondary)
+            y += 30
+        y += 16
+
+    comments = sentiment.get('top_comments') or []
+    if comments:
+        page, draw, primary, secondary = _new_page(brand, title, 'Top comments by sentiment')
+        pages.append(page)
+        y = 220
+        for index, comment in enumerate(comments, start=1):
+            if y > PAGE_SIZE[1] - 180:
+                page, draw, primary, secondary = _new_page(brand, title, 'Top comments by sentiment')
+                pages.append(page)
+                y = 220
+            sentiment_label = str(comment.get('sentiment') or 'neutral').title()
+            language = str(comment.get('language') or 'unknown').title()
+            draw.text(
+                (MARGIN, y),
+                f"{index}. {sentiment_label} | {language} | {comment.get('likes') or 0} likes",
+                font=_font(17, True),
+                fill=secondary,
+            )
+            y = _draw_wrapped(
+                draw,
+                comment.get('content') or '',
+                (MARGIN + 18, y + 30),
+                _font(16),
+                (75, 85, 99),
+                PAGE_SIZE[0] - (MARGIN * 2) - 18,
+                line_gap=6,
+            )
+            y += 24
+
+    output = BytesIO()
+    pages[0].save(output, format='PDF', save_all=True, append_images=pages[1:])
+    output.seek(0)
+    return output.getvalue()

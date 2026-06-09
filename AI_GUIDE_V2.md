@@ -914,6 +914,18 @@ Deployment note:
   - Creator discovery, creator profiles, brand campaign lists, and creator campaign browsing show a Boosted badge while the boost is active.
   - Creator campaign browsing prioritizes active boosted campaigns before normal deadline/date ordering.
   - Billing invoices include Spotlight Boost receipts through `backend/app/routes/billing.py` with source type `boost`.
+- Live campaign analytics and sentiment:
+  - Deploy script: `deployment/DEPLOY-LIVE-CAMPAIGN-ANALYTICS.bat`.
+  - Migration: `backend/migrations/versions/202606091000_add_live_campaign_analytics.py`.
+  - `PostMetrics` now stores `clicks` and `conversions`.
+  - `PostMetricsSnapshot` stores cumulative four-hour snapshots so campaign trend charts can render true 7-day, 30-day, and 90-day views.
+  - `PostSentimentComment` caches ThunziAI comment text, sentiment, score, detected language, engagement, and recurring themes.
+  - Supported sentiment languages are English, Shona, Ndebele, Zulu, and Afrikaans. Prefer ThunziAI language labels when present; the sync service uses local keyword hints as fallback.
+  - `GET /api/campaigns/<campaign_id>/performance?days=7|30|90` is restricted to Pro+ brand plans.
+  - Pro receives positive/neutral/negative sentiment percentages.
+  - Premium, Agency, and Enterprise receive sentiment drivers, language breakdown, top 20 comments, and PDF export.
+  - Premium PDF endpoint: `GET /api/campaigns/<campaign_id>/performance/sentiment-report`.
+  - Four-hour platform and submitted-post sync schedules remain in `backend/app/celery_app.py`.
 - Remaining hardening for future slices:
   - Improve team invitation onboarding so new invitees land directly back on the invite after signup/login.
   - Build tailored onboarding steps after Agency/Enterprise signup.

@@ -3,17 +3,28 @@ Campaign Analytics Service
 Calculates campaign performance metrics and analytics
 """
 from app import db
-from app.models import Campaign, Collaboration, PostMetrics, CampaignProposal, CreatorProfile, CampaignCartItem
+from app.models import (
+    Analytics,
+    Campaign,
+    Collaboration,
+    PostMetrics,
+    PostMetricsSnapshot,
+    PostSentimentComment,
+    CampaignProposal,
+    CreatorProfile,
+    CampaignCartItem,
+)
 from app.utils.campaign_helpers import get_campaign_collaborations
 from sqlalchemy import func
 from datetime import datetime, timedelta
+from collections import Counter
 
 
 class CampaignAnalyticsService:
     """Service for calculating campaign performance metrics"""
 
     @staticmethod
-    def get_campaign_performance(campaign_id):
+    def get_campaign_performance(campaign_id, days=30, include_sentiment_comments=False):
         """
         Get comprehensive performance analytics for a campaign
 
@@ -24,6 +35,7 @@ class CampaignAnalyticsService:
         if not campaign:
             return None
 
+        days = days if days in {7, 30, 90} else 30
         all_collaborations = CampaignAnalyticsService._get_campaign_collaborations(campaign_id)
 
         if not all_collaborations:
@@ -35,6 +47,9 @@ class CampaignAnalyticsService:
                 'by_platform': [],
                 'by_creator_platform': [],
                 'timeline': [],
+                'sentiment': CampaignAnalyticsService._empty_sentiment(),
+                'range_days': days,
+                'last_synced_at': None,
                 'campaign_info': {
                     'title': campaign.title,
                     'budget': float(campaign.budget) if campaign.budget else 0,
@@ -49,7 +64,12 @@ class CampaignAnalyticsService:
         creators = CampaignAnalyticsService._calculate_creator_performance(all_collaborations)
         platforms = CampaignAnalyticsService._calculate_platform_breakdown(all_collaborations)
         creator_platforms = CampaignAnalyticsService._calculate_creator_platform_breakdown(all_collaborations)
-        timeline = CampaignAnalyticsService._calculate_timeline(all_collaborations)
+        timeline = CampaignAnalyticsService._calculate_timeline(all_collaborations, days)
+        sentiment = CampaignAnalyticsService._calculate_sentiment(
+            all_collaborations,
+            include_comments=include_sentiment_comments,
+        )
+        last_synced_at = CampaignAnalyticsService._last_synced_at(all_collaborations)
 
         return {
             'overview': overview,
@@ -59,6 +79,9 @@ class CampaignAnalyticsService:
             'by_platform': list(platforms.values()),
             'by_creator_platform': creator_platforms,
             'timeline': timeline,
+            'sentiment': sentiment,
+            'range_days': days,
+            'last_synced_at': last_synced_at,
             'campaign_info': {
                 'title': campaign.title,
                 'budget': float(campaign.budget) if campaign.budget else 0,
@@ -82,6 +105,9 @@ class CampaignAnalyticsService:
         total_likes = 0
         total_comments = 0
         total_shares = 0
+        total_saves = 0
+        total_clicks = 0
+        total_conversions = 0
 
         for collab in collaborations:
             # Get creator profile from collaboration
@@ -100,8 +126,22 @@ class CampaignAnalyticsService:
                 total_likes += metric.likes or 0
                 total_comments += metric.comments or 0
                 total_shares += metric.shares or 0
+                total_saves += metric.saves or 0
+                total_clicks += metric.clicks or 0
+                total_conversions += metric.conversions or 0
 
-        total_engagements = total_likes + total_comments + total_shares
+        first_party = db.session.query(
+            func.sum(Analytics.clicks),
+            func.sum(Analytics.conversions),
+        ).filter(
+            Analytics.entity_type == 'campaign',
+            Analytics.entity_id == campaign.id,
+            Analytics.user_id == campaign.brand.user_id,
+        ).first()
+        total_clicks += int((first_party[0] if first_party else 0) or 0)
+        total_conversions += int((first_party[1] if first_party else 0) or 0)
+
+        total_engagements = total_likes + total_comments + total_shares + total_saves
 
         # Calculate rates
         engagement_rate = (total_engagements / total_reach * 100) if total_reach > 0 else 0
@@ -125,6 +165,9 @@ class CampaignAnalyticsService:
             'total_likes': total_likes,
             'total_comments': total_comments,
             'total_shares': total_shares,
+            'total_saves': total_saves,
+            'total_clicks': total_clicks,
+            'total_conversions': total_conversions,
             'engagement_rate': round(engagement_rate, 2),
             'cost_per_engagement': round(cpe, 2),
             'estimated_roi': round(roi_percentage, 2),
@@ -164,6 +207,9 @@ class CampaignAnalyticsService:
                     'likes': 0,
                     'comments': 0,
                     'shares': 0,
+                    'saves': 0,
+                    'clicks': 0,
+                    'conversions': 0,
                     'engagement_rate': 0,
                     'cost': 0,
                     'cost_per_engagement': 0,
@@ -181,7 +227,13 @@ class CampaignAnalyticsService:
             row['likes'] += sum(m.likes or 0 for m in post_metrics)
             row['comments'] += sum(m.comments or 0 for m in post_metrics)
             row['shares'] += sum(m.shares or 0 for m in post_metrics)
-            row['engagements'] += sum((m.likes or 0) + (m.comments or 0) + (m.shares or 0) for m in post_metrics)
+            row['saves'] += sum(m.saves or 0 for m in post_metrics)
+            row['clicks'] += sum(m.clicks or 0 for m in post_metrics)
+            row['conversions'] += sum(m.conversions or 0 for m in post_metrics)
+            row['engagements'] += sum(
+                (m.likes or 0) + (m.comments or 0) + (m.shares or 0) + (m.saves or 0)
+                for m in post_metrics
+            )
             cost = float(collab.amount or 0)
             row['cost'] += cost
             row['posts_count'] += len(post_metrics)
@@ -252,6 +304,9 @@ class CampaignAnalyticsService:
                         'total_likes': 0,
                         'total_comments': 0,
                         'total_shares': 0,
+                        'total_saves': 0,
+                        'total_clicks': 0,
+                        'total_conversions': 0,
                         'posts_count': 0,
                         '_engagement_rates': []
                     }
@@ -265,8 +320,11 @@ class CampaignAnalyticsService:
                 platforms[platform]['total_likes'] += sum(m.likes or 0 for m in platform_metrics)
                 platforms[platform]['total_comments'] += sum(m.comments or 0 for m in platform_metrics)
                 platforms[platform]['total_shares'] += sum(m.shares or 0 for m in platform_metrics)
+                platforms[platform]['total_saves'] += sum(m.saves or 0 for m in platform_metrics)
+                platforms[platform]['total_clicks'] += sum(m.clicks or 0 for m in platform_metrics)
+                platforms[platform]['total_conversions'] += sum(m.conversions or 0 for m in platform_metrics)
                 platforms[platform]['total_engagements'] += sum(
-                    (m.likes or 0) + (m.comments or 0) + (m.shares or 0)
+                    (m.likes or 0) + (m.comments or 0) + (m.shares or 0) + (m.saves or 0)
                     for m in platform_metrics
                 )
                 platforms[platform]['_engagement_rates'].extend(
@@ -325,6 +383,9 @@ class CampaignAnalyticsService:
                         'likes': 0,
                         'comments': 0,
                         'shares': 0,
+                        'saves': 0,
+                        'clicks': 0,
+                        'conversions': 0,
                         'engagement_rate': 0,
                         'collaboration_ids': set()
                     }
@@ -338,7 +399,15 @@ class CampaignAnalyticsService:
                 row['likes'] += metric.likes or 0
                 row['comments'] += metric.comments or 0
                 row['shares'] += metric.shares or 0
-                row['engagements'] += (metric.likes or 0) + (metric.comments or 0) + (metric.shares or 0)
+                row['saves'] += metric.saves or 0
+                row['clicks'] += metric.clicks or 0
+                row['conversions'] += metric.conversions or 0
+                row['engagements'] += (
+                    (metric.likes or 0)
+                    + (metric.comments or 0)
+                    + (metric.shares or 0)
+                    + (metric.saves or 0)
+                )
                 row['collaboration_ids'].add(collab.id)
                 if metric.engagement_rate is not None and metric.engagement_rate > 0:
                     rates[key].append(float(metric.engagement_rate))
@@ -413,62 +482,166 @@ class CampaignAnalyticsService:
         return platforms
 
     @staticmethod
-    def _calculate_timeline(collaborations):
-        """Calculate performance timeline (daily metrics)"""
-        # Get date range
+    def _calculate_timeline(collaborations, days):
+        """Build cumulative daily trends from four-hour metric snapshots."""
         if not collaborations:
             return []
 
-        # Get earliest collaboration start date
-        start_date = min(c.created_at for c in collaborations).date()
-        end_date = datetime.utcnow().date()
+        collaboration_ids = [collab.id for collab in collaborations]
+        metrics_records = PostMetrics.query.filter(
+            PostMetrics.collaboration_id.in_(collaboration_ids)
+        ).all()
+        if not metrics_records:
+            return []
 
+        metric_ids = [metric.id for metric in metrics_records]
+        snapshots = PostMetricsSnapshot.query.filter(
+            PostMetricsSnapshot.post_metrics_id.in_(metric_ids)
+        ).order_by(
+            PostMetricsSnapshot.post_metrics_id.asc(),
+            PostMetricsSnapshot.captured_at.asc(),
+        ).all()
+
+        snapshots_by_metric = {}
+        for snapshot in snapshots:
+            snapshots_by_metric.setdefault(snapshot.post_metrics_id, []).append(snapshot)
+
+        today = datetime.utcnow().date()
+        start_date = today - timedelta(days=days - 1)
         timeline = []
-        current_date = start_date
-
-        # Limit days to prevent excessive computation
-        max_days = 30
-        days_calculated = 0
-
-        # Calculate from most recent backwards
-        current_date = end_date
-
-        while current_date >= start_date and days_calculated < max_days:
-            # Get metrics for this date
-            day_metrics = {
+        for offset in range(days):
+            current_date = start_date + timedelta(days=offset)
+            end_of_day = datetime.combine(current_date + timedelta(days=1), datetime.min.time())
+            totals = {
                 'date': current_date.isoformat(),
                 'reach': 0,
-                'engagements': 0,
+                'impressions': 0,
                 'views': 0,
-                'collaborations_active': 0
+                'engagements': 0,
+                'clicks': 0,
+                'conversions': 0,
             }
+            for metric in metrics_records:
+                latest = None
+                for snapshot in snapshots_by_metric.get(metric.id, []):
+                    if snapshot.captured_at < end_of_day:
+                        latest = snapshot
+                    else:
+                        break
+                if latest:
+                    totals['reach'] += latest.reach or 0
+                    totals['impressions'] += latest.impressions or 0
+                    totals['views'] += (latest.video_views or 0) or (latest.impressions or 0)
+                    totals['engagements'] += latest.total_engagement or 0
+                    totals['clicks'] += latest.clicks or 0
+                    totals['conversions'] += latest.conversions or 0
+            timeline.append(totals)
 
-            for collab in collaborations:
-                # Check if collaboration was active on this date
-                if collab.created_at.date() <= current_date:
-                    day_metrics['collaborations_active'] += 1
-
-                    # Get creator profile
-                    creator = CreatorProfile.query.get(collab.creator_id)
-                    if creator:
-                        post_metrics = PostMetrics.query.filter(
-                            PostMetrics.collaboration_id == collab.id,
-                            func.date(PostMetrics.created_at) == current_date
-                        ).all()
-
-                        for metric in post_metrics:
-                            day_metrics['views'] += (metric.video_views or 0) or (metric.impressions or 0)
-                            day_metrics['engagements'] += (
-                                (metric.likes or 0) +
-                                (metric.comments or 0) +
-                                (metric.shares or 0)
-                            )
-
-            timeline.insert(0, day_metrics)  # Insert at beginning to maintain chronological order
-            current_date -= timedelta(days=1)
-            days_calculated += 1
+        if not snapshots:
+            latest = timeline[-1]
+            for metric in metrics_records:
+                latest['reach'] += metric.reach or 0
+                latest['impressions'] += metric.impressions or 0
+                latest['views'] += (metric.video_views or 0) or (metric.impressions or 0)
+                latest['engagements'] += metric.total_engagement or 0
+                latest['clicks'] += metric.clicks or 0
+                latest['conversions'] += metric.conversions or 0
 
         return timeline
+
+    @staticmethod
+    def _empty_sentiment():
+        return {
+            'overall': 'neutral',
+            'total_analyzed': 0,
+            'counts': {'positive': 0, 'neutral': 0, 'negative': 0},
+            'percentages': {'positive': 0, 'neutral': 0, 'negative': 0},
+            'languages': {},
+            'drivers': {'positive': [], 'negative': []},
+            'top_comments': [],
+        }
+
+    @staticmethod
+    def _calculate_sentiment(collaborations, include_comments=False):
+        collaboration_ids = [collab.id for collab in collaborations]
+        metrics_records = PostMetrics.query.filter(
+            PostMetrics.collaboration_id.in_(collaboration_ids)
+        ).all()
+        metric_ids = [metric.id for metric in metrics_records]
+
+        comments = PostSentimentComment.query.filter(
+            PostSentimentComment.post_metrics_id.in_(metric_ids)
+        ).all() if metric_ids else []
+
+        if comments:
+            counts = Counter(comment.sentiment or 'neutral' for comment in comments)
+            languages = Counter(comment.language or 'unknown' for comment in comments)
+            positive_themes = Counter()
+            negative_themes = Counter()
+            for comment in comments:
+                target = positive_themes if comment.sentiment == 'positive' else negative_themes
+                if comment.sentiment in {'positive', 'negative'}:
+                    target.update(comment.themes or [])
+            total = len(comments)
+        else:
+            counts = Counter({
+                'positive': sum(metric.positive_comments or 0 for metric in metrics_records),
+                'neutral': sum(metric.neutral_comments or 0 for metric in metrics_records),
+                'negative': sum(metric.negative_comments or 0 for metric in metrics_records),
+            })
+            languages = Counter()
+            positive_themes = Counter()
+            negative_themes = Counter()
+            total = sum(counts.values())
+
+        percentages = {
+            key: round((counts.get(key, 0) / total) * 100, 1) if total else 0
+            for key in ('positive', 'neutral', 'negative')
+        }
+        overall = max(percentages, key=percentages.get) if total else 'neutral'
+
+        result = {
+            'overall': overall,
+            'total_analyzed': total,
+            'counts': {
+                key: counts.get(key, 0)
+                for key in ('positive', 'neutral', 'negative')
+            },
+            'percentages': percentages,
+            'languages': dict(languages.most_common()),
+            'drivers': {
+                'positive': [
+                    {'theme': theme, 'count': count}
+                    for theme, count in positive_themes.most_common(5)
+                ],
+                'negative': [
+                    {'theme': theme, 'count': count}
+                    for theme, count in negative_themes.most_common(5)
+                ],
+            },
+            'top_comments': [],
+        }
+
+        if include_comments:
+            ranked = sorted(
+                comments,
+                key=lambda comment: (
+                    comment.likes or 0,
+                    abs(float(comment.sentiment_score or 0)),
+                ),
+                reverse=True,
+            )
+            result['top_comments'] = [comment.to_dict() for comment in ranked[:20]]
+
+        return result
+
+    @staticmethod
+    def _last_synced_at(collaborations):
+        collaboration_ids = [collab.id for collab in collaborations]
+        latest = db.session.query(func.max(PostMetrics.last_synced_at)).filter(
+            PostMetrics.collaboration_id.in_(collaboration_ids)
+        ).scalar()
+        return latest.isoformat() if latest else None
 
     @staticmethod
     def _get_empty_overview():
@@ -483,6 +656,9 @@ class CampaignAnalyticsService:
             'total_likes': 0,
             'total_comments': 0,
             'total_shares': 0,
+            'total_saves': 0,
+            'total_clicks': 0,
+            'total_conversions': 0,
             'engagement_rate': 0,
             'cost_per_engagement': 0,
             'estimated_roi': 0,

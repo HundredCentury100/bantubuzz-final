@@ -188,7 +188,11 @@ export const campaignsAPI = {
     api.post(`/campaigns/${campaignId}/packages/${packageId}/complete-payment`, { booking_id: bookingId }),
 
   // Analytics
-  getPerformance: (campaignId) => api.get(`/campaigns/${campaignId}/performance`),
+  getPerformance: (campaignId, params) => api.get(`/campaigns/${campaignId}/performance`, { params }),
+  downloadSentimentReport: (campaignId, params) => api.get(
+    `/campaigns/${campaignId}/performance/sentiment-report`,
+    { params, responseType: 'blob' },
+  ),
 
   // Campaign Cart (NEW - unpaid additions workflow)
   getCart: (campaignId, params) => api.get(`/campaigns/${campaignId}/cart`, { params }),
