@@ -107,6 +107,10 @@ def make_celery(app=None):
                 'task': 'app.tasks.report_tasks.send_due_campaign_reports',
                 'schedule': crontab(minute=40),
             },
+            'qualify-referrals': {
+                'task': 'app.tasks.referral_tasks.qualify_due_referrals',
+                'schedule': crontab(minute=10, hour=2),
+            },
         }
     )
 

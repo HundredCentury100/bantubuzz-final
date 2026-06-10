@@ -75,7 +75,7 @@ def get_my_subscription():
     Get current user's active subscription
     """
     try:
-        user_id = get_jwt_identity()
+        user_id = int(get_jwt_identity())
         user = User.query.get(user_id)
 
         # Get active subscription
@@ -657,7 +657,7 @@ def pay_subscription_with_wallet():
     Body: { subscription_id: int, billing_cycle: 'monthly'|'yearly' }
     """
     try:
-        user_id = get_jwt_identity()
+        user_id = int(get_jwt_identity())
         user = User.query.get(user_id)
         data = request.get_json() or {}
 

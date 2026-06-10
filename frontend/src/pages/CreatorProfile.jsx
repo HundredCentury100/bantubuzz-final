@@ -462,7 +462,7 @@ const CreatorProfile = () => {
                       <div className="flex flex-wrap gap-2 mb-2">
                         {creator.badges
                           .sort((a, b) => {
-                            const priority = { 'top_creator': 1, 'verified_creator': 2, 'responds_fast': 3, 'creator': 4 };
+                            const priority = { 'top_creator': 1, 'verified_creator': 2, 'referral_verified': 3, 'responds_fast': 4, 'creator': 5 };
                             return (priority[a] || 99) - (priority[b] || 99);
                           })
                           .map((badge, idx) => (
@@ -494,6 +494,14 @@ const CreatorProfile = () => {
                               <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                             </svg>
                             <span className="leading-snug"><strong className="font-semibold">Verified Creator:</strong> Identity verified by BantuBuzz</span>
+                          </div>
+                        )}
+                        {creator.badges.includes('referral_verified') && (
+                          <div className="flex items-start gap-2 text-xs sm:text-sm text-gray-600">
+                            <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-primary-dark mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                            </svg>
+                            <span className="leading-snug"><strong className="font-semibold">Referral Verified:</strong> Earned by bringing active creators to BantuBuzz</span>
                           </div>
                         )}
                       </div>

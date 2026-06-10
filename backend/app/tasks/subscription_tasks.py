@@ -12,6 +12,7 @@ from app.services.subscription_lifecycle_service import (
     downgrade_to_free,
     mark_renewal_failed,
     plan_price,
+    subscription_amount_due,
 )
 
 
@@ -113,9 +114,9 @@ def process_subscription_renewals():
     failed = 0
     downgraded = 0
     for subscription in due:
-        amount = plan_price(subscription.plan, subscription.billing_cycle or 'monthly')
+        amount = subscription_amount_due(subscription, subscription.billing_cycle or 'monthly')
         if amount <= 0:
-            apply_paid_subscription(subscription, 'free', 'FREE-RENEWAL', amount, subscription.billing_cycle or 'monthly')
+            apply_paid_subscription(subscription, 'account_credit', 'CREDIT-RENEWAL', amount, subscription.billing_cycle or 'monthly')
             renewed += 1
             continue
 

@@ -126,6 +126,16 @@ class CreatorProfile(db.Model):
         from sqlalchemy import func, and_
 
         badges = []
+        from app.models.referral import ReferralReward
+        from sqlalchemy import or_
+
+        referral_badge = ReferralReward.query.filter(
+            ReferralReward.user_id == self.user_id,
+            ReferralReward.reward_type == 'promotional_badge',
+            ReferralReward.status == 'active',
+            or_(ReferralReward.starts_at.is_(None), ReferralReward.starts_at <= datetime.utcnow()),
+            or_(ReferralReward.ends_at.is_(None), ReferralReward.ends_at > datetime.utcnow()),
+        ).first()
         is_top_creator = False
 
         # Check for Top Creator badge (highest priority - all top creators are verified)
@@ -174,6 +184,9 @@ class CreatorProfile(db.Model):
         # Top creators are always verified, so we don't show verified badge separately
         if self.is_verified and not is_top_creator:
             badges.append('verified_creator')
+
+        if referral_badge and 'verified_creator' not in badges:
+            badges.append('referral_verified')
 
         # Always include Creator badge if no other badges (everyone gets at least one)
         if not badges:

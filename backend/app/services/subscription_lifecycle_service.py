@@ -111,7 +111,7 @@ def prepare_paid_upgrade(subscription, new_plan, billing_cycle):
     return amount
 
 
-def subscription_amount_due(subscription, fallback_billing_cycle=None):
+def subscription_gross_amount_due(subscription, fallback_billing_cycle=None):
     if not subscription or not subscription.plan:
         return Decimal('0.00')
     if subscription.pending_change_type == 'upgrade' and subscription.pending_proration_amount is not None:
@@ -120,13 +120,36 @@ def subscription_amount_due(subscription, fallback_billing_cycle=None):
     return plan_price(subscription.plan, billing_cycle)
 
 
+def subscription_amount_due(subscription, fallback_billing_cycle=None):
+    """Return the cash amount due after non-withdrawable account credits."""
+    gross = subscription_gross_amount_due(subscription, fallback_billing_cycle)
+    if not subscription:
+        return gross
+    from app.services.referral_service import account_credit_balance
+    return max(Decimal('0.00'), money(gross - account_credit_balance(subscription.user_id)))
+
+
 def apply_paid_subscription(subscription, payment_method, payment_reference=None, amount=None, billing_cycle=None):
     """Activate a subscription or apply a paid pending upgrade."""
     if not subscription:
         return None
 
     now = datetime.utcnow()
+    gross_amount = subscription_gross_amount_due(subscription, billing_cycle)
     paid_amount = money(amount if amount is not None else subscription_amount_due(subscription, billing_cycle))
+    credit_amount = max(Decimal('0.00'), money(gross_amount - paid_amount))
+    if credit_amount > 0:
+        from app.services.referral_service import apply_account_credit
+        apply_account_credit(
+            subscription.user_id,
+            credit_amount,
+            f'SUBSCRIPTION-CREDIT-{payment_reference or subscription.id}-{int(now.timestamp())}',
+            {
+                'subscription_id': subscription.id,
+                'payment_reference': payment_reference,
+                'billing_cycle': billing_cycle or subscription.billing_cycle,
+            },
+        )
 
     if subscription.pending_change_type == 'upgrade' and subscription.pending_plan_id:
         new_plan = SubscriptionPlan.query.get(subscription.pending_plan_id)
@@ -152,6 +175,10 @@ def apply_paid_subscription(subscription, payment_method, payment_reference=None
 
     if subscription.plan and subscription.plan.user_type == 'brand':
         apply_brand_subscription_entitlements(subscription.user_id, subscription.plan)
+
+    if subscription.plan:
+        from app.services.referral_service import mark_referred_subscription_paid
+        mark_referred_subscription_paid(subscription.user_id, subscription.plan.slug)
 
     return subscription
 

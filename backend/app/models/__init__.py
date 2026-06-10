@@ -65,6 +65,14 @@ from .campaign_chat import CampaignChat, CampaignChatParticipant, CampaignChatMe
 from .campaign_cart import CampaignCartItem
 from .spotlight_boost import SpotlightBoost
 from .campaign_report import CampaignReportSchedule, CampaignReportShare
+from .referral import (
+    AccountCreditTransaction,
+    Referral,
+    ReferralClick,
+    ReferralCode,
+    ReferralFulfillmentTask,
+    ReferralReward,
+)
 
 __all__ = [
     'User',
@@ -137,4 +145,10 @@ __all__ = [
     'CreatorSubscriptionPlan',
     'CreatorSubscription',
     'VerificationApplication',
+    'ReferralCode',
+    'ReferralClick',
+    'Referral',
+    'ReferralReward',
+    'AccountCreditTransaction',
+    'ReferralFulfillmentTask',
 ]

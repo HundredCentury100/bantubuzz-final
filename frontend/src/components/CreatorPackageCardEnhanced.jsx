@@ -62,6 +62,8 @@ const CreatorPackageCardEnhanced = ({ package: pkg, onSelect, isSelected = false
         return { icon: <FaBolt />, label: 'Responds Fast', color: 'bg-green-100 text-green-800 border-green-300' };
       case 'verified_creator':
         return { icon: <FaCheckCircle />, label: 'Verified', color: 'bg-blue-100 text-blue-800 border-blue-300' };
+      case 'referral_verified':
+        return { icon: <FaCheckCircle />, label: 'Referral Verified', color: 'bg-lime-100 text-lime-900 border-lime-300' };
       default:
         return { icon: <FaUsers />, label: 'Creator', color: 'bg-gray-100 text-gray-800 border-gray-300' };
     }

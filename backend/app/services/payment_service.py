@@ -456,10 +456,9 @@ def get_creator_commission_percentage(creator_user_id):
         status='active'
     ).first()
 
-    if subscription and subscription.plan:
-        return subscription.get_commission_rate()
-
-    return 15.0
+    plan_rate = subscription.get_commission_rate() if subscription and subscription.plan else 15.0
+    from app.services.referral_service import effective_creator_commission
+    return effective_creator_commission(creator_user_id, plan_rate)
 
 
 def _find_payment_for_collaboration(collaboration):

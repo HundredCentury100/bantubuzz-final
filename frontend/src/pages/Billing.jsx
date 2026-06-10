@@ -81,6 +81,7 @@ const Billing = () => {
   const [upcomingInvoices, setUpcomingInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [accountCredit, setAccountCredit] = useState(0);
 
   useEffect(() => {
     const fetchInvoices = async () => {
@@ -90,6 +91,7 @@ const Billing = () => {
         const response = await billingAPI.getInvoices();
         setPastInvoices(response.data.past_invoices || []);
         setUpcomingInvoices(response.data.upcoming_invoices || []);
+        setAccountCredit(response.data.account_credit_balance || 0);
       } catch (err) {
         setError(err.response?.data?.error || 'Failed to load billing history');
       } finally {
@@ -128,7 +130,7 @@ const Billing = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="bg-white rounded-3xl shadow-sm p-6">
               <p className="text-sm text-gray-600">Past invoices</p>
               <p className="text-3xl font-bold text-dark mt-2">{money(totalPaid)}</p>
@@ -136,6 +138,11 @@ const Billing = () => {
             <div className="bg-white rounded-3xl shadow-sm p-6">
               <p className="text-sm text-gray-600">Upcoming invoices</p>
               <p className="text-3xl font-bold text-dark mt-2">{money(totalUpcoming)}</p>
+            </div>
+            <div className="bg-white rounded-3xl shadow-sm p-6">
+              <p className="text-sm text-gray-600">Account credit</p>
+              <p className="text-3xl font-bold text-dark mt-2">{money(accountCredit)}</p>
+              <p className="mt-1 text-xs text-gray-500">Applied automatically to subscription billing.</p>
             </div>
           </div>
 

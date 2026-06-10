@@ -87,7 +87,10 @@ export const authAPI = {
   forgotPassword: (email) => api.post('/auth/forgot-password', { email }),
   resetPassword: (token, password) => api.post(`/auth/reset-password/${token}`, { password }),
   // Google OAuth
-  googleCreatorAuth: (credential) => api.post('/auth/google/creator', { credential }),
+  googleCreatorAuth: (credential, referralCode) => api.post('/auth/google/creator', {
+    credential,
+    referral_code: referralCode,
+  }),
   googleCompleteProfile: (data) => api.post('/auth/google/complete-profile', data),
 };
 
@@ -428,6 +431,11 @@ export const paymentsAPI = {
 export const billingAPI = {
   getInvoices: () => api.get('/billing/invoices'),
   downloadInvoice: (downloadUrl) => api.get(downloadUrl.replace(/^\/api/, ''), { responseType: 'blob' }),
+};
+
+export const referralsAPI = {
+  getMine: () => api.get('/referrals/me'),
+  validate: (code) => api.get(`/referrals/validate/${encodeURIComponent(code)}`),
 };
 
 // Agency Client Workspaces API

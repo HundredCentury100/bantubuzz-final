@@ -6,6 +6,7 @@ import { useAuth } from '../hooks/useAuth';
 import { GoogleLogin } from '@react-oauth/google';
 import Navbar from '../components/Navbar';
 import SEO from '../components/SEO';
+import { clearReferralAttribution, getReferralCode } from '../utils/referrals';
 
 const RegisterCreator = () => {
   const navigate = useNavigate();
@@ -33,7 +34,9 @@ const RegisterCreator = () => {
         password: data.password,
         username: data.username,
         phone_number: data.phone_number,
+        referral_code: getReferralCode(),
       });
+      clearReferralAttribution();
 
       // Navigate to OTP verification page
       navigate('/verify-otp', {

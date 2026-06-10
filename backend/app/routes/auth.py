@@ -18,6 +18,7 @@ from app.services.email_service import (
     send_two_factor_code_email,
     send_welcome_email,
 )
+from app.services.referral_service import attach_referral, mark_referral_activated
 
 bp = Blueprint('auth', __name__)
 MAX_FAILED_LOGIN_ATTEMPTS = 5
@@ -182,6 +183,7 @@ def register_creator():
             username=username
         )
         db.session.add(creator_profile)
+        attach_referral(user, data.get('referral_code'))
 
         # Assign free creator subscription plan
         free_plan = SubscriptionPlan.query.filter_by(
@@ -256,6 +258,7 @@ def register_brand():
             expected_workspace_count=_parse_optional_int(data.get('expected_workspace_count'))
         )
         db.session.add(brand_profile)
+        attach_referral(user, data.get('referral_code'))
 
         # Assign free brand subscription plan
         free_plan = SubscriptionPlan.query.filter_by(
@@ -452,6 +455,7 @@ def verify_otp():
 
         # Mark user as verified
         user.is_verified = True
+        mark_referral_activated(user.id)
 
         # Mark OTP as used
         otp.mark_as_used()
@@ -675,6 +679,7 @@ def google_creator_auth():
 
         data = request.get_json()
         credential = data.get('credential')  # Google ID token
+        referral_code = data.get('referral_code')
 
         if not credential:
             return jsonify({'error': 'Google credential is required'}), 400
@@ -765,6 +770,7 @@ def google_creator_auth():
             # Create empty creator profile
             creator_profile = CreatorProfile(user_id=new_user.id)
             db.session.add(creator_profile)
+            attach_referral(new_user, referral_code)
 
             # Assign free creator subscription plan
             free_plan = SubscriptionPlan.query.filter_by(
@@ -857,6 +863,7 @@ def google_complete_profile():
         # Update user
         user.set_password(password)
         user.phone_number = phone_number
+        mark_referral_activated(user.id)
 
         # Update creator profile username
         if user.creator_profile:

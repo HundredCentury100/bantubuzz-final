@@ -45,6 +45,20 @@ const CreatorBadge = ({ badge, size = 'md', variant = 'full' }) => {
           textColor: 'text-white',
           badgeBg: 'bg-green-500'
         };
+      case 'referral_verified':
+        return {
+          label: 'Referral Verified',
+          description: 'Earned through qualified BantuBuzz referrals',
+          icon: (
+            <svg viewBox="0 0 24 24" fill="none" className="h-full w-full" aria-hidden="true">
+              <path d="M12 3l2.3 2.1 3.1-.2.7 3 2.5 1.9-1.3 2.8.7 3-2.8 1.4-1.3 2.8-3-.7-2.6 1.7-2.2-2.1-3.1.2-.7-3-2.5-1.9 1.3-2.8-.7-3 2.8-1.4L8.1 4l3 .7L12 3z" fill="currentColor" />
+              <path d="M8.5 12.2l2.1 2.1 4.9-5" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          ),
+          pillBg: 'bg-primary-dark',
+          textColor: 'text-white',
+          badgeBg: 'bg-primary-dark'
+        };
       default:
         return null;
     }
@@ -144,7 +158,7 @@ const CreatorBadge = ({ badge, size = 'md', variant = 'full' }) => {
 };
 
 CreatorBadge.propTypes = {
-  badge: PropTypes.oneOf(['creator', 'verified_creator', 'top_creator', 'responds_fast']).isRequired,
+  badge: PropTypes.oneOf(['creator', 'verified_creator', 'top_creator', 'responds_fast', 'referral_verified']).isRequired,
   size: PropTypes.oneOf(['sm', 'md', 'lg']),
   variant: PropTypes.oneOf(['full', 'icon', 'overlay'])
 };

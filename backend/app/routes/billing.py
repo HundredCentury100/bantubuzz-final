@@ -16,6 +16,7 @@ from app.models import (
 )
 from app.services.workspace_service import get_request_workspace_id, require_workspace_access
 from app.utils.subscription_helper import get_brand_service_fee_percentage
+from app.services.referral_service import account_credit_balance
 
 bp = Blueprint('billing', __name__)
 
@@ -264,6 +265,7 @@ def get_invoices():
     return jsonify({
         'past_invoices': [item for item in invoices if item['status'] == 'paid'],
         'upcoming_invoices': [item for item in invoices if item['status'] != 'paid'],
+        'account_credit_balance': float(account_credit_balance(user.id)),
     }), 200
 
 

@@ -162,7 +162,8 @@ export const AuthProvider = ({ children }) => {
 
   const googleLoginCreator = async (credential) => {
     try {
-      const response = await authAPI.googleCreatorAuth(credential);
+      const referralCode = localStorage.getItem('bantubuzz_referral_code');
+      const response = await authAPI.googleCreatorAuth(credential, referralCode);
       const data = response.data;
 
       if (data.needs_profile_completion) {
@@ -208,6 +209,8 @@ export const AuthProvider = ({ children }) => {
       localStorage.setItem('user', JSON.stringify(userData));
       localStorage.setItem('profile', JSON.stringify(profileData));
       localStorage.removeItem('google_signup_pending');
+      localStorage.removeItem('bantubuzz_referral_code');
+      localStorage.removeItem('bantubuzz_referral_visitor');
 
       setUser(userData);
       setProfile(profileData);

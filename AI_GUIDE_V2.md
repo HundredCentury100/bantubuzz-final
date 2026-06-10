@@ -27,6 +27,27 @@ This file is a living handoff guide for future AI/Codex sessions working on the 
 
 ## Deployment Lessons Learned
 
+## Referral System - June 10, 2026
+
+- Public referral links use `/r/<code>` and record a privacy-safe visitor hash before showing creator and brand signup choices.
+- Referral attribution is stored in frontend local storage and passed through creator, brand, agency, enterprise, and Google creator registration.
+- Referral database migration: `202606101500_add_referral_system.py`.
+- Qualification runs daily through Celery task `app.tasks.referral_tasks.qualify_due_referrals`.
+- A referred account qualifies after 30 days only when it remains active, verified, and has logged in after activation.
+- Free creator milestone rewards stack:
+  - 1 qualified creator: 12% commission for six months.
+  - 5 qualified creators: 30-day `referral_verified` promotional badge. This is deliberately separate from document identity verification.
+  - 10 qualified creators: permanent 10% commission.
+  - Qualified brand referral: seven days added to the creator's Spotlight Boost.
+- Referral account credits use `account_credit_transactions`, not wallets. They are non-withdrawable and automatically reduce subscription cash amounts.
+- Credit grants are capped at $50 per calendar month. A $150 Agency reward is released as three monthly $50 portions and creates an agency co-marketing fulfillment task.
+- Referral UI is available to both account types at `/referrals` and includes WhatsApp, X/Twitter, Facebook, email, copy, QR, and localized copy.
+- Deploy with:
+
+```powershell
+.\deployment\DEPLOY-REFERRALS.bat
+```
+
 ### Frontend Deploy Location
 
 The live frontend is served from:

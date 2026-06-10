@@ -115,6 +115,8 @@ import SubscriptionPaymentReturn from './pages/SubscriptionPaymentReturn';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfService from './pages/TermsOfService';
 import PublicCampaignReport from './pages/PublicCampaignReport';
+import ReferralLanding from './pages/ReferralLanding';
+import Referrals from './pages/Referrals';
 
 // Support Pages
 import HelpCenter from './pages/HelpCenter';
@@ -211,6 +213,7 @@ function App() {
       <Route path="/packages/:id" element={<PackageDetails />} />
       <Route path="/briefs/:id" element={<BriefDetails />} />
       <Route path="/reports/:token" element={<PublicCampaignReport />} />
+      <Route path="/r/:code" element={<ReferralLanding />} />
 
       {/* Auth Routes */}
       <Route
@@ -938,6 +941,14 @@ function App() {
       <Route path="/brand/workspace-invite/:token" element={<WorkspaceInvite />} />
       <Route path="/privacy" element={<PrivacyPolicy />} />
       <Route path="/terms" element={<TermsOfService />} />
+      <Route
+        path="/referrals"
+        element={
+          <ProtectedRoute>
+            <Referrals />
+          </ProtectedRoute>
+        }
+      />
 
       {/* Subscription Management */}
       <Route

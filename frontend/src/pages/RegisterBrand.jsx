@@ -4,6 +4,7 @@ import { useForm } from 'react-hook-form';
 import { authAPI } from '../services/api';
 import Navbar from '../components/Navbar';
 import SEO from '../components/SEO';
+import { clearReferralAttribution, getReferralCode } from '../utils/referrals';
 
 const RegisterBrand = () => {
   const navigate = useNavigate();
@@ -73,7 +74,9 @@ const RegisterBrand = () => {
         company_name: data.company_name,
         account_type: accountType || 'brand',
         expected_workspace_count: parseWorkspaceCount(data.expected_workspace_count),
+        referral_code: getReferralCode(),
       });
+      clearReferralAttribution();
 
       // Navigate to OTP verification page
       navigate('/verify-otp', {
