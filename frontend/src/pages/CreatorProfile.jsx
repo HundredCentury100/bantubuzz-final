@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
+import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
 import { creatorsAPI, packagesAPI, brandsAPI, reviewsAPI, analyticsAPI, BASE_URL } from '../services/api';
 import { useAuth } from '../hooks/useAuth';
 import { useCart } from '../contexts/CartContext';
@@ -17,10 +17,12 @@ import { PLATFORM_CONFIGS, PACKAGE_TYPES } from '../constants/platformConfig';
 import PortfolioGrid from '../components/PortfolioGrid';
 import { Bolt, Copy, MessageCircle, Trophy } from 'lucide-react';
 import GalleryVideo from '../components/GalleryVideo';
+import CreatorCardActions from '../components/CreatorCardActions';
 
 const CreatorProfile = () => {
   const { id, username } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
   const { addToCart } = useCart();
   const [creator, setCreator] = useState(null);
@@ -319,6 +321,7 @@ const CreatorProfile = () => {
   const reviewCount = reviewsStats?.total_reviews ?? creator.review_stats?.total_reviews ?? reviews.length;
   const profileRating = reviewsStats?.overall ?? creator.effective_rating ?? creator.review_stats?.average_rating ?? null;
   const hasReviews = reviewCount > 0 && profileRating !== null && profileRating !== undefined;
+  const leaderboardReturnPath = location.state?.fromLeaderboard;
 
   return (
     <div className="min-h-screen bg-light">
@@ -333,13 +336,13 @@ const CreatorProfile = () => {
         {/* Navigation */}
         <div className="mb-6 flex items-center gap-4">
           <Link
-            to="/browse/creators"
+            to={leaderboardReturnPath || '/browse/creators'}
             className="text-gray-600 hover:text-gray-900 flex items-center gap-2"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
-            Back to Creators
+            {leaderboardReturnPath ? 'Back to Leaderboard' : 'Back to Creators'}
           </Link>
           {user?.user_type === 'brand' && (
             <>
@@ -450,9 +453,17 @@ const CreatorProfile = () => {
                   </h1>
 
                   {creator.rank?.position && (
-                    <div className="mb-3 inline-flex items-center gap-2 rounded-md border border-primary/30 bg-primary/10 px-3 py-1.5 text-sm font-semibold text-dark">
-                      <Trophy className="h-4 w-4 text-primary-dark" />
-                      Overall rank #{creator.rank.position}
+                    <div className="mb-3 flex flex-wrap items-center gap-2">
+                      <div className="inline-flex items-center gap-2 rounded-md border border-primary/30 bg-primary/10 px-3 py-1.5 text-sm font-semibold text-dark">
+                        <Trophy className="h-4 w-4 text-primary-dark" />
+                        Ranked #{creator.rank.position} Overall
+                      </div>
+                      {creator.rank.position <= 50 && (
+                        <span className="rounded-md bg-dark px-3 py-1.5 text-sm font-bold text-primary">Top 50 Creator</span>
+                      )}
+                      {creator.rank.position > 50 && creator.rank.position <= 100 && (
+                        <span className="rounded-md bg-gray-200 px-3 py-1.5 text-sm font-bold text-gray-800">Top 100 Creator</span>
+                      )}
                     </div>
                   )}
 
@@ -528,6 +539,16 @@ const CreatorProfile = () => {
 
                 {/* Actions - Desktop: Side by side on right, Mobile: Stacked below badges */}
                 <div className="flex flex-col gap-3 w-full md:w-auto md:flex-row md:gap-2 md:flex-shrink-0">
+                  <CreatorCardActions
+                    creator={{
+                      ...creator,
+                      creator_id: creator.id,
+                      category: creator.categories?.[0],
+                      platform: creator.platform_stats?.slice().sort((a, b) => (b.followers || 0) - (a.followers || 0))[0]?.platform,
+                      platform_followers: creator.platform_stats?.slice().sort((a, b) => (b.followers || 0) - (a.followers || 0))[0]?.followers,
+                      overall_rank: creator.rank,
+                    }}
+                  />
                   {/* Share Profile Button - Always visible */}
                   <div className="relative w-full md:w-auto">
                     <button

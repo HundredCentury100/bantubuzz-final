@@ -2,6 +2,7 @@ import unittest
 from datetime import datetime, timedelta
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
+from types import SimpleNamespace
 
 
 FORMULA_PATH = Path(__file__).parents[1] / 'app' / 'services' / 'creator_score_formula.py'
@@ -17,6 +18,8 @@ profile_quality_dimension = formula.profile_quality_dimension
 reach_dimension = formula.reach_dimension
 sentiment_dimension = formula.sentiment_dimension
 normalize_sentiment = formula.normalize_sentiment
+normalize_platform_name = formula.normalize_platform_name
+select_primary_platform = formula.select_primary_platform
 
 
 class CreatorScoreFormulaTests(unittest.TestCase):
@@ -72,6 +75,15 @@ class CreatorScoreFormulaTests(unittest.TestCase):
             'profile_quality': 100,
         }
         self.assertEqual(final_creator_score(dimensions), 80)
+
+    def test_primary_platform_uses_highest_connected_follower_count(self):
+        platforms = [
+            SimpleNamespace(id=1, platform='Instagram', followers=5000, is_connected=True),
+            SimpleNamespace(id=2, platform='TikTok', followers=12000, is_connected=True),
+            SimpleNamespace(id=3, platform='YouTube', followers=50000, is_connected=False),
+        ]
+        self.assertEqual(select_primary_platform(platforms).platform, 'TikTok')
+        self.assertEqual(normalize_platform_name('X/Twitter'), 'twitter')
 
 
 if __name__ == '__main__':

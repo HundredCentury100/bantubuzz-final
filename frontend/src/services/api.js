@@ -108,6 +108,7 @@ export const creatorsAPI = {
   getCreator: (id) => api.get(`/creators/${id}`),
   getCreatorByUsername: (username) => api.get(`/creators/by-username/${encodeURIComponent(username)}`),
   getRankings: (params) => api.get('/creators/rankings', { params }),
+  getLeaderboard: (params) => api.get('/creators/leaderboard', { params }),
   getCreatorRank: (id, params) => api.get(`/creators/${id}/rank`, { params }),
   getOwnProfile: () => api.get('/creators/profile'),
   updateProfile: (data) => api.put('/creators/profile', data),

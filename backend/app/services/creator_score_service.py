@@ -24,6 +24,8 @@ from app.services.creator_score_formula import (
     normalize_sentiment,
     profile_quality_dimension,
     reach_dimension,
+    normalize_platform_name,
+    select_primary_platform,
     sentiment_dimension,
 )
 
@@ -32,6 +34,20 @@ FORMULA_VERSION = '1.0'
 
 
 class CreatorScoreService:
+    SUPPORTED_LEADERBOARD_PLATFORMS = {'instagram', 'tiktok', 'youtube', 'facebook', 'twitter'}
+
+    @staticmethod
+    def normalize_platform(platform):
+        return normalize_platform_name(platform)
+
+    @staticmethod
+    def primary_platform(user_id):
+        platforms = ConnectedPlatform.query.filter_by(
+            user_id=user_id,
+            is_connected=True,
+        ).all()
+        return select_primary_platform(platforms)
+
     @staticmethod
     def total_followers(user_id):
         return int(db.session.query(func.coalesce(func.sum(ConnectedPlatform.followers), 0)).filter(
@@ -312,22 +328,108 @@ class CreatorScoreService:
             ]
             CreatorScoreService._rank_context(matching, 'category', category, previous, now)
 
-        platforms = sorted({
-            row.platform.lower()
+        primary_platforms = {
+            creator.id: CreatorScoreService.primary_platform(creator.user_id)
             for creator in creators
-            for row in ConnectedPlatform.query.filter_by(user_id=creator.user_id, is_connected=True).all()
-            if row.platform
+        }
+        platforms = sorted({
+            CreatorScoreService.normalize_platform(row.platform)
+            for row in primary_platforms.values()
+            if row and CreatorScoreService.normalize_platform(row.platform)
         })
         for platform in platforms:
-            user_ids = {
-                row.user_id for row in ConnectedPlatform.query.filter(
-                    func.lower(ConnectedPlatform.platform) == platform,
-                    ConnectedPlatform.is_connected == True,
-                ).all()
-            }
-            matching = [creator for creator in creators if creator.user_id in user_ids]
+            matching = [
+                creator for creator in creators
+                if primary_platforms.get(creator.id)
+                and CreatorScoreService.normalize_platform(
+                    primary_platforms[creator.id].platform
+                ) == platform
+            ]
             CreatorScoreService._rank_context(matching, 'platform', platform, previous, now)
         return len(creators)
+
+    @staticmethod
+    def leaderboard(category=None, platform=None, limit=50):
+        category_key = (category or '').strip().lower()
+        platform_key = CreatorScoreService.normalize_platform(platform)
+        creators = [
+            creator for creator in CreatorProfile.query.join(User).filter(
+                User.is_active == True,
+                User.is_verified == True,
+            ).all()
+            if creator.private_score and CreatorScoreService.is_ranking_eligible(creator)
+        ]
+
+        if category_key:
+            creators = [
+                creator for creator in creators
+                if category_key in {
+                    str(item).strip().lower()
+                    for item in (creator.categories or [])
+                }
+            ]
+
+        primary_platforms = {
+            creator.id: CreatorScoreService.primary_platform(creator.user_id)
+            for creator in creators
+        }
+        if platform_key:
+            creators = [
+                creator for creator in creators
+                if primary_platforms.get(creator.id)
+                and CreatorScoreService.normalize_platform(
+                    primary_platforms[creator.id].platform
+                ) == platform_key
+            ]
+
+        ordered = sorted(
+            creators,
+            key=lambda creator: (
+                -float(creator.private_score.final_score or 0),
+                -float(creator.private_score.engagement_score or 0),
+                -float(creator.private_score.reach_score or 0),
+                creator.id,
+            ),
+        )
+
+        entries = []
+        for position, creator in enumerate(ordered[:limit], start=1):
+            primary = primary_platforms.get(creator.id)
+            platform_name = CreatorScoreService.normalize_platform(primary.platform) if primary else None
+            categories = creator.categories or []
+            display_category = next(
+                (item for item in categories if str(item).strip().lower() == category_key),
+                categories[0] if categories else None,
+            )
+            entries.append({
+                'rank': position,
+                'creator_id': creator.id,
+                'username': creator.username,
+                'display_name': creator.username or 'Creator',
+                'profile_picture': creator.profile_picture,
+                'profile_picture_sizes': creator.profile_picture_sizes or {},
+                'category': display_category,
+                'categories': categories,
+                'platform': platform_name,
+                'platform_account_name': primary.account_name if primary else None,
+                'platform_followers': int(primary.followers or 0) if primary else 0,
+                'profile_path': f'/{creator.username}' if creator.username else f'/creators/{creator.id}',
+                'overall_rank': CreatorScoreService.public_rank(creator.id),
+            })
+
+        return {
+            'creators': entries,
+            'total': len(ordered),
+            'limit': limit,
+            'category': category_key or None,
+            'platform': platform_key or None,
+            'calculated_at': (
+                max(
+                    (creator.private_score.calculated_at for creator in ordered if creator.private_score),
+                    default=None,
+                )
+            ),
+        }
 
     @staticmethod
     def recalculate_all():

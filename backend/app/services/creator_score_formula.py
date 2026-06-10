@@ -112,3 +112,24 @@ def final_creator_score(dimensions):
         float(dimensions[key]) * WEIGHTS[key]
         for key in WEIGHTS
     ))
+
+
+def normalize_platform_name(platform):
+    normalized = (platform or '').strip().lower()
+    if normalized in {'x', 'x/twitter', 'twitter/x'}:
+        return 'twitter'
+    return normalized
+
+
+def select_primary_platform(platforms):
+    connected = [platform for platform in platforms if getattr(platform, 'is_connected', True)]
+    if not connected:
+        return None
+    return sorted(
+        connected,
+        key=lambda platform: (
+            -(getattr(platform, 'followers', 0) or 0),
+            normalize_platform_name(getattr(platform, 'platform', '')),
+            getattr(platform, 'id', 0) or 0,
+        ),
+    )[0]

@@ -980,6 +980,18 @@ Deployment note:
     - `GET /api/creators/<creator_id>/rank`
   - Admin-only score diagnostics: `GET /api/admin/creator-scores`.
   - Featured fallback and default creator discovery use the private score/rank internally without serializing it.
+- Public creator leaderboard:
+  - Deploy script: `deployment/DEPLOY-CREATOR-LEADERBOARD.bat`.
+  - Public page: `/leaderboard`; no authentication is required.
+  - Public API: `GET /api/creators/leaderboard?limit=50|100&category=<category>&platform=<platform>`.
+  - Leaderboard responses contain rank positions and public creator information only. Never serialize Creator Score values.
+  - A creator's primary platform is their connected platform with the highest follower count. Disconnected accounts are ignored; ties use normalized platform name and then connection ID.
+  - X, X/Twitter, and Twitter/X normalize to `twitter`.
+  - Category and platform filters can be combined; positions are recalculated within the filtered result.
+  - Platform-filtered rows show the follower count on the creator's primary platform.
+  - Public profiles display `Ranked #N Overall` and a Top 50 or Top 100 badge where applicable.
+  - Leaderboard-to-profile navigation stores the list scroll position in session storage and returns to the same filter URL and position.
+  - Creator Cards are generated client-side as branded PNG files and can be downloaded or shared without exposing the private score.
 - Remaining hardening for future slices:
   - Improve team invitation onboarding so new invitees land directly back on the invite after signup/login.
   - Build tailored onboarding steps after Agency/Enterprise signup.

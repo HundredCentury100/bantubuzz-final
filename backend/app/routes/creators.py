@@ -16,7 +16,7 @@ RESERVED_PUBLIC_USERNAMES = {
     'browse', 'cart', 'checkout', 'contact', 'creator', 'creators', 'disputes',
     'forgot-password', 'help-center', 'how-it-works', 'login', 'messages',
     'my-tickets', 'notifications', 'packages', 'payment', 'pricing', 'privacy',
-    'register', 'reset-password', 'saved-creators', 'subscription', 'success-stories',
+    'leaderboard', 'register', 'reset-password', 'saved-creators', 'subscription', 'success-stories',
     'support', 'terms', 'tickets', 'verify-otp', 'wallet', 'youtube'
 }
 
@@ -600,6 +600,34 @@ def get_creator_rankings():
             'limit': limit,
             'creators': creators,
         }), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@bp.route('/leaderboard', methods=['GET'])
+def get_public_leaderboard():
+    """Public rank-only leaderboard with optional category and primary-platform filters."""
+    try:
+        from app.services.creator_score_service import CreatorScoreService
+
+        limit = request.args.get('limit', 50, type=int)
+        category = request.args.get('category')
+        platform = request.args.get('platform')
+        normalized_platform = CreatorScoreService.normalize_platform(platform)
+
+        if limit not in {50, 100}:
+            return jsonify({'error': 'Leaderboard limit must be 50 or 100'}), 400
+        if normalized_platform and normalized_platform not in CreatorScoreService.SUPPORTED_LEADERBOARD_PLATFORMS:
+            return jsonify({'error': 'Unsupported leaderboard platform'}), 400
+
+        payload = CreatorScoreService.leaderboard(
+            category=category,
+            platform=normalized_platform,
+            limit=limit,
+        )
+        if payload['calculated_at']:
+            payload['calculated_at'] = payload['calculated_at'].isoformat()
+        return jsonify(payload), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

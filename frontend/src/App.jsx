@@ -117,6 +117,7 @@ import TermsOfService from './pages/TermsOfService';
 import PublicCampaignReport from './pages/PublicCampaignReport';
 import ReferralLanding from './pages/ReferralLanding';
 import Referrals from './pages/Referrals';
+import Leaderboard from './pages/Leaderboard';
 
 // Support Pages
 import HelpCenter from './pages/HelpCenter';
@@ -208,6 +209,7 @@ function App() {
       {/* Public Routes */}
       <Route path="/" element={<Home />} />
       <Route path="/creators" element={<Creators />} />
+      <Route path="/leaderboard" element={<Leaderboard />} />
       <Route path="/creators/:id" element={<CreatorProfile />} />
       <Route path="/packages" element={<Packages />} />
       <Route path="/packages/:id" element={<PackageDetails />} />

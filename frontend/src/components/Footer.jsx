@@ -44,6 +44,11 @@ const Footer = () => {
                   Success Stories
                 </Link>
               </li>
+              <li>
+                <Link to="/leaderboard" className="text-gray-400 hover:text-primary transition-colors">
+                  Creator Leaderboard
+                </Link>
+              </li>
             </ul>
           </div>
 
@@ -59,6 +64,11 @@ const Footer = () => {
               <li>
                 <Link to="/creators" className="text-gray-400 hover:text-primary transition-colors">
                   Find Creators
+                </Link>
+              </li>
+              <li>
+                <Link to="/leaderboard" className="text-gray-400 hover:text-primary transition-colors">
+                  Creator Leaderboard
                 </Link>
               </li>
               <li>

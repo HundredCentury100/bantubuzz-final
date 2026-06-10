@@ -236,6 +236,14 @@ const Navbar = () => {
                 Search
               </Link>
             )}
+            <Link
+              to="/leaderboard"
+              className={`text-gray-700 hover:text-gray-900 transition-colors text-sm font-medium ${
+                isActive('/leaderboard') ? 'border-b-2 border-primary pb-1' : ''
+              }`}
+            >
+              Leaderboard
+            </Link>
 
             {isAuthenticated ? (
               <div className="flex items-center space-x-6">
@@ -561,6 +569,18 @@ const Navbar = () => {
                         )}
                       </Menu.Item>
                     )}
+                    <Menu.Item>
+                      {({ active }) => (
+                        <Link
+                          to="/leaderboard"
+                          className={`${
+                            active || isActive('/leaderboard') ? 'bg-light' : ''
+                          } block px-4 py-2 text-sm text-gray-700 rounded-lg`}
+                        >
+                          Leaderboard
+                        </Link>
+                      )}
+                    </Menu.Item>
 
                     {isAuthenticated ? (
                       <>
