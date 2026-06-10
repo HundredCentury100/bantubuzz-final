@@ -12,7 +12,7 @@ import {
 import { Bar, Line } from 'react-chartjs-2';
 import {
   Activity,
-  Download,
+  CalendarRange,
   Eye,
   Heart,
   MessageCircle,
@@ -24,6 +24,7 @@ import {
 import toast from 'react-hot-toast';
 
 import { campaignsAPI } from '../services/api';
+import CampaignReportTools from './CampaignReportTools';
 
 ChartJS.register(
   CategoryScale,
@@ -42,17 +43,33 @@ const CampaignPerformanceTab = ({ campaignId }) => {
   const [loading, setLoading] = useState(true);
   const [performance, setPerformance] = useState(null);
   const [accessError, setAccessError] = useState(null);
-  const [exporting, setExporting] = useState(false);
+  const [capabilities, setCapabilities] = useState(null);
+  const [showReportTools, setShowReportTools] = useState(false);
+  const [customRange, setCustomRange] = useState({ start_date: '', end_date: '' });
+  const [useCustomRange, setUseCustomRange] = useState(false);
 
   useEffect(() => {
-    fetchPerformance();
-  }, [campaignId, rangeDays]);
+    if (!useCustomRange || (customRange.start_date && customRange.end_date)) {
+      fetchPerformance();
+    }
+  }, [campaignId, rangeDays, useCustomRange]);
+
+  useEffect(() => {
+    campaignsAPI.getReportCapabilities(campaignId)
+      .then((response) => setCapabilities(response.data))
+      .catch(() => setCapabilities(null));
+  }, [campaignId]);
 
   const fetchPerformance = async () => {
     try {
       setLoading(true);
       setAccessError(null);
-      const response = await campaignsAPI.getPerformance(campaignId, { days: rangeDays });
+      const params = useCustomRange
+        ? customRange
+        : { days: rangeDays };
+      const response = useCustomRange
+        ? await campaignsAPI.getReportData(campaignId, params)
+        : await campaignsAPI.getPerformance(campaignId, params);
       setPerformance(response.data);
     } catch (error) {
       if (error.response?.status === 403) {
@@ -66,23 +83,13 @@ const CampaignPerformanceTab = ({ campaignId }) => {
     }
   };
 
-  const handleExport = async () => {
-    try {
-      setExporting(true);
-      const response = await campaignsAPI.downloadSentimentReport(campaignId, { days: rangeDays });
-      const url = URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `campaign-${campaignId}-sentiment-report.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      URL.revokeObjectURL(url);
-    } catch (error) {
-      toast.error(error.response?.data?.error || 'Failed to export sentiment report');
-    } finally {
-      setExporting(false);
+  const applyCustomRange = () => {
+    if (!customRange.start_date || !customRange.end_date) {
+      toast.error('Choose both a start and end date');
+      return;
     }
+    setUseCustomRange(true);
+    fetchPerformance();
   };
 
   const formatNumber = (value) => {
@@ -246,6 +253,20 @@ const CampaignPerformanceTab = ({ campaignId }) => {
               </button>
             ))}
           </div>
+          {capabilities?.custom_date_range && (
+            <button
+              type="button"
+              onClick={() => setUseCustomRange((value) => !value)}
+              className={`inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-medium ${
+                useCustomRange
+                  ? 'border-gray-900 bg-gray-900 text-white'
+                  : 'border-gray-300 bg-white text-gray-800'
+              }`}
+            >
+              <CalendarRange className="h-4 w-4" />
+              Custom
+            </button>
+          )}
           <button
             type="button"
             onClick={fetchPerformance}
@@ -255,19 +276,43 @@ const CampaignPerformanceTab = ({ campaignId }) => {
             <RefreshCw className="h-4 w-4" />
             Refresh
           </button>
-          {performance.access?.pdf_export && (
+          {capabilities?.pdf_export && (
             <button
               type="button"
-              onClick={handleExport}
-              disabled={exporting}
-              className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-800 hover:bg-gray-50 disabled:opacity-60"
+              onClick={() => setShowReportTools(true)}
+              className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-gray-900 hover:bg-primary/90"
             >
-              <Download className="h-4 w-4" />
-              {exporting ? 'Exporting' : 'PDF'}
+              Reports
             </button>
           )}
         </div>
       </div>
+
+      {capabilities?.custom_date_range && useCustomRange && (
+        <div className="flex flex-col gap-3 border border-gray-200 bg-white p-4 rounded-lg sm:flex-row sm:items-end">
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium uppercase text-gray-500">From</span>
+            <input
+              type="date"
+              value={customRange.start_date}
+              onChange={(event) => setCustomRange((current) => ({ ...current, start_date: event.target.value }))}
+              className="border border-gray-300 px-3 py-2 rounded-lg"
+            />
+          </label>
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium uppercase text-gray-500">To</span>
+            <input
+              type="date"
+              value={customRange.end_date}
+              onChange={(event) => setCustomRange((current) => ({ ...current, end_date: event.target.value }))}
+              className="border border-gray-300 px-3 py-2 rounded-lg"
+            />
+          </label>
+          <button type="button" onClick={applyCustomRange} className="bg-gray-900 px-4 py-2 text-sm font-semibold text-white rounded-lg">
+            Apply Range
+          </button>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-6">
         {metrics.map(({ label, value, icon: Icon, color }) => (
@@ -280,6 +325,15 @@ const CampaignPerformanceTab = ({ campaignId }) => {
           </div>
         ))}
       </div>
+
+      {showReportTools && capabilities && (
+        <CampaignReportTools
+          campaignId={campaignId}
+          capabilities={capabilities}
+          rangeParams={useCustomRange ? customRange : { days: rangeDays }}
+          onClose={() => setShowReportTools(false)}
+        />
+      )}
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(340px,1fr)]">
         <section className="border border-gray-200 bg-white p-5 rounded-lg">

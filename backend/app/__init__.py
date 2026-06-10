@@ -71,7 +71,7 @@ def create_app(config_name='development'):
         return {'error': 'Token has been revoked'}, 401
 
     # Register blueprints
-    from .routes import auth, users, creators, brands, packages, campaigns, bookings, messages, notifications, analytics, collaborations, reviews, wallet, categories, brand_wallet, custom_packages, disputes, subscriptions, briefs, creator_subscriptions, verification, proposals, platforms, admin_extended, messaging_safety, support, admin_logs, internal, campaign_invitations, campaign_payments, campaign_chats, campaign_cart, portfolio, smilepay_payments, billing, workspaces, spotlight_boosts
+    from .routes import auth, users, creators, brands, packages, campaigns, bookings, messages, notifications, analytics, collaborations, reviews, wallet, categories, brand_wallet, custom_packages, disputes, subscriptions, briefs, creator_subscriptions, verification, proposals, platforms, admin_extended, messaging_safety, support, admin_logs, internal, campaign_invitations, campaign_payments, campaign_chats, campaign_cart, portfolio, smilepay_payments, billing, workspaces, spotlight_boosts, campaign_reports
     from .routes import admin  # New admin module structure
 
     app.register_blueprint(auth.bp, url_prefix='/api/auth')
@@ -111,6 +111,7 @@ def create_app(config_name='development'):
     app.register_blueprint(smilepay_payments.bp)  # SmilePay payment routes at /api/payments/smilepay/*
     app.register_blueprint(billing.bp, url_prefix='/api/billing')  # Billing and invoice routes
     app.register_blueprint(workspaces.bp, url_prefix='/api/workspaces')  # Agency client workspace routes
+    app.register_blueprint(campaign_reports.bp)
     app.register_blueprint(spotlight_boosts.bp)  # Spotlight Boost purchase and history routes
 
     # Serve uploaded files

@@ -114,6 +114,7 @@ import SubscriptionPayment from './pages/SubscriptionPayment';
 import SubscriptionPaymentReturn from './pages/SubscriptionPaymentReturn';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfService from './pages/TermsOfService';
+import PublicCampaignReport from './pages/PublicCampaignReport';
 
 // Support Pages
 import HelpCenter from './pages/HelpCenter';
@@ -209,6 +210,7 @@ function App() {
       <Route path="/packages" element={<Packages />} />
       <Route path="/packages/:id" element={<PackageDetails />} />
       <Route path="/briefs/:id" element={<BriefDetails />} />
+      <Route path="/reports/:token" element={<PublicCampaignReport />} />
 
       {/* Auth Routes */}
       <Route

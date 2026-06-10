@@ -193,6 +193,20 @@ export const campaignsAPI = {
     `/campaigns/${campaignId}/performance/sentiment-report`,
     { params, responseType: 'blob' },
   ),
+  getReportCapabilities: (campaignId) => api.get(`/campaign-reports/campaigns/${campaignId}/capabilities`),
+  getReportData: (campaignId, params) => api.get(`/campaign-reports/campaigns/${campaignId}/data`, { params }),
+  downloadCampaignReport: (campaignId, format, params) => api.get(
+    `/campaign-reports/campaigns/${campaignId}/export.${format}`,
+    { params, responseType: 'blob' },
+  ),
+  getReportSchedules: (campaignId) => api.get(`/campaign-reports/campaigns/${campaignId}/schedules`),
+  createReportSchedule: (campaignId, data) => api.post(`/campaign-reports/campaigns/${campaignId}/schedules`, data),
+  updateReportSchedule: (scheduleId, data) => api.put(`/campaign-reports/schedules/${scheduleId}`, data),
+  deleteReportSchedule: (scheduleId) => api.delete(`/campaign-reports/schedules/${scheduleId}`),
+  getReportShares: (campaignId) => api.get(`/campaign-reports/campaigns/${campaignId}/shares`),
+  createReportShare: (campaignId, data) => api.post(`/campaign-reports/campaigns/${campaignId}/shares`, data),
+  revokeReportShare: (shareId) => api.post(`/campaign-reports/shares/${shareId}/revoke`),
+  getPublicReport: (token) => api.get(`/campaign-reports/public/${token}`),
 
   // Campaign Cart (NEW - unpaid additions workflow)
   getCart: (campaignId, params) => api.get(`/campaigns/${campaignId}/cart`, { params }),

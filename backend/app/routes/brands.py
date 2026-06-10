@@ -41,7 +41,10 @@ def get_own_profile():
         if not brand:
             return jsonify({'error': 'Brand profile not found'}), 404
 
-        return jsonify(brand.to_dict(include_user=True)), 200
+        data = brand.to_dict(include_user=True)
+        from app.utils.subscription_helper import get_brand_report_entitlements
+        data['report_entitlements'] = get_brand_report_entitlements(user_id)
+        return jsonify(data), 200
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -155,8 +158,9 @@ def upload_report_logo():
         if not brand:
             return jsonify({'error': 'Brand profile not found'}), 404
 
-        if brand.account_type not in ['agency', 'enterprise']:
-            return jsonify({'error': 'White-label report branding requires an Agency or Enterprise account'}), 403
+        from app.utils.subscription_helper import get_brand_report_entitlements
+        if not get_brand_report_entitlements(user_id)['white_label']:
+            return jsonify({'error': 'White-label report branding requires a Premium or higher brand plan'}), 403
 
         if 'file' not in request.files:
             return jsonify({'error': 'No file provided'}), 400

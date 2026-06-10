@@ -94,3 +94,23 @@ def get_brand_analytics_entitlements(brand_user_id):
         'plan_name': plan.name,
         'plan_slug': plan.slug,
     }
+
+
+def get_brand_report_entitlements(brand_user_id):
+    """Return server-enforced campaign reporting capabilities."""
+    analytics = get_brand_analytics_entitlements(brand_user_id)
+    slug = (analytics.get('plan_slug') or '').lower()
+    name = (analytics.get('plan_name') or '').lower()
+    premium_or_higher = any(
+        token in slug or token in name
+        for token in ('premium', 'agency', 'enterprise')
+    )
+    return {
+        **analytics,
+        'pdf_export': analytics['enabled'],
+        'csv_export': analytics['enabled'],
+        'white_label': premium_or_higher,
+        'custom_date_range': premium_or_higher,
+        'shareable_links': premium_or_higher,
+        'scheduled_reports': analytics['enabled'],
+    }

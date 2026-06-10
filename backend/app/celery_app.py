@@ -28,7 +28,8 @@ def make_celery(app=None):
             'app.tasks.email_tasks',
             'app.tasks.analytics_tasks',
             'app.tasks.collaboration_tasks',
-            'app.tasks.subscription_tasks'
+            'app.tasks.subscription_tasks',
+            'app.tasks.report_tasks'
         ]
     )
 
@@ -100,6 +101,11 @@ def make_celery(app=None):
             'process-subscription-renewals': {
                 'task': 'app.tasks.subscription_tasks.process_subscription_renewals',
                 'schedule': crontab(minute=20),
+            },
+            # Deliver saved weekly/monthly campaign reports.
+            'send-due-campaign-reports': {
+                'task': 'app.tasks.report_tasks.send_due_campaign_reports',
+                'schedule': crontab(minute=40),
             },
         }
     )

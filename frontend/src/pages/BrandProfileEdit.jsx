@@ -56,6 +56,7 @@ const BrandProfileEdit = () => {
   const [logo, setLogo] = useState(null);
   const [reportLogo, setReportLogo] = useState(null);
   const [security, setSecurity] = useState({ can_enable_2fa: false, two_factor_enabled: false });
+  const [reportEntitlements, setReportEntitlements] = useState({ white_label: false });
 
   const {
     register,
@@ -84,6 +85,7 @@ const BrandProfileEdit = () => {
       setProfile(data);
       setLogo(data.logo);
       setReportLogo(data.report_logo || data.logo);
+      setReportEntitlements(data.report_entitlements || { white_label: false });
 
       // Set form values
       setValue('company_name', data.company_name || '');
@@ -486,7 +488,7 @@ const BrandProfileEdit = () => {
                 </p>
               </div>
 
-              {(selectedAccountType === 'agency' || selectedAccountType === 'enterprise') && (
+              {reportEntitlements.white_label && (
                 <div className="mt-8 rounded-lg border border-gray-200 bg-gray-50 p-5">
                   <h3 className="text-lg font-bold text-dark">White-Label Report Branding</h3>
                   <p className="mt-1 text-sm text-gray-600">

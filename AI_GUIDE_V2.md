@@ -926,12 +926,27 @@ Deployment note:
   - Premium, Agency, and Enterprise receive sentiment drivers, language breakdown, top 20 comments, and PDF export.
   - Premium PDF endpoint: `GET /api/campaigns/<campaign_id>/performance/sentiment-report`.
   - Four-hour platform and submitted-post sync schedules remain in `backend/app/celery_app.py`.
+- Exportable campaign reports:
+  - Deploy script: `deployment/DEPLOY-CAMPAIGN-REPORTS.bat`.
+  - Migration: `backend/migrations/versions/202606101000_add_campaign_report_exports.py`.
+  - Shared report data is built by `backend/app/services/campaign_report_service.py`; PDF, CSV, scheduled email, and public links must use this payload so metrics remain consistent.
+  - Pro+ campaign reports:
+    - PDF: `GET /api/campaign-reports/campaigns/<campaign_id>/export.pdf`
+    - CSV: `GET /api/campaign-reports/campaigns/<campaign_id>/export.csv`
+    - Saved weekly/monthly schedules are managed under `/api/campaign-reports/campaigns/<campaign_id>/schedules`.
+  - Premium, Agency, and Enterprise additionally receive:
+    - custom `start_date` and `end_date` report ranges;
+    - white-label PDF branding using the brand report logo, colors, and signature;
+    - revocable, expiring view-only links at `/reports/<token>`.
+  - Public report API: `GET /api/campaign-reports/public/<token>`. It requires no login, rejects expired/revoked links, and also rejects links after the owner loses Premium+ report access.
+  - The locked small `Powered by BantuBuzz` footer remains on white-label PDFs and public reports.
+  - Celery task `app.tasks.report_tasks.send_due_campaign_reports` runs hourly at minute 40 through `celery-beat`.
+  - Premium brand accounts can use the same report branding fields as Agency/Enterprise accounts; report-logo authorization must check the paid plan entitlement rather than `brand_profiles.account_type`.
 - Remaining hardening for future slices:
   - Improve team invitation onboarding so new invitees land directly back on the invite after signup/login.
   - Build tailored onboarding steps after Agency/Enterprise signup.
   - Add account type change/upgrade from account settings without losing existing data.
   - Add custom report sender domains with SPF/DKIM/DMARC verification.
-  - Build scheduled reports.
   - Build cross-workspace analytics exports.
 
 1. Read `AI_GUIDE.md` first for the larger historical context and original project conventions.
