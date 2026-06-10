@@ -189,6 +189,8 @@ def create_portfolio_item():
 
         db.session.add(portfolio_item)
         db.session.commit()
+        from app.services.creator_score_service import queue_creator_score_recalculation
+        queue_creator_score_recalculation(creator.id)
 
         return jsonify({
             'success': True,
@@ -334,6 +336,8 @@ def update_portfolio_item(item_id):
             _apply_thunzi_metrics(portfolio_item, metrics)
 
         db.session.commit()
+        from app.services.creator_score_service import queue_creator_score_recalculation
+        queue_creator_score_recalculation(creator.id)
 
         return jsonify({
             'success': True,
@@ -368,6 +372,8 @@ def delete_portfolio_item(item_id):
 
         db.session.delete(portfolio_item)
         db.session.commit()
+        from app.services.creator_score_service import queue_creator_score_recalculation
+        queue_creator_score_recalculation(creator.id)
 
         return jsonify({
             'success': True,
@@ -462,6 +468,8 @@ def create_portfolio_from_collaboration(collaboration_id):
 
         db.session.add(portfolio_item)
         db.session.commit()
+        from app.services.creator_score_service import queue_creator_score_recalculation
+        queue_creator_score_recalculation(creator.id)
 
         return jsonify({
             'success': True,

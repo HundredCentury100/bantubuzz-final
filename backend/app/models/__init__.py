@@ -73,6 +73,7 @@ from .referral import (
     ReferralFulfillmentTask,
     ReferralReward,
 )
+from .creator_score import CreatorRanking, CreatorScore, CreatorScoreHistory, UserSession
 
 __all__ = [
     'User',
@@ -151,4 +152,8 @@ __all__ = [
     'ReferralReward',
     'AccountCreditTransaction',
     'ReferralFulfillmentTask',
+    'CreatorScore',
+    'CreatorScoreHistory',
+    'CreatorRanking',
+    'UserSession',
 ]

@@ -238,6 +238,8 @@ def create_package():
 
         db.session.add(package)
         db.session.commit()
+        from app.services.creator_score_service import queue_creator_score_recalculation
+        queue_creator_score_recalculation(creator.id)
 
         return jsonify({
             'message': 'Package created successfully',
@@ -298,6 +300,8 @@ def update_package(package_id):
                 setattr(package, field, data[field])
 
         db.session.commit()
+        from app.services.creator_score_service import queue_creator_score_recalculation
+        queue_creator_score_recalculation(creator.id)
 
         return jsonify({
             'message': 'Package updated successfully',
@@ -326,6 +330,8 @@ def delete_package(package_id):
 
         db.session.delete(package)
         db.session.commit()
+        from app.services.creator_score_service import queue_creator_score_recalculation
+        queue_creator_score_recalculation(creator.id)
 
         return jsonify({'message': 'Package deleted successfully'}), 200
 

@@ -19,6 +19,7 @@ from app.services.email_service import (
     send_welcome_email,
 )
 from app.services.referral_service import attach_referral, mark_referral_activated
+from app.services.creator_score_service import CreatorScoreService, queue_creator_score_recalculation
 
 bp = Blueprint('auth', __name__)
 MAX_FAILED_LOGIN_ATTEMPTS = 5
@@ -207,6 +208,7 @@ def register_creator():
         otp = OTP(user_id=user.id, purpose='registration', expiry_minutes=10)
         db.session.add(otp)
         db.session.commit()
+        queue_creator_score_recalculation(creator_profile.id)
 
         # Send OTP email
         send_otp_email(user.email, otp.code, purpose='registration')
@@ -362,7 +364,10 @@ def login():
 
         # Update last login
         user.update_last_login()
+        CreatorScoreService.record_session(user, 'password')
         db.session.commit()
+        if user.user_type == 'creator' and user.creator_profile:
+            queue_creator_score_recalculation(user.creator_profile.id)
 
         return jsonify(_issue_auth_response(user)), 200
 
@@ -399,7 +404,10 @@ def verify_login_two_factor():
         otp.mark_as_used()
         _reset_login_security(user)
         user.update_last_login()
+        CreatorScoreService.record_session(user, 'email_2fa')
         db.session.commit()
+        if user.user_type == 'creator' and user.creator_profile:
+            queue_creator_score_recalculation(user.creator_profile.id)
 
         return jsonify(_issue_auth_response(user)), 200
 
@@ -728,7 +736,10 @@ def google_creator_auth():
                 return jsonify({'error': 'This account is not a creator account'}), 403
 
             user.update_last_login()
+            CreatorScoreService.record_session(user, 'google')
             db.session.commit()
+            if user.creator_profile:
+                queue_creator_score_recalculation(user.creator_profile.id)
 
             claims = {
                 'user_type': user.user_type,
@@ -791,6 +802,7 @@ def google_creator_auth():
                 db.session.add(free_subscription)
 
             db.session.commit()
+            queue_creator_score_recalculation(creator_profile.id)
 
             # Issue a temp access token for the profile completion step
             claims = {
@@ -864,6 +876,8 @@ def google_complete_profile():
         user.set_password(password)
         user.phone_number = phone_number
         mark_referral_activated(user.id)
+        user.update_last_login()
+        CreatorScoreService.record_session(user, 'google_profile_completion')
 
         # Update creator profile username
         if user.creator_profile:
@@ -873,6 +887,7 @@ def google_complete_profile():
             db.session.add(profile)
 
         db.session.commit()
+        queue_creator_score_recalculation(user.creator_profile.id)
 
         # Issue full auth tokens
         claims = {

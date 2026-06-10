@@ -963,6 +963,23 @@ Deployment note:
   - The locked small `Powered by BantuBuzz` footer remains on white-label PDFs and public reports.
   - Celery task `app.tasks.report_tasks.send_due_campaign_reports` runs hourly at minute 40 through `celery-beat`.
   - Premium brand accounts can use the same report branding fields as Agency/Enterprise accounts; report-logo authorization must check the paid plan entitlement rather than `brand_profiles.account_type`.
+- Internal creator scoring and rankings:
+  - Deploy script: `deployment/DEPLOY-CREATOR-SCORING.bat`.
+  - Migration: `backend/migrations/versions/202606101700_add_creator_scoring.py`.
+  - The private score is stored in `creator_scores`; history is stored in `creator_score_history`. Never add either score or its component values to creator/brand-facing serializers.
+  - The final score weights raw 0-100 dimensions once: engagement 35%, reach 25%, followers 10%, sentiment 10%, activity 10%, profile quality 10%.
+  - Product-defined reach thresholds are authoritative: 0.05=10, 0.10=25, 0.30=50, 0.50=70, 1.00+=100. Reach uses submitted-post reach first and video views second.
+  - Login events are stored in `user_sessions`; activity uses sessions from the last 30 days plus 30/60-day inactivity penalties.
+  - Connected ThunziAI platform averages are persisted on `connected_platforms` so engagement and sentiment inputs survive API requests.
+  - Scores recalculate after logins, platform sync/connect/disconnect, post-metric sync, profile edits, profile photo changes, package changes, and success-story changes. A changed platform-wide maximum follower count triggers a full recalculation.
+  - Celery Beat runs a full score/ranking rebuild nightly at 02:30. Deployment also runs `backend/recalculate_creator_scores.py` once after migration.
+  - Public APIs expose rank position only:
+    - `GET /api/creators/rankings?type=overall&limit=50`
+    - `GET /api/creators/rankings?type=category&context=<category>&limit=50`
+    - `GET /api/creators/rankings?type=platform&context=<platform>&limit=100`
+    - `GET /api/creators/<creator_id>/rank`
+  - Admin-only score diagnostics: `GET /api/admin/creator-scores`.
+  - Featured fallback and default creator discovery use the private score/rank internally without serializing it.
 - Remaining hardening for future slices:
   - Improve team invitation onboarding so new invitees land directly back on the invite after signup/login.
   - Build tailored onboarding steps after Agency/Enterprise signup.

@@ -21,6 +21,11 @@ class ConnectedPlatform(db.Model):
     # Metrics
     followers = db.Column(db.Integer, default=0)
     posts = db.Column(db.Integer, default=0)
+    average_engagement_rate = db.Column(db.Numeric(8, 4))
+    average_sentiment_score = db.Column(db.Numeric(8, 4))
+    average_views = db.Column(db.BigInteger)
+    average_reach = db.Column(db.BigInteger)
+    analytics_synced_at = db.Column(db.DateTime)
 
     # Connection status
     is_connected = db.Column(db.Boolean, default=False)
@@ -51,6 +56,10 @@ class ConnectedPlatform(db.Model):
             'profile_url': self.profile_url,
             'followers': self.followers,
             'posts': self.posts,
+            'average_engagement_rate': float(self.average_engagement_rate) if self.average_engagement_rate is not None else None,
+            'average_sentiment_score': float(self.average_sentiment_score) if self.average_sentiment_score is not None else None,
+            'average_views': self.average_views,
+            'average_reach': self.average_reach,
             'is_connected': self.is_connected,
             'sync_status': self.sync_status,
             'last_synced_at': self.last_synced_at.isoformat() if self.last_synced_at else None,
@@ -59,6 +68,23 @@ class ConnectedPlatform(db.Model):
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }
+
+    def update_analytics_from_thunzi(self, payload):
+        if not isinstance(payload, dict):
+            return
+        field_map = {
+            'averageEngagementRate': 'average_engagement_rate',
+            'averageSentimentScore': 'average_sentiment_score',
+            'averageViews': 'average_views',
+            'averageReach': 'average_reach',
+        }
+        updated = False
+        for source, target in field_map.items():
+            if source in payload and payload[source] is not None:
+                setattr(self, target, payload[source])
+                updated = True
+        if updated:
+            self.analytics_synced_at = datetime.utcnow()
 
     def __repr__(self):
         return f'<ConnectedPlatform user_id={self.user_id} platform={self.platform} account={self.account_name}>'

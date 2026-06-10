@@ -29,7 +29,9 @@ def make_celery(app=None):
             'app.tasks.analytics_tasks',
             'app.tasks.collaboration_tasks',
             'app.tasks.subscription_tasks',
-            'app.tasks.report_tasks'
+            'app.tasks.report_tasks',
+            'app.tasks.referral_tasks',
+            'app.tasks.creator_score_tasks',
         ]
     )
 
@@ -110,6 +112,10 @@ def make_celery(app=None):
             'qualify-referrals': {
                 'task': 'app.tasks.referral_tasks.qualify_due_referrals',
                 'schedule': crontab(minute=10, hour=2),
+            },
+            'recalculate-creator-scores': {
+                'task': 'app.tasks.creator_score_tasks.recalculate_all',
+                'schedule': crontab(minute=30, hour=2),
             },
         }
     )

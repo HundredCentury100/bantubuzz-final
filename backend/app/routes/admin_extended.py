@@ -647,3 +647,40 @@ def reject_deposit(deposit_id):
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': str(e)}), 500
+
+
+@bp.route('/creator-scores', methods=['GET'])
+@admin_required
+def list_creator_scores():
+    """Admin-only diagnostics for the private creator scoring system."""
+    try:
+        from app.models import CreatorScore
+
+        page = max(1, request.args.get('page', 1, type=int))
+        per_page = min(100, max(1, request.args.get('per_page', 50, type=int)))
+        pagination = CreatorScore.query.order_by(
+            CreatorScore.final_score.desc(),
+            CreatorScore.creator_profile_id.asc(),
+        ).paginate(page=page, per_page=per_page, error_out=False)
+
+        return jsonify({
+            'scores': [{
+                'creator_profile_id': score.creator_profile_id,
+                'username': score.creator.username if score.creator else None,
+                'engagement_score': float(score.engagement_score or 0),
+                'reach_score': float(score.reach_score or 0),
+                'follower_score': float(score.follower_score or 0),
+                'sentiment_score': float(score.sentiment_score or 0),
+                'activity_score': float(score.activity_score or 0),
+                'profile_quality_score': float(score.profile_quality_score or 0),
+                'final_score': float(score.final_score or 0),
+                'data_quality': score.data_quality or {},
+                'formula_version': score.formula_version,
+                'calculated_at': score.calculated_at.isoformat() if score.calculated_at else None,
+            } for score in pagination.items],
+            'page': page,
+            'pages': pagination.pages,
+            'total': pagination.total,
+        }), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500

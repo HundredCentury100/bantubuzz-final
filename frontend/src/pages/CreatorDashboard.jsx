@@ -629,6 +629,11 @@ const CreatorDashboard = () => {
               <div>
                 <p className="text-xs sm:text-sm text-gray-600 mb-1">Profile Status</p>
                 <p className="text-base sm:text-lg font-bold text-dark capitalize">{profile?.availability_status || 'Available'}</p>
+                {profile?.rank?.position && (
+                  <p className="mt-1 text-xs font-semibold text-primary-dark">
+                    Overall rank #{profile.rank.position}
+                  </p>
+                )}
               </div>
               <div className={`w-8 h-8 sm:w-12 sm:h-12 rounded-lg flex items-center justify-center flex-shrink-0 ${
                 profile?.availability_status === 'available' ? 'bg-primary/10' :

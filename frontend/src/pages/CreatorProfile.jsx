@@ -15,7 +15,7 @@ import SEO from '../components/SEO';
 import toast from 'react-hot-toast';
 import { PLATFORM_CONFIGS, PACKAGE_TYPES } from '../constants/platformConfig';
 import PortfolioGrid from '../components/PortfolioGrid';
-import { Bolt, Copy, MessageCircle } from 'lucide-react';
+import { Bolt, Copy, MessageCircle, Trophy } from 'lucide-react';
 import GalleryVideo from '../components/GalleryVideo';
 
 const CreatorProfile = () => {
@@ -448,6 +448,13 @@ const CreatorProfile = () => {
                   <h1 className="text-3xl font-bold text-dark mb-2">
                     {creator.display_name || creator.username || 'Creator'}
                   </h1>
+
+                  {creator.rank?.position && (
+                    <div className="mb-3 inline-flex items-center gap-2 rounded-md border border-primary/30 bg-primary/10 px-3 py-1.5 text-sm font-semibold text-dark">
+                      <Trophy className="h-4 w-4 text-primary-dark" />
+                      Overall rank #{creator.rank.position}
+                    </div>
+                  )}
 
                   {creator.active_spotlight_boost && (
                     <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-amber-100 px-3 py-1.5 text-sm font-semibold text-amber-800">

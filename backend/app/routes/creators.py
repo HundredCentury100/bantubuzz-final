@@ -2,7 +2,7 @@ from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from datetime import datetime, timezone
 from app import db
-from app.models import CreatorProfile, User, Package
+from app.models import CreatorProfile, CreatorRanking, CreatorScore, User, Package
 from app.utils import save_profile_picture, delete_profile_picture
 from app.utils.file_upload import save_and_compress_image
 from app.utils.image_compression import delete_image_variants
@@ -23,6 +23,8 @@ RESERVED_PUBLIC_USERNAMES = {
 
 def _public_creator_payload(creator):
     creator_data = creator.to_dict(include_user=True, public_view=True)
+    from app.services.creator_score_service import CreatorScoreService
+    creator_data['rank'] = CreatorScoreService.public_rank(creator.id)
 
     from app.models import Collaboration, BrandProfile
 
@@ -124,8 +126,16 @@ def get_featured_creators():
                 from app.models import Collaboration
                 thirty_days_ago = datetime.now(timezone.utc) - timedelta(days=30)
 
-                fallback_creators = fallback_query.order_by(
-                    CreatorProfile.follower_count.desc()
+                fallback_creators = fallback_query.outerjoin(
+                    CreatorRanking,
+                    and_(
+                        CreatorRanking.creator_profile_id == CreatorProfile.id,
+                        CreatorRanking.ranking_type == 'overall',
+                        CreatorRanking.context_key == '',
+                    ),
+                ).order_by(
+                    CreatorRanking.position.asc().nullslast(),
+                    CreatorProfile.follower_count.desc(),
                 ).limit(needed).all()
 
                 # Add fallback creators to featured list
@@ -142,8 +152,16 @@ def get_featured_creators():
             if platform:
                 query = query.filter(func.cast(CreatorProfile.platforms, db.Text).contains(platform))
 
-            featured = query.order_by(
-                CreatorProfile.follower_count.desc()
+            featured = query.outerjoin(
+                CreatorRanking,
+                and_(
+                    CreatorRanking.creator_profile_id == CreatorProfile.id,
+                    CreatorRanking.ranking_type == 'overall',
+                    CreatorRanking.context_key == '',
+                ),
+            ).order_by(
+                CreatorRanking.position.asc().nullslast(),
+                CreatorProfile.follower_count.desc(),
             ).limit(limit).all()
 
         creators_data = []
@@ -321,6 +339,20 @@ def get_creators():
         # Add review stats and cheapest package price
         # ONLY include creators with at least one active package
         creators_with_stats = []
+        private_scores = {
+            row.creator_profile_id: float(row.final_score or 0)
+            for row in CreatorScore.query.filter(
+                CreatorScore.creator_profile_id.in_([creator.id for creator in all_creators])
+            ).all()
+        } if all_creators else {}
+        public_ranks = {
+            row.creator_profile_id: row.position
+            for row in CreatorRanking.query.filter(
+                CreatorRanking.ranking_type == 'overall',
+                CreatorRanking.context_key == '',
+                CreatorRanking.creator_profile_id.in_([creator.id for creator in all_creators]),
+            ).all()
+        } if all_creators else {}
         for creator in all_creators:
             # Get active packages for this creator
             packages = Package.query.filter_by(creator_id=creator.id, is_active=True).all()
@@ -341,6 +373,10 @@ def get_creators():
             prices = [p.price for p in packages]
             creator_dict['cheapest_package_price'] = min(prices)
             creator_dict['total_packages'] = len(packages)
+            creator_dict['rank'] = (
+                {'position': public_ranks[creator.id], 'type': 'overall'}
+                if creator.id in public_ranks else None
+            )
 
             creators_with_stats.append(creator_dict)
 
@@ -414,12 +450,13 @@ def get_creators():
             for creator in creators_with_stats:
                 creator['is_featured'] = creator['id'] in featured_creator_ids
 
-            # Sort: Featured creators first, then by reviews & rating
+            # Sort: paid/manual featured creators first, then the private creator score.
             creators_with_stats.sort(
                 key=lambda x: (
-                    not x.get('is_featured', False),  # Featured first (False < True, so not featured = False sorts first)
-                    -x['review_stats']['total_reviews'],  # Then by reviews descending
-                    -(x['review_stats']['average_rating'] or 0)  # Then by rating descending
+                    not x.get('is_featured', False),
+                    -private_scores.get(x['id'], 0),
+                    -x['review_stats']['total_reviews'],
+                    -(x['review_stats']['average_rating'] or 0),
                 )
             )
         elif sort_by == 'followers_desc':
@@ -518,6 +555,80 @@ def get_creator_by_username(username):
         return jsonify({'error': str(e)}), 500
 
 
+@bp.route('/rankings', methods=['GET'])
+def get_creator_rankings():
+    """Return public creator rankings without exposing internal score values."""
+    try:
+        ranking_type = (request.args.get('type') or 'overall').strip().lower()
+        context = (request.args.get('context') or '').strip().lower()
+        limit = request.args.get('limit', 50, type=int)
+
+        if ranking_type not in {'overall', 'category', 'platform'}:
+            return jsonify({'error': 'Ranking type must be overall, category, or platform'}), 400
+        if ranking_type != 'overall' and not context:
+            return jsonify({'error': 'A context is required for category and platform rankings'}), 400
+        if limit not in {50, 100}:
+            return jsonify({'error': 'Ranking limit must be 50 or 100'}), 400
+
+        rankings = CreatorRanking.query.filter_by(
+            ranking_type=ranking_type,
+            context_key=context if ranking_type != 'overall' else '',
+        ).order_by(CreatorRanking.position.asc()).limit(limit).all()
+
+        creators = []
+        for ranking in rankings:
+            creator = ranking.creator
+            if not creator or not creator.user or not creator.user.is_active:
+                continue
+            payload = _public_creator_payload(creator)
+            payload['rank'] = {
+                'position': ranking.position,
+                'previous_position': ranking.previous_position,
+                'movement': (
+                    ranking.previous_position - ranking.position
+                    if ranking.previous_position is not None else None
+                ),
+                'type': ranking.ranking_type,
+                'context': ranking.context_key or None,
+                'calculated_at': ranking.calculated_at.isoformat(),
+            }
+            creators.append(payload)
+
+        return jsonify({
+            'ranking_type': ranking_type,
+            'context': context or None,
+            'limit': limit,
+            'creators': creators,
+        }), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@bp.route('/<int:creator_id>/rank', methods=['GET'])
+def get_creator_rank(creator_id):
+    """Return one creator's public rank position."""
+    try:
+        from app.services.creator_score_service import CreatorScoreService
+
+        creator = CreatorProfile.query.get(creator_id)
+        if not creator or not creator.user or not creator.user.is_active:
+            return jsonify({'error': 'Creator not found'}), 404
+
+        ranking_type = (request.args.get('type') or 'overall').strip().lower()
+        context = (request.args.get('context') or '').strip().lower()
+        if ranking_type not in {'overall', 'category', 'platform'}:
+            return jsonify({'error': 'Ranking type must be overall, category, or platform'}), 400
+        if ranking_type != 'overall' and not context:
+            return jsonify({'error': 'A context is required for category and platform rankings'}), 400
+
+        return jsonify({
+            'creator_id': creator.id,
+            'rank': CreatorScoreService.public_rank(creator.id, ranking_type, context),
+        }), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @bp.route('/profile', methods=['GET'])
 @jwt_required()
 def get_own_profile():
@@ -533,7 +644,10 @@ def get_own_profile():
         if not creator:
             return jsonify({'error': 'Creator profile not found'}), 404
 
-        return jsonify(creator.to_dict(include_user=True)), 200
+        from app.services.creator_score_service import CreatorScoreService
+        creator_data = creator.to_dict(include_user=True)
+        creator_data['rank'] = CreatorScoreService.public_rank(creator.id)
+        return jsonify(creator_data), 200
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -641,6 +755,8 @@ def update_profile():
 
         creator.updated_at = datetime.now(timezone.utc)
         db.session.commit()
+        from app.services.creator_score_service import queue_creator_score_recalculation
+        queue_creator_score_recalculation(creator.id)
 
         return jsonify({
             'message': 'Profile updated successfully',
@@ -697,6 +813,8 @@ def upload_profile_picture():
             creator.profile_picture = image_data['medium']
             creator.updated_at = datetime.now(timezone.utc)
             db.session.commit()
+            from app.services.creator_score_service import queue_creator_score_recalculation
+            queue_creator_score_recalculation(creator.id)
 
             return jsonify({
                 'message': 'Profile picture updated successfully',

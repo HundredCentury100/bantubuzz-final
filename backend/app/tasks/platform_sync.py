@@ -7,6 +7,7 @@ and other social media APIs to keep creator analytics up to date.
 from app.celery_app import celery
 from app.models import CreatorProfile, ConnectedPlatform
 from app.services.thunzi_service import ThunziAIService
+from app.services.creator_score_service import queue_creator_score_recalculation
 from app import db
 from datetime import datetime, timedelta
 from sqlalchemy import and_
@@ -90,6 +91,7 @@ def sync_platform(platform_id):
             platform.posts = updated_platform.get('posts', platform.posts)
             platform.sync_status = updated_platform.get('syncStatus') or result.get('status', 'success')
             platform.scopes = updated_platform.get('scopes') or platform.scopes
+            platform.update_analytics_from_thunzi(updated_platform)
 
         platform.last_synced_at = datetime.utcnow()
 
@@ -98,6 +100,8 @@ def sync_platform(platform_id):
             creator.refresh_total_followers()
 
         db.session.commit()
+        if creator:
+            queue_creator_score_recalculation(creator.id)
 
         logger.info(f"Successfully synced platform {platform_id}")
         return {

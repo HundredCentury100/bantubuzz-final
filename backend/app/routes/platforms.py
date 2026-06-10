@@ -358,12 +358,15 @@ def connect_platform():
             sync_status=thunzi_platform.get('syncStatus', 'pending'),
             last_synced_at=_parse_thunzi_datetime(thunzi_platform.get('lastSyncedAt'))
         )
+        connected_platform.update_analytics_from_thunzi(thunzi_platform)
 
         db.session.add(connected_platform)
 
         creator.refresh_total_followers()
 
         db.session.commit()
+        from app.services.creator_score_service import queue_creator_score_recalculation
+        queue_creator_score_recalculation(creator.id)
 
         # IMPORTANT: Ensure creator entity is registered in ThunziAI after platform connection
         # This ensures analytics endpoints will work properly
@@ -1013,6 +1016,7 @@ def sync_platform(platform_id):
                     platform.posts = updated_platform.get('posts', platform.posts)
                     platform.sync_status = updated_platform.get('syncStatus', 'success')
                     platform.scopes = updated_platform.get('scopes') or platform.scopes
+                    platform.update_analytics_from_thunzi(updated_platform)
                     platform.last_synced_at = datetime.utcnow()
 
                     # Update creator profile with latest connected-platform follower total
@@ -1021,6 +1025,9 @@ def sync_platform(platform_id):
                         creator.refresh_total_followers()
 
                     db.session.commit()
+                    if creator:
+                        from app.services.creator_score_service import queue_creator_score_recalculation
+                        queue_creator_score_recalculation(creator.id)
 
             return jsonify({
                 'success': True,
@@ -1213,9 +1220,14 @@ def connect_brand_platform():
             is_connected=thunzi_platform.get('isConnected', True), sync_status=thunzi_platform.get('syncStatus', 'pending'),
             last_synced_at=_parse_thunzi_datetime(thunzi_platform.get('lastSyncedAt'))
         )
+        connected_platform.update_analytics_from_thunzi(thunzi_platform)
 
         db.session.add(connected_platform)
         db.session.commit()
+        creator = CreatorProfile.query.filter_by(user_id=current_user_id).first()
+        if creator:
+            from app.services.creator_score_service import queue_creator_score_recalculation
+            queue_creator_score_recalculation(creator.id)
 
         # Trigger initial async sync without blocking the platform connection response.
         if connected_platform.thunzi_platform_id:
@@ -1314,8 +1326,12 @@ def disconnect_brand_platform(platform_id):
                 # Continue with local deletion even if ThunziAI deletion fails
 
         # Delete from local database
+        creator = CreatorProfile.query.filter_by(user_id=current_user_id).first()
         db.session.delete(platform)
         db.session.commit()
+        if creator:
+            from app.services.creator_score_service import queue_creator_score_recalculation
+            queue_creator_score_recalculation(creator.id)
 
         return jsonify({'success': True, 'message': 'Platform disconnected successfully'}), 200
 

@@ -585,6 +585,10 @@ class PostMetricsService:
             )
             PostMetricsService._add_metrics_snapshot(metrics)
             db.session.commit()
+            from app.services.creator_score_service import queue_creator_score_recalculation
+            creator_for_score = CreatorProfile.query.get(creator_id)
+            if creator_for_score:
+                queue_creator_score_recalculation(creator_for_score.id)
 
             current_app.logger.info(
                 f"Successfully synced metrics for deliverable {deliverable_id} - "
