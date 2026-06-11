@@ -1,0 +1,22 @@
+[Unit]
+Description=BantuBuzz Headless CMS
+After=network.target postgresql.service redis-server.service
+Wants=postgresql.service redis-server.service
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/bantubuzz-cms
+EnvironmentFile=/etc/bantubuzz/cms.env
+Environment=NODE_ENV=production
+Environment=PORT=3010
+ExecStart=/usr/bin/npm run start --workspace=@bantubuzz/web
+Restart=always
+RestartSec=5
+TimeoutStopSec=30
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

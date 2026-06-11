@@ -2,6 +2,18 @@
 
 This file is a living handoff guide for future AI/Codex sessions working on the BantuBuzz Platform. Start here before making changes, deploying, or debugging production.
 
+## Headless CMS Integration
+
+- CMS source and Payload admin run at `https://app.bantubuzz.com`.
+- Public editorial URLs are served on `https://bantubuzz.com` through Apache reverse proxying to Next.js on port `3010`.
+- Flask remains authoritative for `/api/*`; CMS browser APIs use `/content-api/*`.
+- CMS reports use `/research/*` because `/reports/:token` belongs to platform campaign reports.
+- Flask and CMS communicate with a shared `CONTENT_BRIDGE_SECRET` using timestamped HMAC-SHA256 signatures. Never commit the real secret.
+- Flask health endpoint: `/api/internal/cms/content-health`.
+- CMS signed health endpoint: `/api/integration/v1/health`.
+- CMS publication webhook target: `/api/internal/cms/content-changed`.
+- Combined VPS templates and the migration order are in `deployment/vps/`.
+
 ## Current Project Context
 
 - Workspace: `D:\Bantubuzz Platform`

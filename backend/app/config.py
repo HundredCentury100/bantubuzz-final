@@ -44,6 +44,11 @@ class Config:
     # Frontend
     FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:3000')
 
+    # Headless CMS bridge
+    CMS_INTERNAL_URL = os.getenv('CMS_INTERNAL_URL', 'http://127.0.0.1:3010')
+    CONTENT_BRIDGE_SECRET = os.getenv('CONTENT_BRIDGE_SECRET')
+    CONTENT_BRIDGE_MAX_SKEW_SECONDS = int(os.getenv('CONTENT_BRIDGE_MAX_SKEW_SECONDS', 300))
+
     # CORS - Allow multiple origins
     CORS_ORIGINS = [
         FRONTEND_URL,
@@ -51,6 +56,7 @@ class Config:
         'https://bantubuzz.com',
         'http://www.bantubuzz.com',
         'https://www.bantubuzz.com',
+        'https://app.bantubuzz.com',
         'http://173.212.245.22:8080'
     ]
 
