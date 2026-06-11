@@ -43,6 +43,13 @@ This file is a living handoff guide for future AI/Codex sessions working on the 
   runs before the production service starts.
 - The default CMS sender identity is `BantuBuzz <hundred@bantubuzz.com>`.
   Outbound email still requires real SMTP host and credentials in `cms.env`.
+- The first PostgreSQL migration is generated on the VPS and may exist there
+  before it has been downloaded locally. CMS redeploys must preserve remote-only
+  files in `apps/web/src/migrations-postgres`, or an otherwise valid rerun sees
+  a non-empty database with no migration history and correctly refuses to run.
+- CMS seed commands disable the platform content webhook until the Flask app is
+  running on the combined VPS. Connection refusals to `127.0.0.1:8002` during
+  this migration phase are expected and must not block CMS setup.
 
 ## Current Project Context
 

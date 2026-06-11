@@ -36,9 +36,11 @@ fi
 timestamp="$(date +%Y%m%d-%H%M%S)"
 release_dir="/var/www/bantubuzz-cms-release-${timestamp}"
 backup_dir="${BACKUP_ROOT}/cms-before-${timestamp}"
+migration_preserve_dir="/tmp/bantubuzz-cms-migrations-${timestamp}"
 
 cleanup_release() {
   rm -rf "$release_dir"
+  rm -rf "$migration_preserve_dir"
 }
 trap cleanup_release EXIT
 
@@ -68,11 +70,24 @@ if [ -f "$CMS_ROOT/package.json" ]; then
     "$CMS_ROOT/" "$backup_dir/"
 fi
 
+if [ -d "$CMS_ROOT/apps/web/src/migrations-postgres" ]; then
+  install -d -o bantubuzz -g www-data -m 2775 "$migration_preserve_dir"
+  rsync -a "$CMS_ROOT/apps/web/src/migrations-postgres/" "$migration_preserve_dir/"
+fi
+
 echo "=== Installing CMS source ==="
 rsync -a --delete \
+  --exclude node_modules \
+  --exclude .next \
   --exclude media \
   --exclude storage \
   "$release_dir/" "$CMS_ROOT/"
+if [ -d "$migration_preserve_dir" ]; then
+  install -d -o bantubuzz -g www-data -m 2775 \
+    "$CMS_ROOT/apps/web/src/migrations-postgres"
+  rsync -a --ignore-existing \
+    "$migration_preserve_dir/" "$CMS_ROOT/apps/web/src/migrations-postgres/"
+fi
 install -d -o bantubuzz -g www-data -m 2775 \
   "$CMS_ROOT/apps/web/media" \
   "$CMS_ROOT/apps/web/storage"
@@ -140,7 +155,7 @@ run_as_app npm exec -- payload migrate
 
 echo "=== Seeding baseline authority content ==="
 cd "$CMS_ROOT"
-run_as_app npm run seed
+run_as_app env BANTUBUZZ_PLATFORM_WEBHOOK_URL= CONTENT_BRIDGE_SECRET= npm run seed
 
 echo "=== Building CMS production application ==="
 run_as_app npm run build
@@ -208,12 +223,29 @@ apache2ctl configtest
 systemctl reload apache2
 
 echo "=== Requesting TLS certificate ==="
-certbot --apache \
-  --non-interactive \
-  --agree-tos \
-  --redirect \
-  --email "$CERTBOT_EMAIL" \
-  -d app.bantubuzz.com
+certificate_ready=false
+for attempt in 1 2 3 4; do
+  if certbot --apache \
+    --non-interactive \
+    --agree-tos \
+    --redirect \
+    --keep-until-expiring \
+    --email "$CERTBOT_EMAIL" \
+    -d app.bantubuzz.com; then
+    certificate_ready=true
+    break
+  fi
+
+  if [ "$attempt" -lt 4 ]; then
+    echo "Certbot attempt $attempt failed; retrying in 20 seconds..."
+    sleep 20
+  fi
+done
+
+if [ "$certificate_ready" != "true" ]; then
+  echo "TLS certificate request failed after four attempts."
+  exit 1
+fi
 
 apache2ctl configtest
 systemctl reload apache2
