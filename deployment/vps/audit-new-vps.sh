@@ -5,6 +5,8 @@
 
 set +e
 
+AUDIT_VERSION="2026-06-11.2"
+
 section() {
   printf '\n\n============================================================\n'
   printf '%s\n' "$1"
@@ -22,6 +24,7 @@ run_if_available() {
 }
 
 section "AUDIT METADATA"
+printf 'Audit version: %s\n' "$AUDIT_VERSION"
 date --iso-8601=seconds 2>/dev/null || date
 printf 'Hostname: '
 hostname

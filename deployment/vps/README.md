@@ -35,6 +35,10 @@ Provisioning creates:
 After provisioning, rerun `deployment\ANALYZE-NEW-VPS.bat`. Production data
 migration and DNS cutover are separate later phases.
 
+For a shorter decisive check, run
+`deployment\VERIFY-NEW-VPS-READINESS.bat`. A successful report ends with
+`BANTUBUZZ_MIGRATION_READINESS_PASS`.
+
 ## Required secrets
 
 Generate one random `CONTENT_BRIDGE_SECRET` and set the same value in:
