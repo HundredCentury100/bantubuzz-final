@@ -96,7 +96,8 @@ fi
 
 echo "=== Installing locked Node dependencies ==="
 cd "$CMS_ROOT"
-run_as_app npm ci --no-audit --no-fund
+run_as_app npm ci --include=dev --no-audit --no-fund
+run_as_app node -e "require.resolve('drizzle-kit/api')"
 
 echo "=== Preparing PostgreSQL migration history ==="
 migration_dir="$CMS_ROOT/apps/web/src/migrations-postgres"

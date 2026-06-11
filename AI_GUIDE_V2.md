@@ -38,6 +38,11 @@ This file is a living handoff guide for future AI/Codex sessions working on the 
 - CMS deployment commands run as `bantubuzz` with `HOME=/home/bantubuzz` and
   `NPM_CONFIG_CACHE=/var/cache/bantubuzz/npm`. Do not preserve root's npm cache
   path when using `runuser`, or npm fails with `/root/.npm` EACCES errors.
+- CMS production installation must use `npm ci --include=dev` because Payload
+  migration generation requires `drizzle-kit`, and Next.js build tooling also
+  runs before the production service starts.
+- The default CMS sender identity is `BantuBuzz <hundred@bantubuzz.com>`.
+  Outbound email still requires real SMTP host and credentials in `cms.env`.
 
 ## Current Project Context
 

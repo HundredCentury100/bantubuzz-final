@@ -271,6 +271,8 @@ BANTUBUZZ_PLATFORM_WEBHOOK_URL=http://127.0.0.1:8002/api/internal/cms/content-ch
 CONTENT_BRIDGE_SECRET=${bridge_secret}
 ANALYTICS_HASH_SALT=${analytics_salt}
 ADMIN_ALLOWED_ORIGINS=https://app.bantubuzz.com
+SMTP_FROM=hundred@bantubuzz.com
+SMTP_FROM_NAME=BantuBuzz
 
 # Configure SMTP, S3, Meilisearch, TTS, analytics, and IndexNow before
 # enabling the CMS services.
