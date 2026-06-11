@@ -10,9 +10,9 @@ set "REMOTE_SCRIPT=%ROOT%\deployment\vps\fix-cms-white-screen.sh"
 set "BROWSER_CHECK=%ROOT%\deployment\vps\check-cms-admin.mjs"
 set "REPORT_DIR=%ROOT%\deployment\vps\reports"
 
-if not exist "%LAYOUT%" (
-    echo ERROR: Updated CMS layout was not found:
-    echo %LAYOUT%
+powershell.exe -NoProfile -Command "if (Test-Path -LiteralPath $env:LAYOUT) { exit 0 } else { exit 1 }"
+if errorlevel 1 (
+    echo ERROR: Updated CMS layout was not found.
     pause
     exit /b 1
 )
