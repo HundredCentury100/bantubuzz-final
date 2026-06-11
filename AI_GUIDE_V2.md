@@ -50,6 +50,11 @@ This file is a living handoff guide for future AI/Codex sessions working on the 
 - CMS seed commands disable the platform content webhook until the Flask app is
   running on the combined VPS. Connection refusals to `127.0.0.1:8002` during
   this migration phase are expected and must not block CMS setup.
+- The first production CMS admin page initially returned HTTP 200 and loaded
+  all static assets but remained blank because the first-user React boundary
+  never resolved. Keep Payload's root layout standard; do not insert a custom
+  pre-hydration paint component inside `RootLayout`. Repair script:
+  `deployment\FIX-CMS-WHITE-SCREEN.bat`.
 
 ## Current Project Context
 
