@@ -1,5 +1,5 @@
 [Unit]
-Description=BantuBuzz Headless CMS
+Description=BantuBuzz Celery Worker
 After=network.target postgresql.service redis-server.service
 Wants=postgresql.service redis-server.service
 
@@ -7,12 +7,12 @@ Wants=postgresql.service redis-server.service
 Type=simple
 User=bantubuzz
 Group=www-data
-WorkingDirectory=/var/www/bantubuzz-cms
-EnvironmentFile=/etc/bantubuzz/cms.env
-ExecStart=/usr/bin/npm exec --workspace=@bantubuzz/web -- next start --hostname 127.0.0.1 --port 3010
+WorkingDirectory=/var/www/bantubuzz/backend
+EnvironmentFile=/etc/bantubuzz/platform.env
+ExecStart=/var/www/bantubuzz/backend/venv/bin/celery -A celery_worker.celery worker --loglevel=info --concurrency=3
 Restart=always
 RestartSec=5
-TimeoutStopSec=30
+TimeoutStopSec=60
 NoNewPrivileges=true
 PrivateTmp=true
 

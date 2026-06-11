@@ -1,0 +1,20 @@
+[Unit]
+Description=BantuBuzz Messaging Service
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+User=bantubuzz
+Group=www-data
+WorkingDirectory=/var/www/bantubuzz/messaging-service
+EnvironmentFile=/etc/bantubuzz/messaging.env
+ExecStart=/usr/bin/node server.js
+Restart=always
+RestartSec=5
+TimeoutStopSec=30
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

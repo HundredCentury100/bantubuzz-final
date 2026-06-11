@@ -13,6 +13,11 @@ This file is a living handoff guide for future AI/Codex sessions working on the 
 - CMS signed health endpoint: `/api/integration/v1/health`.
 - CMS publication webhook target: `/api/internal/cms/content-changed`.
 - Combined VPS templates and the migration order are in `deployment/vps/`.
+- New combined VPS: `13.140.159.150`, Ubuntu 24.04 LTS.
+- Provision infrastructure with `deployment\PROVISION-NEW-VPS.bat`.
+- Provisioning must not contact the old production VPS or change DNS. Database,
+  uploads, environment/provider secrets, TLS, and DNS cutover are handled in
+  separate migration phases.
 
 ## Current Project Context
 

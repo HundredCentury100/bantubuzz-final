@@ -15,6 +15,26 @@ Run `deployment\ANALYZE-NEW-VPS.bat` before provisioning. It connects to
 timestamped report under `deployment\vps\reports\`. The audit does not display
 environment-file contents or make server changes.
 
+## Provisioning
+
+Run `deployment\PROVISION-NEW-VPS.bat` after reviewing the audit. It prepares
+`13.140.159.150` for both products but deliberately does not contact the old
+production server, migrate data, change DNS, request final certificates, or
+start incomplete application services.
+
+Provisioning creates:
+
+- Node.js 22, Python tooling, Apache, Certbot, PostgreSQL, Redis, Meilisearch, UFW, and Fail2ban.
+- A 4 GB swap file.
+- Separate `bantubuzz_platform` and `bantubuzz_cms` databases and roles.
+- `/var/www/bantubuzz` and `/var/www/bantubuzz-cms`.
+- Root-protected generated credentials at `/root/bantubuzz-provisioning-secrets.txt`.
+- Environment skeletons under `/etc/bantubuzz/`.
+- Disabled systemd units for Flask, messaging, Celery worker/beat, CMS web, and CMS content worker.
+
+After provisioning, rerun `deployment\ANALYZE-NEW-VPS.bat`. Production data
+migration and DNS cutover are separate later phases.
+
 ## Required secrets
 
 Generate one random `CONTENT_BRIDGE_SECRET` and set the same value in:
