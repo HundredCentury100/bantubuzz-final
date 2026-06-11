@@ -8,6 +8,13 @@ The target VPS runs both products behind Apache:
 - Messaging: `127.0.0.1:3002`
 - Next/Payload CMS: `127.0.0.1:3010`
 
+## New VPS audit
+
+Run `deployment\ANALYZE-NEW-VPS.bat` before provisioning. It connects to
+`root@13.140.159.150`, performs a read-only readiness audit, and saves a
+timestamped report under `deployment\vps\reports\`. The audit does not display
+environment-file contents or make server changes.
+
 ## Required secrets
 
 Generate one random `CONTENT_BRIDGE_SECRET` and set the same value in:
