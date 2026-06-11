@@ -85,7 +85,7 @@ systemctl is-enabled fail2ban 2>/dev/null
 systemctl is-active fail2ban 2>/dev/null
 
 section "AVAILABLE SOFTWARE"
-for binary in apache2 nginx python3 pip3 node npm pm2 psql pg_dump redis-server redis-cli git curl tar certbot docker; do
+for binary in apache2 nginx python3 pip3 node npm pm2 psql pg_dump redis-server redis-cli meilisearch git curl tar certbot docker; do
   if command -v "$binary" >/dev/null 2>&1; then
     printf '%-16s %s\n' "$binary" "$(command -v "$binary")"
   else
@@ -103,6 +103,7 @@ npm --version 2>&1
 pm2 --version 2>&1
 psql --version 2>&1
 redis-server --version 2>&1
+meilisearch --version 2>&1
 git --version 2>&1
 certbot --version 2>&1
 docker --version 2>&1
@@ -110,10 +111,10 @@ docker --version 2>&1
 section "SERVICE STATE"
 printf '%s\n' "-- Relevant installed service units --"
 systemctl list-unit-files --type=service --no-pager 2>/dev/null |
-  grep -Ei 'apache|nginx|postgres|redis|gunicorn|bantubuzz|node|pm2|docker|fail2ban' || true
+  grep -Ei 'apache|nginx|postgres|redis|meilisearch|gunicorn|bantubuzz|node|pm2|docker|fail2ban' || true
 printf '\n%s\n' "-- Relevant running services --"
 systemctl list-units --type=service --state=running --no-pager 2>/dev/null |
-  grep -Ei 'apache|nginx|postgres|redis|gunicorn|bantubuzz|node|pm2|docker|fail2ban' || true
+  grep -Ei 'apache|nginx|postgres|redis|meilisearch|gunicorn|bantubuzz|node|pm2|docker|fail2ban' || true
 printf '\n%s\n' "-- Failed services --"
 systemctl --failed --no-pager 2>/dev/null
 
@@ -147,6 +148,17 @@ if command -v redis-cli >/dev/null 2>&1; then
 else
   printf 'Redis is not available\n'
 fi
+printf '\n%s\n' "-- Meilisearch readiness --"
+if command -v meilisearch >/dev/null 2>&1; then
+  systemctl is-enabled meilisearch 2>/dev/null
+  systemctl is-active meilisearch 2>/dev/null
+  if command -v curl >/dev/null 2>&1; then
+    curl -fsS http://127.0.0.1:7700/health 2>&1 || true
+    printf '\n'
+  fi
+else
+  printf 'Meilisearch is not available\n'
+fi
 
 section "EXISTING APPLICATION LAYOUT"
 printf '%s\n' "-- /var/www --"
@@ -158,13 +170,13 @@ find /var/www /opt /srv /root -maxdepth 4 \
   \( -iname '*bantubuzz*' -o -iname '*payload*' -o -iname '*cms*' \) \
   -printf '%M %u:%g %s %p\n' 2>/dev/null | head -300
 printf '\n%s\n' "-- Environment files present (contents are not shown) --"
-find /var/www /opt /srv -maxdepth 5 -type f \
+find /var/www /opt /srv /etc/bantubuzz -maxdepth 5 -type f \
   \( -name '.env' -o -name '.env.local' -o -name '*.env' \) \
   -printf '%M %u:%g %s %p\n' 2>/dev/null | head -100
 
 section "PROCESS SNAPSHOT"
 ps -eo user,pid,ppid,%cpu,%mem,etime,cmd --sort=-%mem 2>/dev/null |
-  grep -Ei 'COMMAND|apache|nginx|gunicorn|python|node|pm2|postgres|redis|bantubuzz|payload' |
+  grep -Ei 'COMMAND|apache|nginx|gunicorn|python|node|pm2|postgres|redis|meilisearch|bantubuzz|payload' |
   head -200
 
 section "PACKAGE AND UPDATE STATUS"
@@ -179,7 +191,7 @@ elif command -v dnf >/dev/null 2>&1; then
 fi
 
 section "BANTUBUZZ PORT READINESS"
-for port in 22 80 443 3002 3010 5432 6379 8002; do
+for port in 22 80 443 3002 3010 5432 6379 7700 8002; do
   if ss -lnt 2>/dev/null | awk '{print $4}' | grep -Eq "(^|:)$port$"; then
     printf 'Port %-5s IN USE\n' "$port"
   else

@@ -18,6 +18,10 @@ This file is a living handoff guide for future AI/Codex sessions working on the 
 - Provisioning must not contact the old production VPS or change DNS. Database,
   uploads, environment/provider secrets, TLS, and DNS cutover are handled in
   separate migration phases.
+- June 11, 2026 provisioning verification confirmed Node.js 22, PostgreSQL 16,
+  Redis 7, Apache, Certbot, UFW, Fail2ban, 4 GB swap, both application
+  databases, application directories, and disabled systemd units. The old VPS
+  and `bantubuzz.com` DNS remain unchanged.
 
 ## Current Project Context
 
