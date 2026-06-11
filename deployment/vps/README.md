@@ -39,6 +39,9 @@ For a shorter decisive check, run
 `deployment\VERIFY-NEW-VPS-READINESS.bat`. A successful report ends with
 `BANTUBUZZ_MIGRATION_READINESS_PASS`.
 
+If only the Meilisearch checks fail, run
+`deployment\FIX-MEILISEARCH-NEW-VPS.bat`, then rerun the readiness check.
+
 ## Required secrets
 
 Generate one random `CONTENT_BRIDGE_SECRET` and set the same value in:

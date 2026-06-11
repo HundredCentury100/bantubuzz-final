@@ -98,13 +98,20 @@ install_meilisearch() {
   if ! id meilisearch >/dev/null 2>&1; then
     useradd --system --home-dir /var/lib/meilisearch --shell /usr/sbin/nologin meilisearch
   fi
+  usermod -a -G "$APP_GROUP" meilisearch
   install -d -o meilisearch -g meilisearch -m 0750 /var/lib/meilisearch
+  install -d -o meilisearch -g meilisearch -m 0750 \
+    /var/lib/meilisearch/data.ms \
+    /var/lib/meilisearch/dumps \
+    /var/lib/meilisearch/snapshots
 
   meili_key="$(read_secret MEILISEARCH_MASTER_KEY)"
   cat > /etc/bantubuzz/meilisearch.env <<EOF
 MEILI_ENV=production
 MEILI_HTTP_ADDR=127.0.0.1:7700
 MEILI_DB_PATH=/var/lib/meilisearch/data.ms
+MEILI_DUMP_DIR=/var/lib/meilisearch/dumps
+MEILI_SNAPSHOT_DIR=/var/lib/meilisearch/snapshots
 MEILI_MASTER_KEY=${meili_key}
 MEILI_NO_ANALYTICS=true
 EOF
@@ -121,9 +128,11 @@ Type=simple
 User=meilisearch
 Group=meilisearch
 EnvironmentFile=/etc/bantubuzz/meilisearch.env
+WorkingDirectory=/var/lib/meilisearch
 ExecStart=/usr/local/bin/meilisearch
-Restart=always
+Restart=on-failure
 RestartSec=5
+TimeoutStartSec=60
 LimitNOFILE=65535
 NoNewPrivileges=true
 PrivateTmp=true
@@ -134,6 +143,19 @@ EOF
 
   systemctl daemon-reload
   systemctl enable --now meilisearch
+
+  for attempt in $(seq 1 30); do
+    if curl -fsS http://127.0.0.1:7700/health >/dev/null 2>&1; then
+      echo "Meilisearch is healthy."
+      return
+    fi
+    sleep 2
+  done
+
+  systemctl status meilisearch --no-pager -l 2>&1 || true
+  journalctl -u meilisearch --no-pager -n 120 2>&1 || true
+  echo "Meilisearch did not become healthy."
+  exit 1
 }
 
 configure_postgresql() {
