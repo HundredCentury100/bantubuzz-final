@@ -9,6 +9,8 @@ User=bantubuzz
 Group=www-data
 WorkingDirectory=/var/www/bantubuzz-cms
 EnvironmentFile=/etc/bantubuzz/cms.env
+Environment=HOME=/home/bantubuzz
+Environment=NPM_CONFIG_CACHE=/var/cache/bantubuzz/npm
 ExecStart=/usr/bin/npm exec --workspace=@bantubuzz/web -- next start --hostname 127.0.0.1 --port 3010
 Restart=always
 RestartSec=5

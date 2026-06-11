@@ -35,6 +35,9 @@ This file is a living handoff guide for future AI/Codex sessions working on the 
   disabled until real S3, TTS, SMTP, and IndexNow credentials are configured.
 - Payload automatically verifies and logs in the first administrator created
   through its first-user flow. The CMS forces that first user to `super_admin`.
+- CMS deployment commands run as `bantubuzz` with `HOME=/home/bantubuzz` and
+  `NPM_CONFIG_CACHE=/var/cache/bantubuzz/npm`. Do not preserve root's npm cache
+  path when using `runuser`, or npm fails with `/root/.npm` EACCES errors.
 
 ## Current Project Context
 

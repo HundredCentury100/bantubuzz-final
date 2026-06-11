@@ -3,6 +3,8 @@
 set -Eeuo pipefail
 
 CMS_ROOT="/var/www/bantubuzz-cms"
+APP_HOME="/home/bantubuzz"
+NPM_CACHE="/var/cache/bantubuzz/npm"
 UPLOAD_ARCHIVE="/tmp/bantubuzz-headless-cms.tar.gz"
 MIGRATION_ARCHIVE="/tmp/bantubuzz-cms-postgres-migrations.tar.gz"
 ENV_FILE="/etc/bantubuzz/cms.env"
@@ -40,8 +42,15 @@ cleanup_release() {
 }
 trap cleanup_release EXIT
 
+run_as_app() {
+  runuser -u bantubuzz --preserve-environment -- \
+    env HOME="$APP_HOME" NPM_CONFIG_CACHE="$NPM_CACHE" "$@"
+}
+
 echo "=== Preparing CMS release ==="
 install -d -o bantubuzz -g www-data -m 2775 "$release_dir" "$backup_dir"
+install -d -o bantubuzz -g www-data -m 0750 "$APP_HOME"
+install -d -o bantubuzz -g www-data -m 2775 "$NPM_CACHE"
 tar -xzf "$UPLOAD_ARCHIVE" -C "$release_dir"
 
 if [ ! -f "$release_dir/package.json" ] || [ ! -f "$release_dir/apps/web/payload.config.ts" ]; then
@@ -87,7 +96,7 @@ fi
 
 echo "=== Installing locked Node dependencies ==="
 cd "$CMS_ROOT"
-runuser -u bantubuzz --preserve-environment -- npm ci --no-audit --no-fund
+run_as_app npm ci --no-audit --no-fund
 
 echo "=== Preparing PostgreSQL migration history ==="
 migration_dir="$CMS_ROOT/apps/web/src/migrations-postgres"
@@ -110,7 +119,7 @@ if [ -z "$existing_migration" ]; then
   echo "Generating reviewed first-release PostgreSQL baseline..."
   rm -f "$migration_dir/.gitkeep"
   cd "$CMS_ROOT/apps/web"
-  runuser -u bantubuzz --preserve-environment -- npm exec -- payload migrate:create postgres_baseline --force-accept-warning
+  run_as_app npm exec -- payload migrate:create postgres_baseline --force-accept-warning
   cd "$CMS_ROOT"
 fi
 
@@ -126,14 +135,14 @@ fi
 
 echo "=== Applying CMS PostgreSQL migrations ==="
 cd "$CMS_ROOT/apps/web"
-runuser -u bantubuzz --preserve-environment -- npm exec -- payload migrate
+run_as_app npm exec -- payload migrate
 
 echo "=== Seeding baseline authority content ==="
 cd "$CMS_ROOT"
-runuser -u bantubuzz --preserve-environment -- npm run seed
+run_as_app npm run seed
 
 echo "=== Building CMS production application ==="
-runuser -u bantubuzz --preserve-environment -- npm run build
+run_as_app npm run build
 
 echo "=== Installing CMS web service ==="
 cat > "$SERVICE_FILE" <<'EOF'
@@ -148,6 +157,8 @@ User=bantubuzz
 Group=www-data
 WorkingDirectory=/var/www/bantubuzz-cms
 EnvironmentFile=/etc/bantubuzz/cms.env
+Environment=HOME=/home/bantubuzz
+Environment=NPM_CONFIG_CACHE=/var/cache/bantubuzz/npm
 ExecStart=/usr/bin/npm exec --workspace=@bantubuzz/web -- next start --hostname 127.0.0.1 --port 3010
 Restart=always
 RestartSec=5
