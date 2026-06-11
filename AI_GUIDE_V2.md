@@ -22,6 +22,19 @@ This file is a living handoff guide for future AI/Codex sessions working on the 
   Redis 7, Apache, Certbot, UFW, Fail2ban, 4 GB swap, both application
   databases, application directories, and disabled systemd units. The old VPS
   and `bantubuzz.com` DNS remain unchanged.
+- CMS repository: `D:\Bantubuzz-headless-CMS`, branch `main`.
+- `app.bantubuzz.com` already resolves to the new VPS; `bantubuzz.com` still
+  resolves to the old production VPS until the later platform migration.
+- First CMS release command: `deployment\DEPLOY-HEADLESS-CMS-NEW-VPS.bat`.
+  It uploads only the CMS, generates and applies the PostgreSQL baseline,
+  seeds authority data, builds Next.js, starts the service, configures TLS,
+  verifies `/admin`, and downloads the generated migration for source control.
+- Payload SQLite migrations stay in `apps/web/src/migrations`; PostgreSQL
+  migrations stay in `apps/web/src/migrations-postgres`. Never mix the two.
+- The CMS web service binds to `127.0.0.1:3010`. The content worker remains
+  disabled until real S3, TTS, SMTP, and IndexNow credentials are configured.
+- Payload automatically verifies and logs in the first administrator created
+  through its first-user flow. The CMS forces that first user to `super_admin`.
 
 ## Current Project Context
 

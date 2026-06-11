@@ -1,7 +1,7 @@
 [Unit]
 Description=BantuBuzz Headless CMS
-After=network.target postgresql.service redis-server.service
-Wants=postgresql.service redis-server.service
+After=network.target postgresql.service redis-server.service meilisearch.service
+Wants=postgresql.service redis-server.service meilisearch.service
 
 [Service]
 Type=simple

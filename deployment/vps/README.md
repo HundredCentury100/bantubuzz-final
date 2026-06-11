@@ -42,6 +42,18 @@ For a shorter decisive check, run
 If only the Meilisearch checks fail, run
 `deployment\FIX-MEILISEARCH-NEW-VPS.bat`, then rerun the readiness check.
 
+## First CMS deployment
+
+Run `deployment\DEPLOY-HEADLESS-CMS-NEW-VPS.bat` after the infrastructure
+readiness check passes. It deploys only the headless CMS, generates and applies
+the PostgreSQL baseline migration, seeds baseline authority content, starts the
+CMS web service, and configures TLS for `app.bantubuzz.com`.
+
+The generated PostgreSQL migration is downloaded back into
+`D:\Bantubuzz-headless-CMS\apps\web\src\migrations-postgres` for review and
+source control. The CMS content worker remains disabled until S3, TTS, SMTP,
+and IndexNow credentials are configured.
+
 ## Required secrets
 
 Generate one random `CONTENT_BRIDGE_SECRET` and set the same value in:
