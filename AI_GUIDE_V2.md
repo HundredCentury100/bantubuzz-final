@@ -55,7 +55,6 @@ This file is a living handoff guide for future AI/Codex sessions working on the 
   never resolved. Keep Payload's root layout standard; do not insert a custom
   pre-hydration paint component inside `RootLayout`. Repair script:
   `deployment\FIX-CMS-WHITE-SCREEN.bat`.
-
 ## Current Project Context
 
 - Workspace: `D:\Bantubuzz Platform`
@@ -1046,6 +1045,12 @@ Deployment note:
   - Public profiles display `Ranked #N Overall` and a Top 50 or Top 100 badge where applicable.
   - Leaderboard-to-profile navigation stores the list scroll position in session storage and returns to the same filter URL and position.
   - Creator Cards are generated client-side as branded PNG files and can be downloaded or shared without exposing the private score.
+- Payload CMS admin build:
+  - Payload admin plugins must be present in `apps/web/src/app/(payload)/admin/importMap.js`.
+  - Run `payload generate:importmap` after adding or changing a Payload plugin or admin component. The CMS web build now runs this automatically before `next build`.
+  - A white admin page can occur with no failed static assets when a registered client component is absent from the import map. The June 11, 2026 incident was caused by the missing `@payloadcms/storage-s3/client#S3ClientUploadHandler` entry.
+  - Do not add Payload, its database adapters, or `drizzle-kit` to production `serverExternalPackages`; Payload's Next wrapper manages production bundling.
+  - Repair script: `deployment/FIX-CMS-PAYLOAD-WHITE-SCREEN.bat`. It uploads only the corrected Payload files, rebuilds and restarts the CMS, then verifies the hydrated first-user form in clean headless Chrome.
 - Remaining hardening for future slices:
   - Improve team invitation onboarding so new invitees land directly back on the invite after signup/login.
   - Build tailored onboarding steps after Agency/Enterprise signup.
