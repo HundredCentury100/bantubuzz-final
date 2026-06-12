@@ -12,6 +12,12 @@ This file is a living handoff guide for future AI/Codex sessions working on the 
 - Flask health endpoint: `/api/internal/cms/content-health`.
 - CMS signed health endpoint: `/api/integration/v1/health`.
 - CMS publication webhook target: `/api/internal/cms/content-changed`.
+- Verify live CMS/platform communication after CMS deploy with
+  `deployment\VERIFY-CMS-BRIDGE-NEW-VPS.bat`. It checks the main platform's
+  signed CMS health bridge, `/content-api/posts`, `/blog`, and Payload admin.
+- CMS public page metadata now uses `apps/web/src/lib/site-metadata.ts` in the
+  headless CMS repo. Keep canonical URLs on `https://bantubuzz.com`; admin
+  remains on `https://app.bantubuzz.com`.
 - Combined VPS templates and the migration order are in `deployment/vps/`.
 - New combined VPS: `13.140.159.150`, Ubuntu 24.04 LTS.
 - Provision infrastructure with `deployment\PROVISION-NEW-VPS.bat`.
