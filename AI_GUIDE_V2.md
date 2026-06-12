@@ -72,6 +72,19 @@ This file is a living handoff guide for future AI/Codex sessions working on the 
   failure, use `deployment\RESUME-PLATFORM-MIGRATION-NEW-VPS.bat`; it reuses
   the archives already uploaded to the new VPS and does not recapture the old
   production server.
+- Production Alembic revision `05a90a92435c` was used as the parent of
+  `202603121500` but its migration file was never committed. Source control now
+  contains `05a90a92435c_production_schema_bridge.py`, a no-op bridge from
+  `202603041500`, because the restored production schema already contains that
+  revision's effects. If restoration has completed and Alembic stops on this
+  missing revision, run
+  `deployment\CONTINUE-PLATFORM-MIGRATION-AFTER-RESTORE.bat`; it applies
+  migrations and starts services without repeating restore or dependency setup.
+- The historical `202603091200_trust_safety_phase1` migration remains an
+  orphaned Alembic base with `down_revision = None`. Production restoration
+  must target the current main application revision explicitly
+  (`flask db upgrade 202606101700`) rather than ambiguous `head`. The restored
+  production database already contains the Trust & Safety schema.
 ## Current Project Context
 
 - Workspace: `D:\Bantubuzz Platform`

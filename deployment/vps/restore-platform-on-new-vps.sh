@@ -330,7 +330,8 @@ chown -R "$APP_USER":"$APP_GROUP" "$PLATFORM_ROOT"
 section "Applying current database migrations"
 (
   cd "$BACKEND_ROOT"
-  run_with_environment "$PLATFORM_ENV" venv/bin/flask db upgrade
+  run_with_environment "$PLATFORM_ENV" \
+    venv/bin/flask db upgrade 202606101700
   run_with_environment "$PLATFORM_ENV" venv/bin/python -c \
     "from app import create_app; from sqlalchemy.orm import configure_mappers; app=create_app(); app.app_context().push(); configure_mappers(); print('SQLAlchemy mapper configuration OK')"
 )
