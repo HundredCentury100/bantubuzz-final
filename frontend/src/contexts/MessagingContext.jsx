@@ -3,7 +3,7 @@ import { io } from 'socket.io-client';
 import toast from 'react-hot-toast';
 import messagingService from '../services/messagingAPI';
 
-const MESSAGING_SOCKET_URL = import.meta.env.VITE_MESSAGING_SOCKET_URL || 'http://localhost:3001';
+const MESSAGING_SOCKET_URL = import.meta.env.VITE_MESSAGING_SOCKET_URL || window.location.origin;
 
 const MessagingContext = createContext(null);
 

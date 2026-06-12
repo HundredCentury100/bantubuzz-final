@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { useAuth } from './useAuth';
 import io from 'socket.io-client';
 
-const MESSAGING_SERVICE_URL = import.meta.env.VITE_MESSAGING_SERVICE_URL || 'http://localhost:3002';
+const MESSAGING_SERVICE_URL = import.meta.env.VITE_MESSAGING_SERVICE_URL || window.location.origin;
 
 /**
  * Custom hook for managing campaign chat WebSocket connection

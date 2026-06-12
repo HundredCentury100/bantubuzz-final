@@ -91,6 +91,12 @@ This file is a living handoff guide for future AI/Codex sessions working on the 
   even when `/etc/bantubuzz/platform.env` says production. The factory now uses
   `create_app(config_name=None)` and reads `FLASK_ENV`. New-VPS hotfix:
   `deployment\FIX-NEW-VPS-PRODUCTION-MODE.bat`.
+- During new-VPS staging, the frontend must not be built with absolute
+  `https://bantubuzz.com/api` URLs because DNS still points to the old VPS.
+  Production/staging frontend env now uses same-origin paths:
+  `VITE_API_URL=/api`, `VITE_MESSAGING_URL=/messaging/api`, and Socket.IO falls
+  back to `window.location.origin`. Deploy the IP-staging frontend fix with
+  `deployment\DEPLOY-NEW-VPS-FRONTEND-STAGING-FIX.bat`.
 ## Current Project Context
 
 - Workspace: `D:\Bantubuzz Platform`
