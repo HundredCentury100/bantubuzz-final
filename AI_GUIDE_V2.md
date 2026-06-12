@@ -15,6 +15,11 @@ This file is a living handoff guide for future AI/Codex sessions working on the 
 - Verify live CMS/platform communication after CMS deploy with
   `deployment\VERIFY-CMS-BRIDGE-NEW-VPS.bat`. It checks the main platform's
   signed CMS health bridge, `/content-api/posts`, `/blog`, and Payload admin.
+- Use `deployment\DEPLOY-CMS-METADATA-BRIDGE-UPDATE.bat` for normal CMS code
+  updates after the first installation. It preserves the production database,
+  CMS users, media, `/etc/bantubuzz/cms.env`, Apache, and SSL. Do not use the
+  first-release `DEPLOY-HEADLESS-CMS-NEW-VPS.bat` for routine updates because
+  that script includes baseline migration, seed, and TLS setup steps.
 - CMS public page metadata now uses `apps/web/src/lib/site-metadata.ts` in the
   headless CMS repo. Keep canonical URLs on `https://bantubuzz.com`; admin
   remains on `https://app.bantubuzz.com`.
