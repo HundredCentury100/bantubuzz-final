@@ -97,6 +97,12 @@ This file is a living handoff guide for future AI/Codex sessions working on the 
   `VITE_API_URL=/api`, `VITE_MESSAGING_URL=/messaging/api`, and Socket.IO falls
   back to `window.location.origin`. Deploy the IP-staging frontend fix with
   `deployment\DEPLOY-NEW-VPS-FRONTEND-STAGING-FIX.bat`.
+- After DNS points `bantubuzz.com` and `www.bantubuzz.com` at `13.140.159.150`,
+  configure the final Apache domain and Let's Encrypt certificate with
+  `deployment\CONFIGURE-NEW-VPS-DOMAIN-SSL.bat`. The script uses a temporary
+  HTTP ACME vhost, installs `deployment\vps\bantubuzz-platform.conf`, verifies
+  `https://bantubuzz.com/api/health`, verifies the frontend, and confirms
+  `https://app.bantubuzz.com/admin` remains healthy.
 ## Current Project Context
 
 - Workspace: `D:\Bantubuzz Platform`
