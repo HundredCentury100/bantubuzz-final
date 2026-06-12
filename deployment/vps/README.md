@@ -90,3 +90,26 @@ CONTENT_BRIDGE_MAX_SKEW_SECONDS=300
 5. Install `bantubuzz-platform.conf`, enable `proxy`, `proxy_http`, `proxy_wstunnel`, `rewrite`, and `ssl`, then reload Apache.
 6. Verify `/api/health`, `/api/internal/cms/content-health`, `/blog`, `/content-api/posts`, and `https://app.bantubuzz.com/admin`.
 7. Lower DNS TTL before cutover, update the `A` records, monitor both application logs, then retire the old VPS after validation.
+
+## Full platform snapshot migration
+
+Run `deployment\MIGRATE-PLATFORM-TO-NEW-VPS.bat` to copy the current production
+platform from `173.212.245.22` to `13.140.159.150`.
+
+The orchestrator:
+
+- labels every password prompt as OLD VPS or NEW VPS;
+- captures the complete PostgreSQL platform database, backend uploads, and
+  production provider configuration from the old VPS;
+- deploys the current local backend, frontend build, and messaging source;
+- preserves the separate Payload CMS database and running CMS service;
+- restores the platform database under the new server-local database role;
+- runs current Alembic migrations and SQLAlchemy mapper validation;
+- starts and verifies Flask, messaging, Celery worker, and Celery beat;
+- exposes a temporary HTTP staging entrypoint at `http://13.140.159.150`;
+- does not change DNS or stop the old production platform.
+
+This is a live snapshot, not the final cutover. Once it completes, the two
+platform databases will diverge as users continue using the old VPS. Perform a
+short maintenance-window final sync before changing the `bantubuzz.com` DNS
+records.

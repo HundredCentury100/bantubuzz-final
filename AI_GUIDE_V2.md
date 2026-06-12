@@ -55,6 +55,13 @@ This file is a living handoff guide for future AI/Codex sessions working on the 
   never resolved. Keep Payload's root layout standard; do not insert a custom
   pre-hydration paint component inside `RootLayout`. Repair script:
   `deployment\FIX-CMS-WHITE-SCREEN.bat`.
+- Full platform snapshot migration from `173.212.245.22` to the combined VPS
+  uses `deployment\MIGRATE-PLATFORM-TO-NEW-VPS.bat`. It migrates the production
+  PostgreSQL platform database, backend uploads, and provider configuration,
+  while deploying current local code and preserving the separate Payload CMS
+  database/service. It deliberately does not change DNS or stop the old
+  platform. Treat it as a rehearsal/live snapshot and run a final maintenance
+  window sync before DNS cutover, otherwise the two databases will diverge.
 ## Current Project Context
 
 - Workspace: `D:\Bantubuzz Platform`
