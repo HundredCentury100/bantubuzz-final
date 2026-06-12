@@ -1129,6 +1129,8 @@ Deployment note:
   - Audit logging is a secondary side effect and must log failures without rolling back a successful content or media save.
   - The safe CMS updater verifies `apps/web/media` is writable by the `bantubuzz` service user and runs committed Payload migrations before the production build.
   - Author social profiles are edited through the `sameAs` repeatable field, labelled `Social Links` in Payload. The legacy `socialLinks` JSON field remains hidden for database compatibility and must not be exposed to editors.
+  - PostgreSQL enum migrations must stay aligned with Payload select options. The production baseline originally only allowed `draft/published`; editorial statuses such as `review`, `scheduled`, and `archived` require committed Payload migrations before exposing them in admin.
+  - Public content mappers should distinguish required and optional relationships. Optional relations such as post reviewer, country, cover image, and OG image must not crash previews or public listing pages.
 - Remaining hardening for future slices:
   - Improve team invitation onboarding so new invitees land directly back on the invite after signup/login.
   - Build tailored onboarding steps after Agency/Enterprise signup.
