@@ -7,6 +7,7 @@ from flask_socketio import SocketIO
 from flask_migrate import Migrate
 from .config import config
 from .logging_config import setup_logging, log_exception
+import os
 import traceback
 
 # Initialize extensions
@@ -18,9 +19,13 @@ migrate = Migrate()
 celery = None  # Will be initialized in create_app
 
 
-def create_app(config_name='development'):
+def create_app(config_name=None):
     """Application factory pattern"""
     global celery
+
+    config_name = (config_name or os.getenv('FLASK_ENV', 'development')).lower()
+    if config_name not in config:
+        raise ValueError(f'Unknown Flask configuration: {config_name}')
 
     app = Flask(__name__)
     app.config.from_object(config[config_name])
@@ -118,8 +123,6 @@ def create_app(config_name='development'):
 
     # Serve uploaded files
     from flask import send_from_directory
-    import os
-
     @app.route('/uploads/<path:filename>')
     def uploaded_file(filename):
         """Serve uploaded files"""

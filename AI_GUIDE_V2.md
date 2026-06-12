@@ -85,6 +85,12 @@ This file is a living handoff guide for future AI/Codex sessions working on the 
   must target the current main application revision explicitly
   (`flask db upgrade 202606101700`) rather than ambiguous `head`. The restored
   production database already contains the Trust & Safety schema.
+- Flask's application factory must derive its default configuration from
+  `FLASK_ENV`. A hardcoded `create_app(config_name='development')` causes both
+  Gunicorn's `app:create_app()` and `celery_worker.py` to run DevelopmentConfig
+  even when `/etc/bantubuzz/platform.env` says production. The factory now uses
+  `create_app(config_name=None)` and reads `FLASK_ENV`. New-VPS hotfix:
+  `deployment\FIX-NEW-VPS-PRODUCTION-MODE.bat`.
 ## Current Project Context
 
 - Workspace: `D:\Bantubuzz Platform`
