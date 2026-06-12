@@ -1131,6 +1131,9 @@ Deployment note:
   - Author social profiles are edited through the `sameAs` repeatable field, labelled `Social Links` in Payload. The legacy `socialLinks` JSON field remains hidden for database compatibility and must not be exposed to editors.
   - PostgreSQL enum migrations must stay aligned with Payload select options. The production baseline originally only allowed `draft/published`; editorial statuses such as `review`, `scheduled`, and `archived` require committed Payload migrations before exposing them in admin.
   - Public content mappers should distinguish required and optional relationships. Optional relations such as post reviewer, country, cover image, and OG image must not crash previews or public listing pages.
+  - Payload local uploads must render through `/payload-api/media/file/<encoded filename>`, not `/media/<filename>`. Prefer Payload's generated `url` over custom `publicUrl` for local storage.
+  - Keep `qualityFindings` JSON hidden in Payload admin and show `qualityFindingsSummary` as the readable editor-facing field.
+  - CMS article CTA colors should use BantuBuzz navy `#1F2937` and primary olive-green `#ccdb53`; avoid the older near-black `#171714` and bright lime `#D7FF45` pairing.
 - Remaining hardening for future slices:
   - Improve team invitation onboarding so new invitees land directly back on the invite after signup/login.
   - Build tailored onboarding steps after Agency/Enterprise signup.
