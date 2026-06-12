@@ -198,17 +198,30 @@ tar -xzf "$MIGRATION_ARCHIVE" -C "$RESTORE_ROOT"
   sha256sum -c SHA256SUMS
 )
 
+# pg_restore runs as the postgres OS user for local peer authentication.
+# Allow that user to traverse the protected staging directory and read only
+# the database dump; the environment and upload archives remain root-only.
+chown postgres:postgres "${RESTORE_ROOT}/platform-database.dump"
+chgrp postgres "$RESTORE_ROOT"
+chmod 0710 "$RESTORE_ROOT"
+chmod 0600 "${RESTORE_ROOT}/platform-database.dump"
+
 section "Backing up current new-VPS platform state"
 cp -a "$PLATFORM_ENV" "$MESSAGING_ENV" "$BACKUP_ROOT/"
 if runuser -u postgres -- psql -d bantubuzz_platform -Atqc \
   "SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_schema='public')" |
   grep -q '^t$'; then
+  chgrp postgres "$BACKUP_ROOT"
+  chmod 0730 "$BACKUP_ROOT"
   runuser -u postgres -- pg_dump \
     --format=custom \
     --no-owner \
     --no-acl \
     --file="${BACKUP_ROOT}/platform-database.dump" \
     bantubuzz_platform
+  chown root:root "${BACKUP_ROOT}/platform-database.dump"
+  chmod 0600 "${BACKUP_ROOT}/platform-database.dump"
+  chmod 0700 "$BACKUP_ROOT"
 fi
 
 systemctl stop \

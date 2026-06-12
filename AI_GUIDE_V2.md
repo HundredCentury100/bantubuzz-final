@@ -66,6 +66,12 @@ This file is a living handoff guide for future AI/Codex sessions working on the 
   connections. Migration capture must use the authenticated `DATABASE_URL`
   from the production backend environment for `psql` and `pg_dump`; do not
   assume that `runuser -u postgres` receives peer-authenticated access.
+- New-VPS restoration runs `pg_restore` as the `postgres` OS user for local
+  peer authentication. The extracted custom-format dump must be owned/readable
+  by `postgres`, and its staging directory must be traversable. After a restore
+  failure, use `deployment\RESUME-PLATFORM-MIGRATION-NEW-VPS.bat`; it reuses
+  the archives already uploaded to the new VPS and does not recapture the old
+  production server.
 ## Current Project Context
 
 - Workspace: `D:\Bantubuzz Platform`
