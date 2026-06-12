@@ -81,7 +81,7 @@ platform_env="$(find_platform_env)" || {
 database_url="$(read_database_url "$platform_env")"
 database_name="$(database_name_from_url "$database_url")"
 
-if ! runuser -u postgres -- psql -d "$database_name" -Atqc "SELECT 1" | grep -q '^1$'; then
+if ! psql "$database_url" -Atqc "SELECT 1" | grep -q '^1$'; then
   echo "Cannot access PostgreSQL database: $database_name"
   exit 1
 fi
@@ -90,13 +90,13 @@ rm -rf "$STAGE_ROOT"
 install -d -m 0700 "$STAGE_ROOT"
 
 section "Capturing PostgreSQL database"
-runuser -u postgres -- pg_dump \
+pg_dump \
   --format=custom \
   --compress=6 \
   --no-owner \
   --no-acl \
   --file="${STAGE_ROOT}/platform-database.dump" \
-  "$database_name"
+  "$database_url"
 
 section "Capturing production configuration"
 install -m 0600 "$platform_env" "${STAGE_ROOT}/platform.env"
@@ -140,10 +140,10 @@ section "Writing migration manifest"
   echo "source_host=$(hostname -f 2>/dev/null || hostname)"
   echo "source_root=$PLATFORM_ROOT"
   echo "database_name=$database_name"
-  echo "database_size=$(runuser -u postgres -- psql -d "$database_name" -Atqc "SELECT pg_size_pretty(pg_database_size(current_database()))")"
+  echo "database_size=$(psql "$database_url" -Atqc "SELECT pg_size_pretty(pg_database_size(current_database()))")"
   echo "upload_archive_size=$(du -h "${STAGE_ROOT}/platform-uploads.tar.gz" | awk '{print $1}')"
-  echo "user_count=$(runuser -u postgres -- psql -d "$database_name" -Atqc "SELECT count(*) FROM users" 2>/dev/null || echo unknown)"
-  echo "alembic_version=$(runuser -u postgres -- psql -d "$database_name" -Atqc "SELECT version_num FROM alembic_version" 2>/dev/null || echo unknown)"
+  echo "user_count=$(psql "$database_url" -Atqc "SELECT count(*) FROM users" 2>/dev/null || echo unknown)"
+  echo "alembic_version=$(psql "$database_url" -Atqc "SELECT version_num FROM alembic_version" 2>/dev/null || echo unknown)"
 } > "$MANIFEST"
 
 (

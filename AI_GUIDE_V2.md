@@ -62,6 +62,10 @@ This file is a living handoff guide for future AI/Codex sessions working on the 
   database/service. It deliberately does not change DNS or stop the old
   platform. Treat it as a rehearsal/live snapshot and run a final maintenance
   window sync before DNS cutover, otherwise the two databases will diverge.
+- The old VPS PostgreSQL cluster requires password authentication for local
+  connections. Migration capture must use the authenticated `DATABASE_URL`
+  from the production backend environment for `psql` and `pg_dump`; do not
+  assume that `runuser -u postgres` receives peer-authenticated access.
 ## Current Project Context
 
 - Workspace: `D:\Bantubuzz Platform`
