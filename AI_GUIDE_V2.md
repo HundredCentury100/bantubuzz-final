@@ -28,9 +28,13 @@ This file is a living handoff guide for future AI/Codex sessions working on the 
   Payload's default description, `Payload App` site name, generated OG image,
   or Payload favicons.
 - CMS public editorial pages share `EditorialShell` and follow the marketplace
-  visual system: Poppins-compatible typography, `#ccdb53` primary,
+  visual system: self-hosted Poppins loaded with `next/font/google`,
+  `#ccdb53` primary,
   `#838a36` dark olive, `#ebf4e5` light background, charcoal footer, restrained
   borders, and card radii of 8px or less.
+- Public CMS metadata must explicitly emit the BantuBuzz lightning-mark PNG as
+  the standard favicon, shortcut icon, and Apple touch icon. Do not rely on a
+  browser fallback or Payload's favicon.
 - Combined VPS templates and the migration order are in `deployment/vps/`.
 - New combined VPS: `13.140.159.150`, Ubuntu 24.04 LTS.
 - Provision infrastructure with `deployment\PROVISION-NEW-VPS.bat`.
