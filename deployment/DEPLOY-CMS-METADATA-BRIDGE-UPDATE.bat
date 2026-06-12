@@ -39,10 +39,12 @@ echo   - Upload the current CMS source
 echo   - Back up the currently deployed CMS source
 echo   - Preserve the CMS database, admin users, media, and secrets
 echo   - Preserve Apache and existing SSL certificates
-echo   - Reinstall locked dependencies, build, and restart the CMS
+echo   - Reinstall locked dependencies and apply reviewed CMS migrations
+echo   - Verify the production media directory is writable
+echo   - Build and restart the CMS
 echo   - Verify CMS admin, content API, and signed platform bridge
 echo.
-echo It will NOT seed content, recreate migrations, or request SSL.
+echo It will NOT seed content, create migrations, or request SSL.
 echo.
 echo Report:
 echo %REPORT%

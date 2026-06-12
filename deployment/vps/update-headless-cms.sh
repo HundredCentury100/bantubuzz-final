@@ -67,6 +67,7 @@ install -d -o bantubuzz -g www-data -m 2775 \
   "$CMS_ROOT/apps/web/media" \
   "$CMS_ROOT/apps/web/storage"
 chown -R bantubuzz:www-data "$CMS_ROOT"
+run_as_app test -w "$CMS_ROOT/apps/web/media"
 
 echo "=== Loading existing production environment ==="
 set -a
@@ -82,6 +83,9 @@ fi
 echo "=== Installing locked dependencies ==="
 cd "$CMS_ROOT"
 run_as_app npm ci --include=dev --no-audit --no-fund
+
+echo "=== Applying CMS database migrations ==="
+run_as_app npm run cms:migrate
 
 echo "=== Building updated CMS ==="
 run_as_app npm run build

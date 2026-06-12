@@ -1122,6 +1122,12 @@ Deployment note:
   - A white admin page can occur with no failed static assets when a registered client component is absent from the import map. The June 11, 2026 incident was caused by the missing `@payloadcms/storage-s3/client#S3ClientUploadHandler` entry.
   - Do not add Payload, its database adapters, or `drizzle-kit` to production `serverExternalPackages`; Payload's Next wrapper manages production bundling.
   - Repair script: `deployment/FIX-CMS-PAYLOAD-WHITE-SCREEN.bat`. It uploads only the corrected Payload files, rebuilds and restarts the CMS, then verifies the hydrated first-user form in clean headless Chrome.
+- Payload CMS media uploads and audit logs:
+  - Deploy QA media fixes with `deployment/FIX-CMS-MEDIA-UPLOADS.bat`; it delegates to the safe full CMS updater and preserves the CMS database, users, media, environment, Apache, and SSL.
+  - Payload generates the sanitized upload `filename` before collection `beforeValidate` hooks. Derive local `storageKey`, `bucket`, and `publicUrl` there, but keep those internal fields hidden from editors.
+  - PostgreSQL Payload relationship IDs are numeric. Do not stringify `req.user.id` when writing an `audit-logs.user` relationship.
+  - Audit logging is a secondary side effect and must log failures without rolling back a successful content or media save.
+  - The safe CMS updater verifies `apps/web/media` is writable by the `bantubuzz` service user and runs committed Payload migrations before the production build.
 - Remaining hardening for future slices:
   - Improve team invitation onboarding so new invitees land directly back on the invite after signup/login.
   - Build tailored onboarding steps after Agency/Enterprise signup.
