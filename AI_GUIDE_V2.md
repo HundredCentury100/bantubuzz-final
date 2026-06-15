@@ -1155,7 +1155,8 @@ Deployment note:
   - Clicking Generate Audio enqueues a BullMQ job; publishing the article does not process or trigger that job.
   - The Payload button polls `/api/admin/audio-jobs/<jobId>` and must display queued, generating, uploading, saving, ready, or the actual failed reason.
   - The content worker reports structured progress and logs Redis readiness plus failed jobs.
-  - Production repair runs a disposable end-to-end smoke test across espeak/Piper, ffmpeg/ffprobe, S3 upload, and S3 deletion before restarting services.
+  - Production repair runs a disposable end-to-end smoke test across espeak/Piper, ffmpeg/ffprobe, and the configured audio storage before restarting services.
+  - Audio storage supports S3 when `S3_BUCKET_PUBLIC` is configured and local CMS storage otherwise. Local audio is served through `/content-api/posts/<slug>/audio-file`.
   - A systemd service being `active` is not sufficient proof of a working audio pipeline; verify the smoke test and `BantuBuzz content worker ready` log.
 - Remaining hardening for future slices:
   - Improve team invitation onboarding so new invitees land directly back on the invite after signup/login.

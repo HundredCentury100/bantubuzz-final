@@ -30,7 +30,7 @@ echo Fix BantuBuzz CMS Audio Worker
 echo ============================================================
 echo.
 echo This repair will:
-echo   - Upload only 7 audio worker and status files
+echo   - Upload only 8 audio worker and status files
 echo   - Show queued and failed audio job diagnostics
 echo   - Test TTS, MP3 conversion, S3 upload, and S3 deletion
 echo   - Rebuild the CMS and restart CMS plus its content worker
@@ -56,6 +56,7 @@ echo [2/4] Packaging only required files...
 if exist "%ARCHIVE%" del /q "%ARCHIVE%"
 tar -czf "%ARCHIVE%" -C "%CMS_ROOT%" ^
     "apps/web/src/app/(frontend)/api/admin/audio-jobs/[jobId]/route.ts" ^
+    "apps/web/src/app/(frontend)/api/posts/[slug]/audio-file/route.ts" ^
     "apps/web/src/components/admin/GenerateAudioButton.tsx" ^
     "packages/integrations/src/s3.ts" ^
     "workers/content/package.json" ^

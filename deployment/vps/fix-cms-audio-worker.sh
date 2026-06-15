@@ -29,6 +29,7 @@ run_as_app() {
 
 read -r -d '' TARGET_FILES <<'EOF' || true
 apps/web/src/app/(frontend)/api/admin/audio-jobs/[jobId]/route.ts
+apps/web/src/app/(frontend)/api/posts/[slug]/audio-file/route.ts
 apps/web/src/components/admin/GenerateAudioButton.tsx
 packages/integrations/src/s3.ts
 workers/content/package.json
