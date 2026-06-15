@@ -31,6 +31,7 @@ read -r -d '' TARGET_FILES <<'EOF' || true
 apps/web/src/app/(frontend)/api/admin/audio-jobs/[jobId]/route.ts
 apps/web/src/app/(frontend)/api/posts/[slug]/audio-file/route.ts
 apps/web/src/components/admin/GenerateAudioButton.tsx
+packages/core/src/storage.ts
 packages/integrations/src/s3.ts
 workers/content/package.json
 workers/content/src/audio-queue-diagnostics.ts
