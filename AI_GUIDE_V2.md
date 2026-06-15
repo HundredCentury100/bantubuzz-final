@@ -1150,6 +1150,13 @@ Deployment note:
   - Developer documentation is public at `/developers`; OpenAPI 3.1 is at `/content-api/openapi.json`.
   - Public JSON endpoints use CDN cache headers, CORS, and Redis-backed per-client limits. Standard content APIs allow 120 requests per minute; feeds allow 60.
   - Keep public taxonomy and author responses mapped to explicit public fields instead of returning raw Payload documents.
+- Payload CMS article audio operations:
+  - Repair and diagnostic script: `deployment/FIX-CMS-AUDIO-WORKER.bat`.
+  - Clicking Generate Audio enqueues a BullMQ job; publishing the article does not process or trigger that job.
+  - The Payload button polls `/api/admin/audio-jobs/<jobId>` and must display queued, generating, uploading, saving, ready, or the actual failed reason.
+  - The content worker reports structured progress and logs Redis readiness plus failed jobs.
+  - Production repair runs a disposable end-to-end smoke test across espeak/Piper, ffmpeg/ffprobe, S3 upload, and S3 deletion before restarting services.
+  - A systemd service being `active` is not sufficient proof of a working audio pipeline; verify the smoke test and `BantuBuzz content worker ready` log.
 - Remaining hardening for future slices:
   - Improve team invitation onboarding so new invitees land directly back on the invite after signup/login.
   - Build tailored onboarding steps after Agency/Enterprise signup.
