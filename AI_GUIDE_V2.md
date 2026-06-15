@@ -23,6 +23,12 @@ This file is a living handoff guide for future AI/Codex sessions working on the 
 - CMS public page metadata now uses `apps/web/src/lib/site-metadata.ts` in the
   headless CMS repo. Keep canonical URLs on `https://bantubuzz.com`; admin
   remains on `https://app.bantubuzz.com`.
+- CMS article audio is generated through the content worker. The editor action
+  is registered in Payload's Posts edit controls as `Generate Audio`. The TTS
+  implementation is open-source: `TTS_PROVIDER=piper` by default, with
+  `TTS_PROVIDER=espeak` as a lightweight fallback. Configure/run server
+  prerequisites with `deployment\SETUP-CMS-AUDIO-TTS-NEW-VPS.bat`, then deploy
+  CMS code with `deployment\DEPLOY-HEADLESS-CMS-NEW-VPS.bat`.
 - Payload admin metadata must use BantuBuzz descriptions, social metadata,
   and the BantuBuzz favicon assets from `apps/web/public`; do not expose
   Payload's default description, `Payload App` site name, generated OG image,
