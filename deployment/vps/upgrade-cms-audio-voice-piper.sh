@@ -7,6 +7,7 @@ ENV_FILE="/etc/bantubuzz/cms.env"
 ARCHIVE="/tmp/bantubuzz-cms-piper-voice.tar.gz"
 BACKUP_ROOT="/var/backups/bantubuzz"
 TTS_DIR="/opt/bantubuzz/tts"
+PIPER_DIR="/opt/bantubuzz/piper"
 VOICE_NAME="${VOICE_NAME:-en_US-lessac-medium}"
 PIPER_BIN="${PIPER_BIN:-/usr/local/bin/piper}"
 PIPER_RELEASE_URL="${PIPER_RELEASE_URL:-https://github.com/rhasspy/piper/releases/download/v1.2.0/piper_amd64.tar.gz}"
@@ -59,20 +60,23 @@ echo "=== Installing Piper and audio dependencies ==="
 apt-get update
 apt-get install -y ffmpeg espeak-ng curl ca-certificates tar
 install -d -o root -g www-data -m 0755 "$TTS_DIR"
+install -d -o root -g www-data -m 0755 "$PIPER_DIR"
 
-if [ ! -x "$PIPER_BIN" ]; then
-  tmpdir="$(mktemp -d)"
-  trap 'rm -rf "$tmpdir"' EXIT
-  echo "Downloading Piper runtime..."
-  curl -fsSL "$PIPER_RELEASE_URL" -o "${tmpdir}/piper.tar.gz"
-  tar -xzf "${tmpdir}/piper.tar.gz" -C "$tmpdir"
-  piper_candidate="$(find "$tmpdir" -type f -name piper -perm /111 | head -1)"
-  if [ -z "$piper_candidate" ]; then
-    echo "Unable to find Piper executable inside downloaded release."
-    exit 1
-  fi
-  install -m 0755 "$piper_candidate" "$PIPER_BIN"
+tmpdir="$(mktemp -d)"
+trap 'rm -rf "$tmpdir"' EXIT
+echo "Downloading Piper runtime..."
+curl -fsSL "$PIPER_RELEASE_URL" -o "${tmpdir}/piper.tar.gz"
+tar -xzf "${tmpdir}/piper.tar.gz" -C "$tmpdir"
+piper_root="$(find "$tmpdir" -type f -name piper -perm /111 -printf '%h\n' | head -1)"
+if [ -z "$piper_root" ]; then
+  echo "Unable to find Piper executable inside downloaded release."
+  exit 1
 fi
+rm -rf "${PIPER_DIR:?}/"*
+cp -a "${piper_root}/." "$PIPER_DIR/"
+chmod 0755 "$PIPER_DIR/piper"
+ln -sfn "$PIPER_DIR/piper" "$PIPER_BIN"
+ldconfig "$PIPER_DIR" || true
 
 echo "=== Installing female Piper voice model: ${VOICE_NAME} ==="
 curl -fL "$PIPER_MODEL_URL" -o "$PIPER_MODEL"
@@ -83,6 +87,7 @@ echo "=== Updating CMS TTS environment ==="
 upsert_env TTS_PROVIDER piper
 upsert_env PIPER_BIN "$PIPER_BIN"
 upsert_env PIPER_MODEL "$PIPER_MODEL"
+upsert_env LD_LIBRARY_PATH "$PIPER_DIR"
 upsert_env FFMPEG_BIN /usr/bin/ffmpeg
 upsert_env FFPROBE_BIN /usr/bin/ffprobe
 upsert_env ESPEAK_BIN /usr/bin/espeak-ng
@@ -91,7 +96,7 @@ chown root:www-data "$ENV_FILE"
 chmod 0640 "$ENV_FILE"
 
 echo "=== Verifying commands and worker typecheck ==="
-"$PIPER_BIN" --help >/dev/null
+LD_LIBRARY_PATH="$PIPER_DIR${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}" "$PIPER_BIN" --help >/dev/null
 /usr/bin/ffmpeg -version | head -1
 /usr/bin/ffprobe -version | head -1
 run_as_app "npm --workspace workers/content run typecheck"
