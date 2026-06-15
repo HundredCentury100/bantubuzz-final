@@ -1159,6 +1159,7 @@ Deployment note:
   - Audio storage supports S3 when `S3_BUCKET_PUBLIC` is configured and local CMS storage otherwise. Local audio is served through `/content-api/posts/<slug>/audio-file`.
   - Local generated-audio paths must use `packages/core/src/storage.ts`; do not build paths from raw `process.cwd()` because the CMS service and worker run with different workspace current directories.
   - The audio-file endpoint supports byte ranges. Keep this behavior because browsers use range requests to calculate MP3 duration and seek correctly.
+  - Production article narration should use Piper with the female `en_US-lessac-medium` model. `espeak-ng` is only an operational fallback and sounds robotic. Use `deployment\UPGRADE-CMS-AUDIO-VOICE-PIPER.bat` to install Piper, configure `TTS_PROVIDER=piper`, smoke-test MP3 generation, and regenerate the current sample article audio.
   - A systemd service being `active` is not sufficient proof of a working audio pipeline; verify the smoke test and `BantuBuzz content worker ready` log.
 - Remaining hardening for future slices:
   - Improve team invitation onboarding so new invitees land directly back on the invite after signup/login.
