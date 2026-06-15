@@ -1142,6 +1142,14 @@ Deployment note:
   - Payload local uploads must render through `/payload-api/media/file/<encoded filename>`, not `/media/<filename>`. Prefer Payload's generated `url` over custom `publicUrl` for local storage.
   - Keep `qualityFindings` JSON hidden in Payload admin and show `qualityFindingsSummary` as the readable editor-facing field.
   - CMS article CTA colors should use BantuBuzz navy `#1F2937` and primary olive-green `#ccdb53`; avoid the older near-black `#171714` and bright lime `#D7FF45` pairing.
+- Payload CMS public content APIs and feeds:
+  - Targeted deploy script: `deployment/DEPLOY-CMS-PUBLIC-API-FEEDS.bat`.
+  - Canonical public namespace is `https://bantubuzz.com/content-api/*`; `/api/*` on the main domain belongs to Flask.
+  - Public endpoints include posts, individual posts, authors, individual authors, categories, individual categories, tags, individual tags, related posts, plaintext, audio, search, reports, hubs, entities, and glossary content.
+  - Canonical feeds are `https://bantubuzz.com/feed.json`, `/rss.xml`, and segmented RSS under `/rss/<feed>.xml`.
+  - Developer documentation is public at `/developers`; OpenAPI 3.1 is at `/content-api/openapi.json`.
+  - Public JSON endpoints use CDN cache headers, CORS, and Redis-backed per-client limits. Standard content APIs allow 120 requests per minute; feeds allow 60.
+  - Keep public taxonomy and author responses mapped to explicit public fields instead of returning raw Payload documents.
 - Remaining hardening for future slices:
   - Improve team invitation onboarding so new invitees land directly back on the invite after signup/login.
   - Build tailored onboarding steps after Agency/Enterprise signup.
