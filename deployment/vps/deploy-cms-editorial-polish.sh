@@ -34,6 +34,7 @@ apps/web/src/app/(frontend)/preview/posts/[slug]/page.tsx
 apps/web/src/app/globals.css
 apps/web/src/components/editorial-shell.tsx
 apps/web/src/components/social-icons.tsx
+apps/web/src/lib/site-metadata.ts
 EOF
 
 echo "=== Backing up public editorial files ==="
@@ -89,6 +90,20 @@ grep -q "Join as Creator" "$article_html"
 grep -q "Join as Brand" "$article_html"
 grep -q "https://bantubuzz.com/register/creator" "$article_html"
 grep -q "https://bantubuzz.com/register/brand" "$article_html"
+grep -q 'name="description"' "$article_html"
+grep -q 'rel="canonical"' "$article_html"
+grep -q 'property="og:title"' "$article_html"
+grep -q 'property="og:description"' "$article_html"
+grep -q 'property="og:type" content="article"' "$article_html"
+grep -q 'name="twitter:card"' "$article_html"
+grep -q '"@type":"BlogPosting"' "$article_html"
+grep -q '"@type":"Person"' "$article_html"
+grep -q '"@type":"Organization"' "$article_html"
+grep -q '"@type":"BreadcrumbList"' "$article_html"
+if grep -q "Transcript</h2>" "$article_html"; then
+  echo "Visible transcript section should not render on article pages."
+  exit 1
+fi
 
 rm -f "$article_html" "$ARCHIVE"
 echo "Backup: $backup_dir"

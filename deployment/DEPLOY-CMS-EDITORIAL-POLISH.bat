@@ -62,7 +62,8 @@ tar -czf "%ARCHIVE%" -C "%CMS_ROOT%" ^
     "apps/web/src/app/(frontend)/preview/posts/[slug]/page.tsx" ^
     "apps/web/src/app/globals.css" ^
     "apps/web/src/components/editorial-shell.tsx" ^
-    "apps/web/src/components/social-icons.tsx"
+    "apps/web/src/components/social-icons.tsx" ^
+    "apps/web/src/lib/site-metadata.ts"
 if errorlevel 1 goto :failed
 
 echo.
