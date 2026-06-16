@@ -210,8 +210,14 @@ def register_creator():
         db.session.commit()
         queue_creator_score_recalculation(creator_profile.id)
 
-        # Send OTP email
-        send_otp_email(user.email, otp.code, purpose='registration')
+        # Send OTP email synchronously so SMTP failures are visible to the user
+        if not send_otp_email(user.email, otp.code, purpose='registration'):
+            current_app.logger.error('Creator registration OTP email failed for user_id=%s email=%s', user.id, user.email)
+            return jsonify({
+                'error': 'Account created, but we could not send your verification code. Please use resend code or contact support.',
+                'requires_verification': True,
+                'user': user.to_dict()
+            }), 503
 
         return jsonify({
             'message': 'Creator account created successfully. Please check your email for the verification code.',
@@ -285,8 +291,14 @@ def register_brand():
         db.session.add(otp)
         db.session.commit()
 
-        # Send OTP email
-        send_otp_email(user.email, otp.code, purpose='registration')
+        # Send OTP email synchronously so SMTP failures are visible to the user
+        if not send_otp_email(user.email, otp.code, purpose='registration'):
+            current_app.logger.error('Brand registration OTP email failed for user_id=%s email=%s', user.id, user.email)
+            return jsonify({
+                'error': 'Account created, but we could not send your verification code. Please use resend code or contact support.',
+                'requires_verification': True,
+                'user': user.to_dict()
+            }), 503
 
         return jsonify({
             'message': 'Brand account created successfully. Please check your email for the verification code.',
@@ -506,7 +518,9 @@ def resend_otp():
         db.session.commit()
 
         # Send OTP email
-        send_otp_email(user.email, otp.code, purpose='registration')
+        if not send_otp_email(user.email, otp.code, purpose='registration'):
+            current_app.logger.error('Resend OTP email failed for user_id=%s email=%s', user.id, user.email)
+            return jsonify({'error': 'Could not send verification code. Please try again later.'}), 503
 
         return jsonify({
             'message': 'Verification code sent successfully'

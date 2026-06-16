@@ -42,6 +42,38 @@ class ThunziAIService:
         }
         return self.last_error
 
+    def _api_key_candidates(self) -> List[str]:
+        """Return configured and documented Thunzi API keys without duplicates."""
+        configured = os.getenv('THUNZI_API_KEYS', '')
+        candidates = [self.api_key]
+        candidates.extend([key.strip() for key in configured.split(',') if key.strip()])
+        # Thunzi documentation has included both values in different sections.
+        candidates.extend(['WsoFzZyadXRLP8ypT1mIkhB8', 'soFzZyadXRLP8ypT1mIkhB8'])
+        unique = []
+        for key in candidates:
+            if key and key not in unique:
+                unique.append(key)
+        return unique
+
+    def _request_with_api_key_fallback(self, method: str, url: str, **kwargs):
+        """Send a Thunzi request with x-api-key and retry documented fallback keys on auth failures."""
+        base_headers = dict(kwargs.pop('headers', {}) or {})
+        last_response = None
+        for api_key in self._api_key_candidates():
+            headers = dict(base_headers)
+            headers['x-api-key'] = api_key
+            if kwargs.get('json') is not None:
+                headers.setdefault('Content-Type', 'application/json')
+            response = self.session.request(method, url, headers=headers, **kwargs)
+            last_response = response
+            if response.status_code not in [401, 403]:
+                if api_key != self.api_key:
+                    self.api_key = api_key
+                    self.session.headers.update({'x-api-key': api_key})
+                return response
+
+        return last_response
+
     def _normalize_sync_status(self, status: Optional[str]) -> Optional[str]:
         """Normalize ThunziAI status drift."""
         if not status:
@@ -81,7 +113,7 @@ class ThunziAIService:
             login_password = password or self.password
 
             url = f"{self.BASE_URL}/api/login"
-            payload = {"email": login_email, "password": "***MASKED***"}
+            payload = {"username": login_email, "password": "***MASKED***"}
 
             # Log the API call
             log_external_api_call(
@@ -91,13 +123,27 @@ class ThunziAIService:
                 payload=payload
             )
 
-            response = self.session.post(
+            response = self._request_with_api_key_fallback(
+                'POST',
                 url,
                 json={
-                    "email": login_email,
+                    "username": login_email,
                     "password": login_password
-                }
+                },
+                timeout=30
             )
+
+            # Older Thunzi builds accepted "email" instead of "username".
+            if response.status_code in [400, 422]:
+                response = self._request_with_api_key_fallback(
+                    'POST',
+                    url,
+                    json={
+                        "email": login_email,
+                        "password": login_password
+                    },
+                    timeout=30
+                )
 
             # Log the response
             log_external_api_response(
@@ -204,7 +250,10 @@ class ThunziAIService:
                 payload={'email': email, 'password': '***MASKED***'}
             )
 
-            response = self.session.post(url, json=payload, headers=headers)
+            response = self._request_with_api_key_fallback('POST', url, json=payload, headers=headers, timeout=30)
+            if response.status_code in [404, 405]:
+                url = f"{self.BASE_URL}/api/creators/register"
+                response = self._request_with_api_key_fallback('POST', url, json=payload, headers=headers, timeout=30)
 
             # Log response
             log_external_api_response(
@@ -302,21 +351,46 @@ class ThunziAIService:
         self._ensure_authenticated()
 
         try:
-            # Only send required fields - ThunziAI API doesn't accept contactEmail/industry
             payload = {
                 "name": name,
-                "country": country
+                "country": country,
+                "description": "BantuBuzz connected social analytics workspace"
             }
+            if email:
+                payload["contactEmail"] = email
+            if industry:
+                payload["industry"] = industry
 
-            response = self.session.post(
-                f"{self.BASE_URL}/api/company",
-                json=payload
+            url = f"{self.BASE_URL}/api/company"
+            log_external_api_call(
+                service='ThunziAI',
+                method='POST',
+                url=url,
+                payload=payload
+            )
+
+            response = self._request_with_api_key_fallback('POST', url, json=payload, timeout=30)
+
+            # Some older Thunzi builds rejected optional company fields. Retry
+            # with the legacy minimal payload before failing the connection flow.
+            if response.status_code == 400 and any(key in payload for key in ['contactEmail', 'industry', 'description']):
+                legacy_payload = {"name": name, "country": country}
+                response = self._request_with_api_key_fallback('POST', url, json=legacy_payload, timeout=30)
+
+            log_external_api_response(
+                service='ThunziAI',
+                method='POST',
+                url=url,
+                status_code=response.status_code,
+                response_body=response.json() if response.status_code in [200, 201] else response.text[:500]
             )
 
             if response.status_code in [200, 201]:  # Accept both 200 OK and 201 Created
                 data = response.json()
                 return data.get('id')
 
+            self._set_last_error('create_company', response)
+            log_error('ThunziAI.create_company', f"Failed with status {response.status_code}: {response.text[:300]}")
             print(f"ThunziAI company creation failed: {response.status_code} - {response.text}")
             return None
         except Exception as e:

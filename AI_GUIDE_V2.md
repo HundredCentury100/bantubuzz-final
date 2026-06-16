@@ -118,6 +118,31 @@ This file is a living handoff guide for future AI/Codex sessions working on the 
   production database already contains the Trust & Safety schema.
 - Flask's application factory must derive its default configuration from
   `FLASK_ENV`. A hardcoded `create_app(config_name='development')` causes both
+  production mode and provider configuration drift on the new VPS.
+- Platform production runs on the combined VPS `13.140.159.150`; routine
+  backend-only fixes should target `/var/www/bantubuzz/backend` and use
+  `/etc/bantubuzz/platform.env` as the source of provider configuration. Parse
+  that env file safely with Python/shlex in deployment scripts instead of
+  directly sourcing it, because raw values can contain shell-special
+  characters.
+- OTP email is sent by `backend/app/services/email_service.py` through
+  Flask-Mail. Production may contain either `MAIL_*` or older `SMTP_*`
+  variables; `backend/app/config.py` maps both. OTP registration and resend
+  now send synchronously so SMTP errors are visible and logged instead of being
+  swallowed by a background thread. Use
+  `deployment\DEPLOY-SMTP-THUNZI-FIXES-NEW-VPS.bat` to deploy OTP/SMTP fixes
+  and run a no-send SMTP login check on the new VPS.
+- Creator/brand account connection first creates or reuses a per-user ThunziAI
+  account in `backend/app/routes/platforms.py`, then creates a Thunzi company,
+  then connects the selected platform. A frontend error saying "Failed to
+  create ThunziAI account" means `ThunziAIService.create_company()` failed
+  before the platform connection step. Check `thunzi_service.last_error` in
+  masked logs; the deploy script above prints recent Thunzi lines.
+- ThunziAI docs have drifted around API key, login body, and creator-register
+  endpoint naming. `backend/app/services/thunzi_service.py` therefore sends
+  `x-api-key` on requests, retries documented API key candidates on 401/403,
+  uses `username` for `/api/login` with `email` fallback, and falls back from
+  `/api/creator/register` to `/api/creators/register` if needed.
   Gunicorn's `app:create_app()` and `celery_worker.py` to run DevelopmentConfig
   even when `/etc/bantubuzz/platform.env` says production. The factory now uses
   `create_app(config_name=None)` and reads `FLASK_ENV`. New-VPS hotfix:

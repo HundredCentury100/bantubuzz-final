@@ -3,38 +3,55 @@ from flask_mail import Message
 from app import mail
 from threading import Thread
 from email.utils import formataddr
+from app.utils.logger import log_error
 
 
 def send_async_email(app, msg):
     """Send email asynchronously"""
     with app.app_context():
-        mail.send(msg)
+        try:
+            mail.send(msg)
+            app.logger.info("Email sent to %s with subject %s", msg.recipients, msg.subject)
+        except Exception as exc:
+            log_error('Email.send_async_email', exc)
+            app.logger.exception("Failed to send email to %s with subject %s", msg.recipients, msg.subject)
 
 
-def send_email(subject, recipients, text_body, html_body=None, sender_name='BantuBuzz', reply_to=None, attachments=None):
+def send_email(subject, recipients, text_body, html_body=None, sender_name='BantuBuzz',
+               reply_to=None, attachments=None, async_send=True):
     """Send email"""
-    # Format sender with display name using email.utils.formataddr
-    sender_email = current_app.config.get('MAIL_DEFAULT_SENDER') or current_app.config.get('MAIL_USERNAME', 'user@bantubuzz.com')
-    if isinstance(sender_email, (tuple, list)):
-        sender_name = sender_name or sender_email[0]
-        sender_email = sender_email[-1]
-    sender_display = formataddr((sender_name or 'BantuBuzz', sender_email))
+    try:
+        # Format sender with display name using email.utils.formataddr
+        sender_email = current_app.config.get('MAIL_DEFAULT_SENDER') or current_app.config.get('MAIL_USERNAME', 'user@bantubuzz.com')
+        if isinstance(sender_email, (tuple, list)):
+            sender_name = sender_name or sender_email[0]
+            sender_email = sender_email[-1]
+        sender_display = formataddr((sender_name or 'BantuBuzz', sender_email))
 
-    msg = Message(
-        subject=subject,
-        recipients=recipients if isinstance(recipients, list) else [recipients],
-        sender=sender_display,
-        reply_to=reply_to
-    )
-    msg.body = text_body
-    if html_body:
-        msg.html = html_body
-    for attachment in attachments or []:
-        filename, content_type, data = attachment
-        msg.attach(filename, content_type, data)
+        msg = Message(
+            subject=subject,
+            recipients=recipients if isinstance(recipients, list) else [recipients],
+            sender=sender_display,
+            reply_to=reply_to
+        )
+        msg.body = text_body
+        if html_body:
+            msg.html = html_body
+        for attachment in attachments or []:
+            filename, content_type, data = attachment
+            msg.attach(filename, content_type, data)
 
-    # Send asynchronously
-    Thread(target=send_async_email, args=(current_app._get_current_object(), msg)).start()
+        if async_send:
+            Thread(target=send_async_email, args=(current_app._get_current_object(), msg)).start()
+            return True
+
+        mail.send(msg)
+        current_app.logger.info("Email sent to %s with subject %s", msg.recipients, msg.subject)
+        return True
+    except Exception as exc:
+        log_error('Email.send_email', exc)
+        current_app.logger.exception("Failed to send email to %s with subject %s", recipients, subject)
+        return False
 
 
 def send_otp_email(email, otp_code, purpose='registration'):
@@ -95,7 +112,7 @@ def send_otp_email(email, otp_code, purpose='registration'):
     </html>
     """
 
-    send_email(subject, email, text_body, html_body)
+    return send_email(subject, email, text_body, html_body, async_send=False)
 
 
 def send_welcome_email(user):

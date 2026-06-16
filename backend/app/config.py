@@ -21,14 +21,15 @@ class Config:
     JWT_HEADER_NAME = 'Authorization'
     JWT_HEADER_TYPE = 'Bearer'
 
-    # Mail
-    MAIL_SERVER = os.getenv('MAIL_SERVER', 'smtp.gmail.com')
-    MAIL_PORT = int(os.getenv('MAIL_PORT', 587))
-    MAIL_USE_TLS = os.getenv('MAIL_USE_TLS', 'True') == 'True'
-    MAIL_USE_SSL = os.getenv('MAIL_USE_SSL', 'False') == 'True'
-    MAIL_USERNAME = os.getenv('MAIL_USERNAME')
-    MAIL_PASSWORD = os.getenv('MAIL_PASSWORD')
-    MAIL_DEFAULT_SENDER = os.getenv('MAIL_DEFAULT_SENDER', 'noreply@bantubuzz.com')
+    # Mail. Support both Flask-Mail's MAIL_* names and the older SMTP_* aliases
+    # used by some background utilities and production environment files.
+    MAIL_SERVER = os.getenv('MAIL_SERVER') or os.getenv('SMTP_HOST') or 'smtp.gmail.com'
+    MAIL_PORT = int(os.getenv('MAIL_PORT') or os.getenv('SMTP_PORT') or 587)
+    MAIL_USE_TLS = (os.getenv('MAIL_USE_TLS') or os.getenv('SMTP_USE_TLS') or 'True').lower() == 'true'
+    MAIL_USE_SSL = (os.getenv('MAIL_USE_SSL') or os.getenv('SMTP_USE_SSL') or 'False').lower() == 'true'
+    MAIL_USERNAME = os.getenv('MAIL_USERNAME') or os.getenv('SMTP_USER')
+    MAIL_PASSWORD = os.getenv('MAIL_PASSWORD') or os.getenv('SMTP_PASSWORD')
+    MAIL_DEFAULT_SENDER = os.getenv('MAIL_DEFAULT_SENDER') or os.getenv('SMTP_FROM') or MAIL_USERNAME or 'noreply@bantubuzz.com'
 
     # Redis & Celery
     REDIS_URL = os.getenv('REDIS_URL', 'redis://localhost:6379/0')

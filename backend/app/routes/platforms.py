@@ -17,6 +17,16 @@ import os
 platforms_bp = Blueprint('platforms', __name__)
 
 
+def _log_thunzi_route_error(context, user, platform=None):
+    details = getattr(thunzi_service, 'last_error', None)
+    safe_user = getattr(user, 'id', None)
+    log_error(context, {
+        'user_id': safe_user,
+        'platform': platform,
+        'thunzi_error': details
+    })
+
+
 def _parse_thunzi_datetime(value):
     if not value or str(value).lower() == 'never':
         return None
@@ -236,6 +246,7 @@ def connect_platform():
             # NOTE: This may create an unverified account via API key that cannot login
             user_registered = thunzi_service.ensure_user_registered(email=user.email)
             if not user_registered:
+                _log_thunzi_route_error('platforms.connect_creator.register_thunzi_user', user, platform)
                 return jsonify({'error': 'Failed to register with ThunziAI'}), 500
 
             # After ensure_user_registered, the thunzi_service singleton is authenticated
@@ -250,6 +261,7 @@ def connect_platform():
             )
 
             if not company_id:
+                _log_thunzi_route_error('platforms.connect_creator.create_thunzi_company', user, platform)
                 return jsonify({'error': 'Failed to create ThunziAI account'}), 500
 
             # Create bantubuzz_id for this creator
@@ -1164,6 +1176,7 @@ def connect_brand_platform():
             # Ensure user is registered in ThunziAI (register if needed, then login)
             user_registered = thunzi_service.ensure_user_registered(email=user.email)
             if not user_registered:
+                _log_thunzi_route_error('platforms.connect_brand.register_thunzi_user', user, platform)
                 return jsonify({'error': 'Failed to register with ThunziAI'}), 500
 
             # Create ThunziAI company for this specific brand
@@ -1175,6 +1188,7 @@ def connect_brand_platform():
             )
 
             if not company_id:
+                _log_thunzi_route_error('platforms.connect_brand.create_thunzi_company', user, platform)
                 return jsonify({'error': 'Failed to create ThunziAI account'}), 500
 
             # Save ThunziAI account
