@@ -10,9 +10,28 @@ if [ ! -s "$PLATFORM_ENV" ]; then
   exit 1
 fi
 
-set -a
-source "$PLATFORM_ENV"
-set +a
+eval "$(
+  python3 - "$PLATFORM_ENV" <<'PY'
+import re
+import shlex
+import sys
+from pathlib import Path
+
+env_path = Path(sys.argv[1])
+for raw_line in env_path.read_text().splitlines():
+    line = raw_line.strip()
+    if not line or line.startswith('#') or '=' not in line:
+        continue
+    key, value = line.split('=', 1)
+    key = key.strip()
+    if not re.match(r'^[A-Za-z_][A-Za-z0-9_]*$', key):
+        continue
+    value = value.strip()
+    if len(value) >= 2 and value[0] == value[-1] and value[0] in {'"', "'"}:
+        value = value[1:-1]
+    print(f"export {key}={shlex.quote(value)}")
+PY
+)"
 
 TS="$(date +%Y%m%d_%H%M%S)"
 BACKUP="/var/backups/bantubuzz/creator-score-v11-before-$TS"
