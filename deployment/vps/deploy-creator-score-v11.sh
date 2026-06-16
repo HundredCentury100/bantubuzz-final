@@ -80,7 +80,7 @@ rm -f /tmp/app_*.pyc
 
 echo "Running database migration"
 export FLASK_APP=run.py
-venv/bin/flask db upgrade
+venv/bin/flask db upgrade 202606161000
 
 echo "Restarting services"
 systemctl restart bantubuzz-backend.service bantubuzz-celery-worker.service bantubuzz-celery-beat.service
