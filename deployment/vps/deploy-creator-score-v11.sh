@@ -2,7 +2,17 @@
 set -euo pipefail
 
 REMOTE_ROOT="/var/www/bantubuzz"
+PLATFORM_ENV="/etc/bantubuzz/platform.env"
 cd "$REMOTE_ROOT"
+
+if [ ! -s "$PLATFORM_ENV" ]; then
+  echo "Missing platform environment: $PLATFORM_ENV"
+  exit 1
+fi
+
+set -a
+source "$PLATFORM_ENV"
+set +a
 
 TS="$(date +%Y%m%d_%H%M%S)"
 BACKUP="/var/backups/bantubuzz/creator-score-v11-before-$TS"
@@ -82,4 +92,3 @@ rm -f \
   /tmp/deploy-creator-score-v11.sh
 
 echo BANTUBUZZ_NEW_VPS_CREATOR_SCORE_V11_SUCCESS
-
