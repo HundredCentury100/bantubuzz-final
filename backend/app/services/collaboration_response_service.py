@@ -78,6 +78,12 @@ def creator_accept_collaboration(collaboration_id, creator_user_id):
     # Send notification to brand
     send_collaboration_acceptance_notification(collaboration)
 
+    try:
+        from app.services.creator_score_service import queue_creator_score_recalculation
+        queue_creator_score_recalculation(collaboration.creator_id)
+    except Exception:
+        pass
+
     return collaboration
 
 
@@ -127,6 +133,12 @@ def creator_decline_collaboration(collaboration_id, creator_user_id, reason, cou
 
     # Send notification to brand
     send_collaboration_decline_notification(collaboration, counter_offer)
+
+    try:
+        from app.services.creator_score_service import queue_creator_score_recalculation
+        queue_creator_score_recalculation(collaboration.creator_id)
+    except Exception:
+        pass
 
     return collaboration
 

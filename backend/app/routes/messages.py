@@ -119,6 +119,17 @@ def send_message():
         db.session.commit()
 
         try:
+            from app.services.creator_score_service import queue_creator_score_recalculation
+            sender = User.query.get(int(user_id))
+            receiver = User.query.get(int(data['receiver_id']))
+            if sender and sender.user_type == 'creator' and sender.creator_profile:
+                queue_creator_score_recalculation(sender.creator_profile.id)
+            if receiver and receiver.user_type == 'creator' and receiver.creator_profile:
+                queue_creator_score_recalculation(receiver.creator_profile.id)
+        except Exception:
+            pass
+
+        try:
             from app.utils.websocket_helper import emit_message_to_websocket
             emit_message_to_websocket(message, db.session)
         except Exception as websocket_error:

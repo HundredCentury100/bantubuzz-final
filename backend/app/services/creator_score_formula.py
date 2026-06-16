@@ -3,12 +3,16 @@ from datetime import datetime
 
 
 WEIGHTS = {
-    'engagement': 0.35,
-    'reach': 0.25,
-    'followers': 0.10,
-    'sentiment': 0.10,
-    'activity': 0.10,
-    'profile_quality': 0.10,
+    'engagement': 14,
+    'reach': 10,
+    'followers': 4,
+    'sentiment': 7,
+    'order_completion': 8,
+    'response_rate': 8,
+    'on_time_delivery': 9,
+    'reviews': 20,
+    'profile_trust': 15,
+    'activity': 5,
 }
 
 
@@ -107,11 +111,73 @@ def profile_quality_dimension(has_photo, has_bio, has_platform, has_package, has
     ]) * 20)
 
 
-def final_creator_score(dimensions):
+def profile_trust_dimension(has_photo, has_bio, has_platform, has_package, has_portfolio):
+    return profile_quality_dimension(has_photo, has_bio, has_platform, has_package, has_portfolio)
+
+
+def percentage_dimension(numerator, denominator):
+    denominator = int(denominator or 0)
+    if denominator <= 0:
+        return None
+    return clamp((float(numerator or 0) / denominator) * 100)
+
+
+def order_completion_dimension(completed_orders, total_orders):
+    return percentage_dimension(completed_orders, total_orders)
+
+
+def response_rate_dimension(responded_messages, inbound_messages):
+    return percentage_dimension(responded_messages, inbound_messages)
+
+
+def on_time_delivery_dimension(on_time_deliveries, completed_deliveries):
+    return percentage_dimension(on_time_deliveries, completed_deliveries)
+
+
+def reviews_dimension(average_rating, total_verified_reviews, positive_reviews, recent_review_count):
+    if not total_verified_reviews or not recent_review_count:
+        return None
+
+    average_rating_score = clamp((float(average_rating or 0) / 5) * 100)
+    review_volume_score = clamp((min(int(total_verified_reviews or 0), 20) / 20) * 100)
+    positive_review_ratio = clamp((int(positive_reviews or 0) / int(recent_review_count or 1)) * 100)
+
+    return clamp(
+        (average_rating_score * 0.70)
+        + (review_volume_score * 0.20)
+        + (positive_review_ratio * 0.10)
+    )
+
+
+def weighted_average_score(dimensions, weights=None):
+    weights = weights or WEIGHTS
+    included_weight = 0.0
+    weighted_total = 0.0
+
+    for key, weight in weights.items():
+        value = dimensions.get(key)
+        if value is None:
+            continue
+        included_weight += float(weight)
+        weighted_total += clamp(value) * float(weight)
+
+    if included_weight <= 0:
+        return 0.0
+
+    return clamp(weighted_total / included_weight)
+
+
+def weighted_component_score(dimensions, keys, weights=None):
+    weights = weights or WEIGHTS
     return clamp(sum(
-        float(dimensions[key]) * WEIGHTS[key]
-        for key in WEIGHTS
+        clamp(dimensions.get(key) or 0) * (float(weights[key]) / 100)
+        for key in keys
+        if key in weights and dimensions.get(key) is not None
     ))
+
+
+def final_creator_score(dimensions):
+    return weighted_average_score(dimensions)
 
 
 def normalize_platform_name(platform):

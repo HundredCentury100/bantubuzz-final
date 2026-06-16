@@ -109,91 +109,29 @@ class CreatorProfile(db.Model):
         }
 
     def get_badges(self):
-        """
-        Calculate creator badges based on verification and performance
-        Returns list of up to 2 badges in priority order
-
-        Badge hierarchy:
-        1. Top Creator (5+ completed collaborations in last 30 days) - If top creator, don't show verified
-        2. Responds Fast (avg response time < 2 hours in last 30 days, min 5 conversations)
-        3. Verified Creator (platform verified with documents)
-        4. Creator (default badge for all creators)
-
-        Note: Top Creator badge implies verification, so we don't show verified badge separately for top creators
-        """
-        from datetime import datetime, timedelta
-        from app.models import Collaboration
-        from sqlalchemy import func, and_
-
-        badges = []
-        from app.models.referral import ReferralReward
-        from sqlalchemy import or_
-
-        referral_badge = ReferralReward.query.filter(
-            ReferralReward.user_id == self.user_id,
-            ReferralReward.reward_type == 'promotional_badge',
-            ReferralReward.status == 'active',
-            or_(ReferralReward.starts_at.is_(None), ReferralReward.starts_at <= datetime.utcnow()),
-            or_(ReferralReward.ends_at.is_(None), ReferralReward.ends_at > datetime.utcnow()),
-        ).first()
-        is_top_creator = False
-
-        # Check for Top Creator badge (highest priority - all top creators are verified)
-        thirty_days_ago = datetime.utcnow() - timedelta(days=30)
-        completed_count = Collaboration.query.filter(
-            Collaboration.creator_id == self.id,
-            Collaboration.status == 'completed',
-            Collaboration.updated_at >= thirty_days_ago
-        ).count()
-
-        if completed_count >= 5:
-            badges.append('top_creator')
-            is_top_creator = True
-
-        # Check for Responds Fast badge (fast response time in messaging)
         try:
-            from app.models import Message
+            from app.services.creator_score_service import CreatorScoreService
+            badges = CreatorScoreService.achievement_badges(self)
+        except Exception:
+            badges = ['verified_creator'] if self.is_verified else ['creator']
 
-            # Get messages where creator responded to brands in last 30 days
-            creator_responses = db.session.query(
-                func.extract('epoch', Message.created_at - func.lag(Message.created_at).over(
-                    partition_by=Message.booking_id,
-                    order_by=Message.created_at
-                )).label('response_time')
-            ).filter(
-                Message.sender_id == self.user_id,
-                Message.created_at >= thirty_days_ago
-            ).subquery()
+        try:
+            from app.models.referral import ReferralReward
+            from sqlalchemy import or_
 
-            avg_response = db.session.query(
-                func.avg(creator_responses.c.response_time)
-            ).scalar()
+            referral_badge = ReferralReward.query.filter(
+                ReferralReward.user_id == self.user_id,
+                ReferralReward.reward_type == 'promotional_badge',
+                ReferralReward.status == 'active',
+                or_(ReferralReward.starts_at.is_(None), ReferralReward.starts_at <= datetime.utcnow()),
+                or_(ReferralReward.ends_at.is_(None), ReferralReward.ends_at > datetime.utcnow()),
+            ).first()
+            if referral_badge and 'referral_verified' not in badges:
+                badges.append('referral_verified')
+        except Exception:
+            pass
 
-            message_count = Message.query.filter(
-                Message.sender_id == self.user_id,
-                Message.created_at >= thirty_days_ago
-            ).count()
-
-            # Responds fast if avg response < 2 hours (7200 seconds) and has at least 5 messages
-            if avg_response and message_count >= 5 and avg_response < 7200:
-                badges.append('responds_fast')
-        except:
-            pass  # Skip if messaging table doesn't exist or query fails
-
-        # Check for Verified Creator badge (only if NOT top creator)
-        # Top creators are always verified, so we don't show verified badge separately
-        if self.is_verified and not is_top_creator:
-            badges.append('verified_creator')
-
-        if referral_badge and 'verified_creator' not in badges:
-            badges.append('referral_verified')
-
-        # Always include Creator badge if no other badges (everyone gets at least one)
-        if not badges:
-            badges.append('creator')
-
-        # Return maximum of 2 badges
-        return badges[:2]
+        return badges[:3]
 
     def to_dict(self, include_user=False, public_view=False):
         """

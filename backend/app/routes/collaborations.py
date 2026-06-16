@@ -995,6 +995,11 @@ def complete_collaboration(collab_id):
         update_campaign_completion_for_collaboration(collaboration)
 
         db.session.commit()
+        try:
+            from app.services.creator_score_service import queue_creator_score_recalculation
+            queue_creator_score_recalculation(collaboration.creator_id)
+        except Exception:
+            pass
 
         # Release escrow to creator wallet with 24-hour countdown
         escrow_released = False
@@ -1133,6 +1138,11 @@ def mark_collaboration_complete(collab_id):
         update_campaign_completion_for_collaboration(collaboration)
 
         db.session.commit()
+        try:
+            from app.services.creator_score_service import queue_creator_score_recalculation
+            queue_creator_score_recalculation(collaboration.creator_id)
+        except Exception:
+            pass
 
         # Release escrow to creator wallet
         escrow_released = False
@@ -1371,6 +1381,11 @@ def request_cancellation(collab_id):
             collaboration.updated_at = datetime.utcnow()
 
             db.session.commit()
+            try:
+                from app.services.creator_score_service import queue_creator_score_recalculation
+                queue_creator_score_recalculation(collaboration.creator_id)
+            except Exception:
+                pass
 
             # Notify brand about cancellation
             brand_user = User.query.get(collaboration.brand.user_id)
@@ -1443,6 +1458,11 @@ def cancel_collaboration(collab_id):
         creator.cancelled_collaborations_count = (creator.cancelled_collaborations_count or 0) + 1
 
         db.session.commit()
+        try:
+            from app.services.creator_score_service import queue_creator_score_recalculation
+            queue_creator_score_recalculation(collaboration.creator_id)
+        except Exception:
+            pass
 
         # Send email to brand
         brand_user = User.query.get(collaboration.brand.user_id)
@@ -1622,6 +1642,12 @@ def approve_milestone_deliverable(collab_id, milestone_id, deliverable_id):
                 update_campaign_completion_for_collaboration(collaboration)
 
         db.session.commit()
+        if completed_all_milestones:
+            try:
+                from app.services.creator_score_service import queue_creator_score_recalculation
+                queue_creator_score_recalculation(collaboration.creator_id)
+            except Exception:
+                pass
 
         notify_creator_content_approved(collaboration, deliverable.title)
         if completed_all_milestones:

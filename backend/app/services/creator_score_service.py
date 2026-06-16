@@ -1,3 +1,4 @@
+import math
 from datetime import datetime, timedelta
 
 from sqlalchemy import func
@@ -9,9 +10,12 @@ from app.models import (
     CreatorRanking,
     CreatorScore,
     CreatorScoreHistory,
+    Collaboration,
+    Message,
     Package,
     PortfolioItem,
     PostMetrics,
+    Review,
     User,
     UserSession,
 )
@@ -23,14 +27,20 @@ from app.services.creator_score_formula import (
     follower_dimension,
     normalize_sentiment,
     profile_quality_dimension,
+    profile_trust_dimension,
     reach_dimension,
+    reviews_dimension,
+    order_completion_dimension,
+    on_time_delivery_dimension,
     normalize_platform_name,
+    response_rate_dimension,
     select_primary_platform,
     sentiment_dimension,
+    weighted_component_score,
 )
 
 
-FORMULA_VERSION = '1.0'
+FORMULA_VERSION = '1.1'
 
 
 class CreatorScoreService:
@@ -141,6 +151,121 @@ class CreatorScoreService:
         return sessions, last_session
 
     @staticmethod
+    def _review_inputs(creator_profile_id):
+        completed_review_query = Review.query.join(Collaboration).filter(
+            Review.creator_id == creator_profile_id,
+            Collaboration.status == 'completed',
+        )
+        total_verified = completed_review_query.count()
+        recent_reviews = completed_review_query.order_by(Review.created_at.desc()).limit(20).all()
+
+        ratings = [
+            float(review.get_calculated_rating())
+            for review in recent_reviews
+            if review.get_calculated_rating() is not None
+        ]
+        recent_count = len(ratings)
+        if total_verified <= 0 or recent_count <= 0:
+            return None, {
+                'total_verified_reviews': total_verified,
+                'recent_review_count': recent_count,
+                'average_rating': None,
+                'positive_reviews': 0,
+            }
+
+        positive_reviews = sum(1 for rating in ratings if rating >= 4)
+        average_rating = sum(ratings) / recent_count
+        return reviews_dimension(
+            average_rating,
+            total_verified,
+            positive_reviews,
+            recent_count,
+        ), {
+            'total_verified_reviews': total_verified,
+            'recent_review_count': recent_count,
+            'average_rating': round(average_rating, 4),
+            'positive_reviews': positive_reviews,
+            'positive_review_ratio': round((positive_reviews / recent_count) * 100, 4),
+        }
+
+    @staticmethod
+    def _marketplace_reliability_inputs(creator):
+        terminal_statuses = ['completed', 'cancelled', 'creator_declined']
+        terminal_collaborations = Collaboration.query.filter(
+            Collaboration.creator_id == creator.id,
+            Collaboration.status.in_(terminal_statuses),
+        ).all()
+        completed_collaborations = [
+            collaboration for collaboration in terminal_collaborations
+            if collaboration.status == 'completed'
+        ]
+        completed_orders = len(completed_collaborations)
+        total_orders = len(terminal_collaborations)
+
+        due_deliveries = [
+            collaboration for collaboration in completed_collaborations
+            if collaboration.expected_completion_date is not None
+        ]
+        on_time_deliveries = 0
+        for collaboration in due_deliveries:
+            delivered_at = (
+                collaboration.actual_completion_date
+                or collaboration.live_urls_submitted_at
+                or collaboration.updated_at
+            )
+            if delivered_at and delivered_at <= collaboration.expected_completion_date:
+                on_time_deliveries += 1
+
+        response_cutoff = datetime.utcnow() - timedelta(days=90)
+        inbound_messages = Message.query.join(User, Message.sender_id == User.id).filter(
+            Message.receiver_id == creator.user_id,
+            User.user_type == 'brand',
+            Message.created_at >= response_cutoff,
+        ).order_by(Message.created_at.asc()).all()
+
+        responded_messages = 0
+        for inbound in inbound_messages:
+            reply = Message.query.filter(
+                Message.sender_id == creator.user_id,
+                Message.receiver_id == inbound.sender_id,
+                Message.created_at > inbound.created_at,
+                Message.created_at <= inbound.created_at + timedelta(hours=48),
+            ).first()
+            if reply:
+                responded_messages += 1
+
+        order_completion = order_completion_dimension(completed_orders, total_orders)
+        response_rate = response_rate_dimension(responded_messages, len(inbound_messages))
+        on_time_delivery = on_time_delivery_dimension(on_time_deliveries, len(due_deliveries))
+        marketplace_reliability = weighted_component_score({
+            'order_completion': order_completion,
+            'response_rate': response_rate,
+            'on_time_delivery': on_time_delivery,
+        }, ['order_completion', 'response_rate', 'on_time_delivery'])
+
+        campaign_successes = Collaboration.query.filter(
+            Collaboration.creator_id == creator.id,
+            Collaboration.collaboration_type == 'campaign',
+            Collaboration.status == 'completed',
+        ).count()
+
+        return {
+            'order_completion': order_completion,
+            'response_rate': response_rate,
+            'on_time_delivery': on_time_delivery,
+            'marketplace_reliability': marketplace_reliability,
+            'raw': {
+                'total_orders': total_orders,
+                'completed_orders': completed_orders,
+                'completed_campaigns': campaign_successes,
+                'due_deliveries': len(due_deliveries),
+                'on_time_deliveries': on_time_deliveries,
+                'inbound_brand_messages_90d': len(inbound_messages),
+                'responded_brand_messages_48h': responded_messages,
+            },
+        }
+
+    @staticmethod
     def calculate(creator_profile_id, max_followers=None, persist=True, rebuild_ranks=False):
         creator = CreatorProfile.query.get(creator_profile_id)
         if not creator or not creator.user:
@@ -156,6 +281,8 @@ class CreatorScoreService:
             CreatorScoreService._sentiment_inputs(creator.user_id, creator.id)
         )
         session_count, last_session = CreatorScoreService._activity_inputs(creator.user)
+        review_score, review_snapshot = CreatorScoreService._review_inputs(creator.id)
+        reliability = CreatorScoreService._marketplace_reliability_inputs(creator)
 
         has_platform = ConnectedPlatform.query.filter_by(
             user_id=creator.user_id,
@@ -174,6 +301,13 @@ class CreatorScoreService:
             'reach': reach_dimension(reach_ratio, reach_count > 0),
             'followers': follower_dimension(followers, max_followers),
             'sentiment': sentiment_dimension(average_sentiment, negative_pct, critical_pct),
+            'order_completion': reliability['order_completion'],
+            'response_rate': reliability['response_rate'],
+            'on_time_delivery': reliability['on_time_delivery'],
+            'reviews': review_score,
+            'profile_trust': profile_trust_dimension(
+                has_photo, has_bio, has_platform, has_package, has_portfolio,
+            ),
             'activity': activity_dimension(session_count, last_session),
             'profile_quality': profile_quality_dimension(
                 has_photo, has_bio, has_platform, has_package, has_portfolio,
@@ -192,6 +326,8 @@ class CreatorScoreService:
             'critical_comment_percentage': round(critical_pct, 4),
             'sessions_last_30_days': session_count,
             'last_session_at': last_session.isoformat() if last_session else None,
+            'reviews': review_snapshot,
+            'marketplace_reliability': reliability['raw'],
             'profile_elements': {
                 'photo': has_photo,
                 'bio': has_bio,
@@ -205,6 +341,26 @@ class CreatorScoreService:
             'reach_records': reach_count,
             'sentiment_comments': comment_count,
             'sentiment_source': sentiment_source,
+            'excluded_dimensions': [
+                key for key, value in dimensions.items()
+                if key in {'order_completion', 'response_rate', 'on_time_delivery', 'reviews'}
+                and value is None
+            ],
+            'available_weight': sum(
+                weight for key, weight in {
+                    'engagement': 14,
+                    'reach': 10,
+                    'followers': 4,
+                    'sentiment': 7,
+                    'order_completion': 8,
+                    'response_rate': 8,
+                    'on_time_delivery': 9,
+                    'reviews': 20,
+                    'profile_trust': 15,
+                    'activity': 5,
+                }.items()
+                if dimensions.get(key) is not None
+            ),
         }
         result = {
             'dimensions': dimensions,
@@ -225,6 +381,12 @@ class CreatorScoreService:
         score.reach_score = dimensions['reach']
         score.follower_score = dimensions['followers']
         score.sentiment_score = dimensions['sentiment']
+        score.order_completion_score = dimensions['order_completion'] or 0
+        score.response_rate_score = dimensions['response_rate'] or 0
+        score.on_time_delivery_score = dimensions['on_time_delivery'] or 0
+        score.marketplace_reliability_score = reliability['marketplace_reliability']
+        score.review_score = dimensions['reviews'] or 0
+        score.profile_trust_score = dimensions['profile_trust']
         score.activity_score = dimensions['activity']
         score.profile_quality_score = dimensions['profile_quality']
         score.final_score = final_score
@@ -245,6 +407,12 @@ class CreatorScoreService:
                 reach_score=dimensions['reach'],
                 follower_score=dimensions['followers'],
                 sentiment_score=dimensions['sentiment'],
+                order_completion_score=dimensions['order_completion'] or 0,
+                response_rate_score=dimensions['response_rate'] or 0,
+                on_time_delivery_score=dimensions['on_time_delivery'] or 0,
+                marketplace_reliability_score=reliability['marketplace_reliability'],
+                review_score=dimensions['reviews'] or 0,
+                profile_trust_score=dimensions['profile_trust'],
                 activity_score=dimensions['activity'],
                 profile_quality_score=dimensions['profile_quality'],
                 final_score=final_score,
@@ -346,6 +514,18 @@ class CreatorScoreService:
                 ) == platform
             ]
             CreatorScoreService._rank_context(matching, 'platform', platform, previous, now)
+
+        cities = sorted({
+            str(creator.city or creator.location or '').strip().lower()
+            for creator in creators
+            if str(creator.city or creator.location or '').strip()
+        })
+        for city in cities:
+            matching = [
+                creator for creator in creators
+                if str(creator.city or creator.location or '').strip().lower() == city
+            ]
+            CreatorScoreService._rank_context(matching, 'city', city, previous, now)
         return len(creators)
 
     @staticmethod
@@ -415,6 +595,7 @@ class CreatorScoreService:
                 'platform_followers': int(primary.followers or 0) if primary else 0,
                 'profile_path': f'/{creator.username}' if creator.username else f'/creators/{creator.id}',
                 'overall_rank': CreatorScoreService.public_rank(creator.id),
+                'badges': CreatorScoreService.achievement_badges(creator),
             })
 
         return {
@@ -459,6 +640,157 @@ class CreatorScoreService:
             'type': ranking.ranking_type,
             'context': ranking.context_key or None,
             'calculated_at': ranking.calculated_at.isoformat(),
+        }
+
+    @staticmethod
+    def _score_float(score, field):
+        return float(getattr(score, field, 0) or 0) if score else 0.0
+
+    @staticmethod
+    def achievement_badges(creator):
+        score = getattr(creator, 'private_score', None)
+        if not score:
+            return ['creator_to_watch']
+
+        snapshot = score.input_snapshot or {}
+        review_snapshot = snapshot.get('reviews') or {}
+        reliability_snapshot = snapshot.get('marketplace_reliability') or {}
+        total_followers = int(snapshot.get('followers') or creator.get_total_followers() or 0)
+        total_orders = int(reliability_snapshot.get('total_orders') or 0)
+        completed_orders = int(reliability_snapshot.get('completed_orders') or 0)
+        completed_campaigns = int(reliability_snapshot.get('completed_campaigns') or 0)
+        verified_reviews = int(review_snapshot.get('total_verified_reviews') or 0)
+
+        final_score = CreatorScoreService._score_float(score, 'final_score')
+        reach_score = CreatorScoreService._score_float(score, 'reach_score')
+        engagement_score = CreatorScoreService._score_float(score, 'engagement_score')
+        review_score = CreatorScoreService._score_float(score, 'review_score')
+        profile_trust_score = CreatorScoreService._score_float(score, 'profile_trust_score')
+        marketplace_reliability_score = CreatorScoreService._score_float(score, 'marketplace_reliability_score')
+        order_completion_score = CreatorScoreService._score_float(score, 'order_completion_score')
+        response_rate_score = CreatorScoreService._score_float(score, 'response_rate_score')
+        on_time_delivery_score = CreatorScoreService._score_float(score, 'on_time_delivery_score')
+
+        badges = []
+        if final_score >= 95:
+            badges.append('elite_creator')
+        if (
+            final_score >= 90
+            and review_score >= 90
+            and creator.is_verified
+            and profile_trust_score >= 90
+            and completed_campaigns >= 3
+            and total_orders >= 10
+            and order_completion_score >= 90
+            and response_rate_score >= 90
+            and on_time_delivery_score >= 90
+        ):
+            badges.append('top_creator')
+        if review_score >= 90 and verified_reviews >= 5 and order_completion_score >= 80 and response_rate_score >= 90:
+            badges.append('trusted_creator')
+        if final_score >= 80 and marketplace_reliability_score >= 20:
+            badges.append('brand_magnet')
+        if final_score >= 70 and completed_campaigns >= 5 and review_score >= 70:
+            badges.append('campaign_pro')
+        if final_score >= 70 and engagement_score >= 80:
+            badges.append('engagement_leader')
+        if reach_score >= 80:
+            badges.append('audience_builder')
+        if final_score >= 70 and total_followers >= 10000:
+            badges.append('rising_creator')
+
+        city_key = str(creator.city or creator.location or '').strip().lower()
+        city_rank = CreatorScoreService.public_rank(creator.id, 'city', city_key) if city_key else None
+        if city_rank and city_rank.get('position') and city_rank['position'] <= 10:
+            badges.append('city_top_10')
+
+        for category in creator.categories or []:
+            context = str(category or '').strip().lower()
+            if not context:
+                continue
+            rank = CreatorScoreService.public_rank(creator.id, 'category', context)
+            total = CreatorRanking.query.filter_by(
+                ranking_type='category',
+                context_key=context,
+            ).count()
+            if rank and total and rank.get('position') <= max(1, math.ceil(total * 0.10)):
+                badges.append('category_leader')
+                break
+
+        if creator.is_verified and 'top_creator' not in badges:
+            badges.append('verified_creator')
+
+        if not badges:
+            badges.append('creator_to_watch' if final_score >= 60 else 'creator')
+
+        return badges[:3]
+
+    @staticmethod
+    def owner_score_payload(creator):
+        score = getattr(creator, 'private_score', None)
+        if not score:
+            return {
+                'score': None,
+                'formula_version': FORMULA_VERSION,
+                'message': 'Your score will appear after your profile has enough activity to calculate it.',
+                'improvement_tips': [
+                    'Connect at least one social platform.',
+                    'Complete your profile and add a profile photo.',
+                    'Create an active package so brands can book you.',
+                ],
+            }
+
+        dimensions = {
+            'public_performance': round(weighted_component_score({
+                'engagement': score.engagement_score,
+                'reach': score.reach_score,
+                'followers': score.follower_score,
+                'sentiment': score.sentiment_score,
+            }, ['engagement', 'reach', 'followers', 'sentiment']), 2),
+            'marketplace_reliability': round(float(score.marketplace_reliability_score or 0), 2),
+            'reviews': round(float(score.review_score or 0), 2),
+            'profile_trust': round(float(score.profile_trust_score or score.profile_quality_score or 0), 2),
+            'activity': round(float(score.activity_score or 0), 2),
+        }
+        raw_dimensions = {
+            'engagement': round(float(score.engagement_score or 0), 2),
+            'reach': round(float(score.reach_score or 0), 2),
+            'followers': round(float(score.follower_score or 0), 2),
+            'sentiment': round(float(score.sentiment_score or 0), 2),
+            'order_completion': round(float(score.order_completion_score or 0), 2),
+            'response_rate': round(float(score.response_rate_score or 0), 2),
+            'on_time_delivery': round(float(score.on_time_delivery_score or 0), 2),
+            'reviews': round(float(score.review_score or 0), 2),
+            'profile_trust': round(float(score.profile_trust_score or score.profile_quality_score or 0), 2),
+            'activity': round(float(score.activity_score or 0), 2),
+        }
+        tips = []
+        if raw_dimensions['profile_trust'] < 80:
+            tips.append('Improve profile trust by adding a strong bio, photo, connected platforms, packages, and portfolio work.')
+        if raw_dimensions['engagement'] < 70:
+            tips.append('Connect and sync platforms with stronger engagement so brands can see your audience responds.')
+        if raw_dimensions['reach'] < 70:
+            tips.append('Submit live post URLs and keep your platforms synced so reach and views can be measured.')
+        if raw_dimensions['reviews'] == 0:
+            tips.append('Complete collaborations and ask brands to leave verified reviews after delivery.')
+        elif raw_dimensions['reviews'] < 80:
+            tips.append('Aim for more 4-5 star reviews from completed collaborations.')
+        if raw_dimensions['response_rate'] and raw_dimensions['response_rate'] < 90:
+            tips.append('Reply to brand messages faster to improve your response rate.')
+        if raw_dimensions['on_time_delivery'] and raw_dimensions['on_time_delivery'] < 90:
+            tips.append('Deliver before deadlines to improve your on-time delivery score.')
+        if raw_dimensions['activity'] < 60:
+            tips.append('Log in regularly and stay active so brands know you are available.')
+
+        return {
+            'score': round(float(score.final_score or 0), 1),
+            'formula_version': score.formula_version,
+            'calculated_at': score.calculated_at.isoformat() if score.calculated_at else None,
+            'rank': CreatorScoreService.public_rank(creator.id),
+            'dimensions': dimensions,
+            'raw_dimensions': raw_dimensions,
+            'excluded_dimensions': (score.data_quality or {}).get('excluded_dimensions', []),
+            'improvement_tips': tips[:5],
         }
 
 

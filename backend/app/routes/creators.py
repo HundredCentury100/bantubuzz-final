@@ -563,10 +563,10 @@ def get_creator_rankings():
         context = (request.args.get('context') or '').strip().lower()
         limit = request.args.get('limit', 50, type=int)
 
-        if ranking_type not in {'overall', 'category', 'platform'}:
-            return jsonify({'error': 'Ranking type must be overall, category, or platform'}), 400
+        if ranking_type not in {'overall', 'category', 'platform', 'city'}:
+            return jsonify({'error': 'Ranking type must be overall, category, platform, or city'}), 400
         if ranking_type != 'overall' and not context:
-            return jsonify({'error': 'A context is required for category and platform rankings'}), 400
+            return jsonify({'error': 'A context is required for category, platform, and city rankings'}), 400
         if limit not in {50, 100}:
             return jsonify({'error': 'Ranking limit must be 50 or 100'}), 400
 
@@ -675,6 +675,7 @@ def get_own_profile():
         from app.services.creator_score_service import CreatorScoreService
         creator_data = creator.to_dict(include_user=True)
         creator_data['rank'] = CreatorScoreService.public_rank(creator.id)
+        creator_data['creator_score'] = CreatorScoreService.owner_score_payload(creator)
         return jsonify(creator_data), 200
 
     except Exception as e:

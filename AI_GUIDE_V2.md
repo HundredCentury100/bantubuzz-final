@@ -1096,20 +1096,27 @@ Deployment note:
   - Celery task `app.tasks.report_tasks.send_due_campaign_reports` runs hourly at minute 40 through `celery-beat`.
   - Premium brand accounts can use the same report branding fields as Agency/Enterprise accounts; report-logo authorization must check the paid plan entitlement rather than `brand_profiles.account_type`.
 - Internal creator scoring and rankings:
-  - Deploy script: `deployment/DEPLOY-CREATOR-SCORING.bat`.
-  - Migration: `backend/migrations/versions/202606101700_add_creator_scoring.py`.
-  - The private score is stored in `creator_scores`; history is stored in `creator_score_history`. Never add either score or its component values to creator/brand-facing serializers.
-  - The final score weights raw 0-100 dimensions once: engagement 35%, reach 25%, followers 10%, sentiment 10%, activity 10%, profile quality 10%.
+  - New VPS v1.1 deploy script: `deployment/DEPLOY-NEW-VPS-CREATOR-SCORE-LEADERBOARD-V11.bat`.
+  - Initial migration: `backend/migrations/versions/202606101700_add_creator_scoring.py`.
+  - v1.1 migration: `backend/migrations/versions/202606161000_update_creator_score_v11.py`.
+  - The score is stored in `creator_scores`; history is stored in `creator_score_history`.
+  - Brands and visitors must never receive the numeric Creator Score or raw component scores. They can see rank positions and badges only.
+  - Creators can see their own private score and improvement tips on the creator dashboard through the authenticated `/api/creators/profile` response.
+  - Formula v1.1 uses normalized weighted-average scoring: engagement 14, reach/views 10, followers 4, sentiment 7, order completion 8, response rate 8, on-time delivery 9, reviews 20, profile trust 15, activity 5.
+  - Metrics with no applicable data are excluded and the available weights are normalized back to 100. This is required for no-review/no-order protection.
+  - Reviews use the last 20 verified brand reviews from completed collaborations. Review Score = average rating score 70%, volume score 20%, positive review ratio 10%. Zero reviews are excluded rather than treated as zero.
+  - Marketplace reliability uses terminal collaborations for completion, brand-to-creator messages with creator replies within 48 hours for response rate, and completed collaborations with due dates for on-time delivery.
   - Product-defined reach thresholds are authoritative: 0.05=10, 0.10=25, 0.30=50, 0.50=70, 1.00+=100. Reach uses submitted-post reach first and video views second.
   - Login events are stored in `user_sessions`; activity uses sessions from the last 30 days plus 30/60-day inactivity penalties.
   - Connected ThunziAI platform averages are persisted on `connected_platforms` so engagement and sentiment inputs survive API requests.
-  - Scores recalculate after logins, platform sync/connect/disconnect, post-metric sync, profile edits, profile photo changes, package changes, and success-story changes. A changed platform-wide maximum follower count triggers a full recalculation.
+  - Scores recalculate after logins, platform sync/connect/disconnect, post-metric sync, profile edits, profile photo changes, package changes, success-story changes, review creation, message send, creator accept/decline, cancellation, and collaboration completion. A changed platform-wide maximum follower count triggers a full recalculation.
   - Celery Beat runs a full score/ranking rebuild nightly at 02:30. Deployment also runs `backend/recalculate_creator_scores.py` once after migration.
   - Public APIs expose rank position only:
     - `GET /api/creators/rankings?type=overall&limit=50`
     - `GET /api/creators/rankings?type=category&context=<category>&limit=50`
     - `GET /api/creators/rankings?type=platform&context=<platform>&limit=100`
     - `GET /api/creators/<creator_id>/rank`
+  - Public badges are generated from Creator Score v1.1 inputs: Creator To Watch, Rising Creator, Audience Builder, Engagement Leader, Brand Magnet, Campaign Pro, Trusted Creator, Top Creator, Elite Creator, City Top 10, and Category Leader. Frontend currently uses placeholder SVG badge icons until the design team supplies final artwork.
   - Admin-only score diagnostics: `GET /api/admin/creator-scores`.
   - Featured fallback and default creator discovery use the private score/rank internally without serializing it.
 - Public creator leaderboard:

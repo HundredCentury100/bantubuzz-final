@@ -174,6 +174,20 @@ const CreatorDashboard = () => {
 
   // Profile is complete if bio and at least one category is set
   const profileComplete = profile?.bio && profile?.categories?.length > 0;
+  const creatorScore = profile?.creator_score || {};
+  const scoreValue = typeof creatorScore.score === 'number' ? creatorScore.score : null;
+  const scoreTone = scoreValue >= 85
+    ? 'text-green-700 bg-green-50 border-green-200'
+    : scoreValue >= 70
+      ? 'text-primary-dark bg-primary/10 border-primary/30'
+      : 'text-gray-700 bg-gray-50 border-gray-200';
+  const scoreSections = [
+    ['Public performance', creatorScore.dimensions?.public_performance, 'Engagement, reach, followers, and sentiment'],
+    ['Reliability', creatorScore.dimensions?.marketplace_reliability, 'Completion, response, and on-time delivery'],
+    ['Reviews', creatorScore.dimensions?.reviews, 'Verified brand reviews after completed work'],
+    ['Profile trust', creatorScore.dimensions?.profile_trust, 'Profile completeness and booking readiness'],
+    ['Activity', creatorScore.dimensions?.activity, 'Recent BantuBuzz sessions'],
+  ];
 
   return (
     <div className="min-h-screen bg-light">
@@ -664,6 +678,68 @@ const CreatorDashboard = () => {
               Browse open opportunities
             </Link>
           </div>
+        </div>
+
+        <div className="mb-6 sm:mb-8 border border-gray-200 bg-white p-4 sm:p-6 shadow-sm">
+          <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
+            <div className="flex items-start gap-4">
+              <div className={`flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-xl border ${scoreTone}`}>
+                <span className="text-xl font-bold">{scoreValue === null ? '--' : Math.round(scoreValue)}</span>
+              </div>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Creator Score</p>
+                <h2 className="mt-1 text-xl font-bold text-dark">Your private performance score</h2>
+                <p className="mt-1 max-w-2xl text-sm text-gray-600">
+                  This score helps power rankings and discovery. Only you can see the number; brands see your badges and public rank.
+                </p>
+                <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold">
+                  {creatorScore.rank?.position && (
+                    <span className="rounded-full bg-primary/10 px-3 py-1 text-primary-dark">
+                      Overall rank #{creatorScore.rank.position}
+                    </span>
+                  )}
+                  {creatorScore.formula_version && (
+                    <span className="rounded-full bg-gray-100 px-3 py-1 text-gray-700">
+                      Formula v{creatorScore.formula_version}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <Link
+              to="/creator/platforms"
+              className="inline-flex min-h-[44px] items-center justify-center rounded-full bg-dark px-5 py-2.5 text-sm font-semibold text-white hover:bg-gray-800"
+            >
+              Improve my score
+            </Link>
+          </div>
+
+          <div className="mt-5 grid gap-3 md:grid-cols-5">
+            {scoreSections.map(([label, value, description]) => (
+              <div key={label} className="border border-gray-200 bg-gray-50 p-3">
+                <p className="text-xs font-semibold text-gray-500">{label}</p>
+                <p className="mt-1 text-lg font-bold text-dark">
+                  {typeof value === 'number' ? value.toFixed(value % 1 ? 1 : 0) : '--'}
+                </p>
+                <p className="mt-1 text-xs leading-relaxed text-gray-500">{description}</p>
+              </div>
+            ))}
+          </div>
+
+          {creatorScore.improvement_tips?.length > 0 && (
+            <div className="mt-5 border-t border-gray-100 pt-4">
+              <h3 className="text-sm font-bold text-dark">What to improve next</h3>
+              <div className="mt-3 grid gap-2 md:grid-cols-2">
+                {creatorScore.improvement_tips.map((tip) => (
+                  <div key={tip} className="flex items-start gap-2 text-sm text-gray-700">
+                    <span className="mt-1 h-2 w-2 flex-shrink-0 rounded-full bg-primary" />
+                    <span>{tip}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

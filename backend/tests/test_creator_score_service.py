@@ -15,11 +15,17 @@ engagement_dimension = formula.engagement_dimension
 final_creator_score = formula.final_creator_score
 follower_dimension = formula.follower_dimension
 profile_quality_dimension = formula.profile_quality_dimension
+profile_trust_dimension = formula.profile_trust_dimension
 reach_dimension = formula.reach_dimension
+reviews_dimension = formula.reviews_dimension
 sentiment_dimension = formula.sentiment_dimension
 normalize_sentiment = formula.normalize_sentiment
 normalize_platform_name = formula.normalize_platform_name
+order_completion_dimension = formula.order_completion_dimension
+response_rate_dimension = formula.response_rate_dimension
+on_time_delivery_dimension = formula.on_time_delivery_dimension
 select_primary_platform = formula.select_primary_platform
+weighted_average_score = formula.weighted_average_score
 
 
 class CreatorScoreFormulaTests(unittest.TestCase):
@@ -64,17 +70,49 @@ class CreatorScoreFormulaTests(unittest.TestCase):
         self.assertEqual(profile_quality_dimension(False, False, False, False, False), 0)
         self.assertEqual(profile_quality_dimension(True, True, True, True, True), 100)
         self.assertEqual(profile_quality_dimension(True, True, False, False, False), 40)
+        self.assertEqual(profile_trust_dimension(True, True, True, True, True), 100)
 
-    def test_final_score_weights_each_raw_dimension_once(self):
+    def test_reviews_score_uses_last_twenty_formula(self):
+        self.assertIsNone(reviews_dimension(None, 0, 0, 0))
+        self.assertAlmostEqual(reviews_dimension(4.8, 10, 10, 10), 87.2, places=1)
+
+    def test_marketplace_reliability_dimensions_exclude_missing_data(self):
+        self.assertIsNone(order_completion_dimension(0, 0))
+        self.assertEqual(order_completion_dimension(8, 10), 80)
+        self.assertIsNone(response_rate_dimension(0, 0))
+        self.assertEqual(response_rate_dimension(9, 10), 90)
+        self.assertIsNone(on_time_delivery_dimension(0, 0))
+        self.assertEqual(on_time_delivery_dimension(9, 10), 90)
+
+    def test_final_score_uses_v11_weights(self):
         dimensions = {
             'engagement': 100,
             'reach': 80,
             'followers': 60,
             'sentiment': 50,
+            'order_completion': 90,
+            'response_rate': 80,
+            'on_time_delivery': 70,
+            'reviews': 87.2,
+            'profile_trust': 100,
             'activity': 40,
-            'profile_quality': 100,
         }
-        self.assertEqual(final_creator_score(dimensions), 80)
+        self.assertAlmostEqual(final_creator_score(dimensions), 82.24, places=2)
+
+    def test_final_score_excludes_missing_reviews_and_normalizes(self):
+        dimensions = {
+            'engagement': 100,
+            'reach': 100,
+            'followers': 100,
+            'sentiment': 100,
+            'order_completion': None,
+            'response_rate': None,
+            'on_time_delivery': None,
+            'reviews': None,
+            'profile_trust': 100,
+            'activity': 100,
+        }
+        self.assertEqual(weighted_average_score(dimensions), 100)
 
     def test_primary_platform_uses_highest_connected_follower_count(self):
         platforms = [

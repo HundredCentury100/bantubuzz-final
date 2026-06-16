@@ -112,6 +112,12 @@ def create_review():
         db.session.add(review)
         db.session.commit()
 
+        try:
+            from app.services.creator_score_service import queue_creator_score_recalculation
+            queue_creator_score_recalculation(collaboration.creator_id)
+        except Exception:
+            pass
+
         # Notify creator of new review
         creator_user = User.query.get(collaboration.creator.user_id)
         if creator_user:

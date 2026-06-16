@@ -480,7 +480,23 @@ const CreatorProfile = () => {
                       <div className="flex flex-wrap gap-2 mb-2">
                         {creator.badges
                           .sort((a, b) => {
-                            const priority = { 'top_creator': 1, 'verified_creator': 2, 'referral_verified': 3, 'responds_fast': 4, 'creator': 5 };
+                            const priority = {
+                              elite_creator: 1,
+                              top_creator: 2,
+                              trusted_creator: 3,
+                              brand_magnet: 4,
+                              campaign_pro: 5,
+                              engagement_leader: 6,
+                              audience_builder: 7,
+                              rising_creator: 8,
+                              city_top_10: 9,
+                              category_leader: 10,
+                              verified_creator: 11,
+                              referral_verified: 12,
+                              creator_to_watch: 13,
+                              responds_fast: 14,
+                              creator: 15,
+                            };
                             return (priority[a] || 99) - (priority[b] || 99);
                           })
                           .map((badge, idx) => (
@@ -495,7 +511,23 @@ const CreatorProfile = () => {
                             <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-primary mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
                               <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                             </svg>
-                            <span className="leading-snug"><strong className="font-semibold">Top Creator:</strong> 5+ collaborations in last 30 days with high ratings</span>
+                            <span className="leading-snug"><strong className="font-semibold">Top Creator:</strong> Elite score, verified profile, strong reviews, delivery history, and response rate</span>
+                          </div>
+                        )}
+                        {creator.badges.includes('trusted_creator') && (
+                          <div className="flex items-start gap-2 text-xs sm:text-sm text-gray-600">
+                            <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                            </svg>
+                            <span className="leading-snug"><strong className="font-semibold">Trusted Creator:</strong> Strong verified reviews, reliable completion, and fast brand response</span>
+                          </div>
+                        )}
+                        {(creator.badges.includes('elite_creator') || creator.badges.includes('brand_magnet') || creator.badges.includes('campaign_pro')) && (
+                          <div className="flex items-start gap-2 text-xs sm:text-sm text-gray-600">
+                            <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-primary-dark mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                              <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
+                            </svg>
+                            <span className="leading-snug"><strong className="font-semibold">Performance Badge:</strong> Earned through strong marketplace results and creator score signals</span>
                           </div>
                         )}
                         {creator.badges.includes('responds_fast') && (
