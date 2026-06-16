@@ -74,10 +74,11 @@ def make_celery(app=None):
                 'task': 'app.tasks.platform_sync.cleanup_old_sync_results',
                 'schedule': crontab(minute=0, hour=3),  # Daily at 3 AM
             },
-            # Check and notify inactive users every day at 9 AM
+            # Check and notify inactive users once a week at 9 AM.
+            # This keeps the "We miss you" reminder helpful without overwhelming users.
             'notify-inactive-users': {
                 'task': 'app.tasks.email_tasks.check_and_notify_inactive_users',
-                'schedule': crontab(minute=0, hour=9),  # Daily at 9 AM
+                'schedule': crontab(minute=0, hour=9, day_of_week='monday'),  # Weekly at 9 AM
             },
             # Check for auto-complete eligible collaborations every day at 10 AM
             'check-auto-complete-collaborations': {

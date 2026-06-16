@@ -18,11 +18,11 @@ All email notification tasks have been created:
 ### 2. Celery Beat Schedule Updated ✅
 File: `backend/app/celery_app.py`
 
-Added daily inactive user check scheduled for 9 AM:
+Added weekly inactive user check scheduled for Monday at 9 AM:
 ```python
 'notify-inactive-users': {
     'task': 'app.tasks.email_tasks.check_and_notify_inactive_users',
-    'schedule': crontab(minute=0, hour=9),  # Daily at 9 AM
+    'schedule': crontab(minute=0, hour=9, day_of_week='monday'),  # Weekly at 9 AM
 },
 ```
 
@@ -97,24 +97,24 @@ except Exception as email_error:
 
 1. **Upload Updated Files**:
 ```bash
-scp backend/app/tasks/email_tasks.py root@173.212.245.22:/var/www/bantubuzz/backend/app/tasks/
-scp backend/app/celery_app.py root@173.212.245.22:/var/www/bantubuzz/backend/app/celery_app.py
-scp backend/app/routes/messages.py root@173.212.245.22:/var/www/bantubuzz/backend/app/routes/
+scp backend/app/tasks/email_tasks.py root@13.140.159.150:/var/www/bantubuzz/backend/app/tasks/
+scp backend/app/celery_app.py root@13.140.159.150:/var/www/bantubuzz/backend/app/celery_app.py
+scp backend/app/routes/messages.py root@13.140.159.150:/var/www/bantubuzz/backend/app/routes/
 ```
 
 2. **Restart Celery Worker** (to pick up new tasks):
 ```bash
-ssh root@173.212.245.22 "systemctl restart celery-worker"
+ssh root@13.140.159.150 "systemctl restart bantubuzz-celery-worker.service"
 ```
 
 3. **Restart Celery Beat** (to pick up new schedule):
 ```bash
-ssh root@173.212.245.22 "systemctl restart celery-beat"
+ssh root@13.140.159.150 "systemctl restart bantubuzz-celery-beat.service"
 ```
 
 4. **Restart Backend** (if collaboration routes are updated):
 ```bash
-ssh root@173.212.245.22 "pkill -f 'gunicorn.*8002' && cd /var/www/bantubuzz/backend && source venv/bin/activate && gunicorn --bind 127.0.0.1:8002 --workers 4 --timeout 120 --error-logfile gunicorn_error.log --access-logfile gunicorn_access.log 'app:create_app()' --daemon"
+ssh root@13.140.159.150 "systemctl restart bantubuzz-backend.service"
 ```
 
 ## Testing
@@ -135,7 +135,7 @@ ssh root@173.212.245.22 "pkill -f 'gunicorn.*8002' && cd /var/www/bantubuzz/back
 3. Creator should receive payment release email
 
 ### Test Inactive User Notifications
-- Wait for scheduled task to run at 9 AM daily
+- Wait for scheduled task to run at 9 AM on Monday
 - OR manually trigger: `celery -A celery_worker.celery call app.tasks.email_tasks.check_and_notify_inactive_users`
 
 ## Email Templates
