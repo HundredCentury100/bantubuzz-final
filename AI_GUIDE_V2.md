@@ -1118,6 +1118,10 @@ Deployment note:
     - `GET /api/creators/<creator_id>/rank`
   - Public badges are generated from Creator Score v1.1 inputs: Creator To Watch, Rising Creator, Audience Builder, Engagement Leader, Brand Magnet, Campaign Pro, Trusted Creator, Top Creator, Elite Creator, City Top 10, and Category Leader. Frontend currently uses placeholder SVG badge icons until the design team supplies final artwork.
   - Admin-only score diagnostics: `GET /api/admin/creator-scores`.
+  - June 16, 2026 new-VPS deployment succeeded via report `deployment/vps/reports/new-vps-creator-score-leaderboard-v11-13.140.159.150-20260616-221649.txt`: migration `202606101700 -> 202606161000` ran, backend/Celery worker/Celery beat were active, 90 creator scores/rankings recalculated, and local/public health returned healthy.
+  - Deployment gotchas from this release:
+    - Do not `source /etc/bantubuzz/platform.env` directly in shell helpers. It is valid as a systemd `EnvironmentFile`, but can contain values that break Bash parsing. Use a parser that exports shell-escaped `KEY=value` pairs.
+    - Do not run plain `flask db upgrade` from this repo while the historical orphan trust-safety migration exists. Target the intended head/revision for focused deploys, e.g. `venv/bin/flask db upgrade 202606161000`.
   - Featured fallback and default creator discovery use the private score/rank internally without serializing it.
 - Public creator leaderboard:
   - Deploy script: `deployment/DEPLOY-CREATOR-LEADERBOARD.bat`.
