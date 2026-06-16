@@ -28,15 +28,15 @@ const MetricCard = ({
   };
 
   return (
-    <div className={`bg-primary/10 rounded-2xl p-4 ${className}`}>
+    <div className={`bg-primary/10 rounded-2xl p-3 sm:p-4 min-w-0 ${className}`}>
       {/* Icon and Title */}
-      <div className="flex items-center gap-2 mb-2">
-        {icon && <span className="text-2xl">{icon}</span>}
-        <span className="text-sm text-gray-600 font-medium">{title}</span>
+      <div className="flex min-w-0 items-start gap-2 mb-2">
+        {icon && <span className="text-xl sm:text-2xl shrink-0 leading-none">{icon}</span>}
+        <span className="min-w-0 text-xs sm:text-sm text-gray-600 font-medium leading-snug break-words">{title}</span>
       </div>
 
       {/* Value */}
-      <p className="text-2xl font-bold text-dark mb-1">{formattedValue}</p>
+      <p className="text-xl sm:text-2xl font-bold text-dark mb-1 break-words leading-tight">{formattedValue}</p>
 
       {/* Optional Subtitle */}
       {subtitle && (

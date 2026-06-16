@@ -67,8 +67,8 @@ class BrandProfile(db.Model):
             'location': self.location,
             'social_links': self.social_links or {},
             'verified_status': self.verified_status,
-            'created_at': self.created_at.isoformat(),
-            'updated_at': self.updated_at.isoformat()
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }
 
         if include_user and self.user:

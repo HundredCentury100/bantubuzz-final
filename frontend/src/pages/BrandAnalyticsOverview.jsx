@@ -607,18 +607,18 @@ const BrandAnalyticsOverview = () => {
           <div className="space-y-4">
             {getVisibleCollaborations().map((campaign) => (
               <div key={campaign.id} className="bg-white rounded-3xl shadow-sm hover:shadow-md p-6 transition-shadow">
-                <div className="flex items-center justify-between flex-wrap gap-4">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                   {/* Creator Info */}
-                  <div className="flex items-center gap-4">
+                  <div className="flex min-w-0 items-center gap-4">
                     <Avatar
                       src={campaign.creator.profile_picture}
                       alt={campaign.creator.display_name}
                       size="md"
                       type="user"
                     />
-                    <div>
+                    <div className="min-w-0">
                       <p className="font-semibold text-dark">{campaign.creator.display_name}</p>
-                      <p className="text-xs text-primary font-medium">
+                      <p className="text-xs text-primary font-medium break-words">
                         {campaign.type_label || 'Package Collaboration'}
                         {campaign.campaign?.title ? ` • ${campaign.campaign.title}` : ''}
                       </p>
@@ -636,29 +636,29 @@ const BrandAnalyticsOverview = () => {
                   </div>
 
                   {/* Campaign Stats */}
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-6 flex-1 max-w-2xl">
-                    <div className="text-center">
-                      <p className="text-xs text-gray-600 mb-1">Investment</p>
-                      <p className="text-lg font-bold text-dark">{formatCurrency(campaign.amount)}</p>
+                  <div className="grid w-full grid-cols-2 gap-3 sm:grid-cols-4 lg:max-w-2xl lg:flex-1">
+                    <div className="min-w-0 rounded-2xl bg-gray-50 px-3 py-3 text-center">
+                      <p className="text-xs text-gray-600 mb-1 leading-snug break-words">Investment</p>
+                      <p className="text-base sm:text-lg font-bold text-dark break-words">{formatCurrency(campaign.amount)}</p>
                     </div>
-                    <div className="text-center">
-                      <p className="text-xs text-gray-600 mb-1">Reach</p>
-                      <p className="text-lg font-bold text-dark">{formatNumber(campaign.metrics.reach)}</p>
+                    <div className="min-w-0 rounded-2xl bg-gray-50 px-3 py-3 text-center">
+                      <p className="text-xs text-gray-600 mb-1 leading-snug break-words">Reach</p>
+                      <p className="text-base sm:text-lg font-bold text-dark break-words">{formatNumber(campaign.metrics.reach)}</p>
                     </div>
-                    <div className="text-center">
-                      <p className="text-xs text-gray-600 mb-1">Engagement</p>
-                      <p className="text-lg font-bold text-dark">{formatNumber(campaign.metrics.engagement)}</p>
+                    <div className="min-w-0 rounded-2xl bg-gray-50 px-3 py-3 text-center">
+                      <p className="text-xs text-gray-600 mb-1 leading-snug break-words">Engagement</p>
+                      <p className="text-base sm:text-lg font-bold text-dark break-words">{formatNumber(campaign.metrics.engagement)}</p>
                     </div>
-                    <div className="text-center">
-                      <p className="text-xs text-gray-600 mb-1">Eng. Rate</p>
-                      <p className="text-lg font-bold text-primary">{campaign.metrics.avg_engagement_rate}%</p>
+                    <div className="min-w-0 rounded-2xl bg-gray-50 px-3 py-3 text-center">
+                      <p className="text-xs text-gray-600 mb-1 leading-snug break-words">Eng. Rate</p>
+                      <p className="text-base sm:text-lg font-bold text-primary break-words">{campaign.metrics.avg_engagement_rate}%</p>
                     </div>
                   </div>
 
                   {/* View Analytics Button */}
                   <Link
                     to={`/brand/analytics/${campaign.id}`}
-                    className="px-6 py-2.5 bg-primary text-dark rounded-full hover:bg-primary/90 transition-colors text-sm font-medium"
+                    className="w-full px-6 py-2.5 bg-primary text-dark rounded-full hover:bg-primary/90 transition-colors text-sm font-medium text-center sm:w-auto"
                   >
                     View Details
                   </Link>

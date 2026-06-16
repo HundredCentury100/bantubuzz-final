@@ -76,12 +76,23 @@ const BrandProfileEdit = () => {
 
   const fetchProfile = async () => {
     try {
-      const [response, authResponse] = await Promise.all([
+      const [profileResult, authResult] = await Promise.allSettled([
         brandsAPI.getOwnProfile(),
         authAPI.getCurrentUser(),
       ]);
-      const data = response.data;
-      setSecurity(authResponse.data.security || { can_enable_2fa: false, two_factor_enabled: false });
+
+      if (profileResult.status !== 'fulfilled') {
+        console.error('Failed to load brand profile:', profileResult.reason);
+        throw profileResult.reason;
+      }
+
+      const data = profileResult.value.data;
+      const authData = authResult.status === 'fulfilled' ? authResult.value.data : {};
+      if (authResult.status !== 'fulfilled') {
+        console.warn('Brand security metadata failed to load:', authResult.reason);
+      }
+
+      setSecurity(authData.security || { can_enable_2fa: false, two_factor_enabled: false });
       setProfile(data);
       setLogo(data.logo);
       setReportLogo(data.report_logo || data.logo);
@@ -101,7 +112,7 @@ const BrandProfileEdit = () => {
       setValue('report_sender_name', data.report_sender_name || data.company_name || '');
       setValue('report_reply_to_email', data.report_reply_to_email || data.user?.email || '');
       setValue('report_email_signature', data.report_email_signature || '');
-      setValue('two_factor_enabled', Boolean(authResponse.data.security?.two_factor_enabled));
+      setValue('two_factor_enabled', Boolean(authData.security?.two_factor_enabled));
 
       // Social links
       setValue('facebook', data.social_links?.facebook || '');
@@ -110,6 +121,7 @@ const BrandProfileEdit = () => {
       setValue('instagram', data.social_links?.instagram || '');
 
     } catch (err) {
+      console.error('Brand profile edit load error:', err);
       setError('Failed to load profile');
     } finally {
       setLoadingProfile(false);

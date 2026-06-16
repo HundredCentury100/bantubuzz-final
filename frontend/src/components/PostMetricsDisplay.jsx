@@ -108,7 +108,7 @@ const PostMetricsDisplay = ({
             </p>
           </div>
 
-          <span className="shrink-0 rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-dark">
+          <span className="w-fit shrink-0 rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-dark">
             Auto-syncs every 4h
           </span>
         </div>
@@ -156,15 +156,15 @@ const PostMetricsDisplay = ({
       {/* Main Metrics Card */}
       <div className="bg-white rounded-3xl shadow-sm hover:shadow-md p-6">
         {/* Header */}
-        <div className="flex items-center justify-between gap-4 mb-4">
-          <div>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-4">
+          <div className="min-w-0">
             <h3 className="text-lg font-semibold text-dark">📊 Post Performance</h3>
-            <p className="text-sm text-gray-600 mt-1">
+            <p className="text-sm text-gray-600 mt-1 break-words">
               {formatPlatformName(metrics.post_platform)} • {truncateUrl(metrics.post_url, 40)}
             </p>
           </div>
 
-          <span className="shrink-0 rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-dark">
+          <span className="w-fit shrink-0 rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-dark">
             Auto-syncs every 4h
           </span>
         </div>
@@ -196,7 +196,7 @@ const PostMetricsDisplay = ({
         )}
 
         {/* Core Metrics Grid - First Row (Conditional) */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-4">
           {availableMetrics.reach && (
             <MetricCard
               title="Reach"
@@ -230,7 +230,7 @@ const PostMetricsDisplay = ({
         </div>
 
         {/* Engagement Breakdown - Second Row (Conditional) */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
           <MetricCard
             title="Likes"
             value={metrics.likes}
@@ -301,7 +301,7 @@ const PostMetricsDisplay = ({
       {metrics.video_views > 0 && (
         <div className="bg-white rounded-2xl p-6">
           <h4 className="text-lg font-semibold text-dark mb-4">🎥 Video Performance</h4>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
             <MetricCard
               title="Views"
               value={metrics.video_views}

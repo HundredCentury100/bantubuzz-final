@@ -138,10 +138,10 @@ const CollaborationAnalytics = ({
       {/* Main Analytics Card */}
       <div className="bg-white rounded-3xl shadow-sm hover:shadow-md p-6">
         {/* Header */}
-        <div className="flex items-center justify-between mb-4">
-          <div>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between mb-4">
+          <div className="min-w-0">
             <h3 className="text-lg font-semibold text-dark">📊 Collaboration Performance</h3>
-            <p className="text-sm text-gray-600 mt-1">
+            <p className="text-sm text-gray-600 mt-1 break-words">
               Aggregated from {analytics.total_posts} post{analytics.total_posts !== 1 ? 's' : ''}
               {analytics.platforms_included?.length > 0 && (
                 <span className="ml-1">
@@ -153,7 +153,7 @@ const CollaborationAnalytics = ({
 
           <button
             onClick={fetchAnalytics}
-            className="px-4 py-2 bg-primary text-dark rounded-full font-medium hover:bg-primary/90 transition-colors text-sm"
+            className="w-full sm:w-auto shrink-0 px-4 py-2 bg-primary text-dark rounded-full font-medium hover:bg-primary/90 transition-colors text-sm"
           >
             🔄 Refresh
           </button>
@@ -170,7 +170,7 @@ const CollaborationAnalytics = ({
         )}
 
         {/* Core Metrics Grid - First Row (Conditional) */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-4">
           {availableMetrics.reach && (
             <MetricCard
               title="Total Reach"
@@ -211,7 +211,7 @@ const CollaborationAnalytics = ({
         </div>
 
         {/* Engagement Breakdown - Second Row (Conditional) */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
           <MetricCard
             title="Total Likes"
             value={analytics.total_likes}
@@ -273,7 +273,7 @@ const CollaborationAnalytics = ({
       {availableMetrics.videoViews && (
         <div className="bg-white rounded-3xl shadow-sm hover:shadow-md p-6">
           <h4 className="text-lg font-semibold text-dark mb-4">🎥 Video Performance</h4>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
             <MetricCard
               title="Total Views"
               value={analytics.total_video_views}
