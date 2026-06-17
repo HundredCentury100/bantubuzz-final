@@ -143,6 +143,13 @@ This file is a living handoff guide for future AI/Codex sessions working on the 
   `x-api-key` on requests, retries documented API key candidates on 401/403,
   uses `username` for `/api/login` with `email` fallback, and falls back from
   `/api/creator/register` to `/api/creators/register` if needed.
+- First-time Thunzi account setup must not assume API-key registration creates
+  a normal logged-in cookie session. The correct flow is: register/login the
+  Thunzi user, create `/api/company` using `x-api-key`, then attach the
+  returned company id to the returned Thunzi user id with `PUT /api/user/:id`.
+  Store both `thunzi_user_id` and `thunzi_company_id` locally before adding
+  platforms. Existing accounts can still use login, which is why they may work
+  while new account setup fails.
   Gunicorn's `app:create_app()` and `celery_worker.py` to run DevelopmentConfig
   even when `/etc/bantubuzz/platform.env` says production. The factory now uses
   `create_app(config_name=None)` and reads `FLASK_ENV`. New-VPS hotfix:

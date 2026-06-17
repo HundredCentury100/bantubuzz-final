@@ -244,8 +244,8 @@ def connect_platform():
         if not thunzi_account:
             # Ensure user is registered in ThunziAI (register if needed)
             # NOTE: This may create an unverified account via API key that cannot login
-            user_registered = thunzi_service.ensure_user_registered(email=user.email)
-            if not user_registered:
+            thunzi_user = thunzi_service.ensure_user_registered(email=user.email)
+            if not thunzi_user:
                 _log_thunzi_route_error('platforms.connect_creator.register_thunzi_user', user, platform)
                 return jsonify({'error': 'Failed to register with ThunziAI'}), 500
 
@@ -263,6 +263,10 @@ def connect_platform():
             if not company_id:
                 _log_thunzi_route_error('platforms.connect_creator.create_thunzi_company', user, platform)
                 return jsonify({'error': 'Failed to create ThunziAI account'}), 500
+
+            thunzi_user_id = thunzi_user.get('id') or thunzi_user.get('Id')
+            if thunzi_user_id:
+                thunzi_service.update_user_company(thunzi_user_id, company_id)
 
             # Create bantubuzz_id for this creator
             bantubuzz_id = f"creator_{creator.id}"
@@ -282,6 +286,7 @@ def connect_platform():
             # Save ThunziAI account with bantubuzz_id
             thunzi_account = ThunziAccount(
                 user_id=current_user_id,
+                thunzi_user_id=thunzi_user_id,
                 thunzi_company_id=company_id,
                 thunzi_email=user.email,
                 bantubuzz_id=bantubuzz_id
@@ -1174,8 +1179,8 @@ def connect_brand_platform():
 
         if not thunzi_account:
             # Ensure user is registered in ThunziAI (register if needed, then login)
-            user_registered = thunzi_service.ensure_user_registered(email=user.email)
-            if not user_registered:
+            thunzi_user = thunzi_service.ensure_user_registered(email=user.email)
+            if not thunzi_user:
                 _log_thunzi_route_error('platforms.connect_brand.register_thunzi_user', user, platform)
                 return jsonify({'error': 'Failed to register with ThunziAI'}), 500
 
@@ -1191,9 +1196,14 @@ def connect_brand_platform():
                 _log_thunzi_route_error('platforms.connect_brand.create_thunzi_company', user, platform)
                 return jsonify({'error': 'Failed to create ThunziAI account'}), 500
 
+            thunzi_user_id = thunzi_user.get('id') or thunzi_user.get('Id')
+            if thunzi_user_id:
+                thunzi_service.update_user_company(thunzi_user_id, company_id)
+
             # Save ThunziAI account
             thunzi_account = ThunziAccount(
                 user_id=current_user_id,
+                thunzi_user_id=thunzi_user_id,
                 thunzi_company_id=company_id,
                 thunzi_email=user.email
             )

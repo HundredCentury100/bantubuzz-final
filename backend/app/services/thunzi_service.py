@@ -166,9 +166,14 @@ class ThunziAIService:
             return False
 
     def _ensure_authenticated(self):
-        """Ensure we're authenticated before making requests"""
+        """Ensure we're authenticated before making requests when a session is required."""
         if not self.is_authenticated:
             self.login()
+
+    def _is_email_exists_response(self, response) -> bool:
+        body = self._log_response_body(response)
+        text = str(body).lower()
+        return 'email' in text and ('exist' in text or 'already' in text)
 
     def get_shared_company_id(self) -> int:
         """
@@ -232,7 +237,11 @@ class ThunziAIService:
             }
         """
         try:
-            url = f"{self.BASE_URL}/api/creator/register"
+            endpoints = [
+                f"{self.BASE_URL}/api/creators/register",
+                f"{self.BASE_URL}/api/creator/register",
+                f"{self.BASE_URL}/api/register",
+            ]
             headers = {
                 'x-api-key': self.api_key,
                 'Content-Type': 'application/json'
@@ -246,20 +255,23 @@ class ThunziAIService:
             log_external_api_call(
                 service='ThunziAI',
                 method='POST',
-                url=url,
+                url=' / '.join(endpoints),
                 payload={'email': email, 'password': '***MASKED***'}
             )
 
-            response = self._request_with_api_key_fallback('POST', url, json=payload, headers=headers, timeout=30)
-            if response.status_code in [404, 405]:
-                url = f"{self.BASE_URL}/api/creators/register"
+            response = None
+            used_url = None
+            for url in endpoints:
+                used_url = url
                 response = self._request_with_api_key_fallback('POST', url, json=payload, headers=headers, timeout=30)
+                if response.status_code not in [404, 405]:
+                    break
 
             # Log response
             log_external_api_response(
                 service='ThunziAI',
                 method='POST',
-                url=url,
+                url=used_url,
                 status_code=response.status_code,
                 response_body=response.json() if response.status_code in [200, 201] else response.text[:500]
             )
@@ -267,6 +279,7 @@ class ThunziAIService:
             if response.status_code in [200, 201]:
                 return response.json()
 
+            self._set_last_error('register_creator', response)
             log_error('ThunziAI.register_creator',
                      f"Failed with status {response.status_code}: {response.text[:200]}")
             return None
@@ -299,57 +312,76 @@ class ThunziAIService:
             )
             return {"email": email}
 
-        # If login fails, try to register via API key endpoint
-        # This will return 400 "Email already exists" for existing unverified accounts
+        # If login fails, register through the documented API-key endpoint.
         log_external_api_call(
             service='ThunziAI',
             method='REGISTER',
-            url=f"{self.BASE_URL}/api/creator/register",
+            url=f"{self.BASE_URL}/api/creators/register",
             payload={'email': email, 'note': 'Ensure user registered via API key'}
         )
 
         user_data = self.register_creator(email=email, password=password)
 
-        # Check if registration failed due to "Email already exists"
-        # This means the account exists but is unverified (cannot login)
         if not user_data:
-            log_external_api_response(
-                service='ThunziAI',
-                method='REGISTER',
-                url=f"{self.BASE_URL}/api/creator/register",
-                status_code=400,
-                response_body=f"Email {email} already exists (unverified account) - marking as authenticated anyway"
-            )
+            last_response = (self.last_error or {}).get('body')
+            log_error('ThunziAI.ensure_user_registered',
+                      f"Registration failed for {email}: {last_response}")
+            return None
 
-            # For existing unverified accounts, mark as authenticated
-            # The account exists in ThunziAI, we just can't login
-            # But we can still make API calls as if we're authenticated
-            self.is_authenticated = True
-            self.email = email
-
-            return {"email": email, "note": "existing_unverified"}
-
-        # IMPORTANT: API key registration creates unverified accounts
-        # These accounts can create companies/platforms but not login
-        # Mark as authenticated using session from registration
-        self.is_authenticated = True
+        # The updated Thunzi API uses x-api-key on every request. New accounts
+        # may not be login-able until verified, so do not pretend there is a
+        # cookie session; subsequent setup requests use _request_with_api_key_fallback.
+        self.is_authenticated = False
         self.email = email
 
         log_external_api_response(
             service='ThunziAI',
             method='REGISTER',
-            url=f"{self.BASE_URL}/api/creator/register",
+            url=f"{self.BASE_URL}/api/creators/register",
             status_code=200,
-            response_body=f"Creator {email} registered successfully (unverified account, session authenticated)"
+            response_body=f"User {email} registered successfully via API key"
         )
 
         return user_data
 
+    def update_user_company(self, thunzi_user_id: int, company_id: int, setup_step: str = 'complete') -> bool:
+        """Attach the created Thunzi company to the Thunzi user per updated docs."""
+        if not thunzi_user_id or not company_id:
+            return False
+
+        try:
+            url = f"{self.BASE_URL}/api/user/{thunzi_user_id}"
+            payload = {
+                "companyId": company_id,
+                "setupStep": setup_step,
+                "verified": True,
+            }
+            log_external_api_call(
+                service='ThunziAI',
+                method='PUT',
+                url=url,
+                payload=payload
+            )
+            response = self._request_with_api_key_fallback('PUT', url, json=payload, timeout=30)
+            log_external_api_response(
+                service='ThunziAI',
+                method='PUT',
+                url=url,
+                status_code=response.status_code,
+                response_body=response.json() if response.status_code in [200, 201] else response.text[:500]
+            )
+            if response.status_code in [200, 201]:
+                return True
+            self._set_last_error('update_user_company', response)
+            return False
+        except Exception as e:
+            self._set_last_error('update_user_company', message=str(e))
+            log_error('ThunziAI.update_user_company', e)
+            return False
+
     def create_company(self, name: str, email: str = None, country: str = "Zimbabwe",
                       industry: str = None) -> Optional[int]:
         """Create ThunziAI company for BantuBuzz user (creator or brand)"""
-        self._ensure_authenticated()
-
         try:
             payload = {
                 "name": name,
@@ -410,8 +442,6 @@ class ThunziAIService:
         Returns:
             Creator data dict with bantuBuzzId, companyId, status
         """
-        self._ensure_authenticated()
-
         try:
             payload = {
                 "name": name,
@@ -429,7 +459,7 @@ class ThunziAIService:
                 payload=payload
             )
 
-            response = self.session.post(url, json=payload)
+            response = self._request_with_api_key_fallback('POST', url, json=payload, timeout=30)
 
             log_external_api_response(
                 service='ThunziAI',
@@ -467,8 +497,6 @@ class ThunziAIService:
             True if creator entity exists or was successfully created
             False if creation failed (but this shouldn't prevent platform connection)
         """
-        self._ensure_authenticated()
-
         try:
             # First check if creator already exists
             url = f"{self.BASE_URL}/api/creators/{bantubuzz_id}/platforms"
@@ -480,7 +508,7 @@ class ThunziAIService:
                 payload={'bantubuzz_id': bantubuzz_id, 'action': 'check_exists'}
             )
 
-            response = self.session.get(url)
+            response = self._request_with_api_key_fallback('GET', url, timeout=30)
 
             log_external_api_response(
                 service='ThunziAI',
@@ -586,8 +614,6 @@ class ThunziAIService:
                 "createdAt": string
             }
         """
-        self._ensure_authenticated()
-
         try:
             self.last_error = None
             payload = {
@@ -632,7 +658,7 @@ class ThunziAIService:
                 payload=masked_payload
             )
 
-            response = self.session.post(url, json=payload)
+            response = self._request_with_api_key_fallback('POST', url, json=payload, timeout=30)
 
             # Log the response
             try:
