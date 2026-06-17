@@ -6,7 +6,7 @@ const Footer = () => {
   return (
     <footer className="bg-dark text-light">
       <div className="container-custom py-12">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8">
           {/* Brand */}
           <div className="space-y-4">
             <div className="flex items-center gap-3">
@@ -72,8 +72,40 @@ const Footer = () => {
                 </Link>
               </li>
               <li>
-                <a href="#" className="text-gray-400 hover:text-primary transition-colors">
+                <Link to="/pricing" className="text-gray-400 hover:text-primary transition-colors">
                   Pricing
+                </Link>
+              </li>
+            </ul>
+          </div>
+
+          {/* BantuBuzz Intelligence */}
+          <div>
+            <h3 className="text-white font-semibold mb-4">BantuBuzz Intelligence</h3>
+            <ul className="space-y-2 text-sm">
+              <li>
+                <a href="/blog" className="text-gray-400 hover:text-primary transition-colors">
+                  Blog
+                </a>
+              </li>
+              <li>
+                <a href="/research" className="text-gray-400 hover:text-primary transition-colors">
+                  Research
+                </a>
+              </li>
+              <li>
+                <a href="/research/reports" className="text-gray-400 hover:text-primary transition-colors">
+                  Reports
+                </a>
+              </li>
+              <li>
+                <a href="/knowledge-hub" className="text-gray-400 hover:text-primary transition-colors">
+                  Knowledge Hub
+                </a>
+              </li>
+              <li>
+                <a href="/glossary" className="text-gray-400 hover:text-primary transition-colors">
+                  Glossary
                 </a>
               </li>
             </ul>
