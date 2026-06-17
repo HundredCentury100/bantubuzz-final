@@ -133,8 +133,9 @@ class ThunziAIService:
                 timeout=30
             )
 
-            # Older Thunzi builds accepted "email" instead of "username".
-            if response.status_code in [400, 422]:
+            # Current Thunzi production still accepts "email" while documented
+            # "username" can return 401 for valid accounts.
+            if response.status_code in [400, 401, 422]:
                 response = self._request_with_api_key_fallback(
                     'POST',
                     url,
