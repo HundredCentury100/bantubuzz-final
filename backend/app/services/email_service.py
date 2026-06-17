@@ -2,7 +2,7 @@ from flask import current_app
 from flask_mail import Message
 from app import mail
 from threading import Thread
-from email.utils import formataddr
+from email.utils import formataddr, parseaddr
 from app.utils.logger import log_error
 
 
@@ -21,11 +21,15 @@ def send_email(subject, recipients, text_body, html_body=None, sender_name='Bant
                reply_to=None, attachments=None, async_send=True):
     """Send email"""
     try:
-        # Format sender with display name using email.utils.formataddr
-        sender_email = current_app.config.get('MAIL_DEFAULT_SENDER') or current_app.config.get('MAIL_USERNAME', 'user@bantubuzz.com')
-        if isinstance(sender_email, (tuple, list)):
-            sender_name = sender_name or sender_email[0]
-            sender_email = sender_email[-1]
+        sender_value = current_app.config.get('MAIL_DEFAULT_SENDER') or current_app.config.get('MAIL_USERNAME', 'user@bantubuzz.com')
+        if isinstance(sender_value, (tuple, list)):
+            sender_name = sender_name or sender_value[0]
+            sender_email = sender_value[-1]
+        else:
+            parsed_name, parsed_email = parseaddr(str(sender_value))
+            sender_email = parsed_email or str(sender_value)
+            if parsed_name:
+                sender_name = parsed_name
         sender_display = formataddr((sender_name or 'BantuBuzz', sender_email))
 
         msg = Message(

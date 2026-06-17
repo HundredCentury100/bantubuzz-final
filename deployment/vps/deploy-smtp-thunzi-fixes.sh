@@ -95,6 +95,7 @@ venv/bin/python - <<'PY'
 import os
 import smtplib
 import ssl
+from email.utils import formataddr, parseaddr
 
 host = os.getenv('MAIL_SERVER') or os.getenv('SMTP_HOST') or 'smtp.gmail.com'
 port = int(os.getenv('MAIL_PORT') or os.getenv('SMTP_PORT') or '587')
@@ -103,6 +104,9 @@ use_tls = (os.getenv('MAIL_USE_TLS') or os.getenv('SMTP_USE_TLS') or 'True').low
 username = os.getenv('MAIL_USERNAME') or os.getenv('SMTP_USER')
 password = os.getenv('MAIL_PASSWORD') or os.getenv('SMTP_PASSWORD')
 sender = os.getenv('MAIL_DEFAULT_SENDER') or os.getenv('SMTP_FROM') or username
+parsed_name, parsed_email = parseaddr(str(sender))
+sender_email = parsed_email or str(sender)
+sender_display = formataddr((parsed_name or 'BantuBuzz', sender_email))
 
 print(f"MAIL_HOST={host}")
 print(f"MAIL_PORT={port}")
@@ -111,6 +115,7 @@ print(f"MAIL_USE_TLS={use_tls}")
 print(f"MAIL_USERNAME_SET={bool(username)}")
 print(f"MAIL_PASSWORD_SET={bool(password)}")
 print(f"MAIL_DEFAULT_SENDER={sender}")
+print(f"MAIL_NORMALIZED_SENDER={sender_display}")
 
 if not host or not username or not password:
     raise SystemExit("SMTP_LOGIN_FAIL: missing host, username, or password")
