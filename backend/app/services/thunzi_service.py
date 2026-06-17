@@ -419,7 +419,15 @@ class ThunziAIService:
 
             if response.status_code in [200, 201]:  # Accept both 200 OK and 201 Created
                 data = response.json()
-                return data.get('id')
+                company = data.get('newCompany') if isinstance(data, dict) else None
+                company_id = data.get('id') if isinstance(data, dict) else None
+                if not company_id and isinstance(company, dict):
+                    company_id = company.get('id')
+                if company_id:
+                    return company_id
+                self._set_last_error('create_company', response, message='Company response did not include id')
+                log_error('ThunziAI.create_company', f"Company response missing id: {data}")
+                return None
 
             self._set_last_error('create_company', response)
             log_error('ThunziAI.create_company', f"Failed with status {response.status_code}: {response.text[:300]}")
