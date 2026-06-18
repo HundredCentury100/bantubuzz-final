@@ -1,9 +1,10 @@
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from './hooks/useAuth';
 import ScrollToTop from './components/ScrollToTop';
 import { SubscriptionProvider } from './contexts/SubscriptionContext';
 import { WorkspaceProvider } from './contexts/WorkspaceContext';
 import SubscriptionWrapper from './components/SubscriptionWrapper';
+import Footer from './components/Footer';
 
 // Pages
 import Home from './pages/Home';
@@ -200,6 +201,34 @@ const AdminRoute = ({ children }) => {
 };
 
 function App() {
+  const { isAuthenticated } = useAuth();
+  const location = useLocation();
+  const routesWithLocalFooter = [
+    '/',
+    '/about',
+    '/how-it-works',
+    '/contact',
+    '/help-center',
+    '/leaderboard',
+    '/packages',
+    '/pricing',
+    '/privacy',
+    '/success-stories',
+    '/terms',
+    '/creator/platforms',
+    '/brand/platforms',
+    '/my-tickets',
+    '/subscription/manage',
+  ];
+  const path = location.pathname;
+  const hasLocalFooter =
+    routesWithLocalFooter.includes(path) ||
+    path.startsWith('/bookings/') ||
+    path.startsWith('/creators/') ||
+    path.startsWith('/help-center/submit') ||
+    path.startsWith('/tickets/');
+  const showAuthenticatedFooter = isAuthenticated && !path.startsWith('/admin') && !hasLocalFooter;
+
   return (
     <SubscriptionProvider>
       <WorkspaceProvider>
@@ -1007,6 +1036,7 @@ function App() {
       {/* 404 */}
       <Route path="*" element={<NotFound />} />
     </Routes>
+        {showAuthenticatedFooter && <Footer />}
         </SubscriptionWrapper>
       </WorkspaceProvider>
     </SubscriptionProvider>

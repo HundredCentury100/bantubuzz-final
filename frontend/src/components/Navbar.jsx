@@ -236,23 +236,6 @@ const Navbar = () => {
                 Search
               </Link>
             )}
-            <Link
-              to="/how-it-works"
-              className={`text-gray-700 hover:text-gray-900 transition-colors text-sm font-medium ${
-                isActive('/how-it-works') ? 'border-b-2 border-primary pb-1' : ''
-              }`}
-            >
-              How It Works
-            </Link>
-            <Link
-              to="/pricing"
-              className={`text-gray-700 hover:text-gray-900 transition-colors text-sm font-medium ${
-                isActive('/pricing') ? 'border-b-2 border-primary pb-1' : ''
-              }`}
-            >
-              Pricing
-            </Link>
-
             {isAuthenticated ? (
               <div className="flex items-center space-x-6">
                 {/* Dashboard Link - First and prominent */}
@@ -486,21 +469,19 @@ const Navbar = () => {
                             </Link>
                           )}
                         </Menu.Item>
-                        {(!user || user?.user_type !== 'creator') && (
-                          <Menu.Item>
-                            {({ active }) => (
-                              <Link
-                                to="/pricing"
-                                className={`${
-                                  active ? 'bg-gray-50' : ''
-                                } flex items-center px-4 py-2 text-sm text-gray-700`}
-                              >
-                                <CurrencyDollarIcon className="h-5 w-5 mr-3 text-gray-400" />
-                                Pricing
-                              </Link>
-                            )}
-                          </Menu.Item>
-                        )}
+                        <Menu.Item>
+                          {({ active }) => (
+                            <Link
+                              to="/pricing"
+                              className={`${
+                                active ? 'bg-gray-50' : ''
+                              } flex items-center px-4 py-2 text-sm text-gray-700`}
+                            >
+                              <CurrencyDollarIcon className="h-5 w-5 mr-3 text-gray-400" />
+                              Pricing
+                            </Link>
+                          )}
+                        </Menu.Item>
                       </div>
 
                       {/* Logout Section */}
@@ -525,6 +506,22 @@ const Navbar = () => {
               </div>
             ) : (
               <div className="flex items-center space-x-3">
+                <Link
+                  to="/how-it-works"
+                  className={`text-gray-700 hover:text-gray-900 transition-colors text-sm font-medium px-2 py-2 ${
+                    isActive('/how-it-works') ? 'border-b-2 border-primary pb-1' : ''
+                  }`}
+                >
+                  How It Works
+                </Link>
+                <Link
+                  to="/pricing"
+                  className={`text-gray-700 hover:text-gray-900 transition-colors text-sm font-medium px-2 py-2 ${
+                    isActive('/pricing') ? 'border-b-2 border-primary pb-1' : ''
+                  }`}
+                >
+                  Pricing
+                </Link>
                 <Link to="/login" className="text-gray-700 hover:text-gray-900 text-sm font-medium px-4 py-2">
                   Login
                 </Link>
@@ -793,20 +790,18 @@ const Navbar = () => {
                             </Link>
                           )}
                         </Menu.Item>
-                        {(!user || user?.user_type !== 'creator') && (
-                          <Menu.Item>
-                            {({ active }) => (
-                              <Link
-                                to="/pricing"
-                                className={`${
-                                  active ? 'bg-light' : ''
-                                } block px-4 py-2 text-sm text-gray-700 rounded-lg`}
-                              >
-                                Pricing
-                              </Link>
-                            )}
-                          </Menu.Item>
-                        )}
+                        <Menu.Item>
+                          {({ active }) => (
+                            <Link
+                              to="/pricing"
+                              className={`${
+                                active ? 'bg-light' : ''
+                              } block px-4 py-2 text-sm text-gray-700 rounded-lg`}
+                            >
+                              Pricing
+                            </Link>
+                          )}
+                        </Menu.Item>
                         <Menu.Item>
                           {({ active }) => (
                             <button

@@ -1207,6 +1207,13 @@ Deployment note:
   - Article navigation must remain accessible while reading. Desktop uses a sticky right-side table of contents below the sticky header with an independently scrollable long menu. Mobile uses a sticky expandable `On this page` control. Markdown headings use scroll margin so anchor navigation does not hide headings behind the site header.
   - Article SEO QA requirements: render a normalized 150-160 character `meta name="description"` when the configured description is long enough, canonical URLs, Open Graph/Twitter article tags, BlogPosting JSON-LD, Person, Organization, BreadcrumbList, visible FAQ blocks, and visible internal-link blocks. Do not render the transcript as a visible section because the audio already reads the article.
   - A systemd service being `active` is not sufficient proof of a working audio pipeline; verify the smoke test and `BantuBuzz content worker ready` log.
+- Public/authenticated navigation and global footer:
+  - Public desktop navbar shows Search, How It Works, Pricing, Login, Join as Creator, and Join as Brand.
+  - Once authenticated, How It Works and Pricing must not stay in the top navbar; they remain accessible from the profile/account menu.
+  - Logged-in app pages should render the shared footer globally, including dashboards. Avoid duplicate footers on public routes that already render their own footer locally.
+  - CMS blog/editorial pages live in `D:\Bantubuzz-headless-CMS` and have their own footer implementation. Keep that footer aligned with the main platform columns, including the BantuBuzz Intelligence links.
+  - Main-platform navbar/footer deploy: `deployment\DEPLOY-NEW-VPS-PUBLIC-NAV-FOOTER.bat`.
+  - CMS blog footer deploy: `deployment\DEPLOY-CMS-FOOTER-NAV.bat`.
 - Remaining hardening for future slices:
   - Improve team invitation onboarding so new invitees land directly back on the invite after signup/login.
   - Build tailored onboarding steps after Agency/Enterprise signup.
