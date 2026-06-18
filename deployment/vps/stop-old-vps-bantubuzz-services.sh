@@ -30,6 +30,20 @@ do
 done
 
 echo
+echo "Stopping known Node supervisors that may restart old messaging"
+if command -v pm2 >/dev/null 2>&1; then
+  pm2 list || true
+  pm2 delete all || true
+  pm2 kill || true
+fi
+if command -v forever >/dev/null 2>&1; then
+  forever list || true
+  forever stopall || true
+fi
+pkill -f '[p]m2' || true
+pkill -f '[f]orever' || true
+
+echo
 echo "Stopping leftover BantuBuzz runtime processes without matching this SSH command"
 python3 - <<'PY'
 import os
@@ -59,7 +73,7 @@ for proc_dir in Path('/proc').iterdir():
     cmdline = raw_cmdline.replace(b'\x00', b' ').decode('utf-8', 'ignore')
     is_bantubuzz_runtime = (
         '/var/www/bantubuzz/' in cmdline
-        and any(token in cmdline for token in ('celery', 'gunicorn', 'messaging-service', 'server.js'))
+        and any(token in cmdline for token in ('celery', 'gunicorn', 'messaging-service', 'server.js', 'node'))
     )
 
     if is_bantubuzz_runtime:
@@ -85,6 +99,41 @@ for pid, cmdline in matches:
         os.kill(pid, signal.SIGKILL)
     except ProcessLookupError:
         pass
+PY
+
+sleep 2
+echo
+echo "Second pass for stubborn/restarted BantuBuzz runtime processes"
+python3 - <<'PY'
+import os
+import signal
+from pathlib import Path
+
+own_pid = os.getpid()
+parent_pid = os.getppid()
+
+for proc_dir in Path('/proc').iterdir():
+    if not proc_dir.name.isdigit():
+        continue
+    pid = int(proc_dir.name)
+    if pid in {own_pid, parent_pid}:
+        continue
+
+    try:
+        raw_cmdline = (proc_dir / 'cmdline').read_bytes()
+    except OSError:
+        continue
+
+    if not raw_cmdline:
+        continue
+
+    cmdline = raw_cmdline.replace(b'\x00', b' ').decode('utf-8', 'ignore')
+    if '/var/www/bantubuzz/' in cmdline and any(token in cmdline for token in ('celery', 'gunicorn', 'messaging-service', 'server.js', 'node')):
+        print(f"KILL {pid}: {cmdline}")
+        try:
+            os.kill(pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
 PY
 
 sleep 2
