@@ -19,6 +19,7 @@ profile_trust_dimension = formula.profile_trust_dimension
 reach_dimension = formula.reach_dimension
 reviews_dimension = formula.reviews_dimension
 sentiment_dimension = formula.sentiment_dimension
+average_delivery_score = formula.average_delivery_score
 normalize_sentiment = formula.normalize_sentiment
 normalize_platform_name = formula.normalize_platform_name
 order_completion_dimension = formula.order_completion_dimension
@@ -52,9 +53,9 @@ class CreatorScoreFormulaTests(unittest.TestCase):
     def test_sentiment_normalizes_and_applies_penalties(self):
         self.assertEqual(sentiment_dimension(0.8), 80)
         self.assertEqual(normalize_sentiment(75), 75)
-        self.assertEqual(sentiment_dimension(80, negative_percentage=11), 60)
-        self.assertEqual(sentiment_dimension(80, critical_percentage=11), 40)
-        self.assertEqual(sentiment_dimension(80, negative_percentage=20), 0)
+        self.assertEqual(sentiment_dimension(80, negative_percentage=11), 78)
+        self.assertEqual(sentiment_dimension(80, critical_percentage=11), 56)
+        self.assertEqual(sentiment_dimension(80, negative_percentage=20), 60)
 
     def test_activity_uses_sessions_and_inactivity_penalties(self):
         now = datetime.utcnow()
@@ -70,7 +71,8 @@ class CreatorScoreFormulaTests(unittest.TestCase):
         self.assertEqual(profile_quality_dimension(False, False, False, False, False), 0)
         self.assertEqual(profile_quality_dimension(True, True, True, True, True), 100)
         self.assertEqual(profile_quality_dimension(True, True, False, False, False), 40)
-        self.assertEqual(profile_trust_dimension(True, True, True, True, True), 100)
+        self.assertEqual(profile_trust_dimension(True, True, True, True, True, True, True), 100)
+        self.assertEqual(profile_trust_dimension(True, True, False, False, False), 40)
 
     def test_reviews_score_uses_last_twenty_formula(self):
         self.assertIsNone(reviews_dimension(None, 0, 0, 0))
@@ -83,6 +85,8 @@ class CreatorScoreFormulaTests(unittest.TestCase):
         self.assertEqual(response_rate_dimension(9, 10), 90)
         self.assertIsNone(on_time_delivery_dimension(0, 0))
         self.assertEqual(on_time_delivery_dimension(9, 10), 90)
+        self.assertIsNone(average_delivery_score([]))
+        self.assertEqual(average_delivery_score([100, 90, 80, 50, 0]), 64)
 
     def test_final_score_uses_v11_weights(self):
         dimensions = {

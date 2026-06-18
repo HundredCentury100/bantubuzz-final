@@ -39,6 +39,9 @@ class CreatorProfile(db.Model):
     # Verification and badges
     is_verified = db.Column(db.Boolean, default=False)  # Verified by platform with documents
     verified_at = db.Column(db.DateTime, nullable=True)
+    leaderboard_show_score = db.Column(db.Boolean, default=False, nullable=False)
+    leaderboard_badges = db.Column(db.JSON, default=list)
+    leaderboard_notified_at = db.Column(db.DateTime, nullable=True)
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -109,6 +112,10 @@ class CreatorProfile(db.Model):
         }
 
     def get_badges(self):
+        badges = self.get_all_badges()
+        return badges[:3]
+
+    def get_all_badges(self):
         try:
             from app.services.creator_score_service import CreatorScoreService
             badges = CreatorScoreService.achievement_badges(self)
@@ -131,6 +138,17 @@ class CreatorProfile(db.Model):
         except Exception:
             pass
 
+        return badges
+
+    def get_leaderboard_badges(self):
+        badges = self.get_all_badges()
+        selected = self.leaderboard_badges or []
+        selected = [badge for badge in selected if badge in badges]
+
+        if len(badges) <= 3:
+            return badges
+        if selected:
+            return selected[:3]
         return badges[:3]
 
     def to_dict(self, include_user=False, public_view=False):
@@ -172,6 +190,9 @@ class CreatorProfile(db.Model):
             'revision_fee': self.revision_fee or 0.0,
             'is_verified': self.is_verified or False,
             'badges': self.get_badges(),
+            'leaderboard_show_score': bool(self.leaderboard_show_score),
+            'leaderboard_badges': self.leaderboard_badges or [],
+            'leaderboard_display_badges': self.get_leaderboard_badges(),
             'rating_penalty': float(getattr(self, 'rating_penalty', 0.0) or 0.0),
             'cancelled_collaborations_count': getattr(self, 'cancelled_collaborations_count', 0) or 0,
             'effective_rating': self.get_effective_rating(),

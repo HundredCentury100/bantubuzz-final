@@ -77,8 +77,8 @@ def sentiment_dimension(base_sentiment, negative_percentage=0, critical_percenta
     score = normalize_sentiment(base_sentiment)
     if score is None:
         return 0.0
-    negative_penalty = max(0.0, float(negative_percentage or 0) - 10.0) * 20.0
-    critical_penalty = max(0.0, float(critical_percentage or 0) - 10.0) * 40.0
+    negative_penalty = max(0.0, float(negative_percentage or 0) - 10.0) * 2.0
+    critical_penalty = max(0.0, float(critical_percentage or 0) - 5.0) * 4.0
     return clamp(score - negative_penalty - critical_penalty)
 
 
@@ -111,8 +111,23 @@ def profile_quality_dimension(has_photo, has_bio, has_platform, has_package, has
     ]) * 20)
 
 
-def profile_trust_dimension(has_photo, has_bio, has_platform, has_package, has_portfolio):
-    return profile_quality_dimension(has_photo, has_bio, has_platform, has_package, has_portfolio)
+def profile_trust_dimension(
+    has_photo,
+    has_bio,
+    has_platform,
+    has_package,
+    has_portfolio=False,
+    is_verified=False,
+    has_success_story=False,
+):
+    return clamp(sum([
+        20 if has_bio else 0,
+        20 if has_photo else 0,
+        20 if has_platform else 0,
+        15 if has_package else 0,
+        15 if is_verified else 0,
+        10 if (has_success_story or has_portfolio) else 0,
+    ]))
 
 
 def percentage_dimension(numerator, denominator):
@@ -132,6 +147,12 @@ def response_rate_dimension(responded_messages, inbound_messages):
 
 def on_time_delivery_dimension(on_time_deliveries, completed_deliveries):
     return percentage_dimension(on_time_deliveries, completed_deliveries)
+
+
+def average_delivery_score(delivery_scores):
+    if not delivery_scores:
+        return None
+    return clamp(sum(clamp(score) for score in delivery_scores) / len(delivery_scores))
 
 
 def reviews_dimension(average_rating, total_verified_reviews, positive_reviews, recent_review_count):

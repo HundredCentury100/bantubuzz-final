@@ -25,6 +25,10 @@ def _public_creator_payload(creator):
     creator_data = creator.to_dict(include_user=True, public_view=True)
     from app.services.creator_score_service import CreatorScoreService
     creator_data['rank'] = CreatorScoreService.public_rank(creator.id)
+    creator_data['public_creator_score'] = (
+        round(float(creator.private_score.final_score or 0), 1)
+        if creator.leaderboard_show_score and creator.private_score else None
+    )
 
     from app.models import Collaboration, BrandProfile
 
@@ -644,10 +648,10 @@ def get_creator_rank(creator_id):
 
         ranking_type = (request.args.get('type') or 'overall').strip().lower()
         context = (request.args.get('context') or '').strip().lower()
-        if ranking_type not in {'overall', 'category', 'platform'}:
-            return jsonify({'error': 'Ranking type must be overall, category, or platform'}), 400
+        if ranking_type not in {'overall', 'category', 'platform', 'city'}:
+            return jsonify({'error': 'Ranking type must be overall, category, platform, or city'}), 400
         if ranking_type != 'overall' and not context:
-            return jsonify({'error': 'A context is required for category and platform rankings'}), 400
+            return jsonify({'error': 'A context is required for category, platform, and city rankings'}), 400
 
         return jsonify({
             'creator_id': creator.id,
@@ -679,6 +683,58 @@ def get_own_profile():
         return jsonify(creator_data), 200
 
     except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@bp.route('/profile/leaderboard-preferences', methods=['PUT'])
+@jwt_required()
+def update_leaderboard_preferences():
+    """Update current creator's public leaderboard score and badge display preferences."""
+    try:
+        user_id = int(get_jwt_identity())
+        user = User.query.get(user_id)
+
+        if not user or user.user_type != 'creator' or not user.creator_profile:
+            return jsonify({'error': 'Creator profile not found'}), 404
+
+        creator = user.creator_profile
+        data = request.get_json() or {}
+        from app.services.creator_score_service import CreatorScoreService
+
+        available_badges = CreatorScoreService.achievement_badges(creator)
+        selected_badges = data.get('selected_badges', creator.leaderboard_badges or [])
+        if selected_badges is None:
+            selected_badges = []
+        if not isinstance(selected_badges, list):
+            return jsonify({'error': 'selected_badges must be a list'}), 400
+
+        selected_badges = [
+            str(badge)
+            for badge in selected_badges
+            if str(badge) in available_badges
+        ]
+        if len(selected_badges) > 3:
+            return jsonify({'error': 'You can display up to 3 leaderboard badges'}), 400
+
+        if 'show_score' in data:
+            creator.leaderboard_show_score = bool(data.get('show_score'))
+        creator.leaderboard_badges = selected_badges
+        creator.updated_at = datetime.utcnow()
+        db.session.commit()
+
+        return jsonify({
+            'message': 'Leaderboard preferences updated',
+            'available_badges': available_badges,
+            'leaderboard_preferences': {
+                'show_score': bool(creator.leaderboard_show_score),
+                'selected_badges': creator.leaderboard_badges or [],
+                'display_badges': creator.get_leaderboard_badges(),
+                'notified_at': creator.leaderboard_notified_at.isoformat() if creator.leaderboard_notified_at else None,
+            },
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
         return jsonify({'error': str(e)}), 500
 
 

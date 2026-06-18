@@ -12,6 +12,7 @@ from app.models import (
     CreatorScoreHistory,
     Collaboration,
     Message,
+    Notification,
     Package,
     PortfolioItem,
     PostMetrics,
@@ -21,6 +22,7 @@ from app.models import (
 )
 from app.services.creator_score_formula import (
     activity_dimension,
+    average_delivery_score,
     clamp,
     engagement_dimension,
     final_creator_score,
@@ -41,6 +43,25 @@ from app.services.creator_score_formula import (
 
 
 FORMULA_VERSION = '1.1'
+
+
+BADGE_PRIORITY = {
+    'elite_creator': 100,
+    'top_creator': 90,
+    'trusted_creator': 80,
+    'campaign_pro': 70,
+    'brand_magnet': 60,
+    'category_leader': 55,
+    'city_top_10': 50,
+    'engagement_leader': 40,
+    'audience_builder': 30,
+    'rising_creator': 20,
+    'verified_creator': 15,
+    'referral_verified': 12,
+    'creator_to_watch': 5,
+    'buzz_creator': 1,
+    'creator': 0,
+}
 
 
 class CreatorScoreService:
@@ -229,14 +250,39 @@ class CreatorScoreService:
                 Message.sender_id == creator.user_id,
                 Message.receiver_id == inbound.sender_id,
                 Message.created_at > inbound.created_at,
-                Message.created_at <= inbound.created_at + timedelta(hours=48),
+                Message.created_at <= inbound.created_at + timedelta(hours=12),
             ).first()
             if reply:
                 responded_messages += 1
 
+        delivery_scores = []
+        early_delivery_cutoff = timedelta(hours=12)
+        late_deliveries = 0
+        missed_deliveries = 0
+        for collaboration in completed_collaborations:
+            if collaboration.expected_completion_date is None:
+                continue
+            delivered_at = (
+                collaboration.actual_completion_date
+                or collaboration.live_urls_submitted_at
+                or collaboration.updated_at
+            )
+            if not delivered_at:
+                missed_deliveries += 1
+                delivery_scores.append(0)
+            elif delivered_at <= collaboration.expected_completion_date - early_delivery_cutoff:
+                delivery_scores.append(100)
+            elif delivered_at < collaboration.expected_completion_date:
+                delivery_scores.append(90)
+            elif delivered_at == collaboration.expected_completion_date:
+                delivery_scores.append(80)
+            else:
+                late_deliveries += 1
+                delivery_scores.append(50)
+
         order_completion = order_completion_dimension(completed_orders, total_orders)
         response_rate = response_rate_dimension(responded_messages, len(inbound_messages))
-        on_time_delivery = on_time_delivery_dimension(on_time_deliveries, len(due_deliveries))
+        on_time_delivery = average_delivery_score(delivery_scores)
         marketplace_reliability = weighted_component_score({
             'order_completion': order_completion,
             'response_rate': response_rate,
@@ -260,8 +306,11 @@ class CreatorScoreService:
                 'completed_campaigns': campaign_successes,
                 'due_deliveries': len(due_deliveries),
                 'on_time_deliveries': on_time_deliveries,
+                'late_deliveries': late_deliveries,
+                'missed_deliveries': missed_deliveries,
+                'delivery_scores': delivery_scores,
                 'inbound_brand_messages_90d': len(inbound_messages),
-                'responded_brand_messages_48h': responded_messages,
+                'responded_brand_messages_12h': responded_messages,
             },
         }
 
@@ -294,7 +343,8 @@ class CreatorScoreService:
             is_visible=True,
         ).first() is not None
         has_photo = bool(creator.profile_picture or creator.profile_picture_sizes)
-        has_bio = len((creator.bio or '').strip()) >= 40
+        has_bio = len((creator.bio or '').strip()) >= 160
+        has_success_story = bool((creator.success_stories or '').strip()) or has_portfolio
 
         dimensions = {
             'engagement': engagement_dimension(average_engagement),
@@ -306,7 +356,13 @@ class CreatorScoreService:
             'on_time_delivery': reliability['on_time_delivery'],
             'reviews': review_score,
             'profile_trust': profile_trust_dimension(
-                has_photo, has_bio, has_platform, has_package, has_portfolio,
+                has_photo,
+                has_bio,
+                has_platform,
+                has_package,
+                has_portfolio=has_portfolio,
+                is_verified=creator.is_verified,
+                has_success_story=has_success_story,
             ),
             'activity': activity_dimension(session_count, last_session),
             'profile_quality': profile_quality_dimension(
@@ -334,6 +390,8 @@ class CreatorScoreService:
                 'connected_platform': has_platform,
                 'active_package': has_package,
                 'visible_portfolio': has_portfolio,
+                'verified': bool(creator.is_verified),
+                'success_story': has_success_story,
             },
         }
         quality = {
@@ -449,12 +507,7 @@ class CreatorScoreService:
     def _rank_context(creators, ranking_type, context_key, previous, now):
         ordered = sorted(
             creators,
-            key=lambda creator: (
-                -float(creator.private_score.final_score or 0),
-                -float(creator.private_score.engagement_score or 0),
-                -float(creator.private_score.reach_score or 0),
-                creator.id,
-            ),
+            key=CreatorScoreService._ranking_sort_key,
         )
         for position, creator in enumerate(ordered, start=1):
             db.session.add(CreatorRanking(
@@ -482,6 +535,7 @@ class CreatorScoreService:
             if creator.private_score and CreatorScoreService.is_ranking_eligible(creator)
         ]
         CreatorScoreService._rank_context(creators, 'overall', '', previous, now)
+        CreatorScoreService.notify_new_leaderboard_creators(creators, limit=100, now=now)
 
         categories = sorted({
             str(category).strip().lower()
@@ -564,12 +618,7 @@ class CreatorScoreService:
 
         ordered = sorted(
             creators,
-            key=lambda creator: (
-                -float(creator.private_score.final_score or 0),
-                -float(creator.private_score.engagement_score or 0),
-                -float(creator.private_score.reach_score or 0),
-                creator.id,
-            ),
+            key=CreatorScoreService._ranking_sort_key,
         )
 
         entries = []
@@ -595,7 +644,13 @@ class CreatorScoreService:
                 'platform_followers': int(primary.followers or 0) if primary else 0,
                 'profile_path': f'/{creator.username}' if creator.username else f'/creators/{creator.id}',
                 'overall_rank': CreatorScoreService.public_rank(creator.id),
-                'badges': CreatorScoreService.achievement_badges(creator),
+                'badges': creator.get_leaderboard_badges(),
+                'all_badges': CreatorScoreService.achievement_badges(creator),
+                'show_score': bool(creator.leaderboard_show_score),
+                'creator_score': (
+                    round(float(creator.private_score.final_score or 0), 1)
+                    if creator.leaderboard_show_score else None
+                ),
             })
 
         return {
@@ -647,10 +702,98 @@ class CreatorScoreService:
         return float(getattr(score, field, 0) or 0) if score else 0.0
 
     @staticmethod
+    def _badge_rank(creator):
+        badges = CreatorScoreService.achievement_badges(creator)
+        return max([BADGE_PRIORITY.get(badge, 0) for badge in badges] or [0])
+
+    @staticmethod
+    def _subscription_rank(creator):
+        try:
+            from app.models import CreatorSubscription, CreatorSubscriptionPlan
+            active = CreatorSubscription.query.join(CreatorSubscriptionPlan).filter(
+                CreatorSubscription.creator_id == creator.id,
+                CreatorSubscription.status == 'active',
+                CreatorSubscription.payment_verified == True,
+                CreatorSubscriptionPlan.subscription_type == 'platform',
+            ).order_by(CreatorSubscriptionPlan.price.desc()).first()
+            if not active or not active.plan:
+                return 0
+            plan_name = (active.plan.name or '').lower()
+            if 'pro' in plan_name:
+                return 20
+            if 'rising' in plan_name:
+                return 10
+        except Exception:
+            pass
+        return 0
+
+    @staticmethod
+    def _last_active_timestamp(creator):
+        snapshot = getattr(creator.private_score, 'input_snapshot', {}) or {}
+        value = snapshot.get('last_session_at')
+        if value:
+            try:
+                return datetime.fromisoformat(value).timestamp()
+            except Exception:
+                pass
+        return creator.user.last_login.timestamp() if creator.user and creator.user.last_login else 0
+
+    @staticmethod
+    def _ranking_sort_key(creator):
+        score = creator.private_score
+        return (
+            -CreatorScoreService._badge_rank(creator),
+            -CreatorScoreService._subscription_rank(creator),
+            -float(score.final_score or 0),
+            -float(score.on_time_delivery_score or 0),
+            -float(score.response_rate_score or 0),
+            -float(score.engagement_score or 0),
+            -CreatorScoreService._last_active_timestamp(creator),
+            creator.id,
+        )
+
+    @staticmethod
+    def notify_new_leaderboard_creators(creators, limit=100, now=None):
+        now = now or datetime.utcnow()
+        ordered = sorted(creators, key=CreatorScoreService._ranking_sort_key)[:limit]
+        for position, creator in enumerate(ordered, start=1):
+            if creator.leaderboard_notified_at or not creator.user or not creator.user.email:
+                continue
+            creator.leaderboard_notified_at = now
+            db.session.add(Notification(
+                user_id=creator.user_id,
+                type='leaderboard',
+                title='You are on the BantuBuzz leaderboard',
+                message=f'Your creator profile is now ranked #{position} on the BantuBuzz leaderboard.',
+                action_url='/leaderboard',
+            ))
+            try:
+                from app.services.email_service import send_email
+                send_email(
+                    'You made the BantuBuzz Creator Leaderboard',
+                    creator.user.email,
+                    (
+                        f'Hi {creator.username or "Creator"},\n\n'
+                        f'Your BantuBuzz creator profile is now ranked #{position} on the leaderboard.\n'
+                        'You can manage whether your score is visible and which badges appear from your creator dashboard.\n\n'
+                        'The BantuBuzz Team'
+                    ),
+                    f"""
+                    <p>Hi {creator.username or 'Creator'},</p>
+                    <p>Your BantuBuzz creator profile is now ranked <strong>#{position}</strong> on the leaderboard.</p>
+                    <p>You can manage whether your score is visible and which badges appear from your creator dashboard.</p>
+                    <p><a href="https://bantubuzz.com/creator/dashboard">Manage leaderboard display</a></p>
+                    <p>The BantuBuzz Team</p>
+                    """,
+                )
+            except Exception:
+                pass
+
+    @staticmethod
     def achievement_badges(creator):
         score = getattr(creator, 'private_score', None)
         if not score:
-            return ['creator_to_watch']
+            return ['buzz_creator']
 
         snapshot = score.input_snapshot or {}
         review_snapshot = snapshot.get('reviews') or {}
@@ -672,7 +815,26 @@ class CreatorScoreService:
         on_time_delivery_score = CreatorScoreService._score_float(score, 'on_time_delivery_score')
 
         badges = []
-        if final_score >= 95:
+        last_active_days = 999
+        last_session_at = snapshot.get('last_session_at')
+        if last_session_at:
+            try:
+                last_active_days = (datetime.utcnow() - datetime.fromisoformat(last_session_at)).total_seconds() / 86400
+            except Exception:
+                pass
+
+        if (
+            final_score >= 98
+            and review_score >= 95
+            and creator.is_verified
+            and profile_trust_score >= 95
+            and completed_campaigns >= 5
+            and total_orders >= 20
+            and order_completion_score >= 95
+            and response_rate_score >= 95
+            and on_time_delivery_score >= 95
+            and last_active_days <= 7
+        ):
             badges.append('elite_creator')
         if (
             final_score >= 90
@@ -690,13 +852,13 @@ class CreatorScoreService:
             badges.append('trusted_creator')
         if final_score >= 80 and marketplace_reliability_score >= 20:
             badges.append('brand_magnet')
-        if final_score >= 70 and completed_campaigns >= 5 and review_score >= 70:
+        if final_score >= 70 and completed_campaigns >= 1:
             badges.append('campaign_pro')
-        if final_score >= 70 and engagement_score >= 80:
+        if final_score >= 70 and engagement_score >= 90:
             badges.append('engagement_leader')
         if reach_score >= 80:
             badges.append('audience_builder')
-        if final_score >= 70 and total_followers >= 10000:
+        if final_score >= 70 and total_followers >= 10000 and profile_trust_score >= 70 and last_active_days <= 14:
             badges.append('rising_creator')
 
         city_key = str(creator.city or creator.location or '').strip().lower()
@@ -721,9 +883,9 @@ class CreatorScoreService:
             badges.append('verified_creator')
 
         if not badges:
-            badges.append('creator_to_watch' if final_score >= 60 else 'creator')
+            badges.append('creator_to_watch' if final_score >= 60 else 'buzz_creator')
 
-        return badges[:3]
+        return sorted(dict.fromkeys(badges), key=lambda badge: -BADGE_PRIORITY.get(badge, 0))
 
     @staticmethod
     def owner_score_payload(creator):
@@ -787,6 +949,13 @@ class CreatorScoreService:
             'formula_version': score.formula_version,
             'calculated_at': score.calculated_at.isoformat() if score.calculated_at else None,
             'rank': CreatorScoreService.public_rank(creator.id),
+            'badges': CreatorScoreService.achievement_badges(creator),
+            'leaderboard_preferences': {
+                'show_score': bool(creator.leaderboard_show_score),
+                'selected_badges': creator.leaderboard_badges or [],
+                'display_badges': creator.get_leaderboard_badges(),
+                'notified_at': creator.leaderboard_notified_at.isoformat() if creator.leaderboard_notified_at else None,
+            },
             'dimensions': dimensions,
             'raw_dimensions': raw_dimensions,
             'excluded_dimensions': (score.data_quality or {}).get('excluded_dimensions', []),

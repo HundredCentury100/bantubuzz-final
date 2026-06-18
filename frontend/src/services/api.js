@@ -115,6 +115,7 @@ export const creatorsAPI = {
   getCreatorRank: (id, params) => api.get(`/creators/${id}/rank`, { params }),
   getOwnProfile: () => api.get('/creators/profile'),
   updateProfile: (data) => api.put('/creators/profile', data),
+  updateLeaderboardPreferences: (data) => api.put('/creators/profile/leaderboard-preferences', data),
   uploadProfilePicture: (file) => {
     const formData = new FormData();
     formData.append('file', file);

@@ -4,6 +4,7 @@ import { creatorsAPI, packagesAPI, bookingsAPI, opportunitiesAPI, collaborations
 import api from '../services/api';
 import Navbar from '../components/Navbar';
 import CollaborationResponseModal from '../components/CollaborationResponseModal';
+import CreatorBadge from '../components/CreatorBadge';
 import toast from 'react-hot-toast';
 import { SparklesIcon, RocketLaunchIcon, BuildingOfficeIcon, ArrowUpIcon } from '@heroicons/react/24/outline';
 
@@ -35,6 +36,11 @@ const CreatorDashboard = () => {
   const [featuredBannerDismissed, setFeaturedBannerDismissed] = useState(
     localStorage.getItem('featuredBannerDismissed') === 'true'
   );
+  const [leaderboardPrefs, setLeaderboardPrefs] = useState({
+    show_score: false,
+    selected_badges: [],
+  });
+  const [savingLeaderboardPrefs, setSavingLeaderboardPrefs] = useState(false);
 
   useEffect(() => {
     fetchDashboardData();
@@ -72,6 +78,50 @@ const CreatorDashboard = () => {
     fetchDashboardData();
   };
 
+  const handleLeaderboardBadgeToggle = (badge) => {
+    setLeaderboardPrefs((current) => {
+      const selected = current.selected_badges || [];
+      if (selected.includes(badge)) {
+        return {
+          ...current,
+          selected_badges: selected.filter((item) => item !== badge),
+        };
+      }
+      if (selected.length >= 3) {
+        toast.error('You can display up to 3 badges on the leaderboard.');
+        return current;
+      }
+      return {
+        ...current,
+        selected_badges: [...selected, badge],
+      };
+    });
+  };
+
+  const saveLeaderboardPreferences = async () => {
+    try {
+      setSavingLeaderboardPrefs(true);
+      const response = await creatorsAPI.updateLeaderboardPreferences(leaderboardPrefs);
+      const preferences = response.data.leaderboard_preferences;
+      setProfile((current) => ({
+        ...current,
+        creator_score: {
+          ...(current?.creator_score || {}),
+          leaderboard_preferences: preferences,
+        },
+      }));
+      setLeaderboardPrefs({
+        show_score: Boolean(preferences?.show_score),
+        selected_badges: preferences?.selected_badges || [],
+      });
+      toast.success('Leaderboard display updated.');
+    } catch (error) {
+      toast.error(error.response?.data?.error || 'Failed to update leaderboard display.');
+    } finally {
+      setSavingLeaderboardPrefs(false);
+    }
+  };
+
   const fetchDashboardData = async () => {
     try {
       // Fetch all data in parallel for faster loading
@@ -99,7 +149,12 @@ const CreatorDashboard = () => {
 
       // Handle profile
       if (profileRes.status === 'fulfilled') {
-        setProfile(profileRes.value.data);
+        const nextProfile = profileRes.value.data;
+        setProfile(nextProfile);
+        setLeaderboardPrefs({
+          show_score: Boolean(nextProfile.creator_score?.leaderboard_preferences?.show_score),
+          selected_badges: nextProfile.creator_score?.leaderboard_preferences?.selected_badges || [],
+        });
       }
 
       // Handle packages - Keep FULL array for stats, slice for display
@@ -188,6 +243,8 @@ const CreatorDashboard = () => {
     ['Profile trust', creatorScore.dimensions?.profile_trust, 'Profile completeness and booking readiness'],
     ['Activity', creatorScore.dimensions?.activity, 'Recent BantuBuzz sessions'],
   ];
+  const availableLeaderboardBadges = creatorScore.badges || [];
+  const selectedLeaderboardBadges = leaderboardPrefs.selected_badges || [];
 
   return (
     <div className="min-h-screen bg-light">
@@ -725,6 +782,78 @@ const CreatorDashboard = () => {
                 <p className="mt-1 text-xs leading-relaxed text-gray-500">{description}</p>
               </div>
             ))}
+          </div>
+
+          <div className="mt-5 border-t border-gray-100 pt-4">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <h3 className="text-sm font-bold text-dark">Leaderboard display</h3>
+                <p className="mt-1 max-w-2xl text-sm text-gray-600">
+                  Your rank and badges can appear publicly. Your score stays hidden unless you choose to show it.
+                </p>
+              </div>
+              <label className="inline-flex min-h-[44px] cursor-pointer items-center gap-3 rounded-full border border-gray-200 bg-gray-50 px-4 py-2 text-sm font-semibold text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={leaderboardPrefs.show_score}
+                  onChange={(event) => setLeaderboardPrefs((current) => ({
+                    ...current,
+                    show_score: event.target.checked,
+                  }))}
+                  className="h-4 w-4 accent-primary"
+                />
+                Show my score on leaderboard
+              </label>
+            </div>
+
+            {availableLeaderboardBadges.length > 0 && (
+              <div className="mt-4">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  Choose up to 3 badges to show
+                </p>
+                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                  {availableLeaderboardBadges.map((badge) => {
+                    const selected = selectedLeaderboardBadges.includes(badge);
+                    return (
+                      <button
+                        key={badge}
+                        type="button"
+                        onClick={() => handleLeaderboardBadgeToggle(badge)}
+                        className={`flex min-h-[48px] items-center justify-between gap-3 border px-3 py-2 text-left transition-colors ${
+                          selected
+                            ? 'border-primary bg-primary/10'
+                            : 'border-gray-200 bg-white hover:border-primary/60'
+                        }`}
+                      >
+                        <CreatorBadge badge={badge} size="sm" />
+                        <span className={`h-4 w-4 rounded-full border ${selected ? 'border-primary bg-primary' : 'border-gray-300'}`} />
+                      </button>
+                    );
+                  })}
+                </div>
+                {availableLeaderboardBadges.length <= 3 && (
+                  <p className="mt-2 text-xs text-gray-500">
+                    You have three or fewer badges, so all can display automatically.
+                  </p>
+                )}
+              </div>
+            )}
+
+            <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex flex-wrap gap-2">
+                {(creatorScore.leaderboard_preferences?.display_badges || availableLeaderboardBadges.slice(0, 3)).map((badge) => (
+                  <CreatorBadge key={badge} badge={badge} size="sm" />
+                ))}
+              </div>
+              <button
+                type="button"
+                onClick={saveLeaderboardPreferences}
+                disabled={savingLeaderboardPrefs}
+                className="inline-flex min-h-[44px] items-center justify-center rounded-full bg-primary px-5 py-2.5 text-sm font-semibold text-dark hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {savingLeaderboardPrefs ? 'Saving...' : 'Save leaderboard display'}
+              </button>
+            </div>
           </div>
 
           {creatorScore.improvement_tips?.length > 0 && (

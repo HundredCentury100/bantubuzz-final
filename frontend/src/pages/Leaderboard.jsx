@@ -5,6 +5,7 @@ import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import ResponsiveImage from '../components/ResponsiveImage';
 import CreatorCardActions from '../components/CreatorCardActions';
+import CreatorBadge from '../components/CreatorBadge';
 import SEO from '../components/SEO';
 import { creatorsAPI } from '../services/api';
 import { PLATFORM_CONFIGS } from '../constants/platformConfig';
@@ -187,12 +188,13 @@ const Leaderboard = () => {
 
         {!error && !loading && creators.length > 0 && (
           <section className="border border-gray-200 bg-white">
-            <div className="hidden grid-cols-[80px_1fr_180px_180px_150px_110px] border-b border-gray-200 bg-gray-50 px-5 py-3 text-xs font-semibold uppercase text-gray-500 lg:grid">
+            <div className="hidden grid-cols-[80px_1fr_170px_160px_130px_140px_110px] border-b border-gray-200 bg-gray-50 px-5 py-3 text-xs font-semibold uppercase text-gray-500 lg:grid">
               <span>Rank</span>
               <span>Creator</span>
               <span>Category</span>
               <span>Platform</span>
               <span>Followers</span>
+              <span>Badges</span>
               <span className="text-right">Card</span>
             </div>
             {creators.map((creator) => {
@@ -212,7 +214,7 @@ const Leaderboard = () => {
                       openCreator(creator);
                     }
                   }}
-                  className="group relative cursor-pointer border-b border-gray-100 px-4 py-4 last:border-b-0 hover:bg-primary/5 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary lg:grid lg:grid-cols-[80px_1fr_180px_180px_150px_110px] lg:items-center lg:px-5"
+                  className="group relative cursor-pointer border-b border-gray-100 px-4 py-4 last:border-b-0 hover:bg-primary/5 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary lg:grid lg:grid-cols-[80px_1fr_170px_160px_130px_140px_110px] lg:items-center lg:px-5"
                 >
                   <div className="mb-3 flex items-center justify-between lg:mb-0">
                     <span className={`flex h-10 min-w-10 items-center justify-center rounded-md px-2 text-lg font-bold ${creator.rank <= 3 ? 'bg-primary text-dark' : 'bg-gray-100 text-gray-700'}`}>
@@ -230,6 +232,11 @@ const Leaderboard = () => {
                     <div className="min-w-0">
                       <h2 className="truncate font-bold text-dark group-hover:text-primary-dark">{creator.display_name}</h2>
                       <p className="truncate text-sm text-gray-500">@{creator.username}</p>
+                      {creator.show_score && creator.creator_score !== null && creator.creator_score !== undefined && (
+                        <p className="mt-1 inline-flex rounded-full bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary-dark">
+                          Score {creator.creator_score}
+                        </p>
+                      )}
                     </div>
                   </div>
                   <div className="mt-3 text-sm text-gray-700 lg:mt-0">{creator.category || 'Creator'}</div>
@@ -240,6 +247,11 @@ const Leaderboard = () => {
                   <div className="mt-2 flex items-center justify-between lg:mt-0 lg:block">
                     <span className="text-xs text-gray-500 lg:hidden">Platform followers</span>
                     <span className="font-bold text-dark">{formatFollowers(creator.platform_followers)}</span>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2 lg:mt-0">
+                    {(creator.badges || []).slice(0, 3).map((badge) => (
+                      <CreatorBadge key={badge} badge={badge} size="sm" />
+                    ))}
                   </div>
                   <div className="hidden justify-end lg:flex">
                     <CreatorCardActions creator={creator} compact />

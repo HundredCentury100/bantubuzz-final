@@ -1129,15 +1129,21 @@ Deployment note:
   - Premium brand accounts can use the same report branding fields as Agency/Enterprise accounts; report-logo authorization must check the paid plan entitlement rather than `brand_profiles.account_type`.
 - Internal creator scoring and rankings:
   - New VPS v1.1 deploy script: `deployment/DEPLOY-NEW-VPS-CREATOR-SCORE-LEADERBOARD-V11.bat`.
+  - New VPS v1.2 deploy script: `deployment/DEPLOY-NEW-VPS-CREATOR-SCORE-LEADERBOARD-V12.bat`.
   - Initial migration: `backend/migrations/versions/202606101700_add_creator_scoring.py`.
   - v1.1 migration: `backend/migrations/versions/202606161000_update_creator_score_v11.py`.
+  - v1.2 migration: `backend/migrations/versions/202606181200_add_creator_leaderboard_preferences.py`.
+  - v1.2 hotfix migration: `backend/migrations/versions/202606181300_ensure_creator_featured_fields.py`. It is idempotent and repairs production databases missing `creator_profiles.is_featured`, `featured_type`, `featured_order`, or `featured_since`, which breaks admin featured creator actions.
   - The score is stored in `creator_scores`; history is stored in `creator_score_history`.
-  - Brands and visitors must never receive the numeric Creator Score or raw component scores. They can see rank positions and badges only.
+  - Brands and visitors must never receive raw component scores. Numeric Creator Score is hidden by default and is only serialized publicly when the creator explicitly enables `leaderboard_show_score`.
   - Creators can see their own private score and improvement tips on the creator dashboard through the authenticated `/api/creators/profile` response.
   - Formula v1.1 uses normalized weighted-average scoring: engagement 14, reach/views 10, followers 4, sentiment 7, order completion 8, response rate 8, on-time delivery 9, reviews 20, profile trust 15, activity 5.
   - Metrics with no applicable data are excluded and the available weights are normalized back to 100. This is required for no-review/no-order protection.
   - Reviews use the last 20 verified brand reviews from completed collaborations. Review Score = average rating score 70%, volume score 20%, positive review ratio 10%. Zero reviews are excluded rather than treated as zero.
-  - Marketplace reliability uses terminal collaborations for completion, brand-to-creator messages with creator replies within 48 hours for response rate, and completed collaborations with due dates for on-time delivery.
+  - Marketplace reliability uses terminal collaborations for completion, brand-to-creator messages with creator replies within 12 hours for response rate, and completed collaborations with due dates for delivery scoring.
+  - Delivery scoring follows product tiers: 12+ hours before deadline = 100, before deadline = 90, exact deadline = 80, late but accepted = 50, missed = 0.
+  - Sentiment penalties are product-scaled: negative comments above 10% subtract 2 points per percentage point; critical comments above 5% subtract 4 points per percentage point.
+  - Profile Trust is weighted by complete bio of at least 160 characters, profile photo, connected platform, active package, verification, and success story/portfolio with metrics.
   - Product-defined reach thresholds are authoritative: 0.05=10, 0.10=25, 0.30=50, 0.50=70, 1.00+=100. Reach uses submitted-post reach first and video views second.
   - Login events are stored in `user_sessions`; activity uses sessions from the last 30 days plus 30/60-day inactivity penalties.
   - Connected ThunziAI platform averages are persisted on `connected_platforms` so engagement and sentiment inputs survive API requests.
@@ -1148,18 +1154,21 @@ Deployment note:
     - `GET /api/creators/rankings?type=category&context=<category>&limit=50`
     - `GET /api/creators/rankings?type=platform&context=<platform>&limit=100`
     - `GET /api/creators/<creator_id>/rank`
-  - Public badges are generated from Creator Score v1.1 inputs: Creator To Watch, Rising Creator, Audience Builder, Engagement Leader, Brand Magnet, Campaign Pro, Trusted Creator, Top Creator, Elite Creator, City Top 10, and Category Leader. Frontend currently uses placeholder SVG badge icons until the design team supplies final artwork.
+  - Public badges are generated from Creator Score v1.1 inputs: Buzz Creator, Creator To Watch, Rising Creator, Audience Builder, Engagement Leader, Brand Magnet, Campaign Pro, Trusted Creator, Top Creator, Elite Creator, City Top 10, and Category Leader. Frontend currently uses placeholder SVG badge icons until the design team supplies final artwork.
+  - Creators manage leaderboard display through `PUT /api/creators/profile/leaderboard-preferences`: `show_score` controls public numeric score visibility, and `selected_badges` lets creators choose up to 3 badges. Default badge fallback is `buzz_creator`.
+  - Leaderboard rebuild sends a one-time in-app/email notification when a creator first appears in the Top 100.
   - Admin-only score diagnostics: `GET /api/admin/creator-scores`.
   - June 16, 2026 new-VPS deployment succeeded via report `deployment/vps/reports/new-vps-creator-score-leaderboard-v11-13.140.159.150-20260616-221649.txt`: migration `202606101700 -> 202606161000` ran, backend/Celery worker/Celery beat were active, 90 creator scores/rankings recalculated, and local/public health returned healthy.
   - Deployment gotchas from this release:
     - Do not `source /etc/bantubuzz/platform.env` directly in shell helpers. It is valid as a systemd `EnvironmentFile`, but can contain values that break Bash parsing. Use a parser that exports shell-escaped `KEY=value` pairs.
-    - Do not run plain `flask db upgrade` from this repo while the historical orphan trust-safety migration exists. Target the intended head/revision for focused deploys, e.g. `venv/bin/flask db upgrade 202606161000`.
+    - Do not run plain `flask db upgrade` from this repo while the historical orphan trust-safety migration exists. Target the intended head/revision for focused deploys, e.g. `venv/bin/flask db upgrade 202606181300`.
   - Featured fallback and default creator discovery use the private score/rank internally without serializing it.
 - Public creator leaderboard:
   - Deploy script: `deployment/DEPLOY-CREATOR-LEADERBOARD.bat`.
   - Public page: `/leaderboard`; no authentication is required.
   - Public API: `GET /api/creators/leaderboard?limit=50|100&category=<category>&platform=<platform>`.
-  - Leaderboard responses contain rank positions and public creator information only. Never serialize Creator Score values.
+  - Leaderboard responses contain rank positions and public creator information. Only serialize `creator_score` when `show_score` is true for that creator.
+  - Leaderboard rows display the creator's selected/default public badges, and the public profile shows the opted-in score next to rank badges when available.
   - A creator's primary platform is their connected platform with the highest follower count. Disconnected accounts are ignored; ties use normalized platform name and then connection ID.
   - X, X/Twitter, and Twitter/X normalize to `twitter`.
   - Category and platform filters can be combined; positions are recalculated within the filtered result.

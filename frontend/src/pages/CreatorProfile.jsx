@@ -464,6 +464,11 @@ const CreatorProfile = () => {
                       {creator.rank.position > 50 && creator.rank.position <= 100 && (
                         <span className="rounded-md bg-gray-200 px-3 py-1.5 text-sm font-bold text-gray-800">Top 100 Creator</span>
                       )}
+                      {creator.public_creator_score !== null && creator.public_creator_score !== undefined && (
+                        <span className="rounded-md bg-primary px-3 py-1.5 text-sm font-bold text-dark">
+                          Score {creator.public_creator_score}
+                        </span>
+                      )}
                     </div>
                   )}
 

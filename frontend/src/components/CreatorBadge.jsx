@@ -145,6 +145,14 @@ const CreatorBadge = ({ badge, size = 'md', variant = 'full' }) => {
           textColor: 'text-white',
           badgeBg: 'bg-gray-700'
         };
+      case 'buzz_creator':
+        return {
+          label: 'Buzz Creator',
+          icon: placeholderIcon('M12 3l2.2 4.5 5 .7-3.6 3.5.8 5-4.4-2.3-4.4 2.3.8-5L4 8.2l5-.7L12 3z'),
+          pillBg: 'bg-gray-700',
+          textColor: 'text-white',
+          badgeBg: 'bg-gray-700'
+        };
       default:
         return null;
     }
@@ -260,6 +268,7 @@ CreatorBadge.propTypes = {
     'city_top_10',
     'category_leader',
     'creator_to_watch',
+    'buzz_creator',
   ]).isRequired,
   size: PropTypes.oneOf(['sm', 'md', 'lg']),
   variant: PropTypes.oneOf(['full', 'icon', 'overlay'])
