@@ -538,7 +538,7 @@ The BantuBuzz Team
 
 
 @celery.task(name='app.tasks.email_tasks.send_inactive_user_reminder')
-def send_inactive_user_reminder(user_id):
+def send_inactive_user_reminder(user_id, scheduled_week_start=None):
     """
     Send reminder email to users who haven't logged in for 7+ days.
 
@@ -549,6 +549,7 @@ def send_inactive_user_reminder(user_id):
         dict: Send result
     """
     try:
+        from app import db
         from app.models import User, CreatorProfile, BrandProfile
         from datetime import datetime, timedelta
 
@@ -563,6 +564,18 @@ def send_inactive_user_reminder(user_id):
         if user.last_login and user.last_login > datetime.utcnow() - timedelta(days=7):
             logger.info(f"User {user_id} is now active, skipping notification")
             return {'status': 'skipped', 'message': 'User is active'}
+
+        now = datetime.utcnow()
+        week_start = now - timedelta(days=now.weekday())
+        week_start = week_start.replace(hour=0, minute=0, second=0, microsecond=0)
+        week_start_key = week_start.isoformat()
+        if (
+            user.inactive_reminder_sent_at
+            and user.inactive_reminder_sent_at >= week_start
+            and scheduled_week_start != week_start_key
+        ):
+            logger.info(f"User {user_id} already received this week's inactive reminder, skipping")
+            return {'status': 'skipped', 'message': 'Already reminded this week'}
 
         # Get user type-specific content
         if user.user_type == 'creator':
@@ -618,6 +631,9 @@ The BantuBuzz Team
             html_body=html_body
         )
 
+        user.inactive_reminder_sent_at = now
+        db.session.commit()
+
         logger.info(f"Successfully sent inactive user reminder to user {user_id}")
         return {
             'status': 'success',
@@ -639,40 +655,68 @@ def check_and_notify_inactive_users():
     """
     Periodic task to find and notify inactive users (7+ days since last login).
 
-    This task is scheduled to run daily via Celery Beat.
+    This task is scheduled to run weekly on Monday at 9 AM via Celery Beat.
+    It also exits on non-Mondays so a stale daily scheduler cannot spam users.
 
     Returns:
         dict: Summary of notifications sent
     """
     try:
         from app.models import User
+        from app import db
+        from sqlalchemy import or_
         from datetime import datetime, timedelta
+
+        now = datetime.utcnow()
+        if now.weekday() != 0:
+            logger.info("Skipping inactive user reminders because today is not Monday")
+            return {
+                'status': 'skipped',
+                'message': 'Inactive reminders only run on Mondays',
+                'weekday': now.weekday()
+            }
 
         logger.info("Checking for inactive users...")
 
         # Find users who haven't logged in for 7+ days
-        seven_days_ago = datetime.utcnow() - timedelta(days=7)
+        seven_days_ago = now - timedelta(days=7)
+        week_start = now - timedelta(days=now.weekday())
+        week_start = week_start.replace(hour=0, minute=0, second=0, microsecond=0)
 
         inactive_users = User.query.filter(
             User.is_active == True,
             User.is_verified == True,
-            User.last_login < seven_days_ago
+            User.last_login < seven_days_ago,
+            or_(
+                User.inactive_reminder_sent_at.is_(None),
+                User.inactive_reminder_sent_at < week_start
+            )
         ).all()
 
         logger.info(f"Found {len(inactive_users)} inactive users")
 
+        # Reserve users for this week before queueing so duplicate beat entries
+        # cannot enqueue the same reminder repeatedly on Monday.
+        eligible_user_ids = []
+        for user in inactive_users:
+            user.inactive_reminder_sent_at = now
+            eligible_user_ids.append(user.id)
+
+        db.session.commit()
+
         # Send notifications asynchronously
         tasks_queued = 0
-        for user in inactive_users:
-            # Queue individual notification task
-            send_inactive_user_reminder.delay(user.id)
+        week_start_key = week_start.isoformat()
+        for user_id in eligible_user_ids:
+            send_inactive_user_reminder.delay(user_id, scheduled_week_start=week_start_key)
             tasks_queued += 1
 
         logger.info(f"Queued {tasks_queued} inactive user reminder emails")
         return {
             'status': 'success',
             'inactive_users_found': len(inactive_users),
-            'notifications_queued': tasks_queued
+            'notifications_queued': tasks_queued,
+            'week_start': week_start.isoformat()
         }
 
     except Exception as e:

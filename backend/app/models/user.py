@@ -22,6 +22,7 @@ class User(db.Model):
     locked_until = db.Column(db.DateTime, nullable=True)
     two_factor_enabled = db.Column(db.Boolean, default=False, nullable=False)
     last_login = db.Column(db.DateTime)
+    inactive_reminder_sent_at = db.Column(db.DateTime, nullable=True)
     # Google OAuth fields
     google_oauth_id = db.Column(db.String(255), unique=True, nullable=True)
     google_profile_picture = db.Column(db.String(500), nullable=True)
@@ -95,6 +96,7 @@ class User(db.Model):
             'is_account_suspended': self.is_account_suspended,
             'account_suspended_until': self.account_suspended_until.isoformat() if self.account_suspended_until else None,
             'last_login': self.last_login.isoformat() if self.last_login else None,
+            'inactive_reminder_sent_at': self.inactive_reminder_sent_at.isoformat() if self.inactive_reminder_sent_at else None,
             'created_at': self.created_at.isoformat(),
             'updated_at': self.updated_at.isoformat()
         }

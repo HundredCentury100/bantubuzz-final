@@ -1214,6 +1214,12 @@ Deployment note:
   - CMS blog/editorial pages live in `D:\Bantubuzz-headless-CMS` and have their own footer implementation. Keep that footer aligned with the main platform columns, including the BantuBuzz Intelligence links.
   - Main-platform navbar/footer deploy: `deployment\DEPLOY-NEW-VPS-PUBLIC-NAV-FOOTER.bat`.
   - CMS blog footer deploy: `deployment\DEPLOY-CMS-FOOTER-NAV.bat`.
+- Inactive user "We miss you" emails:
+  - Must run only once weekly on Monday at 9 AM, not daily.
+  - Celery Beat schedule lives in `backend/app/celery_app.py` under `notify-inactive-users` with `day_of_week='monday'`.
+  - The task itself also exits on non-Mondays so stale/daily scheduler cache entries cannot send emails.
+  - `users.inactive_reminder_sent_at` stores the weekly guard; the checker reserves users for the current week before queueing emails to avoid duplicate Monday sends.
+  - Targeted deploy script: `deployment\DEPLOY-NEW-VPS-WEEKLY-INACTIVE-EMAIL.bat`. It uploads the task/model/migration/schedule files, runs migration `202606181000`, clears Celery Beat's persisted schedule file, and restarts backend/Celery services.
 - Remaining hardening for future slices:
   - Improve team invitation onboarding so new invitees land directly back on the invite after signup/login.
   - Build tailored onboarding steps after Agency/Enterprise signup.
