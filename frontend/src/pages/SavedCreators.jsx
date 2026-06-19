@@ -165,7 +165,7 @@ const SavedCreators = () => {
                             return (priority[a] || 99) - (priority[b] || 99);
                           })
                           .map((badge, idx) => (
-                            <CreatorBadge key={idx} badge={badge} size="md" variant="overlay" />
+                            <CreatorBadge key={idx} badge={badge} size="sm" variant="icon-only" />
                           ))}
                       </div>
                     )}

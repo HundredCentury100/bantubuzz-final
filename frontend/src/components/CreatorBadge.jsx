@@ -130,11 +130,45 @@ const CreatorBadge = ({ badge, size = 'md', variant = 'full' }) => {
   };
   const padding = hasArtwork ? 'py-1 pl-1 pr-2.5' : 'px-2 py-0.5';
   const shadow = hasArtwork ? 'shadow-md' : 'shadow-sm';
+  const iconOnlySizeClasses = {
+    sm: hasArtwork ? 'h-8 w-8' : 'h-7 w-7',
+    md: hasArtwork ? 'h-10 w-10' : 'h-8 w-8',
+    lg: hasArtwork ? 'h-12 w-12' : 'h-10 w-10',
+  };
   const imageClassName = [
     iconSizeClasses[size],
     'flex-shrink-0 object-contain',
     config.invertImage ? 'brightness-0 invert' : '',
   ].join(' ');
+  const iconOnlyImageClassName = [
+    iconOnlySizeClasses[size],
+    'object-contain',
+    config.invertImage ? 'brightness-0 invert' : '',
+  ].join(' ');
+
+  if (variant === 'icon-only') {
+    return (
+      <div
+        className={`inline-flex items-center justify-center rounded-full ${config.pillBg} p-1 ${shadow}`}
+        title={config.label}
+        aria-label={config.label}
+      >
+        {config.image ? (
+          <img
+            src={config.image}
+            alt=""
+            className={iconOnlyImageClassName}
+            loading="lazy"
+            aria-hidden="true"
+          />
+        ) : (
+          <span className="inline-flex h-5 w-5 items-center justify-center text-white">
+            {config.icon}
+          </span>
+        )}
+      </div>
+    );
+  }
 
   const content = (
     <>
@@ -192,7 +226,7 @@ CreatorBadge.propTypes = {
     'buzz_creator',
   ]).isRequired,
   size: PropTypes.oneOf(['sm', 'md', 'lg']),
-  variant: PropTypes.oneOf(['full', 'icon', 'overlay']),
+  variant: PropTypes.oneOf(['full', 'icon', 'overlay', 'icon-only']),
 };
 
 export default CreatorBadge;
