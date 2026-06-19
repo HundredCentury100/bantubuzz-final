@@ -287,8 +287,15 @@ export const getEligibleCreators = (params) => {
   return adminAPI.get('/admin/creators/eligible-for-featured', { params });
 };
 
-export const featureCreator = (creatorId, featuredOrder = 0) => {
-  return adminAPI.post(`/admin/creators/${creatorId}/feature`, { featured_order: featuredOrder });
+export const featureCreator = (creatorId, payload = {}) => {
+  const data = typeof payload === 'number'
+    ? { featured_order: payload }
+    : {
+        featured_order: payload.featured_order ?? 0,
+        featured_type: payload.featured_type ?? 'general',
+      };
+
+  return adminAPI.post(`/admin/creators/${creatorId}/feature`, data);
 };
 
 export const unfeatureCreator = (creatorId) => {
