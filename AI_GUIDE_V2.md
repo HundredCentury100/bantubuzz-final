@@ -1161,8 +1161,9 @@ Deployment note:
     - `GET /api/creators/rankings?type=category&context=<category>&limit=50`
     - `GET /api/creators/rankings?type=platform&context=<platform>&limit=100`
     - `GET /api/creators/<creator_id>/rank`
-  - Public badges are generated from Creator Score v1.1 inputs: Buzz Creator, Creator To Watch, Rising Creator, Audience Builder, Engagement Leader, Brand Magnet, Campaign Pro, Trusted Creator, Top Creator, Elite Creator, City Top 10, and Category Leader. Frontend currently uses placeholder SVG badge icons until the design team supplies final artwork.
-  - Creators manage leaderboard display through `PUT /api/creators/profile/leaderboard-preferences`: `show_score` controls public numeric score visibility, and `selected_badges` lets creators choose up to 3 badges. Default badge fallback is `buzz_creator`.
+  - Public badges are generated from Creator Score v1.1 inputs: Creator To Watch, Rising Creator, Audience Builder, Engagement Leader, Brand Magnet, Campaign Pro, Trusted Creator, Top Creator, Elite Creator, City Top 10, and Category Leader. `Buzz Creator` was retired; any old `buzz_creator` value should be treated as a legacy alias for `creator_to_watch`.
+  - Badge artwork lives in `frontend/public/assets/badges`; deploy badge UI/backend changes with `deployment\DEPLOY-NEW-VPS-CREATOR-BADGES.bat`.
+  - Creators manage leaderboard display through `PUT /api/creators/profile/leaderboard-preferences`: `show_score` controls public numeric score visibility, and `selected_badges` lets creators choose up to 3 badges. Default badge fallback is `creator_to_watch`.
   - Leaderboard rebuild sends a one-time in-app/email notification when a creator first appears in the Top 100.
   - Admin-only score diagnostics: `GET /api/admin/creator-scores`.
   - June 16, 2026 new-VPS deployment succeeded via report `deployment/vps/reports/new-vps-creator-score-leaderboard-v11-13.140.159.150-20260616-221649.txt`: migration `202606101700 -> 202606161000` ran, backend/Celery worker/Celery beat were active, 90 creator scores/rankings recalculated, and local/public health returned healthy.

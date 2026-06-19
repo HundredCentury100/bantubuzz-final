@@ -115,6 +115,14 @@ class CreatorProfile(db.Model):
         badges = self.get_all_badges()
         return badges[:3]
 
+    def _normalize_badges(self, badges):
+        normalized = []
+        for badge in badges or []:
+            badge_key = 'creator_to_watch' if badge == 'buzz_creator' else badge
+            if badge_key not in normalized:
+                normalized.append(badge_key)
+        return normalized
+
     def get_all_badges(self):
         try:
             from app.services.creator_score_service import CreatorScoreService
@@ -138,11 +146,12 @@ class CreatorProfile(db.Model):
         except Exception:
             pass
 
-        return badges
+        return self._normalize_badges(badges)
 
     def get_leaderboard_badges(self):
         badges = self.get_all_badges()
         selected = self.leaderboard_badges or []
+        selected = self._normalize_badges(selected)
         selected = [badge for badge in selected if badge in badges]
 
         if len(badges) <= 3:

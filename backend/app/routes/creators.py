@@ -25,6 +25,8 @@ def _public_creator_payload(creator):
     creator_data = creator.to_dict(include_user=True, public_view=True)
     from app.services.creator_score_service import CreatorScoreService
     creator_data['rank'] = CreatorScoreService.public_rank(creator.id)
+    creator_data['badges'] = creator.get_all_badges()
+    creator_data['leaderboard_display_badges'] = creator.get_leaderboard_badges()
     creator_data['public_creator_score'] = (
         round(float(creator.private_score.final_score or 0), 1)
         if creator.leaderboard_show_score and creator.private_score else None

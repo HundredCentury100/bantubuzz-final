@@ -59,7 +59,6 @@ BADGE_PRIORITY = {
     'verified_creator': 15,
     'referral_verified': 12,
     'creator_to_watch': 5,
-    'buzz_creator': 1,
     'creator': 0,
 }
 
@@ -793,7 +792,7 @@ class CreatorScoreService:
     def achievement_badges(creator):
         score = getattr(creator, 'private_score', None)
         if not score:
-            return ['buzz_creator']
+            return ['creator_to_watch']
 
         snapshot = score.input_snapshot or {}
         review_snapshot = snapshot.get('reviews') or {}
@@ -883,7 +882,7 @@ class CreatorScoreService:
             badges.append('verified_creator')
 
         if not badges:
-            badges.append('creator_to_watch' if final_score >= 60 else 'buzz_creator')
+            badges.append('creator_to_watch')
 
         return sorted(dict.fromkeys(badges), key=lambda badge: -BADGE_PRIORITY.get(badge, 0))
 
