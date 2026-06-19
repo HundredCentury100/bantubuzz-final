@@ -16,6 +16,25 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def _apply_thunzi_platform_update(platform, updated_platform, fallback_status=None):
+    if not updated_platform:
+        return False
+
+    platform.account_name = updated_platform.get('accountName') or platform.account_name
+    platform.account_id = updated_platform.get('accountId') or platform.account_id
+    platform.account_id_secondary = updated_platform.get('accountIdSecondary') or platform.account_id_secondary
+    platform.profile_url = updated_platform.get('profileUrl') or platform.profile_url
+    if updated_platform.get('followers') is not None:
+        platform.followers = updated_platform.get('followers')
+    if updated_platform.get('posts') is not None:
+        platform.posts = updated_platform.get('posts')
+    platform.sync_status = updated_platform.get('syncStatus') or fallback_status or platform.sync_status
+    platform.scopes = updated_platform.get('scopes') or platform.scopes
+    platform.update_analytics_from_thunzi(updated_platform)
+    platform.last_synced_at = datetime.utcnow()
+    return True
+
+
 @celery.task(name='app.tasks.platform_sync.sync_platform')
 def sync_platform(platform_id):
     """
@@ -69,31 +88,26 @@ def sync_platform(platform_id):
             poll_interval_seconds=5
         )
 
-        if not result.get('success'):
-            logger.error(f"Sync failed for platform {platform_id}")
-            platform.sync_status = result.get('status', 'failed')
-            db.session.commit()
-            return {'status': 'error', 'message': 'Platform sync failed'}
-
-        # Fetch latest platform data from ThunziAI and update local cache.
+        # Always fetch latest platform data. Thunzi async sync can time out in
+        # BantuBuzz while Thunzi later has fresh success metrics available.
         platforms_data = thunzi_service.get_platforms(thunzi_account.thunzi_company_id)
         updated_platform = next(
             (p for p in platforms_data if p.get('id') == platform.thunzi_platform_id),
             None
         )
 
-        if updated_platform:
-            platform.account_name = updated_platform.get('accountName') or platform.account_name
-            platform.account_id = updated_platform.get('accountId') or platform.account_id
-            platform.account_id_secondary = updated_platform.get('accountIdSecondary') or platform.account_id_secondary
-            platform.profile_url = updated_platform.get('profileUrl') or platform.profile_url
-            platform.followers = updated_platform.get('followers', platform.followers)
-            platform.posts = updated_platform.get('posts', platform.posts)
-            platform.sync_status = updated_platform.get('syncStatus') or result.get('status', 'success')
-            platform.scopes = updated_platform.get('scopes') or platform.scopes
-            platform.update_analytics_from_thunzi(updated_platform)
+        refreshed_from_thunzi = _apply_thunzi_platform_update(
+            platform,
+            updated_platform,
+            fallback_status=result.get('status', 'success' if result.get('success') else 'failed'),
+        )
 
-        platform.last_synced_at = datetime.utcnow()
+        if not result.get('success') and not refreshed_from_thunzi:
+            logger.error(f"Sync failed for platform {platform_id}")
+            platform.sync_status = result.get('status', 'failed')
+            platform.last_synced_at = datetime.utcnow()
+            db.session.commit()
+            return {'status': 'error', 'message': 'Platform sync failed'}
 
         creator = CreatorProfile.query.filter_by(user_id=platform.user_id).first()
         if creator:
@@ -109,7 +123,8 @@ def sync_platform(platform_id):
             'platform_id': platform_id,
             'platform': platform.platform,
             'synced_at': platform.last_synced_at.isoformat(),
-            'result': result
+            'result': result,
+            'refreshed_from_thunzi': refreshed_from_thunzi,
         }
 
     except Exception as e:

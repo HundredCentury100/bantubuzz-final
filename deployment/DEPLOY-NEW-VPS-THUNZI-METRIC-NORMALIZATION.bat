@@ -25,6 +25,7 @@ echo This targeted deployment will:
 echo   - Normalize ThunziAI engagement-rate scale handling
 echo   - Normalize ThunziAI sentiment score display/storage handling
 echo   - Fix post metric sync to use Thunzi sentimentScore/top-level sentiment
+echo   - Refresh stale local platform analytics from current Thunzi payloads
 echo   - Normalize existing obvious fractional stored values
 echo   - Recalculate creator scores
 echo   - Restart backend, Celery worker, and Celery beat
@@ -45,7 +46,8 @@ call "backend\venv\Scripts\python.exe" -m py_compile ^
     "backend\app\utils\thunzi_metrics.py" ^
     "backend\app\models\connected_platform.py" ^
     "backend\app\services\creator_analytics_service.py" ^
-    "backend\app\services\post_metrics_service.py"
+    "backend\app\services\post_metrics_service.py" ^
+    "backend\app\tasks\platform_sync.py"
 if not "%ERRORLEVEL%"=="0" goto :failed_popd
 popd
 
@@ -56,7 +58,8 @@ tar -czf "%BACKEND_ARCHIVE%" -C "%ROOT%\backend" ^
     app/utils/thunzi_metrics.py ^
     app/models/connected_platform.py ^
     app/services/creator_analytics_service.py ^
-    app/services/post_metrics_service.py
+    app/services/post_metrics_service.py ^
+    app/tasks/platform_sync.py
 if errorlevel 1 goto :failed
 
 echo.

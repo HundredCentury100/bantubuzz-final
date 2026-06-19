@@ -42,11 +42,12 @@ tar --ignore-failed-read -czf "$BACKUP/backend-targeted.tar.gz" -C backend \
   app/utils/thunzi_metrics.py \
   app/models/connected_platform.py \
   app/services/creator_analytics_service.py \
-  app/services/post_metrics_service.py
+  app/services/post_metrics_service.py \
+  app/tasks/platform_sync.py
 
 echo "Installing backend files"
 tar -xzf /tmp/bantubuzz-thunzi-metric-normalization.tar.gz -C backend
-chown -R bantubuzz:www-data backend/app/utils backend/app/models backend/app/services
+chown -R bantubuzz:www-data backend/app/utils backend/app/models backend/app/services backend/app/tasks
 
 echo "Compiling targeted backend files"
 cd backend
@@ -58,21 +59,45 @@ files = [
     'app/models/connected_platform.py',
     'app/services/creator_analytics_service.py',
     'app/services/post_metrics_service.py',
+    'app/tasks/platform_sync.py',
 ]
 for path in files:
     py_compile.compile(path, cfile=f"/tmp/{path.replace('/', '_')}.pyc", doraise=True)
 PY
 rm -f /tmp/app_*.pyc
 
-echo "Normalizing existing obvious fractional metric values"
+echo "Refreshing local platform analytics from current Thunzi payloads"
 export FLASK_APP=run.py
 venv/bin/python - <<'PY'
 from app import create_app, db
-from app.models import ConnectedPlatform, PostMetrics
+from app.models import ConnectedPlatform, PostMetrics, ThunziAccount
+from app.services.thunzi_service import ThunziAIService
+from app.tasks.platform_sync import _apply_thunzi_platform_update
 from app.utils.thunzi_metrics import normalize_engagement_rate_percent, normalize_sentiment_0_100
 
 app = create_app()
 with app.app_context():
+    refresh_updates = 0
+    service = ThunziAIService()
+    accounts = ThunziAccount.query.filter(
+        ThunziAccount.thunzi_company_id.isnot(None),
+        ThunziAccount.thunzi_email.isnot(None),
+    ).all()
+    for account in accounts:
+        if not service.login(email=account.thunzi_email, password=account.thunzi_email):
+            continue
+        raw_platforms = service.get_platforms(account.thunzi_company_id)
+        for raw in raw_platforms:
+            thunzi_platform_id = raw.get('id')
+            if not thunzi_platform_id:
+                continue
+            local = ConnectedPlatform.query.filter_by(
+                user_id=account.user_id,
+                thunzi_platform_id=thunzi_platform_id,
+            ).first()
+            if local and _apply_thunzi_platform_update(local, raw):
+                refresh_updates += 1
+
     platform_updates = 0
     post_updates = 0
 
@@ -98,6 +123,7 @@ with app.app_context():
             post_updates += 1
 
     db.session.commit()
+    print(f"platform_rows_refreshed_from_thunzi={refresh_updates}")
     print(f"platform_rows_normalized={platform_updates}")
     print(f"post_metric_rows_normalized={post_updates}")
 PY

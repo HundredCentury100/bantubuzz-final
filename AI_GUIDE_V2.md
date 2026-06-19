@@ -735,6 +735,7 @@ There are two analytics paths:
    - Used as a fallback when no local `PostMetrics` exist.
    - Engagement rates must be normalized to percent with `backend/app/utils/thunzi_metrics.py` because ThunziAI can return either `0.052` or `5.2` for 5.2%.
    - Sentiment platform analytics are returned to the creator analytics frontend as `0..1` because that UI multiplies by 100; connected-platform storage normalizes sentiment to `0..100` for Creator Score inputs.
+   - Thunzi async sync can time out locally while Thunzi later has completed `success` metrics. `app/tasks/platform_sync.py` now refreshes the local `ConnectedPlatform` row from `GET /api/platforms?companyId=...` even after an async timeout when Thunzi has a matching platform payload. The metric-normalization deploy also runs a one-time refresh for stale local rows before recalculating creator scores.
 
 2. Stored post metrics via `PostMetricsService`.
    - Deliverable URLs are parsed and validated.
