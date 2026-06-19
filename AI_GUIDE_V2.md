@@ -733,6 +733,8 @@ There are two analytics paths:
    - Gets platforms from `GET /api/platforms?companyId=...`.
    - Uses Thunzi pre-calculated fields like `averageEngagementRate`, `averageViews`, `averageReach`, `averageComments`, `averageLikes`, `averageShares`, `averageSaves`.
    - Used as a fallback when no local `PostMetrics` exist.
+   - Engagement rates must be normalized to percent with `backend/app/utils/thunzi_metrics.py` because ThunziAI can return either `0.052` or `5.2` for 5.2%.
+   - Sentiment platform analytics are returned to the creator analytics frontend as `0..1` because that UI multiplies by 100; connected-platform storage normalizes sentiment to `0..100` for Creator Score inputs.
 
 2. Stored post metrics via `PostMetricsService`.
    - Deliverable URLs are parsed and validated.
@@ -740,6 +742,8 @@ There are two analytics paths:
    - Matches by `originalId`, extracting the portion after the first underscore when needed.
    - Fetches insights by original post ID.
    - Stores results in `post_metrics`.
+   - `PostMetrics.engagement_rate` is percent. Normalize Thunzi post `engagementRate` before storage.
+   - `PostMetrics.sentiment_score` is `-100..100`. Prefer Thunzi `sentimentScore` on the post or top-level insights `sentiment`; string sentiment labels are only a fallback.
 
 ### Deliverable Metrics
 
@@ -803,6 +807,7 @@ Current implementation:
 - `get_posts_by_company_id` is more reliable than creator-specific post fetching for metrics sync.
 - Audience data may require Instagram Business/Creator accounts and enough followers/data.
 - Check for field name drift: `lastSynced` vs `lastSyncedAt`, `positive` vs `postive`, `platformConnectionId` vs `platormConnectionId`, `originalId` vs `originalPostId`.
+- June 19, 2026 product concern: sentiment and engagement looked swapped or decimal-shifted. Code inspection found the fields were not literally swapped (`averageEngagementRate` and `averageSentimentScore` map separately), but scale drift was real. Deploy `deployment/DEPLOY-NEW-VPS-THUNZI-METRIC-NORMALIZATION.bat` to normalize scale handling and obvious stored fractional values, then run `deployment/DIAGNOSE-NEW-VPS-THUNZI-METRICS.bat` for read-only raw Thunzi-vs-local comparisons.
 
 ## How Future AI Sessions Should Work
 

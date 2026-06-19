@@ -17,6 +17,11 @@ from app.models import (
     CreatorProfile
 )
 from app.services.thunzi_service import thunzi_service
+from app.utils.thunzi_metrics import (
+    normalize_engagement_rate_percent,
+    normalize_post_sentiment_score,
+    sentiment_label_from_score,
+)
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Union
 import hashlib
@@ -539,7 +544,7 @@ class PostMetricsService:
             # Store ThunziAI's engagement rate if available (TikTok, Facebook, Instagram)
             engagement_rate_value = post_data.get('engagementRate')
             if engagement_rate_value is not None:
-                metrics.engagement_rate = engagement_rate_value
+                metrics.engagement_rate = normalize_engagement_rate_percent(engagement_rate_value)
 
             # Video metrics (if available)
             video_views_value = post_data.get('videoViews') or post_data.get('views')
@@ -549,22 +554,16 @@ class PostMetricsService:
             # Calculate total engagement from available metrics
             metrics.calculate_engagement()
 
-            # Sentiment analysis (YouTube-only has sentiment score)
-            sentiment_value = post_data.get('sentiment')
+            sentiment_value = (
+                post_data.get('sentimentScore')
+                if post_data.get('sentimentScore') is not None
+                else insights.get('sentiment')
+            )
             if sentiment_value is not None:
-                if isinstance(sentiment_value, (int, float)):
-                    # ThunziAI sometimes returns sentiment as a percentage.
-                    if sentiment_value <= 33:
-                        metrics.sentiment = 'negative'
-                        metrics.sentiment_score = sentiment_value - 50
-                    elif sentiment_value <= 66:
-                        metrics.sentiment = 'neutral'
-                        metrics.sentiment_score = 0
-                    else:
-                        metrics.sentiment = 'positive'
-                        metrics.sentiment_score = sentiment_value - 50
-                else:
-                    metrics.sentiment = PostMetricsService._normalize_sentiment(sentiment_value)
+                metrics.sentiment_score = normalize_post_sentiment_score(sentiment_value)
+                metrics.sentiment = sentiment_label_from_score(metrics.sentiment_score)
+            elif post_data.get('sentiment') is not None:
+                metrics.sentiment = PostMetricsService._normalize_sentiment(post_data.get('sentiment'))
 
             # Handle ThunziAI's typo: they return "postive" instead of "positive"
             metrics.positive_comments = sentiment_data.get('positive', sentiment_data.get('postive', 0))

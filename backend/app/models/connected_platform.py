@@ -4,6 +4,7 @@ Stores social media platforms connected via ThunziAI
 """
 from app import db
 from datetime import datetime
+from app.utils.thunzi_metrics import normalize_engagement_rate_percent, normalize_sentiment_0_100
 
 
 class ConnectedPlatform(db.Model):
@@ -72,17 +73,19 @@ class ConnectedPlatform(db.Model):
     def update_analytics_from_thunzi(self, payload):
         if not isinstance(payload, dict):
             return
-        field_map = {
-            'averageEngagementRate': 'average_engagement_rate',
-            'averageSentimentScore': 'average_sentiment_score',
-            'averageViews': 'average_views',
-            'averageReach': 'average_reach',
-        }
         updated = False
-        for source, target in field_map.items():
-            if source in payload and payload[source] is not None:
-                setattr(self, target, payload[source])
-                updated = True
+        if payload.get('averageEngagementRate') is not None:
+            self.average_engagement_rate = normalize_engagement_rate_percent(payload.get('averageEngagementRate'))
+            updated = True
+        if payload.get('averageSentimentScore') is not None:
+            self.average_sentiment_score = normalize_sentiment_0_100(payload.get('averageSentimentScore'))
+            updated = True
+        if payload.get('averageViews') is not None:
+            self.average_views = payload.get('averageViews')
+            updated = True
+        if payload.get('averageReach') is not None:
+            self.average_reach = payload.get('averageReach')
+            updated = True
         if updated:
             self.analytics_synced_at = datetime.utcnow()
 

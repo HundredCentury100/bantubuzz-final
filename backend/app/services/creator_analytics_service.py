@@ -9,6 +9,7 @@ from statistics import mean
 
 from app.models import ThunziAccount
 from app.services.thunzi_service import thunzi_service
+from app.utils.thunzi_metrics import normalize_engagement_rate_percent, normalize_sentiment_fraction
 
 
 class CreatorAnalyticsService:
@@ -147,6 +148,8 @@ class CreatorAnalyticsService:
             # Extract pre-calculated averages from ThunziAI (NEW fields)
             avg_engagement_rate = thunzi_platform.get('averageEngagementRate', 0)
             avg_sentiment_score = thunzi_platform.get('averageSentimentScore', 0)
+            avg_engagement_rate = normalize_engagement_rate_percent(avg_engagement_rate) or 0
+            avg_sentiment_score = normalize_sentiment_fraction(avg_sentiment_score) or 0
             avg_views = thunzi_platform.get('averageViews', 0)
             avg_reach = thunzi_platform.get('averageReach', 0)
             avg_comments = thunzi_platform.get('averageComments', 0)
