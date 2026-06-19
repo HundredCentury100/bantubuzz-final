@@ -70,10 +70,14 @@ echo "Refreshing local platform analytics from current Thunzi payloads"
 export FLASK_APP=run.py
 venv/bin/python - <<'PY'
 from app import create_app, db
-from app.models import ConnectedPlatform, PostMetrics, ThunziAccount
+from app.models import ConnectedPlatform, PostMetrics, PostSentimentComment, ThunziAccount
 from app.services.thunzi_service import ThunziAIService
 from app.tasks.platform_sync import _apply_thunzi_platform_update
-from app.utils.thunzi_metrics import normalize_engagement_rate_percent, normalize_sentiment_0_100
+from app.utils.thunzi_metrics import (
+    normalize_engagement_rate_percent,
+    normalize_post_sentiment_score,
+    normalize_sentiment_0_100,
+)
 
 app = create_app()
 with app.app_context():
@@ -100,6 +104,7 @@ with app.app_context():
 
     platform_updates = 0
     post_updates = 0
+    comment_updates = 0
 
     for platform in ConnectedPlatform.query.all():
         changed = False
@@ -122,10 +127,17 @@ with app.app_context():
             metric.engagement_rate = normalized
             post_updates += 1
 
+    for comment in PostSentimentComment.query.filter(PostSentimentComment.sentiment_score.isnot(None)).all():
+        normalized = normalize_post_sentiment_score(comment.sentiment_score)
+        if normalized is not None and float(normalized) != float(comment.sentiment_score):
+            comment.sentiment_score = normalized
+            comment_updates += 1
+
     db.session.commit()
     print(f"platform_rows_refreshed_from_thunzi={refresh_updates}")
     print(f"platform_rows_normalized={platform_updates}")
     print(f"post_metric_rows_normalized={post_updates}")
+    print(f"post_sentiment_comment_rows_normalized={comment_updates}")
 PY
 
 echo "Restarting services"

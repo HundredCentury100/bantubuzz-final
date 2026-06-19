@@ -164,7 +164,7 @@ class PostMetricsService:
                     'author': author or None,
                     'content': content,
                     'sentiment': PostMetricsService._normalize_sentiment(comment.get('sentiment')),
-                    'sentiment_score': comment.get('sentimentScore'),
+                    'sentiment_score': normalize_post_sentiment_score(comment.get('sentimentScore')),
                     'language': PostMetricsService._detect_language(
                         content,
                         comment.get('language') or comment.get('languageCode')

@@ -25,6 +25,7 @@ echo This targeted deployment will:
 echo   - Normalize ThunziAI engagement-rate scale handling
 echo   - Normalize ThunziAI sentiment score display/storage handling
 echo   - Fix post metric sync to use Thunzi sentimentScore/top-level sentiment
+echo   - Normalize comment-level sentiment used in reports
 echo   - Refresh stale local platform analytics from current Thunzi payloads
 echo   - Normalize existing obvious fractional stored values
 echo   - Recalculate creator scores
@@ -76,7 +77,7 @@ echo ============================================================
 echo PASSWORD PROMPT: NEW VPS %NEW_SERVER%
 echo ============================================================
 ssh -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=15 -o ServerAliveCountMax=20 ^
-    %SSH_USER%@%NEW_SERVER% "bash /tmp/deploy-thunzi-metric-normalization.sh" 2>&1 | powershell.exe -NoProfile -Command ^
+    %SSH_USER%@%NEW_SERVER% "sed -i 's/\r$//' /tmp/deploy-thunzi-metric-normalization.sh && bash /tmp/deploy-thunzi-metric-normalization.sh" 2>&1 | powershell.exe -NoProfile -Command ^
     "$input | Tee-Object -FilePath '%REPORT%'; if (Select-String -Quiet -SimpleMatch 'BANTUBUZZ_NEW_VPS_THUNZI_METRIC_NORMALIZATION_SUCCESS' '%REPORT%') { exit 0 } else { exit 1 }"
 if errorlevel 1 goto :failed
 

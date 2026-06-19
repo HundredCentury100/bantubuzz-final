@@ -745,6 +745,7 @@ There are two analytics paths:
    - Stores results in `post_metrics`.
    - `PostMetrics.engagement_rate` is percent. Normalize Thunzi post `engagementRate` before storage.
    - `PostMetrics.sentiment_score` is `-100..100`. Prefer Thunzi `sentimentScore` on the post or top-level insights `sentiment`; string sentiment labels are only a fallback.
+   - `PostSentimentComment.sentiment_score` is also `-100..100`; normalize comment-level Thunzi `sentimentScore` before saving so campaign reports and advanced sentiment analytics do not mix raw `0..1`, `0..100`, and signed scales.
 
 ### Deliverable Metrics
 
