@@ -15,7 +15,7 @@ import SEO from '../components/SEO';
 import toast from 'react-hot-toast';
 import { PLATFORM_CONFIGS, PACKAGE_TYPES } from '../constants/platformConfig';
 import PortfolioGrid from '../components/PortfolioGrid';
-import { Bolt, Copy, MessageCircle, Trophy } from 'lucide-react';
+import { Bookmark, Bolt, Copy, MessageCircle, Plus, Share2, Trophy } from 'lucide-react';
 import GalleryVideo from '../components/GalleryVideo';
 import CreatorCardActions from '../components/CreatorCardActions';
 
@@ -322,6 +322,9 @@ const CreatorProfile = () => {
   const profileRating = reviewsStats?.overall ?? creator.effective_rating ?? creator.review_stats?.average_rating ?? null;
   const hasReviews = reviewCount > 0 && profileRating !== null && profileRating !== undefined;
   const leaderboardReturnPath = location.state?.fromLeaderboard;
+  const toolbarIconButton = 'inline-flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full border border-gray-300 bg-white text-gray-700 transition-colors hover:border-primary hover:text-primary';
+  const toolbarPrimaryButton = 'inline-flex h-11 flex-shrink-0 items-center justify-center gap-2 rounded-full border border-primary bg-primary px-4 text-sm font-semibold text-white transition-colors hover:bg-primary/90';
+  const toolbarOutlineButton = 'inline-flex h-11 flex-shrink-0 items-center justify-center gap-2 rounded-full border border-primary bg-white px-4 text-sm font-semibold text-primary transition-colors hover:bg-primary hover:text-white';
 
   return (
     <div className="min-h-screen bg-light">
@@ -446,8 +449,8 @@ const CreatorProfile = () => {
 
             {/* Creator Info */}
             <div className="flex-1">
-              <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4 mb-4">
-                <div className="flex-1">
+              <div className="flex flex-col gap-4 mb-4 md:flex-row md:flex-wrap md:items-start md:justify-between">
+                <div className="min-w-0 flex-1">
                   <h1 className="text-3xl font-bold text-dark mb-2">
                     {creator.display_name || creator.username || 'Creator'}
                   </h1>
@@ -574,9 +577,10 @@ const CreatorProfile = () => {
                   </p>
                 </div>
 
-                {/* Actions - Desktop: Side by side on right, Mobile: Stacked below badges */}
-                <div className="flex flex-col gap-3 w-full md:w-auto md:flex-row md:gap-2 md:flex-shrink-0">
+                {/* Actions */}
+                <div className="flex w-full flex-wrap items-center justify-start gap-2 md:w-auto md:max-w-[760px] md:justify-end">
                   <CreatorCardActions
+                    compact
                     creator={{
                       ...creator,
                       creator_id: creator.id,
@@ -587,15 +591,14 @@ const CreatorProfile = () => {
                     }}
                   />
                   {/* Share Profile Button - Always visible */}
-                  <div className="relative w-full md:w-auto">
+                  <div className="relative">
                     <button
                       onClick={() => setShowShareMenu((value) => !value)}
-                      className="px-6 py-3 rounded-full border border-gray-300 bg-white text-gray-700 hover:border-primary hover:text-primary transition-colors flex items-center justify-center gap-2 whitespace-nowrap font-medium w-full md:w-auto"
+                      className={toolbarIconButton}
+                      title="Share profile"
+                      aria-label="Share profile"
                     >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
-                      </svg>
-                      Share Profile
+                      <Share2 className="h-5 w-5" />
                     </button>
 
                     {showShareMenu && (
@@ -628,37 +631,34 @@ const CreatorProfile = () => {
                         username: creator.username,
                         profile_picture: creator.profile_picture
                       } }}
-                      className="px-6 py-3 rounded-full border border-primary bg-primary text-white hover:bg-primary/90 transition-colors flex items-center justify-center gap-2 whitespace-nowrap font-medium w-full md:w-auto"
+                      className={toolbarPrimaryButton}
+                      title="Send message"
                     >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                      </svg>
-                      Send Message
+                      <MessageCircle className="h-5 w-5" />
+                      <span>Message</span>
                     </Link>
                     {/* Invite to Campaign and Save buttons only for brands */}
                     {user?.user_type === 'brand' && (
                       <>
                         <button
                           onClick={() => setShowInviteModal(true)}
-                          className="px-6 py-3 rounded-full border border-primary bg-white text-primary hover:bg-primary hover:text-white transition-colors flex items-center justify-center gap-2 whitespace-nowrap font-medium w-full md:w-auto"
+                          className={toolbarOutlineButton}
+                          title="Invite to campaign"
                         >
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                          </svg>
-                          Invite to Campaign
+                          <Plus className="h-5 w-5" />
+                          <span>Invite</span>
                         </button>
                         <button
                           onClick={handleSaveCreator}
-                          className={`px-6 py-3 rounded-full border transition-colors flex items-center justify-center gap-2 whitespace-nowrap font-medium w-full md:w-auto ${
+                          className={`inline-flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full border transition-colors ${
                             isSaved
                               ? 'bg-primary text-white border-primary'
                               : 'bg-white text-gray-600 border-gray-300 hover:border-primary hover:text-primary'
                           }`}
+                          title={isSaved ? 'Saved creator' : 'Save creator'}
+                          aria-label={isSaved ? 'Saved creator' : 'Save creator'}
                         >
-                          <svg className="w-5 h-5" fill={isSaved ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
-                          </svg>
-                          {isSaved ? 'Saved' : 'Save Creator'}
+                          <Bookmark className={`h-5 w-5 ${isSaved ? 'fill-current' : ''}`} />
                         </button>
                       </>
                     )}
