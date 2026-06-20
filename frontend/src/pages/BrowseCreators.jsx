@@ -659,10 +659,17 @@ const BrowseCreators = () => {
           /* Creators Grid */
           <>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-              {creators.map((creator) => (
+              {creators.map((creator, index) => {
+                const isPrimaryRow = Math.floor(index / 4) % 2 === 0;
+                const cardBackground = isPrimaryRow ? 'bg-primary' : 'bg-white';
+                const profileButtonClass = isPrimaryRow
+                  ? 'bg-white text-dark hover:bg-gray-100'
+                  : 'bg-dark text-white hover:bg-gray-800';
+
+                return (
                 <div
                   key={creator.id}
-                  className="bg-primary p-4 rounded-3xl shadow-sm hover:shadow-md transition-shadow relative"
+                  className={`${cardBackground} p-4 rounded-3xl shadow-sm hover:shadow-md transition-shadow relative`}
                 >
                   {/* Save/Unsave Heart Icon - Top Right */}
                   <button
@@ -828,12 +835,13 @@ const BrowseCreators = () => {
                   {/* View Profile Button - White on Primary Background */}
                   <Link
                     to={`/creators/${creator.id}`}
-                    className="block w-full bg-white text-dark text-center py-3 rounded-full font-medium hover:bg-gray-100 transition-colors"
+                    className={`block w-full ${profileButtonClass} text-center py-3 rounded-full font-medium transition-colors`}
                   >
                     View profile
                   </Link>
                 </div>
-              ))}
+              );
+              })}
             </div>
 
             {/* Pagination */}
