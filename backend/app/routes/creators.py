@@ -678,10 +678,18 @@ def get_own_profile():
         if not creator:
             return jsonify({'error': 'Creator profile not found'}), 404
 
-        from app.services.creator_score_service import CreatorScoreService
         creator_data = creator.to_dict(include_user=True)
-        creator_data['rank'] = CreatorScoreService.public_rank(creator.id)
-        creator_data['creator_score'] = CreatorScoreService.owner_score_payload(creator)
+        try:
+            from app.services.creator_score_service import CreatorScoreService
+            creator_data['rank'] = CreatorScoreService.public_rank(creator.id)
+            creator_data['creator_score'] = CreatorScoreService.owner_score_payload(creator)
+        except Exception:
+            creator_data['rank'] = None
+            creator_data['creator_score'] = {
+                'score': None,
+                'message': 'Your score is temporarily unavailable.',
+                'improvement_tips': []
+            }
         return jsonify(creator_data), 200
 
     except Exception as e:

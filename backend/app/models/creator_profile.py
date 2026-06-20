@@ -168,8 +168,43 @@ class CreatorProfile(db.Model):
             include_user: Include user object
             public_view: If True, exclude private info (email) from user object
         """
-        total_followers = self.get_total_followers()
-        review_stats = self.get_review_stats()
+        try:
+            total_followers = self.get_total_followers()
+        except Exception:
+            total_followers = int(self.follower_count or 0)
+
+        try:
+            platform_stats = self.get_platform_stats()
+        except Exception:
+            platform_stats = []
+
+        try:
+            review_stats = self.get_review_stats()
+        except Exception:
+            review_stats = {
+                'average_rating': None,
+                'total_reviews': 0
+            }
+
+        try:
+            badges = self.get_badges()
+        except Exception:
+            badges = ['verified_creator'] if self.is_verified else ['creator_to_watch']
+
+        try:
+            leaderboard_display_badges = self.get_leaderboard_badges()
+        except Exception:
+            leaderboard_display_badges = badges[:3]
+
+        try:
+            active_spotlight_boost = self.get_active_spotlight_boost()
+        except Exception:
+            active_spotlight_boost = None
+
+        try:
+            effective_rating = self.get_effective_rating()
+        except Exception:
+            effective_rating = None
 
         data = {
             'id': self.id,
@@ -189,7 +224,7 @@ class CreatorProfile(db.Model):
             'country': self.country,
             'languages': self.languages or [],
             'platforms': self.platforms or [],  # Platforms selected by creator
-            'platform_stats': self.get_platform_stats(),  # Connected platforms with follower counts
+            'platform_stats': platform_stats,  # Connected platforms with follower counts
             'availability_status': self.availability_status,
             'social_links': self.social_links or {},
             'success_stories': self.success_stories,
@@ -198,15 +233,15 @@ class CreatorProfile(db.Model):
             'free_revisions': self.free_revisions or 2,
             'revision_fee': self.revision_fee or 0.0,
             'is_verified': self.is_verified or False,
-            'badges': self.get_badges(),
+            'badges': badges,
             'leaderboard_show_score': bool(self.leaderboard_show_score),
             'leaderboard_badges': self.leaderboard_badges or [],
-            'leaderboard_display_badges': self.get_leaderboard_badges(),
+            'leaderboard_display_badges': leaderboard_display_badges,
             'rating_penalty': float(getattr(self, 'rating_penalty', 0.0) or 0.0),
             'cancelled_collaborations_count': getattr(self, 'cancelled_collaborations_count', 0) or 0,
-            'effective_rating': self.get_effective_rating(),
+            'effective_rating': effective_rating,
             'review_stats': review_stats,
-            'active_spotlight_boost': self.get_active_spotlight_boost(),
+            'active_spotlight_boost': active_spotlight_boost,
             'created_at': self.created_at.isoformat(),
             'updated_at': self.updated_at.isoformat()
         }

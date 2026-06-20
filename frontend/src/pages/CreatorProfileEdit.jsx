@@ -73,12 +73,18 @@ const CreatorProfileEdit = () => {
 
   const fetchProfile = async () => {
     try {
-      const [response, authResponse] = await Promise.all([
-        creatorsAPI.getOwnProfile(),
-        authAPI.getCurrentUser(),
-      ]);
+      const response = await creatorsAPI.getOwnProfile();
       const data = response.data;
-      setSecurity(authResponse.data.security || { can_enable_2fa: false, two_factor_enabled: false });
+
+      try {
+        const authResponse = await authAPI.getCurrentUser();
+        setSecurity(authResponse.data.security || { can_enable_2fa: false, two_factor_enabled: false });
+        setValue('two_factor_enabled', Boolean(authResponse.data.security?.two_factor_enabled));
+      } catch (authErr) {
+        console.warn('Failed to load creator security settings:', authErr);
+        setSecurity({ can_enable_2fa: false, two_factor_enabled: false });
+      }
+
       setProfile(data);
       setProfilePicture(data.profile_picture);
 
@@ -116,9 +122,9 @@ const CreatorProfileEdit = () => {
       // Revision settings
       setValue('free_revisions', data.free_revisions !== undefined ? data.free_revisions : 2);
       setValue('revision_fee', data.revision_fee || 0);
-      setValue('two_factor_enabled', Boolean(authResponse.data.security?.two_factor_enabled));
 
     } catch (err) {
+      console.error('Failed to load creator profile:', err);
       setError('Failed to load profile');
     } finally {
       setLoadingProfile(false);
