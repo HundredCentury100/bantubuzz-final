@@ -1237,6 +1237,11 @@ Deployment note:
   - The task itself also exits on non-Mondays so stale/daily scheduler cache entries cannot send emails.
   - `users.inactive_reminder_sent_at` stores the weekly guard; the checker reserves users for the current week before queueing emails to avoid duplicate Monday sends.
   - Targeted deploy script: `deployment\DEPLOY-NEW-VPS-WEEKLY-INACTIVE-EMAIL.bat`. It uploads the task/model/migration/schedule files, runs migration `202606181000`, clears Celery Beat's persisted schedule file, and restarts backend/Celery services.
+- Admin payment verification and collaborations:
+  - Campaign cart payments require real `campaign_payments` and `campaign_payment_items` tables; do not rely on the older raw SQL file alone. The Alembic migration `202606221100_ensure_campaign_payment_tables.py` creates/repairs those tables and the related collaboration payment columns.
+  - Admin payment pages should never expose raw SQL/driver errors to the UI. If optional campaign payment tables are unavailable before migration, return a clean admin-facing migration message or skip optional campaign cart rows.
+  - Collaboration serialization must tolerate legacy rows with missing dates, missing relations, or decimal values. Keep `Collaboration.to_dict()` returning JSON-safe values.
+  - Targeted deploy script: `deployment\DEPLOY-NEW-VPS-ADMIN-PAYMENTS-COLLABORATIONS-FIX.bat`. It uploads only the payment/collaboration/billing backend files, the migration, rebuilt frontend dist, runs `flask db upgrade heads`, then restarts backend/Celery and reloads Apache.
 - Remaining hardening for future slices:
   - Improve team invitation onboarding so new invitees land directly back on the invite after signup/login.
   - Build tailored onboarding steps after Agency/Enterprise signup.

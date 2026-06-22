@@ -151,9 +151,9 @@ class Collaboration(db.Model):
             'workspace_id': self.workspace_id,
             'title': self.title,
             'description': self.description,
-            'amount': self.amount,
-            'status': self.status,
-            'progress_percentage': self.progress_percentage,
+            'amount': float(self.amount or 0),
+            'status': self.status or 'in_progress',
+            'progress_percentage': self.progress_percentage or 0,
             'creator_response_at': self.creator_response_at.isoformat() if self.creator_response_at else None,
             'creator_decline_reason': self.creator_decline_reason,
             'refund_processed': self.refund_processed,
@@ -167,7 +167,7 @@ class Collaboration(db.Model):
             'cancelled_by_creator': getattr(self, 'cancelled_by_creator', False),
             'cancellation_reason': getattr(self, 'cancellation_reason', None),
             'cancelled_at': self.cancelled_at.isoformat() if hasattr(self, 'cancelled_at') and self.cancelled_at else None,
-            'start_date': self.start_date.isoformat(),
+            'start_date': self.start_date.isoformat() if self.start_date else None,
             'expected_completion_date': self.expected_completion_date.isoformat() if self.expected_completion_date else None,
             'actual_completion_date': self.actual_completion_date.isoformat() if self.actual_completion_date else None,
             'notes': self.notes,
@@ -180,8 +180,8 @@ class Collaboration(db.Model):
             'additional_notes': self.additional_notes,
             'live_urls_submitted_at': self.live_urls_submitted_at.isoformat() if self.live_urls_submitted_at else None,
             'auto_complete_eligible_at': self.auto_complete_eligible_at.isoformat() if self.auto_complete_eligible_at else None,
-            'created_at': self.created_at.isoformat(),
-            'updated_at': self.updated_at.isoformat()
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
         }
 
         if include_relations:
