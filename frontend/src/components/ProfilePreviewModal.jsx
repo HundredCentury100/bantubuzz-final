@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Bookmark, Bolt, Copy, MessageCircle, Plus, Share2, Trophy } from 'lucide-react';
 import { BASE_URL } from '../services/api';
-import CreatorBadge from './CreatorBadge';
+import CreatorBadge, { getBadgeConfig } from './CreatorBadge';
 import GalleryVideo from './GalleryVideo';
 
 const badgePriority = {
@@ -43,20 +43,6 @@ const platformConfig = {
     color: 'text-gray-950',
     icon: <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />,
   },
-};
-
-const badgeExplanations = {
-  top_creator: ['Top Creator', 'Elite score, verified profile, strong reviews, delivery history, and response rate'],
-  trusted_creator: ['Trusted Creator', 'Strong verified reviews, reliable completion, and fast brand response'],
-  responds_fast: ['Responds Fast', 'Typically replies within 2 hours'],
-  verified_creator: ['Verified Creator', 'Identity verified by BantuBuzz'],
-  referral_verified: ['Referral Verified', 'Earned by bringing active creators to BantuBuzz'],
-  engagement_leader: ['Engagement Leader', 'Strong audience engagement across connected platforms'],
-  audience_builder: ['Audience Builder', 'Consistently reaches an active audience'],
-  rising_creator: ['Rising Creator', 'Growing creator with strong marketplace signals'],
-  city_top_10: ['City Top 10', 'Ranked among top creators in their city'],
-  category_leader: ['Category Leader', 'Ranked highly in one of their creator categories'],
-  creator_to_watch: ['Creator To Watch', 'A creator brands should keep an eye on'],
 };
 
 const formatFollowers = (count) => {
@@ -154,8 +140,8 @@ const ProfilePreviewModal = ({ profile, onClose }) => {
                   )}
                   {badges.length > 0 && (
                     <div className="absolute left-2 top-2 flex flex-wrap gap-1.5">
-                      {badges.slice(0, 3).map((badge) => (
-                        <CreatorBadge key={badge} badge={badge} size="sm" variant="icon-only" />
+                      {badges.slice(0, 2).map((badge) => (
+                        <CreatorBadge key={badge} badge={badge} size="sm" variant="card" />
                       ))}
                     </div>
                   )}
@@ -266,15 +252,15 @@ const ProfilePreviewModal = ({ profile, onClose }) => {
                             </div>
                             <div className="mt-2 space-y-2">
                               {badges
-                                .filter((badge) => badgeExplanations[badge])
-                                .slice(0, 4)
-                                .map((badge) => (
+                                .map((badge) => ({ badge, config: getBadgeConfig(badge) }))
+                                .filter(({ config }) => config?.description)
+                                .map(({ badge, config }) => (
                                   <div key={badge} className="flex items-start gap-2 text-xs text-gray-600 sm:text-sm">
                                     <svg className="mt-0.5 h-4 w-4 flex-shrink-0 text-primary-dark" fill="currentColor" viewBox="0 0 20 20">
                                       <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                                     </svg>
                                     <span className="leading-snug">
-                                      <strong className="font-semibold">{badgeExplanations[badge][0]}:</strong> {badgeExplanations[badge][1]}
+                                      <strong className="font-semibold">{config.label}:</strong> {config.description}
                                     </span>
                                   </div>
                                 ))}

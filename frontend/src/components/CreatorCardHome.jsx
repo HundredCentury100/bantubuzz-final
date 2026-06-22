@@ -28,12 +28,14 @@ const CreatorCardHome = ({ creator, bgColor = 'white', textColor = 'dark' }) => 
         {creator.badges && creator.badges.length > 0 && (
           <div className="absolute top-2 left-2 flex flex-wrap gap-1.5">
             {creator.badges
+              .filter((badge) => badge !== 'creator')
               .sort((a, b) => {
                 const priority = { 'top_creator': 1, 'verified_creator': 2, 'referral_verified': 3, 'responds_fast': 4, 'creator': 5 };
                 return (priority[a] || 99) - (priority[b] || 99);
               })
+              .slice(0, 2)
               .map((badge, idx) => (
-                <CreatorBadge key={idx} badge={badge} size="sm" variant="icon-only" />
+                <CreatorBadge key={idx} badge={badge} size="sm" variant="card" />
               ))}
           </div>
         )}

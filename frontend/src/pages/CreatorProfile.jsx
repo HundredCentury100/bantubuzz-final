@@ -6,7 +6,7 @@ import { useCart } from '../contexts/CartContext';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
 import ReviewCard from '../components/ReviewCard';
-import CreatorBadge from '../components/CreatorBadge';
+import CreatorBadge, { getBadgeConfig } from '../components/CreatorBadge';
 import CustomPackageRequestModal from '../components/CustomPackageRequestModal';
 import InviteToCampaignModal from '../components/InviteToCampaignModal';
 import PlatformAnalytics from '../components/creator/PlatformAnalytics';
@@ -514,54 +514,20 @@ const CreatorProfile = () => {
 
                       {/* Badge Explanations - Mobile Responsive */}
                       <div className="mt-2 space-y-2">
-                        {creator.badges.includes('top_creator') && (
-                          <div className="flex items-start gap-2 text-xs sm:text-sm text-gray-600">
-                            <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-primary mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                            </svg>
-                            <span className="leading-snug"><strong className="font-semibold">Top Creator:</strong> Elite score, verified profile, strong reviews, delivery history, and response rate</span>
-                          </div>
-                        )}
-                        {creator.badges.includes('trusted_creator') && (
-                          <div className="flex items-start gap-2 text-xs sm:text-sm text-gray-600">
-                            <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                            </svg>
-                            <span className="leading-snug"><strong className="font-semibold">Trusted Creator:</strong> Strong verified reviews, reliable completion, and fast brand response</span>
-                          </div>
-                        )}
-                        {(creator.badges.includes('elite_creator') || creator.badges.includes('brand_magnet') || creator.badges.includes('campaign_pro')) && (
-                          <div className="flex items-start gap-2 text-xs sm:text-sm text-gray-600">
-                            <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-primary-dark mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                              <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                            </svg>
-                            <span className="leading-snug"><strong className="font-semibold">Performance Badge:</strong> Earned through strong marketplace results and creator score signals</span>
-                          </div>
-                        )}
-                        {creator.badges.includes('responds_fast') && (
-                          <div className="flex items-start gap-2 text-xs sm:text-sm text-gray-600">
-                            <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-green-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                            </svg>
-                            <span className="leading-snug"><strong className="font-semibold">Responds Fast:</strong> Typically replies within 2 hours</span>
-                          </div>
-                        )}
-                        {creator.badges.includes('verified_creator') && (
-                          <div className="flex items-start gap-2 text-xs sm:text-sm text-gray-600">
-                            <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                            </svg>
-                            <span className="leading-snug"><strong className="font-semibold">Verified Creator:</strong> Identity verified by BantuBuzz</span>
-                          </div>
-                        )}
-                        {creator.badges.includes('referral_verified') && (
-                          <div className="flex items-start gap-2 text-xs sm:text-sm text-gray-600">
-                            <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-primary-dark mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                            </svg>
-                            <span className="leading-snug"><strong className="font-semibold">Referral Verified:</strong> Earned by bringing active creators to BantuBuzz</span>
-                          </div>
-                        )}
+                        {creator.badges
+                          .filter((badge) => badge !== 'creator')
+                          .map((badge) => ({ badge, config: getBadgeConfig(badge) }))
+                          .filter(({ config }) => config?.description)
+                          .map(({ badge, config }) => (
+                            <div key={badge} className="flex items-start gap-2 text-xs sm:text-sm text-gray-600">
+                              <svg className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-primary-dark mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                              </svg>
+                              <span className="leading-snug">
+                                <strong className="font-semibold">{config.label}:</strong> {config.description}
+                              </span>
+                            </div>
+                          ))}
                       </div>
                     </div>
                   )}

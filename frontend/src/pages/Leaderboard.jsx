@@ -249,9 +249,33 @@ const Leaderboard = () => {
                     <span className="font-bold text-dark">{formatFollowers(creator.platform_followers)}</span>
                   </div>
                   <div className="mt-3 flex flex-wrap gap-2 lg:mt-0">
-                    {(creator.badges || []).slice(0, 3).map((badge) => (
-                      <CreatorBadge key={badge} badge={badge} size="sm" />
-                    ))}
+                    {(creator.badges || [])
+                      .filter((badge) => badge !== 'creator')
+                      .slice()
+                      .sort((a, b) => {
+                        const priority = {
+                          elite_creator: 1,
+                          top_creator: 2,
+                          trusted_creator: 3,
+                          brand_magnet: 4,
+                          campaign_pro: 5,
+                          engagement_leader: 6,
+                          audience_builder: 7,
+                          rising_creator: 8,
+                          city_top_10: 9,
+                          category_leader: 10,
+                          verified_creator: 11,
+                          referral_verified: 12,
+                          creator_to_watch: 13,
+                          buzz_creator: 13,
+                          responds_fast: 14,
+                        };
+                        return (priority[a] || 99) - (priority[b] || 99);
+                      })
+                      .slice(0, 2)
+                      .map((badge) => (
+                        <CreatorBadge key={badge} badge={badge} size="sm" variant="card" />
+                      ))}
                   </div>
                   <div className="hidden justify-end lg:flex">
                     <CreatorCardActions creator={creator} compact />

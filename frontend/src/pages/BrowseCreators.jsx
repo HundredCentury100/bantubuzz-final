@@ -717,12 +717,14 @@ const BrowseCreators = () => {
                           )}
                           {creator.badges
                             ?.slice()
+                            .filter((badge) => badge !== 'creator')
                             .sort((a, b) => {
                               const priority = { 'top_creator': 1, 'verified_creator': 2, 'responds_fast': 3, 'creator': 4 };
                               return (priority[a] || 99) - (priority[b] || 99);
                             })
+                            .slice(0, 2)
                             .map((badge, idx) => (
-                              <CreatorBadge key={idx} badge={badge} size="sm" variant="icon-only" />
+                              <CreatorBadge key={idx} badge={badge} size="sm" variant="card" />
                             ))}
                         </div>
                       )}
