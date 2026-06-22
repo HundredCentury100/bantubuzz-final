@@ -1239,6 +1239,7 @@ Deployment note:
   - Targeted deploy script: `deployment\DEPLOY-NEW-VPS-WEEKLY-INACTIVE-EMAIL.bat`. It uploads the task/model/migration/schedule files, runs migration `202606181000`, clears Celery Beat's persisted schedule file, and restarts backend/Celery services.
 - Admin payment verification and collaborations:
   - Campaign cart payments require real `campaign_payments` and `campaign_payment_items` tables; do not rely on the older raw SQL file alone. The Alembic migration `202606221100_ensure_campaign_payment_tables.py` creates/repairs those tables and the related collaboration payment columns.
+  - Some production databases already contain Trust & Safety tables from a manual deploy while Alembic has not recorded `202603091200_trust_safety_phase1`. Keep that migration idempotent; otherwise `flask db upgrade heads` can fail on duplicate `user_blocks`.
   - Admin payment pages should never expose raw SQL/driver errors to the UI. If optional campaign payment tables are unavailable before migration, return a clean admin-facing migration message or skip optional campaign cart rows.
   - Collaboration serialization must tolerate legacy rows with missing dates, missing relations, or decimal values. Keep `Collaboration.to_dict()` returning JSON-safe values.
   - Targeted deploy script: `deployment\DEPLOY-NEW-VPS-ADMIN-PAYMENTS-COLLABORATIONS-FIX.bat`. It uploads only the payment/collaboration/billing backend files, the migration, rebuilt frontend dist, runs `flask db upgrade heads`, then restarts backend/Celery and reloads Apache.

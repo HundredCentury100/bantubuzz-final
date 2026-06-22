@@ -22,37 +22,58 @@ branch_labels = None
 depends_on = None
 
 
+def _inspector():
+    return sa.inspect(op.get_bind())
+
+
+def _has_table(table_name):
+    return _inspector().has_table(table_name)
+
+
+def _has_index(table_name, index_name):
+    if not _has_table(table_name):
+        return False
+    return index_name in {index['name'] for index in _inspector().get_indexes(table_name)}
+
+
+def _create_index_if_missing(index_name, table_name, columns):
+    if _has_table(table_name) and not _has_index(table_name, index_name):
+        op.create_index(index_name, table_name, columns)
+
+
 def upgrade():
     """Create Phase 1 Trust & Safety tables"""
 
     # 1. User Blocks Table
-    op.create_table(
-        'user_blocks',
-        sa.Column('id', sa.Integer(), nullable=False),
-        sa.Column('blocker_user_id', sa.Integer(), nullable=False),
-        sa.Column('blocked_user_id', sa.Integer(), nullable=False),
-        sa.Column('reason', sa.String(length=100), nullable=True),
-        sa.Column('is_active', sa.Boolean(), nullable=False, server_default='true'),
-        sa.Column('created_at', sa.DateTime(), nullable=False, server_default=sa.text('CURRENT_TIMESTAMP')),
-        sa.Column('unblocked_at', sa.DateTime(), nullable=True),
+    if not _has_table('user_blocks'):
+        op.create_table(
+            'user_blocks',
+            sa.Column('id', sa.Integer(), nullable=False),
+            sa.Column('blocker_user_id', sa.Integer(), nullable=False),
+            sa.Column('blocked_user_id', sa.Integer(), nullable=False),
+            sa.Column('reason', sa.String(length=100), nullable=True),
+            sa.Column('is_active', sa.Boolean(), nullable=False, server_default='true'),
+            sa.Column('created_at', sa.DateTime(), nullable=False, server_default=sa.text('CURRENT_TIMESTAMP')),
+            sa.Column('unblocked_at', sa.DateTime(), nullable=True),
 
-        sa.PrimaryKeyConstraint('id'),
-        sa.ForeignKeyConstraint(['blocker_user_id'], ['users.id'], ondelete='CASCADE'),
-        sa.ForeignKeyConstraint(['blocked_user_id'], ['users.id'], ondelete='CASCADE'),
-        sa.UniqueConstraint('blocker_user_id', 'blocked_user_id', name='unique_block_pair')
-    )
+            sa.PrimaryKeyConstraint('id'),
+            sa.ForeignKeyConstraint(['blocker_user_id'], ['users.id'], ondelete='CASCADE'),
+            sa.ForeignKeyConstraint(['blocked_user_id'], ['users.id'], ondelete='CASCADE'),
+            sa.UniqueConstraint('blocker_user_id', 'blocked_user_id', name='unique_block_pair')
+        )
 
     # Indexes for user_blocks
-    op.create_index('idx_user_blocks_blocker', 'user_blocks', ['blocker_user_id'])
-    op.create_index('idx_user_blocks_blocked', 'user_blocks', ['blocked_user_id'])
-    op.create_index('idx_user_blocks_active', 'user_blocks', ['is_active'])
+    _create_index_if_missing('idx_user_blocks_blocker', 'user_blocks', ['blocker_user_id'])
+    _create_index_if_missing('idx_user_blocks_blocked', 'user_blocks', ['blocked_user_id'])
+    _create_index_if_missing('idx_user_blocks_active', 'user_blocks', ['is_active'])
 
 
     # 2. Message Risk Signals Table
-    op.create_table(
-        'message_risk_signals',
-        sa.Column('id', sa.Integer(), nullable=False),
-        sa.Column('user_id', sa.Integer(), nullable=False),
+    if not _has_table('message_risk_signals'):
+        op.create_table(
+            'message_risk_signals',
+            sa.Column('id', sa.Integer(), nullable=False),
+            sa.Column('user_id', sa.Integer(), nullable=False),
 
         # Risk Signals
         sa.Column('blocks_received_count', sa.Integer(), nullable=False, server_default='0'),
@@ -75,21 +96,22 @@ def upgrade():
 
         sa.PrimaryKeyConstraint('id'),
         sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE'),
-        sa.UniqueConstraint('user_id', name='unique_user_risk_signals')
-    )
+            sa.UniqueConstraint('user_id', name='unique_user_risk_signals')
+        )
 
     # Indexes for message_risk_signals
-    op.create_index('idx_risk_signals_user', 'message_risk_signals', ['user_id'])
-    op.create_index('idx_risk_signals_level', 'message_risk_signals', ['risk_level'])
-    op.create_index('idx_risk_signals_score', 'message_risk_signals', ['risk_score'])
+    _create_index_if_missing('idx_risk_signals_user', 'message_risk_signals', ['user_id'])
+    _create_index_if_missing('idx_risk_signals_level', 'message_risk_signals', ['risk_level'])
+    _create_index_if_missing('idx_risk_signals_score', 'message_risk_signals', ['risk_score'])
 
 
     # 3. Message Safety Warnings Table
-    op.create_table(
-        'message_safety_warnings',
-        sa.Column('id', sa.Integer(), nullable=False),
-        sa.Column('user_id', sa.Integer(), nullable=False),
-        sa.Column('conversation_id', sa.String(length=100), nullable=False),
+    if not _has_table('message_safety_warnings'):
+        op.create_table(
+            'message_safety_warnings',
+            sa.Column('id', sa.Integer(), nullable=False),
+            sa.Column('user_id', sa.Integer(), nullable=False),
+            sa.Column('conversation_id', sa.String(length=100), nullable=False),
 
         # Warning Details
         sa.Column('warning_type', sa.String(length=50), nullable=False),
@@ -104,20 +126,21 @@ def upgrade():
         sa.Column('created_at', sa.DateTime(), nullable=False, server_default=sa.text('CURRENT_TIMESTAMP')),
 
         sa.PrimaryKeyConstraint('id'),
-        sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE')
-    )
+            sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE')
+        )
 
     # Indexes for message_safety_warnings
-    op.create_index('idx_safety_warnings_user', 'message_safety_warnings', ['user_id'])
-    op.create_index('idx_safety_warnings_type', 'message_safety_warnings', ['warning_type'])
-    op.create_index('idx_safety_warnings_created', 'message_safety_warnings', ['created_at'])
+    _create_index_if_missing('idx_safety_warnings_user', 'message_safety_warnings', ['user_id'])
+    _create_index_if_missing('idx_safety_warnings_type', 'message_safety_warnings', ['warning_type'])
+    _create_index_if_missing('idx_safety_warnings_created', 'message_safety_warnings', ['created_at'])
 
 
     # 4. Message Reports Table
-    op.create_table(
-        'message_reports',
-        sa.Column('id', sa.Integer(), nullable=False),
-        sa.Column('report_number', sa.String(length=20), nullable=False),
+    if not _has_table('message_reports'):
+        op.create_table(
+            'message_reports',
+            sa.Column('id', sa.Integer(), nullable=False),
+            sa.Column('report_number', sa.String(length=20), nullable=False),
 
         # Reporter & Reported
         sa.Column('reporter_id', sa.Integer(), nullable=False),
@@ -154,16 +177,16 @@ def upgrade():
         sa.UniqueConstraint('report_number', name='unique_report_number'),
         sa.ForeignKeyConstraint(['reporter_id'], ['users.id'], ondelete='CASCADE'),
         sa.ForeignKeyConstraint(['reported_user_id'], ['users.id'], ondelete='CASCADE'),
-        sa.ForeignKeyConstraint(['reviewed_by'], ['users.id'], ondelete='SET NULL')
-    )
+            sa.ForeignKeyConstraint(['reviewed_by'], ['users.id'], ondelete='SET NULL')
+        )
 
     # Indexes for message_reports
-    op.create_index('idx_message_reports_reporter', 'message_reports', ['reporter_id'])
-    op.create_index('idx_message_reports_reported', 'message_reports', ['reported_user_id'])
-    op.create_index('idx_message_reports_status', 'message_reports', ['status'])
-    op.create_index('idx_message_reports_emergency', 'message_reports', ['is_emergency'])
-    op.create_index('idx_message_reports_conversation', 'message_reports', ['conversation_id'])
-    op.create_index('idx_message_reports_created', 'message_reports', ['created_at'])
+    _create_index_if_missing('idx_message_reports_reporter', 'message_reports', ['reporter_id'])
+    _create_index_if_missing('idx_message_reports_reported', 'message_reports', ['reported_user_id'])
+    _create_index_if_missing('idx_message_reports_status', 'message_reports', ['status'])
+    _create_index_if_missing('idx_message_reports_emergency', 'message_reports', ['is_emergency'])
+    _create_index_if_missing('idx_message_reports_conversation', 'message_reports', ['conversation_id'])
+    _create_index_if_missing('idx_message_reports_created', 'message_reports', ['created_at'])
 
     print("✅ Phase 1 Trust & Safety tables created successfully")
 

@@ -45,6 +45,7 @@ python -m py_compile ^
     app\routes\admin\payments.py ^
     app\routes\admin\collaborations.py ^
     app\routes\billing.py ^
+    migrations\versions\202603091200_add_trust_safety_phase1_tables.py ^
     migrations\versions\202606221100_ensure_campaign_payment_tables.py
 if errorlevel 1 goto :failed_popd
 popd
@@ -64,6 +65,7 @@ tar -czf "%BACKEND_ARCHIVE%" -C "%ROOT%\backend" ^
     app/routes/admin/payments.py ^
     app/routes/admin/collaborations.py ^
     app/routes/billing.py ^
+    migrations/versions/202603091200_add_trust_safety_phase1_tables.py ^
     migrations/versions/202606221100_ensure_campaign_payment_tables.py
 if errorlevel 1 goto :failed
 
