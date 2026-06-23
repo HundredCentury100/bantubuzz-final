@@ -554,6 +554,8 @@ class SmilePayService:
             # Update related payment record based on payment type
             if transaction.payment_type == 'subscription':
                 SmilePayService._complete_subscription_payment(transaction)
+            elif transaction.payment_type == 'creator_subscription':
+                SmilePayService._complete_creator_subscription_payment(transaction)
             elif transaction.payment_type == 'booking':
                 SmilePayService._complete_booking_payment(transaction)
             elif transaction.payment_type == 'campaign':
@@ -593,6 +595,35 @@ class SmilePayService:
 
             db.session.commit()
             logger.info(f"Subscription {subscription.id} activated after SmilePay payment")
+
+    @staticmethod
+    def _complete_creator_subscription_payment(transaction: SmilePayTransaction):
+        """Complete creator add-on or creator subscription payment."""
+        from app.models import CreatorProfile, CreatorSubscription
+
+        subscription = CreatorSubscription.query.get(transaction.payment_id)
+        if subscription:
+            subscription.payment_verified = True
+            subscription.payment_method = transaction.payment_method or 'smilepay'
+            subscription.payment_status = 'paid'
+            subscription.status = 'active'
+            subscription.start_date = datetime.now(timezone.utc)
+            if subscription.plan and subscription.plan.duration_days:
+                from datetime import timedelta
+                subscription.end_date = datetime.now(timezone.utc) + timedelta(days=subscription.plan.duration_days)
+
+            creator = CreatorProfile.query.get(subscription.creator_id)
+            if creator and subscription.plan:
+                if subscription.plan.subscription_type == 'verification':
+                    creator.is_verified = True
+                elif subscription.plan.subscription_type == 'featured':
+                    if subscription.plan.featured_category == 'homepage':
+                        creator.is_featured_homepage = True
+                    elif subscription.plan.featured_category == 'category':
+                        creator.is_featured_category = True
+
+            db.session.commit()
+            logger.info(f"Creator subscription {subscription.id} activated after SmilePay payment")
 
     @staticmethod
     def _complete_booking_payment(transaction: SmilePayTransaction):

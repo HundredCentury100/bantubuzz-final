@@ -1250,6 +1250,12 @@ Deployment note:
   - Wallet transactions for subscription payments must include `subscription_reference` in metadata and a readable `SUB-<id>` reference in the description so billing/history can identify the payment.
   - Billing subscription invoices should show `paid` for verified/active paid subscriptions and include `payment_reference`.
   - Targeted deploy script: `deployment\DEPLOY-NEW-VPS-BRAND-SUBSCRIPTION-WALLET-PAYMENT.bat`. It deploys only the subscription/wallet/billing routes plus rebuilt frontend and does not run migrations.
+- Payment service audit notes:
+  - The current wallet schema uses `available_balance` and `pending_clearance`; do not use legacy `wallet.balance`.
+  - Brand/customer spending transactions should use `transaction_type='payment'` with a negative amount and metadata identifying the source payment.
+  - Creator earnings should not be credited directly on payment confirmation. Keep funds escrowed and release to creator `pending_clearance` through the escrow release service when the collaboration completes.
+  - Campaign cart payments are the primary campaign payment flow. Legacy campaign payment routes must still tolerate `in_progress` collaborations and use `Collaboration.amount/title`, not nonexistent `collab.package` relationships.
+  - SmilePay `payment_type='subscription'` activates the main `Subscription` model. Creator add-ons must use `payment_type='creator_subscription'` so `CreatorSubscription` records and badge/feature effects activate correctly.
 - Remaining hardening for future slices:
   - Improve team invitation onboarding so new invitees land directly back on the invite after signup/login.
   - Build tailored onboarding steps after Agency/Enterprise signup.

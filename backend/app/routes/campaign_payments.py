@@ -17,6 +17,7 @@ from app.utils.campaign_helpers import (
 )
 from app.utils.subscription_helper import get_brand_service_fee_percentage
 from datetime import datetime
+from decimal import Decimal
 import uuid
 
 bp = Blueprint('campaign_payments', __name__, url_prefix='/api/campaign-payments')
@@ -60,7 +61,7 @@ def calculate_payment():
         # Get collaborations - need to fetch by IDs since they're from campaign
         collaborations = Collaboration.query.filter(
             Collaboration.id.in_(collaboration_ids),
-            Collaboration.status == 'active'
+            Collaboration.status.in_(['active', 'in_progress'])
         ).all()
 
         # Verify all collaborations belong to this campaign
@@ -79,7 +80,7 @@ def calculate_payment():
         subtotal = 0
 
         for collab in collaborations:
-            item_amount = float(collab.package.price)
+            item_amount = float(collab.amount or 0)
             subtotal += item_amount
 
             # Get creator name from CreatorProfile relationship
@@ -88,7 +89,7 @@ def calculate_payment():
             items.append({
                 'collaboration_id': collab.id,
                 'creator_name': creator_name,
-                'package_title': collab.package.title,
+                'package_title': collab.title or 'Campaign collaboration',
                 'amount': item_amount
             })
 
@@ -185,7 +186,7 @@ def initiate_payment():
         elif payment_method == 'bank_transfer':
             # Bank transfer - mark as pending, brand will upload proof
             payment.status = 'pending'
-            payment.metadata = {
+            payment.payment_metadata = {
                 'bank_details': {
                     'bank_name': 'CBZ Bank',
                     'account_name': 'BantuBuzz Holdings',
@@ -200,7 +201,7 @@ def initiate_payment():
                 'message': 'Bank transfer initiated. Please make payment and upload proof.',
                 'payment': payment.to_dict(),
                 'payment_method': 'bank_transfer',
-                'bank_details': payment.metadata['bank_details'],
+                'bank_details': payment.payment_metadata['bank_details'],
                 'status': 'pending'
             }), 200
 
@@ -305,9 +306,11 @@ def upload_bank_proof(payment_id):
         # Save file (implement file upload logic)
         # For now, just mark as processing pending admin verification
         payment.status = 'processing'
-        payment.metadata = payment.metadata or {}
-        payment.metadata['proof_uploaded'] = True
-        payment.metadata['proof_uploaded_at'] = datetime.utcnow().isoformat()
+        payment.payment_metadata = {
+            **(payment.payment_metadata or {}),
+            'proof_uploaded': True,
+            'proof_uploaded_at': datetime.utcnow().isoformat(),
+        }
         db.session.commit()
 
         # Notify admin for verification
@@ -365,54 +368,45 @@ def process_wallet_payment(payment, user_id):
         if not wallet:
             return {'success': False, 'error': 'Wallet not found'}
 
-        total_amount = float(payment.total_amount)
+        total_amount = Decimal(str(payment.total_amount or 0))
+        available_balance = Decimal(str(wallet.available_balance or 0))
 
-        if wallet.balance < total_amount:
-            return {'success': False, 'error': f'Insufficient wallet balance. Available: ${wallet.balance}, Required: ${total_amount}'}
+        if available_balance < total_amount:
+            return {'success': False, 'error': f'Insufficient wallet balance. Available: ${available_balance:.2f}, Required: ${total_amount:.2f}'}
 
-        # Deduct from brand wallet
-        wallet.balance -= total_amount
+        # Deduct from brand wallet and keep funds escrowed until collaboration completion.
+        wallet.available_balance = available_balance - total_amount
+        wallet.total_spent = Decimal(str(wallet.total_spent or 0)) + total_amount
+        wallet.updated_at = datetime.utcnow()
 
         # Create transaction record
         transaction = WalletTransaction(
             wallet_id=wallet.id,
-            transaction_type='debit',
-            amount=total_amount,
+            user_id=user_id,
+            transaction_type='payment',
+            amount=-abs(total_amount),
             description=f'Campaign payment for {payment.campaign.title}',
-            reference=f'CAMP-PAY-{payment.id}',
-            status='completed'
+            status='available',
+            clearance_required=False,
+            transaction_metadata={
+                'payment_type': 'campaign_payment',
+                'payment_reference': f'CAMP-PAY-{payment.id}',
+                'campaign_payment_id': payment.id,
+                'campaign_id': payment.campaign_id,
+            },
         )
         db.session.add(transaction)
 
-        # Credit creator wallets
         for item in payment.items:
-            creator_wallet = Wallet.query.filter_by(user_id=item.creator_user_id).first()
-            if not creator_wallet:
-                # Create wallet if doesn't exist
-                creator_wallet = Wallet(user_id=item.creator_user_id, balance=0)
-                db.session.add(creator_wallet)
-                db.session.flush()
-
-            # Credit net amount (after platform fee)
-            creator_wallet.balance += float(item.net_amount)
-
-            # Create transaction
-            creator_transaction = WalletTransaction(
-                wallet_id=creator_wallet.id,
-                transaction_type='credit',
-                amount=float(item.net_amount),
-                description=f'Payment for collaboration in {payment.campaign.title}',
-                reference=f'CAMP-PAY-{payment.id}',
-                status='completed'
-            )
-            db.session.add(creator_transaction)
+            if item.collaboration:
+                item.collaboration.escrow_status = 'escrowed'
 
             # Notify creator
             notification = Notification(
                 user_id=item.creator_user_id,
-                type='payment_received',
-                title='Payment Received',
-                message=f'You received ${item.net_amount} for your collaboration in "{payment.campaign.title}"',
+                type='campaign_payment_escrowed',
+                title='Campaign Payment Confirmed',
+                message=f'Payment for your collaboration in "{payment.campaign.title}" is now held in escrow.',
                 related_id=payment.id
             )
             db.session.add(notification)

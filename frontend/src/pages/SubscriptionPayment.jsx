@@ -319,6 +319,7 @@ const SubscriptionPayment = () => {
   const plan = subscription?.plan || planInfo;
   // Creator subscriptions use 'price', brand subscriptions use 'price_monthly'/'price_yearly'
   const amount = Number(amountDue ?? plan?.price ?? (billingCycle === 'yearly' ? plan?.price_yearly : plan?.price_monthly) ?? 0);
+  const isCreatorAddonPayment = user?.user_type === 'creator' && !isTierSubscriptionPlan(plan);
   // Use appropriate reference format based on subscription type
   const refId = subscription?.id || subscriptionId || paymentData?.subscription_id || 'PENDING';
   const reference = user?.user_type === 'creator' ? `CREATOR_SUB_${refId}` : `SUB-${refId}`;
@@ -637,7 +638,7 @@ const SubscriptionPayment = () => {
         onClose={() => setShowSmilePayModal(false)}
         amount={amount}
         currency="USD"
-        paymentType="subscription"
+        paymentType={isCreatorAddonPayment ? 'creator_subscription' : 'subscription'}
         paymentId={subscription?.id || subscriptionId || paymentData?.subscription_id}
         itemName={plan?.name || 'Subscription'}
         itemDescription={`${billingCycle} subscription - ${plan?.name || ''}`}
