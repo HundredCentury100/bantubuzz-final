@@ -159,6 +159,7 @@ def _subscription_invoice(subscription):
     price = subscription.plan.price_monthly if subscription.plan and billing_cycle == 'monthly' else None
     if subscription.plan and billing_cycle == 'yearly':
         price = subscription.plan.price_yearly
+    is_paid = bool(subscription.payment_verified or subscription.payment_status in ['paid', 'verified'] or subscription.status == 'active')
 
     return {
         'id': f'subscription-{subscription.id}',
@@ -167,11 +168,12 @@ def _subscription_invoice(subscription):
         'source_id': subscription.id,
         'title': plan_name,
         'description': f'{billing_cycle.title()} subscription',
-        'amount': _money(price or subscription.last_payment_amount),
+        'amount': _money(subscription.last_payment_amount or price),
         'currency': 'USD',
-        'status': 'upcoming',
-        'payment_status': subscription.status,
+        'status': 'paid' if is_paid else 'upcoming',
+        'payment_status': subscription.payment_status or subscription.status,
         'payment_method': subscription.payment_method,
+        'payment_reference': subscription.payment_reference,
         'issued_at': _date(subscription.created_at),
         'paid_at': _date(subscription.last_payment_date),
         'due_at': _date(subscription.next_payment_date or subscription.current_period_end),

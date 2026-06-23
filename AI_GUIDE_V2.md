@@ -1243,6 +1243,13 @@ Deployment note:
   - Admin payment pages should never expose raw SQL/driver errors to the UI. If optional campaign payment tables are unavailable before migration, return a clean admin-facing migration message or skip optional campaign cart rows.
   - Collaboration serialization must tolerate legacy rows with missing dates, missing relations, or decimal values. Keep `Collaboration.to_dict()` returning JSON-safe values.
   - Targeted deploy script: `deployment\DEPLOY-NEW-VPS-ADMIN-PAYMENTS-COLLABORATIONS-FIX.bat`. It uploads only the payment/collaboration/billing backend files, the migration, rebuilt frontend dist, runs `flask db upgrade heads`, then restarts backend/Celery and reloads Apache.
+- Brand subscription wallet payments:
+  - Brand subscription checkout supports wallet payment through `POST /api/subscriptions/pay-with-wallet`.
+  - The subscription payment page should show wallet balance available for subscription as `available_balance + pending_clearance`, while still displaying the available and pending portions separately.
+  - Wallet subscription deductions use available funds first, then pending clearance if needed, and activate the subscription immediately through `apply_paid_subscription`.
+  - Wallet transactions for subscription payments must include `subscription_reference` in metadata and a readable `SUB-<id>` reference in the description so billing/history can identify the payment.
+  - Billing subscription invoices should show `paid` for verified/active paid subscriptions and include `payment_reference`.
+  - Targeted deploy script: `deployment\DEPLOY-NEW-VPS-BRAND-SUBSCRIPTION-WALLET-PAYMENT.bat`. It deploys only the subscription/wallet/billing routes plus rebuilt frontend and does not run migrations.
 - Remaining hardening for future slices:
   - Improve team invitation onboarding so new invitees land directly back on the invite after signup/login.
   - Build tailored onboarding steps after Agency/Enterprise signup.

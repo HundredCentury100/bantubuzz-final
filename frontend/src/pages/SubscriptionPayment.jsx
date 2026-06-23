@@ -23,6 +23,12 @@ const SubscriptionPayment = () => {
   const [loadingWallet, setLoadingWallet] = useState(false);
   const [showSmilePayModal, setShowSmilePayModal] = useState(false);
 
+  const walletAvailableBalance = Number(walletBalance?.available_balance || 0);
+  const walletPendingClearance = Number(walletBalance?.pending_clearance || 0);
+  const walletSpendableBalance = Number(
+    walletBalance?.subscription_spendable_balance ?? (walletAvailableBalance + walletPendingClearance)
+  );
+
   // Get plan info from location state
   const planInfo = location.state?.plan;
   const billingCycle = location.state?.billingCycle || 'monthly';
@@ -112,7 +118,7 @@ const SubscriptionPayment = () => {
     // Creator subscriptions use 'price', brand subscriptions use 'price_monthly'/'price_yearly'
     const amount = amountDue ?? plan?.price ?? (billingCycle === 'yearly' ? plan?.price_yearly : plan?.price_monthly);
 
-    if (!walletBalance || walletBalance.available_balance < amount) {
+    if (!walletBalance || walletSpendableBalance < Number(amount || 0)) {
       toast.error('Insufficient wallet balance');
       return;
     }
@@ -140,6 +146,14 @@ const SubscriptionPayment = () => {
 
       if (response.data.success) {
         toast.success('Payment successful! Your subscription is now active.');
+        if (response.data.data) {
+          setWalletBalance((current) => ({
+            ...(current || {}),
+            available_balance: response.data.data.wallet_balance ?? current?.available_balance ?? 0,
+            pending_clearance: response.data.data.wallet_pending_clearance ?? current?.pending_clearance ?? 0,
+            subscription_spendable_balance: response.data.data.wallet_spendable_balance ?? current?.subscription_spendable_balance ?? 0,
+          }));
+        }
 
         // Check if this is a verification subscription
         const plan = subscription?.plan || planInfo;
@@ -304,7 +318,7 @@ const SubscriptionPayment = () => {
 
   const plan = subscription?.plan || planInfo;
   // Creator subscriptions use 'price', brand subscriptions use 'price_monthly'/'price_yearly'
-  const amount = amountDue ?? plan?.price ?? (billingCycle === 'yearly' ? plan?.price_yearly : plan?.price_monthly);
+  const amount = Number(amountDue ?? plan?.price ?? (billingCycle === 'yearly' ? plan?.price_yearly : plan?.price_monthly) ?? 0);
   // Use appropriate reference format based on subscription type
   const refId = subscription?.id || subscriptionId || paymentData?.subscription_id || 'PENDING';
   const reference = user?.user_type === 'creator' ? `CREATOR_SUB_${refId}` : `SUB-${refId}`;
@@ -339,8 +353,12 @@ const SubscriptionPayment = () => {
             <div className="bg-gradient-to-r from-primary to-primary-dark rounded-3xl shadow-lg p-6 mb-6 text-white">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm opacity-90 mb-1">Available Wallet Balance</p>
-                  <p className="text-3xl font-bold">${(walletBalance.available_balance || 0).toFixed(2)}</p>
+                  <p className="text-sm opacity-90 mb-1">Wallet Balance Available for Subscription</p>
+                  <p className="text-3xl font-bold">${walletSpendableBalance.toFixed(2)}</p>
+                  <p className="mt-1 text-xs opacity-90">
+                    ${walletAvailableBalance.toFixed(2)} available
+                    {walletPendingClearance > 0 ? ` + $${walletPendingClearance.toFixed(2)} pending clearance` : ''}
+                  </p>
                 </div>
                 <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center">
                   <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -348,13 +366,16 @@ const SubscriptionPayment = () => {
                   </svg>
                 </div>
               </div>
-              {walletBalance.available_balance < amount && amount > 0 && (
+              {walletSpendableBalance < amount && amount > 0 && (
                 <div className="mt-4 pt-4 border-t border-white/20">
                   <p className="text-sm">
                     <svg className="w-4 h-4 inline mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                     </svg>
-                    Insufficient balance. You need ${(amount - walletBalance.available_balance).toFixed(2)} more.
+                    Insufficient balance. You need ${(amount - walletSpendableBalance).toFixed(2)} more.
+                    <Link to={user?.user_type === 'brand' ? '/brand/wallet' : '/wallet'} className="ml-1 underline">
+                      Top up wallet
+                    </Link>
                   </p>
                 </div>
               )}
@@ -404,7 +425,7 @@ const SubscriptionPayment = () => {
               {walletBalance && (
                 <label
                   className={`flex items-start p-4 border-2 rounded-3xl cursor-pointer transition-colors ${
-                    walletBalance.available_balance < amount ? 'opacity-50 cursor-not-allowed' : 'hover:border-primary'
+                    walletSpendableBalance < amount ? 'opacity-50 cursor-not-allowed' : 'hover:border-primary'
                   }`}
                   style={{ borderColor: paymentMethod === 'wallet' ? '#ccdb53' : '#e5e7eb' }}
                 >
@@ -414,22 +435,25 @@ const SubscriptionPayment = () => {
                     value="wallet"
                     checked={paymentMethod === 'wallet'}
                     onChange={(e) => setPaymentMethod(e.target.value)}
-                    disabled={walletBalance.available_balance < amount}
+                    disabled={walletSpendableBalance < amount}
                     className="mt-1"
                   />
                   <div className="ml-3 flex-1">
                     <div className="flex items-center gap-2">
                       <span className="font-semibold text-dark">Pay with Wallet</span>
-                      {walletBalance.available_balance >= amount && (
+                      {walletSpendableBalance >= amount && (
                         <span className="text-xs px-2 py-0.5 bg-green-100 text-green-700 rounded-full">Recommended</span>
                       )}
                     </div>
                     <p className="text-sm text-gray-600 mt-1">
-                      Use your wallet balance (${(walletBalance.available_balance || 0).toFixed(2)} available)
+                      Use your wallet balance (${walletSpendableBalance.toFixed(2)} available including pending clearance)
                     </p>
-                    {walletBalance.available_balance < amount && (
+                    {walletSpendableBalance < amount && (
                       <p className="text-sm text-red-600 mt-1">
-                        Insufficient balance. You need ${((amount || 0) - (walletBalance.available_balance || 0)).toFixed(2)} more.
+                        Insufficient balance. You need ${(amount - walletSpendableBalance).toFixed(2)} more.
+                        <Link to={user?.user_type === 'brand' ? '/brand/wallet' : '/wallet'} className="ml-1 font-medium underline">
+                          Top up or choose another method.
+                        </Link>
                       </p>
                     )}
                   </div>
@@ -541,7 +565,7 @@ const SubscriptionPayment = () => {
                 paymentLoading ||
                 uploading ||
                 (paymentMethod === 'bank_transfer' && !proofFile) ||
-                (paymentMethod === 'wallet' && (!walletBalance || walletBalance.available_balance < amount))
+                (paymentMethod === 'wallet' && (!walletBalance || walletSpendableBalance < amount))
               }
               className="bg-dark hover:bg-gray-800 text-white font-medium px-6 py-3 rounded-full w-full disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 transition-colors"
             >

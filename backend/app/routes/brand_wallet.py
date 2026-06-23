@@ -25,7 +25,10 @@ def get_wallet_balance():
 
         return jsonify({
             'success': True,
-            'wallet': wallet.to_dict()
+            'wallet': {
+                **wallet.to_dict(),
+                'subscription_spendable_balance': float((wallet.available_balance or 0) + (wallet.pending_clearance or 0)),
+            }
         }), 200
 
     except Exception as e:
