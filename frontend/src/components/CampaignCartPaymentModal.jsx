@@ -3,6 +3,7 @@ import { FaTimes, FaWallet, FaUniversity, FaCreditCard, FaCheckCircle, FaMobileA
 import { campaignsAPI } from '../services/api';
 import SmilePayPaymentModal from './SmilePayPaymentModal';
 import toast from 'react-hot-toast';
+import BankTransferDetails from './BankTransferDetails';
 
 const CampaignCartPaymentModal = ({
   isOpen,
@@ -57,10 +58,6 @@ const CampaignCartPaymentModal = ({
         setCampaignPaymentId(response.data.payment_id);
         // Show bank details
         setBankDetails(response.data.bank_details || {
-          bank_name: 'Steward Bank',
-          account_name: 'BantuBuzz (Pvt) Ltd',
-          account_number: '1234567890',
-          branch: 'Harare',
           reference: response.data.payment_reference || `CART-${campaignId}-${Date.now()}`
         });
         toast.success('Bank transfer initiated. Please complete payment and upload proof.');
@@ -251,27 +248,8 @@ const CampaignCartPaymentModal = ({
                 <FaUniversity className="text-blue-600" />
                 Bank Transfer Details
               </h3>
-              <div className="space-y-3">
-                <div>
-                  <p className="text-sm text-blue-700 font-medium">Bank Name</p>
-                  <p className="text-blue-900 font-semibold">{bankDetails.bank_name}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-blue-700 font-medium">Account Name</p>
-                  <p className="text-blue-900 font-semibold">{bankDetails.account_name}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-blue-700 font-medium">Account Number</p>
-                  <p className="text-blue-900 font-semibold">{bankDetails.account_number}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-blue-700 font-medium">Branch</p>
-                  <p className="text-blue-900 font-semibold">{bankDetails.branch}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-blue-700 font-medium">Reference (Important!)</p>
-                  <p className="text-blue-900 font-semibold text-lg">{bankDetails.reference}</p>
-                </div>
+              <div className="text-blue-900">
+                <BankTransferDetails bankDetails={bankDetails} />
               </div>
             </div>
 

@@ -7,6 +7,7 @@ from app import db
 from app.models import Payment, PaymentVerification, Booking, WalletTransaction, Collaboration, User, BrandProfile, Subscription
 from app.services.wallet_service import get_or_create_wallet
 from app.utils.email_service import send_payment_verified_notification
+from app.utils.bank_details import get_bank_transfer_details
 
 
 class PaymentService:
@@ -167,15 +168,30 @@ def create_payment_record(booking_id, user_id, amount, payment_method='paynow', 
 def generate_payment_instructions(booking_id, amount):
     """Generate payment instructions for brands"""
     reference = f"BP-{datetime.utcnow().strftime('%Y%m%d')}-{booking_id}"
+    bank_details = get_bank_transfer_details(reference)
+    account_lines = []
+    for account in bank_details["accounts"]:
+        account_lines.append(
+            "\n".join(
+                line for line in [
+                    f"Bank: {account['bank_name']}",
+                    f"Account Name: {account['account_name']}",
+                    f"Account Number: {account['account_number']}",
+                    f"Currency: {account.get('currency')}" if account.get('currency') else None,
+                    f"Account Type: {account.get('account_type')}" if account.get('account_type') else None,
+                    f"Branch: {account.get('branch')}" if account.get('branch') else None,
+                    f"Branch Code: {account.get('branch_code')}" if account.get('branch_code') else None,
+                    f"Swift Code: {account.get('swift_code')}" if account.get('swift_code') else None,
+                ]
+                if line
+            )
+        )
     instructions = f"""
 Please complete payment of ${amount:.2f}:
 
 **Bank Transfer:**
-Bank: CBZ Bank | Account: 1234567890
-Branch: Harare | Reference: {reference}
+{chr(10).join(account_lines)}
 
-**EcoCash:** +263771234567
-**OneMoney:** +263771234567
 Reference: {reference}
 
 Upload proof after payment.

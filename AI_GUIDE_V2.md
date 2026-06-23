@@ -1256,6 +1256,7 @@ Deployment note:
   - Creator earnings should not be credited directly on payment confirmation. Keep funds escrowed and release to creator `pending_clearance` through the escrow release service when the collaboration completes.
   - Campaign cart payments are the primary campaign payment flow. Legacy campaign payment routes must still tolerate `in_progress` collaborations and use `Collaboration.amount/title`, not nonexistent `collab.package` relationships.
   - SmilePay `payment_type='subscription'` activates the main `Subscription` model. Creator add-ons must use `payment_type='creator_subscription'` so `CreatorSubscription` records and badge/feature effects activate correctly.
+  - Bank-transfer receiving accounts are centralized in `backend/app/utils/bank_details.py` and `frontend/src/utils/bankDetails.js`. Keep all bank-transfer screens using `BankTransferDetails` and preserve the generated payment/deposit reference beside the account list.
 - Remaining hardening for future slices:
   - Improve team invitation onboarding so new invitees land directly back on the invite after signup/login.
   - Build tailored onboarding steps after Agency/Enterprise signup.

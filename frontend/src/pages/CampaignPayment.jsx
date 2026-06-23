@@ -4,6 +4,7 @@ import { paymentsAPI, campaignsAPI } from '../services/api';
 import api from '../services/api';
 import Navbar from '../components/Navbar';
 import toast from 'react-hot-toast';
+import BankTransferDetails from '../components/BankTransferDetails';
 
 const CampaignPayment = () => {
   const { bookingId } = useParams();
@@ -328,18 +329,10 @@ const CampaignPayment = () => {
               </svg>
               Bank Transfer Instructions
             </h3>
-            <div className="space-y-2 text-sm text-blue-900">
-              <p><strong>Bank Name:</strong> Example Bank</p>
-              <p><strong>Account Name:</strong> BantuBuzz Platform</p>
-              <p><strong>Account Number:</strong> 1234567890</p>
-              <p>
-                <strong>Reference:</strong>{' '}
-                <span className="font-mono bg-blue-100 px-2 py-0.5 rounded text-blue-800">
-                  CAMPAIGN-{paymentData.campaign_id}-{paymentData.application_id || 'APP'}
-                </span>
-              </p>
+            <div className="text-blue-900">
+              <BankTransferDetails reference={`CAMPAIGN-${paymentData.campaign_id}-${paymentData.application_id || 'APP'}`} />
               {paymentData.amount && (
-                <p><strong>Amount:</strong> ${paymentData.amount}</p>
+                <p className="mt-3 text-sm"><strong>Amount:</strong> ${paymentData.amount}</p>
               )}
             </div>
             <p className="text-xs text-blue-700 italic mt-3">

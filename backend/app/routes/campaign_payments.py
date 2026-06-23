@@ -16,6 +16,7 @@ from app.utils.campaign_helpers import (
     user_owns_campaign, get_campaign_collaborations
 )
 from app.utils.subscription_helper import get_brand_service_fee_percentage
+from app.utils.bank_details import get_bank_transfer_details
 from datetime import datetime
 from decimal import Decimal
 import uuid
@@ -187,13 +188,7 @@ def initiate_payment():
             # Bank transfer - mark as pending, brand will upload proof
             payment.status = 'pending'
             payment.payment_metadata = {
-                'bank_details': {
-                    'bank_name': 'CBZ Bank',
-                    'account_name': 'BantuBuzz Holdings',
-                    'account_number': '1234567890',
-                    'branch': 'Harare Main Branch',
-                    'reference': f'CAMP-{payment.id}'
-                }
+                'bank_details': get_bank_transfer_details(f'CAMP-{payment.id}')
             }
             db.session.commit()
 

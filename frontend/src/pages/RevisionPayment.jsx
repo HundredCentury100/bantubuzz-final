@@ -4,6 +4,7 @@ import { toast } from 'react-hot-toast';
 import { collaborationsAPI, paymentsAPI, bookingsAPI } from '../services/api';
 import api from '../services/api';
 import { useAuth } from '../hooks/useAuth';
+import BankTransferDetails from '../components/BankTransferDetails';
 
 const RevisionPayment = () => {
   const { bookingId } = useParams();
@@ -287,17 +288,9 @@ const RevisionPayment = () => {
           {paymentMethod === 'bank_transfer' && (
             <div className="mb-6 bg-gray-50 border border-gray-200 rounded-3xl p-4">
               <h3 className="font-semibold text-gray-900 mb-3">Bank Transfer Instructions</h3>
-              <div className="text-sm text-gray-700 space-y-2">
-                <p><span className="font-medium">Bank:</span> ZB Bank</p>
-                <p><span className="font-medium">Account Name:</span> BantuBuzz Platform</p>
-                <p><span className="font-medium">Account Number:</span> 4107123456789</p>
-                <p><span className="font-medium">Amount:</span> ${revisionData.fee}</p>
-                <p>
-                  <span className="font-medium">Reference:</span>{' '}
-                  <span className="font-mono bg-gray-200 px-2 py-0.5 rounded text-gray-800">
-                    REV-{revisionData.collaboration_id}-{revisionData.deliverable_id}
-                  </span>
-                </p>
+              <div className="text-sm text-gray-700">
+                <BankTransferDetails reference={`REV-${revisionData.collaboration_id}-${revisionData.deliverable_id}`} compact />
+                <p className="mt-3"><span className="font-medium">Amount:</span> ${revisionData.fee}</p>
               </div>
 
               <div className="mt-4">

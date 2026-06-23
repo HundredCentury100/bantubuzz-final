@@ -17,6 +17,7 @@ from app.models import (
 from app.services.email_service import EmailService, send_email
 from app.utils.notifications import create_notification
 from app.utils.subscription_helper import get_brand_service_fee_percentage
+from app.utils.bank_details import get_bank_transfer_details
 
 
 def money(value):
@@ -24,13 +25,7 @@ def money(value):
 
 
 def get_bank_details(reference):
-    return {
-        "bank_name": "Steward Bank",
-        "account_name": "BantuBuzz (Pvt) Ltd",
-        "account_number": "1234567890",
-        "branch": "Harare",
-        "reference": reference,
-    }
+    return get_bank_transfer_details(reference)
 
 
 def get_cart_items_for_payment(campaign_id, brand_id, cart_item_ids=None):
