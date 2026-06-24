@@ -65,6 +65,7 @@ from .campaign_chat import CampaignChat, CampaignChatParticipant, CampaignChatMe
 from .campaign_cart import CampaignCartItem
 from .spotlight_boost import SpotlightBoost
 from .campaign_report import CampaignReportSchedule, CampaignReportShare
+from .creator_match_feedback import CreatorMatchFeedback
 from .referral import (
     AccountCreditTransaction,
     Referral,
@@ -136,6 +137,7 @@ __all__ = [
     'SpotlightBoost',
     'CampaignReportSchedule',
     'CampaignReportShare',
+    'CreatorMatchFeedback',
     'PortfolioItem',
     'SmilePayTransaction',
     'ClientWorkspace',

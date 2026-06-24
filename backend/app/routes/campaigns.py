@@ -21,6 +21,7 @@ from app.models.package import Package
 from app.models.booking import Booking
 from app.models.collaboration import Collaboration
 from app.models.spotlight_boost import SpotlightBoost
+from app.services.creator_matching_service import CreatorMatchingService
 from app.services.workspace_service import get_request_workspace_id, require_workspace_access, scope_query_to_workspace
 from app.utils.notifications import create_notification
 
@@ -1279,6 +1280,102 @@ def remove_package_from_campaign(campaign_id, package_id):
     except Exception as e:
         db.session.rollback()
         print(f"Error removing package: {str(e)}")
+        return jsonify({'error': str(e)}), 500
+
+
+# ========================================
+# BRAND ENDPOINTS - AI Creator Matching
+# ========================================
+
+@bp.route('/<int:campaign_id>/creator-matches', methods=['GET'])
+@jwt_required()
+def get_creator_matches(campaign_id):
+    """Return Pro+ AI-ranked creator suggestions for a campaign."""
+    try:
+        user_id = int(get_jwt_identity())
+        brand = BrandProfile.query.filter_by(user_id=user_id).first()
+        if not brand:
+            return jsonify({'error': 'Brand profile not found'}), 404
+
+        campaign = Campaign.query.get(campaign_id)
+        if not campaign or campaign.brand_id != brand.id:
+            return jsonify({'error': 'Campaign not found'}), 404
+
+        if campaign.workspace_id:
+            _, workspace_error, workspace_status = require_workspace_access(
+                user_id,
+                campaign.workspace_id,
+                'can_manage_campaigns',
+            )
+            if workspace_error:
+                return jsonify({'error': workspace_error}), workspace_status
+
+        access = CreatorMatchingService.get_plan_access(user_id)
+        if not access['enabled']:
+            return jsonify({
+                'error': access['message'],
+                'feature': 'ai_creator_matching',
+                'access': access,
+            }), 403
+
+        limit = request.args.get('limit', 25, type=int)
+        matches = CreatorMatchingService.get_matches(campaign, brand, user_id, limit=limit)
+        return jsonify({
+            'campaign_id': campaign.id,
+            'access': access,
+            'matches': matches,
+            'count': len(matches),
+        }), 200
+
+    except Exception as e:
+        current_app.logger.error('Creator matching failed', exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
+@bp.route('/<int:campaign_id>/creator-matches/<int:creator_id>/feedback', methods=['POST'])
+@jwt_required()
+def save_creator_match_feedback(campaign_id, creator_id):
+    """Store thumbs up/down feedback for AI creator matching."""
+    try:
+        user_id = int(get_jwt_identity())
+        brand = BrandProfile.query.filter_by(user_id=user_id).first()
+        if not brand:
+            return jsonify({'error': 'Brand profile not found'}), 404
+
+        campaign = Campaign.query.get(campaign_id)
+        if not campaign or campaign.brand_id != brand.id:
+            return jsonify({'error': 'Campaign not found'}), 404
+
+        creator = CreatorProfile.query.get(creator_id)
+        if not creator:
+            return jsonify({'error': 'Creator not found'}), 404
+
+        access = CreatorMatchingService.get_plan_access(user_id)
+        if not access['enabled']:
+            return jsonify({
+                'error': access['message'],
+                'feature': 'ai_creator_matching',
+                'access': access,
+            }), 403
+
+        data = request.get_json(silent=True) or {}
+        feedback = CreatorMatchingService.save_feedback(
+            user_id,
+            campaign.id,
+            creator.id,
+            data.get('feedback'),
+            reason=data.get('reason'),
+        )
+        return jsonify({
+            'message': 'Feedback saved',
+            'feedback': feedback.to_dict(),
+        }), 200
+
+    except ValueError as e:
+        return jsonify({'error': str(e)}), 400
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error('Saving creator match feedback failed', exc_info=True)
         return jsonify({'error': str(e)}), 500
 
 

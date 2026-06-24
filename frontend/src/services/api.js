@@ -197,6 +197,11 @@ export const campaignsAPI = {
   completePackagePayment: (campaignId, packageId, bookingId) =>
     api.post(`/campaigns/${campaignId}/packages/${packageId}/complete-payment`, { booking_id: bookingId }),
 
+  // AI Creator Matching
+  getCreatorMatches: (campaignId, params) => api.get(`/campaigns/${campaignId}/creator-matches`, { params }),
+  submitCreatorMatchFeedback: (campaignId, creatorId, data) =>
+    api.post(`/campaigns/${campaignId}/creator-matches/${creatorId}/feedback`, data),
+
   // Analytics
   getPerformance: (campaignId, params) => api.get(`/campaigns/${campaignId}/performance`, { params }),
   downloadSentimentReport: (campaignId, params) => api.get(
