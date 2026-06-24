@@ -212,6 +212,24 @@ This file is a living handoff guide for future AI/Codex sessions working on the 
 .\deployment\DEPLOY-REFERRALS.bat
 ```
 
+## Direct Messaging - June 24, 2026
+
+- Direct messages use two services:
+  - Flask API under `/api/messages/*` for persistence, attachments, push subscriptions, and fallback sends.
+  - Node/Socket.IO service under `/messaging` for realtime delivery, online status, typing indicators, read receipts, and conversation reads.
+- Message history is stored indefinitely in the PostgreSQL `messages` table.
+- Rich message support is already in the schema through migration `202606051000_add_rich_messaging_and_push.py`: text, image/file attachments, and content links use `message_type`, `attachment_*`, and `link_*` fields.
+- Browser/mobile push notifications use `push_subscriptions`, `frontend/public/message-push-sw.js`, and `backend/app/services/push_service.py`. Production requires valid `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, and `pywebpush`.
+- Trust and Safety uses `user_blocks`, `message_reports`, `message_risk_signals`, and `message_safety_warnings` through `backend/app/routes/messaging_safety.py`.
+- Active blocks must be enforced on every send path. Both the Flask fallback endpoint `POST /api/messages/` and the Node Socket.IO `send_message` handler check `user_blocks` before inserting a message. The frontend composer also disables input/actions when `check-block` returns `can_message: false`.
+- Frontend messaging screen: `frontend/src/pages/Messages.jsx`.
+- Frontend socket state: `frontend/src/contexts/MessagingContext.jsx`.
+- Messaging API wrapper: `frontend/src/services/messagingAPI.js`.
+- Node service: `messaging-service/server.js`.
+- New VPS messaging service is systemd unit `bantubuzz-messaging.service` on port `3002`. Restart it after `messaging-service/server.js` changes.
+- Deploy the June 24 direct-message safety hardening with `deployment\DEPLOY-NEW-VPS-DIRECT-MESSAGING-SAFETY.bat`; it deploys only `backend/app/routes/messages.py`, `messaging-service/server.js`, the frontend build, and restarts backend/messaging/Apache.
+- Direct message feature status after this pass: realtime chat, persistent history, text/images/files/links, read receipts, typing indicators, block/report UI/API, and push subscription support are implemented. When debugging, verify both the Node service and Flask fallback because users can send through either path depending on socket availability.
+
 ### Frontend Deploy Location
 
 The live frontend is served from:

@@ -249,6 +249,14 @@ const Messages = () => {
   };
 
   const sendCurrentMessage = async () => {
+    if (blockStatus?.blocked_by_me || blockStatus?.blocked_me || blockStatus?.can_message === false) {
+      toast.error(blockStatus?.blocked_by_me
+        ? 'Unblock this user before sending messages.'
+        : 'You cannot message this user.'
+      );
+      return false;
+    }
+
     const { content, extra } = buildOutgoingMessage();
     const success = await sendMessage(selectedConversation.id, content, null, extra);
 
@@ -958,7 +966,7 @@ const Messages = () => {
                       }}
                       className="flex-shrink-0 p-2.5 text-primary hover:bg-primary/10 rounded-full transition-all group relative"
                       title={user?.user_type === 'brand' ? 'Request Custom Package' : 'Send Custom Offer'}
-                      disabled={false}
+                      disabled={blockStatus?.can_message === false}
                     >
                       {/* Package Icon */}
                       <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -988,7 +996,7 @@ const Messages = () => {
                     <button
                       type="button"
                       onClick={() => imageInputRef.current?.click()}
-                      disabled={attachmentUploading}
+                      disabled={attachmentUploading || blockStatus?.can_message === false}
                       className="flex-shrink-0 p-2.5 text-primary hover:bg-primary/10 rounded-full transition-all"
                       title="Send image"
                     >
@@ -997,7 +1005,7 @@ const Messages = () => {
                     <button
                       type="button"
                       onClick={() => fileInputRef.current?.click()}
-                      disabled={attachmentUploading}
+                      disabled={attachmentUploading || blockStatus?.can_message === false}
                       className="flex-shrink-0 p-2.5 text-primary hover:bg-primary/10 rounded-full transition-all"
                       title="Attach file"
                     >
@@ -1011,7 +1019,7 @@ const Messages = () => {
                         onChange={handleTyping}
                         placeholder="Type a message..."
                         className="w-full px-4 py-3 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-primary text-base"
-                        disabled={false}
+                        disabled={blockStatus?.can_message === false}
                         inputMode="text"
                         autoComplete="off"
                         autoCorrect="on"
@@ -1021,7 +1029,7 @@ const Messages = () => {
                     </div>
                     <button
                       type="submit"
-                      disabled={(!messageText.trim() && !pendingAttachment) || attachmentUploading}
+                      disabled={(!messageText.trim() && !pendingAttachment) || attachmentUploading || blockStatus?.can_message === false}
                       className="bg-primary hover:bg-primary-dark text-white rounded-full disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center flex-shrink-0 w-12 h-12 min-w-[48px] min-h-[48px] shadow-lg active:scale-95"
                       title="Send message"
                       aria-label="Send message"
