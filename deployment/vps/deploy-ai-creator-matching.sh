@@ -40,12 +40,21 @@ BACKUP="/var/backups/bantubuzz/ai-creator-matching-before-$TS"
 
 echo "Creating targeted backup at $BACKUP"
 mkdir -p "$BACKUP"
-tar --ignore-failed-read --exclude='__pycache__' --exclude='*.pyc' -czf "$BACKUP/backend-targeted.tar.gz" -C backend \
-  app/models/__init__.py \
-  app/models/creator_match_feedback.py \
-  app/services/creator_matching_service.py \
-  app/routes/campaigns.py \
-  migrations/versions/202606241000_add_creator_match_feedback.py
+cat > /tmp/ai-creator-matching-backup-files.txt <<'EOF'
+app/models/__init__.py
+app/models/creator_match_feedback.py
+app/services/creator_matching_service.py
+app/routes/campaigns.py
+migrations/versions/202606241000_add_creator_match_feedback.py
+EOF
+while IFS= read -r path; do
+  [ -e "backend/$path" ] && printf '%s\n' "$path"
+done < /tmp/ai-creator-matching-backup-files.txt > /tmp/ai-creator-matching-existing-files.txt
+if [ -s /tmp/ai-creator-matching-existing-files.txt ]; then
+  tar --exclude='__pycache__' --exclude='*.pyc' -czf "$BACKUP/backend-targeted.tar.gz" -C backend -T /tmp/ai-creator-matching-existing-files.txt
+else
+  tar -czf "$BACKUP/backend-targeted.tar.gz" --files-from /dev/null
+fi
 tar --ignore-failed-read -czf "$BACKUP/frontend-current.tar.gz" -C "$FRONTEND_ROOT" .
 
 echo "Installing backend files"
@@ -79,7 +88,7 @@ rm -f /tmp/app_*.pyc
 
 echo "Running database migration"
 export FLASK_APP=run.py
-venv/bin/flask db upgrade
+venv/bin/flask db upgrade heads
 
 echo "Restarting backend and Apache"
 systemctl restart bantubuzz-backend.service
@@ -98,6 +107,8 @@ echo
 rm -f \
   /tmp/bantubuzz-ai-creator-matching-backend.tar.gz \
   /tmp/bantubuzz-ai-creator-matching-frontend.tar.gz \
-  /tmp/deploy-ai-creator-matching.sh
+  /tmp/deploy-ai-creator-matching.sh \
+  /tmp/ai-creator-matching-backup-files.txt \
+  /tmp/ai-creator-matching-existing-files.txt
 
 echo BANTUBUZZ_NEW_VPS_AI_CREATOR_MATCHING_SUCCESS
