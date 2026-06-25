@@ -1283,6 +1283,12 @@ Deployment note:
   - Scheduled sends are processed by Celery Beat through `app.tasks.bulk_brief_tasks.send_due_bulk_briefs` every 10 minutes. Response tracking syncs proposals back into recipient rows hourly.
   - Open tracking is based on creator visits to `/briefs/<id>?bulk_recipient=<recipient_id>`. Response tracking is based on proposals submitted for the same brief by the same creator.
   - Targeted deploy script: `deployment\DEPLOY-NEW-VPS-BULK-BRIEF-SENDING.bat`. It uploads changed brief/backend/Celery files, migration `202606251000_add_bulk_brief_sending.py`, rebuilt frontend dist, runs `flask db upgrade heads`, and restarts backend plus Celery worker/beat.
+- Campaign scenario analysis:
+  - First production slice is a live cart-preview estimator, not the future offline ML training pipeline. It uses `backend/app/services/campaign_scenario_service.py` to estimate worst/base/predicted/best outcomes from campaign cart items, creator connected-platform averages, package deliverables, and historical `post_metrics`.
+  - API endpoint: `GET /api/campaigns/<campaign_id>/cart/scenarios`. It is brand-owned and lives in `campaign_cart.py` because the first trigger is the cart before payment.
+  - Frontend panel: `frontend/src/components/CampaignScenarioPanel.jsx`, mounted above the cart payment controls in `CampaignCart.jsx`. It refreshes with an 800ms debounce when cart items change and shows reach, engagement rate, CPM, sentiment, confidence, similar-campaign count, and optimisation suggestions.
+  - Current v1 does not persist predictions. When live scenario tracking is implemented, store a prediction snapshot at payment/activation time so actual campaign performance can be compared against the original bands.
+  - Targeted deploy script: `deployment\DEPLOY-NEW-VPS-CAMPAIGN-SCENARIO-ANALYSIS.bat`. It uploads the scenario service, cart route, rebuilt frontend dist, and restarts backend/Apache. No migration is required for v1.
 - Remaining hardening for future slices:
   - Improve team invitation onboarding so new invitees land directly back on the invite after signup/login.
   - Build tailored onboarding steps after Agency/Enterprise signup.

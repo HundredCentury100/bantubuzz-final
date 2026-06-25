@@ -225,6 +225,7 @@ export const campaignsAPI = {
 
   // Campaign Cart (NEW - unpaid additions workflow)
   getCart: (campaignId, params) => api.get(`/campaigns/${campaignId}/cart`, { params }),
+  getCartScenarios: (campaignId, params) => api.get(`/campaigns/${campaignId}/cart/scenarios`, { params }),
   addInvitationToCart: (campaignId, data) => api.post(`/campaigns/${campaignId}/cart/add-invitation`, data),
   addApplicationToCart: (campaignId, data) => api.post(`/campaigns/${campaignId}/cart/add-application`, data),
   addPackageToCart: (campaignId, data) => api.post(`/campaigns/${campaignId}/cart/add-package`, data),

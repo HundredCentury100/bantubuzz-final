@@ -4,6 +4,7 @@ import { campaignsAPI } from '../services/api';
 import CampaignCartItem from './CampaignCartItem';
 import CampaignCartPaymentModal from './CampaignCartPaymentModal';
 import CollaborationDetailsForm from './CollaborationDetailsForm';
+import CampaignScenarioPanel from './CampaignScenarioPanel';
 import toast from 'react-hot-toast';
 
 const CampaignCart = ({ campaignId, onPaymentComplete }) => {
@@ -199,6 +200,8 @@ const CampaignCart = ({ campaignId, onPaymentComplete }) => {
 
   return (
     <div className="space-y-6">
+      <CampaignScenarioPanel campaignId={campaignId} cartItems={cartItems} />
+
       {/* Header with Summary */}
       <div className="bg-white rounded-lg shadow p-6">
         <div className="flex items-center justify-between mb-4">

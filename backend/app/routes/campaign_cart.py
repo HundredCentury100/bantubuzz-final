@@ -17,6 +17,7 @@ from app.services.campaign_cart_payment_service import (
     get_cart_items_for_payment,
     pay_campaign_cart_with_wallet,
 )
+from app.services.campaign_scenario_service import CampaignScenarioService
 from app.utils.notifications import create_notification
 from datetime import datetime, timedelta
 from decimal import Decimal
@@ -77,6 +78,35 @@ def get_campaign_cart(campaign_id):
         import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
+
+
+@bp.route('/<int:campaign_id>/cart/scenarios', methods=['GET'])
+@jwt_required()
+def get_campaign_cart_scenarios(campaign_id):
+    """Predict campaign outcome scenarios for the current cart selection."""
+    try:
+        user_id = int(get_jwt_identity())
+        user = User.query.get(user_id)
+        if not user or user.user_type != 'brand':
+            return jsonify({'error': 'Unauthorized'}), 403
+
+        brand = BrandProfile.query.filter_by(user_id=user_id).first()
+        if not brand:
+            return jsonify({'error': 'Brand profile not found'}), 404
+
+        campaign = Campaign.query.get(campaign_id)
+        if not campaign or campaign.brand_id != brand.id:
+            return jsonify({'error': 'Campaign not found or access denied'}), 404
+
+        item_ids = request.args.getlist('cart_item_ids', type=int)
+        prediction = CampaignScenarioService.predict_for_cart(campaign_id, item_ids or None)
+        return jsonify(prediction), 200
+
+    except Exception as e:
+        print(f"Error getting campaign cart scenarios: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': 'Unable to calculate campaign scenarios'}), 500
 
 
 @bp.route('/<int:campaign_id>/cart/add-invitation', methods=['POST'])
