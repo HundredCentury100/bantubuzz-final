@@ -102,6 +102,7 @@ import BrowseBriefs from './pages/BrowseBriefs';
 import BriefDetails from './pages/BriefDetails';
 import CreateBrief from './pages/CreateBrief';
 import ManageBriefs from './pages/ManageBriefs';
+import BulkBriefSend from './pages/BulkBriefSend';
 import MyProposals from './pages/MyProposals';
 
 // Public Pages
@@ -585,6 +586,14 @@ function App() {
         element={
           <ProtectedRoute requiredType="brand">
             <CreateBrief />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/brand/briefs/:id/bulk-send"
+        element={
+          <ProtectedRoute requiredType="brand">
+            <BulkBriefSend />
           </ProtectedRoute>
         }
       />

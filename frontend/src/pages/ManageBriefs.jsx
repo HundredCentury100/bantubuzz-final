@@ -12,7 +12,8 @@ import {
   CheckCircle,
   XCircle,
   FileText,
-  DollarSign
+  DollarSign,
+  Send
 } from 'lucide-react';
 
 const ManageBriefs = () => {
@@ -381,6 +382,13 @@ const ManageBriefs = () => {
 
                         {brief.status === 'open' && (
                           <>
+                            <Link
+                              to={`/brand/briefs/${brief.id}/bulk-send`}
+                              className="flex items-center gap-2 px-4 py-2 bg-dark text-white rounded-lg hover:bg-gray-800 transition-colors"
+                            >
+                              <Send size={16} />
+                              Bulk Send
+                            </Link>
                             <button
                               onClick={() => handleViewProposals(brief)}
                               className="flex items-center gap-2 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors"

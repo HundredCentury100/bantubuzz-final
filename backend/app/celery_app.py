@@ -32,6 +32,7 @@ def make_celery(app=None):
             'app.tasks.report_tasks',
             'app.tasks.referral_tasks',
             'app.tasks.creator_score_tasks',
+            'app.tasks.bulk_brief_tasks',
         ]
     )
 
@@ -117,6 +118,14 @@ def make_celery(app=None):
             'recalculate-creator-scores': {
                 'task': 'app.tasks.creator_score_tasks.recalculate_all',
                 'schedule': crontab(minute=30, hour=2),
+            },
+            'send-due-bulk-briefs': {
+                'task': 'app.tasks.bulk_brief_tasks.send_due_bulk_briefs',
+                'schedule': crontab(minute='*/10'),
+            },
+            'sync-bulk-brief-responses': {
+                'task': 'app.tasks.bulk_brief_tasks.sync_bulk_brief_responses',
+                'schedule': crontab(minute=25),
             },
         }
     )

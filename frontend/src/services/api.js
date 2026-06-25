@@ -491,6 +491,8 @@ export const briefsAPI = {
 
   // Proposals for Brief
   getBriefProposals: (id) => api.get(`/briefs/${id}/proposals`),
+  createBulkSend: (id, data) => api.post(`/briefs/${id}/bulk-send`, data),
+  getBulkSends: (id) => api.get(`/briefs/${id}/bulk-sends`),
 };
 
 // Proposals API
