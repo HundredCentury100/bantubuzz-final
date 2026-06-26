@@ -2,6 +2,24 @@
 
 This file is a living handoff guide for future AI/Codex sessions working on the BantuBuzz Platform. Start here before making changes, deploying, or debugging production.
 
+## Creator Score / BIQ
+
+- The internal creator ranking score is now productized as **BIQ — BantuBuzz
+  Intelligence Quotient** on creator-owned surfaces. Public/brand-facing pages
+  may show the creator's rank and optional BIQ value only when leaderboard
+  preferences allow it; never expose formula internals publicly by default.
+- `CreatorScoreService.owner_score_payload()` is the owner-facing payload for
+  creator dashboards. It returns BIQ tier, benchmark, history, change
+  explanations, recovery roadmap, dimensions, badges, and leaderboard display
+  preferences.
+- Public profile and leaderboard labels should say `BIQ`, not generic `Score`,
+  when referring to creator ranking values. Sentiment metrics can still use
+  `Score` because that is a separate analytics metric.
+- Deploy BIQ presentation updates to the new VPS with
+  `deployment\DEPLOY-NEW-VPS-BIQ-PRODUCTIZATION.bat`. This targeted deployment
+  uploads the creator score service plus the compiled frontend, restarts the
+  backend, reloads Apache, and does not run database migrations.
+
 ## Headless CMS Integration
 
 - CMS source and Payload admin run at `https://app.bantubuzz.com`.

@@ -892,6 +892,8 @@ class CreatorScoreService:
         if not score:
             return {
                 'score': None,
+                'biq': None,
+                'tier': CreatorScoreService.biq_tier(None),
                 'formula_version': FORMULA_VERSION,
                 'message': 'Your score will appear after your profile has enough activity to calculate it.',
                 'improvement_tips': [
@@ -901,6 +903,7 @@ class CreatorScoreService:
                 ],
             }
 
+        score_value = round(float(score.final_score or 0), 1)
         dimensions = {
             'public_performance': round(weighted_component_score({
                 'engagement': score.engagement_score,
@@ -943,8 +946,15 @@ class CreatorScoreService:
         if raw_dimensions['activity'] < 60:
             tips.append('Log in regularly and stay active so brands know you are available.')
 
+        history = CreatorScoreService.biq_history_payload(creator.id)
+        benchmark = CreatorScoreService.biq_benchmark_payload(creator, score_value)
+        change_explanations = CreatorScoreService.biq_change_explanations(score, history)
+        recovery_roadmap = CreatorScoreService.biq_recovery_roadmap(raw_dimensions)
+
         return {
-            'score': round(float(score.final_score or 0), 1),
+            'score': score_value,
+            'biq': score_value,
+            'tier': CreatorScoreService.biq_tier(score_value),
             'formula_version': score.formula_version,
             'calculated_at': score.calculated_at.isoformat() if score.calculated_at else None,
             'rank': CreatorScoreService.public_rank(creator.id),
@@ -958,8 +968,160 @@ class CreatorScoreService:
             'dimensions': dimensions,
             'raw_dimensions': raw_dimensions,
             'excluded_dimensions': (score.data_quality or {}).get('excluded_dimensions', []),
+            'benchmark': benchmark,
+            'history': history,
+            'change_explanations': change_explanations,
+            'recovery_roadmap': recovery_roadmap,
             'improvement_tips': tips[:5],
         }
+
+    @staticmethod
+    def biq_tier(score_value):
+        if score_value is None:
+            return {
+                'key': 'new',
+                'label': 'New',
+                'description': 'More profile, platform, and marketplace data is needed.',
+            }
+        if score_value >= 85:
+            return {
+                'key': 'excellent',
+                'label': 'Excellent',
+                'description': 'Top-quality creator signal with strong marketplace readiness.',
+            }
+        if score_value >= 70:
+            return {
+                'key': 'strong',
+                'label': 'Strong',
+                'description': 'Reliable creator signal with clear strengths.',
+            }
+        if score_value >= 50:
+            return {
+                'key': 'developing',
+                'label': 'Developing',
+                'description': 'Growing profile with visible opportunities to improve.',
+            }
+        return {
+            'key': 'new',
+            'label': 'New',
+            'description': 'Early-stage creator signal with limited verified data.',
+        }
+
+    @staticmethod
+    def biq_history_payload(creator_profile_id, months=12):
+        cutoff = datetime.utcnow() - timedelta(days=months * 31)
+        rows = CreatorScoreHistory.query.filter(
+            CreatorScoreHistory.creator_profile_id == creator_profile_id,
+            CreatorScoreHistory.calculated_at >= cutoff,
+        ).order_by(CreatorScoreHistory.calculated_at.asc()).all()
+
+        by_month = {}
+        for row in rows:
+            key = row.calculated_at.strftime('%Y-%m')
+            by_month[key] = row
+
+        return [
+            {
+                'month': key,
+                'score': round(float(row.final_score or 0), 1),
+                'calculated_at': row.calculated_at.isoformat() if row.calculated_at else None,
+            }
+            for key, row in by_month.items()
+        ][-months:]
+
+    @staticmethod
+    def biq_benchmark_payload(creator, score_value):
+        categories = creator.categories or []
+        category = categories[0] if categories else None
+        if category:
+            context = str(category).strip().lower()
+            rank = CreatorScoreService.public_rank(creator.id, 'category', context)
+            total = CreatorRanking.query.filter_by(
+                ranking_type='category',
+                context_key=context,
+            ).count()
+            if rank and rank.get('position') and total:
+                percentile = max(1, min(100, round((rank['position'] / total) * 100)))
+                return {
+                    'label': f'Top {percentile}% in {category}',
+                    'category': category,
+                    'percentile': percentile,
+                    'rank': rank,
+                    'total': total,
+                }
+
+        overall = CreatorScoreService.public_rank(creator.id)
+        total_overall = CreatorRanking.query.filter_by(ranking_type='overall', context_key='').count()
+        if overall and overall.get('position') and total_overall:
+            percentile = max(1, min(100, round((overall['position'] / total_overall) * 100)))
+            return {
+                'label': f'Top {percentile}% overall',
+                'category': None,
+                'percentile': percentile,
+                'rank': overall,
+                'total': total_overall,
+            }
+
+        return {
+            'label': 'Benchmark pending',
+            'category': category,
+            'percentile': None,
+            'rank': None,
+            'total': total_overall,
+        }
+
+    @staticmethod
+    def biq_change_explanations(score, history):
+        if not history or len(history) < 2:
+            return ['BIQ explanations will appear after at least two score snapshots.']
+
+        previous = history[-2]['score']
+        current = round(float(score.final_score or 0), 1)
+        delta = round(current - previous, 1)
+        if abs(delta) < 0.1:
+            return ['Your BIQ is stable compared with the previous score snapshot.']
+
+        direction = 'increased' if delta > 0 else 'decreased'
+        explanations = [f'Your BIQ {direction} by {abs(delta)} points since the previous snapshot.']
+
+        component_candidates = [
+            ('engagement_score', 'engagement quality'),
+            ('reach_score', 'reach and views'),
+            ('sentiment_score', 'audience sentiment'),
+            ('marketplace_reliability_score', 'marketplace reliability'),
+            ('review_score', 'verified reviews'),
+            ('profile_trust_score', 'profile trust'),
+            ('activity_score', 'platform activity'),
+        ]
+        strongest = max(
+            component_candidates,
+            key=lambda item: abs(float(getattr(score, item[0], 0) or 0)),
+        )
+        explanations.append(f'The current strongest visible signal is {strongest[1]}.')
+        return explanations[:3]
+
+    @staticmethod
+    def biq_recovery_roadmap(raw_dimensions):
+        roadmap = []
+        dimension_actions = [
+            ('profile_trust', 'Complete your profile', 'Add a profile photo, stronger bio, portfolio work, packages, and connected platforms.'),
+            ('engagement', 'Strengthen engagement', 'Sync platforms with high-quality comments, saves, shares, and active audience response.'),
+            ('reach', 'Improve measurable reach', 'Submit live post URLs and keep platform analytics synced so reach/views can be verified.'),
+            ('reviews', 'Build verified reviews', 'Complete collaborations and ask brands to review once work is finished.'),
+            ('response_rate', 'Reply faster', 'Respond to brand messages within 12 hours where possible.'),
+            ('on_time_delivery', 'Protect delivery reliability', 'Submit content and post URLs before the agreed deadline.'),
+            ('activity', 'Stay active', 'Log in regularly and keep your availability current.'),
+        ]
+        for key, title, description in dimension_actions:
+            value = raw_dimensions.get(key)
+            if value is not None and value < 75:
+                roadmap.append({
+                    'dimension': key,
+                    'title': title,
+                    'description': description,
+                    'current_score': value,
+                })
+        return roadmap[:4]
 
 
 def queue_creator_score_recalculation(creator_profile_id):

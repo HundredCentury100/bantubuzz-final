@@ -231,11 +231,14 @@ const CreatorDashboard = () => {
   const profileComplete = profile?.bio && profile?.categories?.length > 0;
   const creatorScore = profile?.creator_score || {};
   const scoreValue = typeof creatorScore.score === 'number' ? creatorScore.score : null;
-  const scoreTone = scoreValue >= 85
+  const biqTier = creatorScore.tier || { label: scoreValue === null ? 'New' : 'Developing' };
+  const scoreTone = biqTier.key === 'excellent'
     ? 'text-green-700 bg-green-50 border-green-200'
-    : scoreValue >= 70
+    : biqTier.key === 'strong'
       ? 'text-primary-dark bg-primary/10 border-primary/30'
-      : 'text-gray-700 bg-gray-50 border-gray-200';
+      : biqTier.key === 'developing'
+        ? 'text-amber-700 bg-amber-50 border-amber-200'
+        : 'text-gray-700 bg-gray-50 border-gray-200';
   const scoreSections = [
     ['Public performance', creatorScore.dimensions?.public_performance, 'Engagement, reach, followers, and sentiment'],
     ['Reliability', creatorScore.dimensions?.marketplace_reliability, 'Completion, response, and on-time delivery'],
@@ -243,6 +246,11 @@ const CreatorDashboard = () => {
     ['Profile trust', creatorScore.dimensions?.profile_trust, 'Profile completeness and booking readiness'],
     ['Activity', creatorScore.dimensions?.activity, 'Recent BantuBuzz sessions'],
   ];
+  const scoreHistory = creatorScore.history || [];
+  const scoreHistoryValues = scoreHistory.map((point) => Number(point.score || 0));
+  const historyMin = scoreHistoryValues.length ? Math.min(...scoreHistoryValues) : 0;
+  const historyMax = scoreHistoryValues.length ? Math.max(...scoreHistoryValues) : 100;
+  const historyRange = Math.max(1, historyMax - historyMin);
   const availableLeaderboardBadges = creatorScore.badges || [];
   const selectedLeaderboardBadges = leaderboardPrefs.selected_badges || [];
 
@@ -744,12 +752,20 @@ const CreatorDashboard = () => {
                 <span className="text-xl font-bold">{scoreValue === null ? '--' : Math.round(scoreValue)}</span>
               </div>
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">Creator Score</p>
-                <h2 className="mt-1 text-xl font-bold text-dark">Your private performance score</h2>
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">BIQ Creator Intelligence</p>
+                <h2 className="mt-1 text-xl font-bold text-dark">Your BantuBuzz Intelligence Quotient</h2>
                 <p className="mt-1 max-w-2xl text-sm text-gray-600">
-                  This score helps power rankings and discovery. Only you can see the number; brands see your badges and public rank.
+                  BIQ is your 0-100 creator quality signal. It powers rankings, discovery, badges, and future intelligence tools.
                 </p>
                 <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold">
+                  <span className={`rounded-full px-3 py-1 ${scoreTone}`}>
+                    {biqTier.label}
+                  </span>
+                  {creatorScore.benchmark?.label && (
+                    <span className="rounded-full bg-dark px-3 py-1 text-white">
+                      {creatorScore.benchmark.label}
+                    </span>
+                  )}
                   {creatorScore.rank?.position && (
                     <span className="rounded-full bg-primary/10 px-3 py-1 text-primary-dark">
                       Overall rank #{creatorScore.rank.position}
@@ -768,7 +784,7 @@ const CreatorDashboard = () => {
               to="/creator/platforms"
               className="inline-flex min-h-[44px] items-center justify-center rounded-full bg-dark px-5 py-2.5 text-sm font-semibold text-white hover:bg-gray-800"
             >
-              Improve my score
+              Improve my BIQ
             </Link>
           </div>
 
@@ -784,12 +800,60 @@ const CreatorDashboard = () => {
             ))}
           </div>
 
+          <div className="mt-5 grid gap-4 lg:grid-cols-[1.1fr_0.9fr]">
+            <div className="border border-gray-200 bg-gray-50 p-4">
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-bold text-dark">BIQ history</h3>
+                  <p className="text-xs text-gray-500">Last 12 months of score snapshots</p>
+                </div>
+                {scoreHistory.length > 0 && (
+                  <span className="rounded-full bg-white px-3 py-1 text-xs font-semibold text-gray-600">
+                    {scoreHistory.length} point{scoreHistory.length === 1 ? '' : 's'}
+                  </span>
+                )}
+              </div>
+              {scoreHistory.length > 0 ? (
+                <div className="flex h-24 items-end gap-2">
+                  {scoreHistory.map((point) => {
+                    const value = Number(point.score || 0);
+                    const height = 18 + ((value - historyMin) / historyRange) * 70;
+                    return (
+                      <div key={point.month} className="flex min-w-0 flex-1 flex-col items-center gap-1">
+                        <div
+                          className="w-full rounded-t bg-primary"
+                          style={{ height: `${height}%` }}
+                          title={`${point.month}: ${value}`}
+                        />
+                        <span className="w-full truncate text-center text-[10px] text-gray-500">{point.month.slice(5)}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="text-sm text-gray-600">History appears after multiple BIQ snapshots are calculated.</p>
+              )}
+            </div>
+
+            <div className="border border-gray-200 bg-gray-50 p-4">
+              <h3 className="text-sm font-bold text-dark">What changed</h3>
+              <div className="mt-3 space-y-2">
+                {(creatorScore.change_explanations || []).map((explanation) => (
+                  <div key={explanation} className="flex items-start gap-2 text-sm text-gray-700">
+                    <span className="mt-1.5 h-2 w-2 flex-shrink-0 rounded-full bg-primary" />
+                    <span>{explanation}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
           <div className="mt-5 border-t border-gray-100 pt-4">
             <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
               <div>
                 <h3 className="text-sm font-bold text-dark">Leaderboard display</h3>
                 <p className="mt-1 max-w-2xl text-sm text-gray-600">
-                  Your rank and badges can appear publicly. Your score stays hidden unless you choose to show it.
+                  Your rank and badges can appear publicly. Your BIQ stays hidden unless you choose to show it.
                 </p>
               </div>
               <label className="inline-flex min-h-[44px] cursor-pointer items-center gap-3 rounded-full border border-gray-200 bg-gray-50 px-4 py-2 text-sm font-semibold text-gray-700">
@@ -802,7 +866,7 @@ const CreatorDashboard = () => {
                   }))}
                   className="h-4 w-4 accent-primary"
                 />
-                Show my score on leaderboard
+                Show my BIQ on leaderboard
               </label>
             </div>
 
@@ -864,6 +928,28 @@ const CreatorDashboard = () => {
                   <div key={tip} className="flex items-start gap-2 text-sm text-gray-700">
                     <span className="mt-1 h-2 w-2 flex-shrink-0 rounded-full bg-primary" />
                     <span>{tip}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {creatorScore.recovery_roadmap?.length > 0 && (
+            <div className="mt-5 border-t border-gray-100 pt-4">
+              <h3 className="text-sm font-bold text-dark">Recovery roadmap</h3>
+              <p className="mt-1 text-sm text-gray-600">
+                Focus here first if your BIQ drops or you want to move into the next tier.
+              </p>
+              <div className="mt-3 grid gap-3 md:grid-cols-2">
+                {creatorScore.recovery_roadmap.map((item) => (
+                  <div key={item.dimension} className="border border-gray-200 bg-gray-50 p-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="font-semibold text-dark">{item.title}</p>
+                      <span className="rounded-full bg-white px-2 py-1 text-xs font-bold text-gray-700">
+                        {Number(item.current_score || 0).toFixed(0)}
+                      </span>
+                    </div>
+                    <p className="mt-1 text-sm text-gray-600">{item.description}</p>
                   </div>
                 ))}
               </div>

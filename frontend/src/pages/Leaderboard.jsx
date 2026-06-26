@@ -234,7 +234,7 @@ const Leaderboard = () => {
                       <p className="truncate text-sm text-gray-500">@{creator.username}</p>
                       {creator.show_score && creator.creator_score !== null && creator.creator_score !== undefined && (
                         <p className="mt-1 inline-flex rounded-full bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary-dark">
-                          Score {creator.creator_score}
+                          BIQ {creator.creator_score}
                         </p>
                       )}
                     </div>
