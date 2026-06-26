@@ -25,6 +25,12 @@ cat > "$CONF_AVAILABLE" <<'EOF'
     AddType application/javascript .js .mjs
     AddType image/svg+xml .svg .svgz
 </IfModule>
+<LocationMatch "^/wp-content/litespeed/css/.*\.css$">
+    ForceType text/css
+</LocationMatch>
+<LocationMatch "^/wp-content/litespeed/js/.*\.js$">
+    ForceType application/javascript
+</LocationMatch>
 EOF
 
 echo "Ensuring Apache MIME module and config are enabled"
@@ -41,8 +47,30 @@ sleep 2
 echo "Finding current optimized assets"
 HTML="/tmp/makumbiri-css-mime-check.html"
 curl -k -sS "https://$DOMAIN/" -o "$HTML"
-CSS_URL="$(grep -Eoi 'https://[^"'"'"' ]+wp-content/litespeed/css/[^"'"'"' ]+\.css[^"'"'"' ]*' "$HTML" | head -1 || true)"
-JS_URL="$(grep -Eoi 'https://[^"'"'"' ]+wp-content/litespeed/js/[^"'"'"' ]+\.js[^"'"'"' ]*' "$HTML" | head -1 || true)"
+read -r CSS_URL JS_URL < <(
+  python3 - "$HTML" "$DOMAIN" <<'PY'
+import re
+import sys
+
+html_path, domain = sys.argv[1], sys.argv[2]
+html = open(html_path, encoding='utf-8', errors='replace').read()
+
+def first(pattern):
+    match = re.search(pattern, html, flags=re.I)
+    if not match:
+        return ''
+    url = match.group(0)
+    if url.startswith('//'):
+        return 'https:' + url
+    if url.startswith('/'):
+        return f'https://{domain}{url}'
+    return url
+
+css = first(r'(?:https:)?//[^"\' )]+wp-content/litespeed/css/[^"\' )]+\.css[^"\' )]*|/wp-content/litespeed/css/[^"\' )]+\.css[^"\' )]*')
+js = first(r'(?:https:)?//[^"\' )]+wp-content/litespeed/js/[^"\' )]+\.js[^"\' )]*|/wp-content/litespeed/js/[^"\' )]+\.js[^"\' )]*')
+print(css, js)
+PY
+)
 
 if [ -z "$CSS_URL" ]; then
   echo "Could not find optimized CSS URL in public HTML"
