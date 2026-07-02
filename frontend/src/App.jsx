@@ -116,6 +116,9 @@ import SubscriptionPayment from './pages/SubscriptionPayment';
 import SubscriptionPaymentReturn from './pages/SubscriptionPaymentReturn';
 import PrivacyPolicy from './pages/PrivacyPolicy';
 import TermsOfService from './pages/TermsOfService';
+import HarassmentPolicy from './pages/HarassmentPolicy';
+import SupportPolicy from './pages/SupportPolicy';
+import SpamPolicy from './pages/SpamPolicy';
 import PublicCampaignReport from './pages/PublicCampaignReport';
 import ReferralLanding from './pages/ReferralLanding';
 import Referrals from './pages/Referrals';
@@ -214,6 +217,9 @@ function App() {
     '/packages',
     '/pricing',
     '/privacy',
+    '/policies/harassment-abuse',
+    '/policies/spam-solicitation',
+    '/policies/support',
     '/success-stories',
     '/terms',
     '/creator/platforms',
@@ -981,6 +987,9 @@ function App() {
       <Route path="/brand/workspace-invite/:token" element={<WorkspaceInvite />} />
       <Route path="/privacy" element={<PrivacyPolicy />} />
       <Route path="/terms" element={<TermsOfService />} />
+      <Route path="/policies/harassment-abuse" element={<HarassmentPolicy />} />
+      <Route path="/policies/spam-solicitation" element={<SpamPolicy />} />
+      <Route path="/policies/support" element={<SupportPolicy />} />
       <Route
         path="/referrals"
         element={

@@ -140,6 +140,21 @@ const Footer = () => {
                   Terms of Service
                 </Link>
               </li>
+              <li>
+                <Link to="/policies/support" className="text-gray-400 hover:text-primary transition-colors">
+                  Support Policy
+                </Link>
+              </li>
+              <li>
+                <Link to="/policies/harassment-abuse" className="text-gray-400 hover:text-primary transition-colors">
+                  Harassment & Abuse Policy
+                </Link>
+              </li>
+              <li>
+                <Link to="/policies/spam-solicitation" className="text-gray-400 hover:text-primary transition-colors">
+                  Spam & Solicitation Policy
+                </Link>
+              </li>
             </ul>
           </div>
         </div>

@@ -1,208 +1,146 @@
-import Navbar from '../components/Navbar';
-import Footer from '../components/Footer';
-import SEO from '../components/SEO';
+import PolicyPage from '../components/PolicyPage';
 
-const TermsOfService = () => {
-  return (
-    <div className="min-h-screen bg-light">
-      <SEO
-        title="Terms of Service - BantuBuzz"
-        description="Read BantuBuzz's terms of service to understand the rules and guidelines for using our platform."
-        keywords="terms of service, user agreement, terms and conditions, bantubuzz"
-      />
-      <Navbar />
-
-      {/* Hero Section */}
-      <section className="bg-gradient-to-r from-primary to-primary-dark text-white py-16">
-        <div className="container-custom">
-          <h1 className="text-4xl font-bold mb-4">Terms of Service</h1>
-          <p className="text-lg opacity-90">Last updated: January 6, 2025</p>
-        </div>
-      </section>
-
-      {/* Content */}
-      <section className="section-padding">
-        <div className="container-custom max-w-4xl">
-          <div className="bg-white rounded-lg shadow-md p-8 md:p-12 space-y-8">
-            {/* Introduction */}
-            <div>
-              <h2 className="text-2xl font-bold text-dark mb-4">1. Acceptance of Terms</h2>
-              <p className="text-gray-700 leading-relaxed">
-                By accessing and using BantuBuzz, you accept and agree to be bound by these Terms of Service. If you do not agree to these terms, please do not use our platform. We reserve the right to modify these terms at any time, and your continued use constitutes acceptance of any changes.
-              </p>
-            </div>
-
-            {/* Eligibility */}
-            <div>
-              <h2 className="text-2xl font-bold text-dark mb-4">2. Eligibility</h2>
-              <p className="text-gray-700 mb-3">To use BantuBuzz, you must:</p>
-              <ul className="list-disc list-inside space-y-2 text-gray-700 ml-4">
-                <li>Be at least 18 years of age</li>
-                <li>Have the legal capacity to enter into binding contracts</li>
-                <li>Provide accurate and complete registration information</li>
-                <li>Maintain the security of your account credentials</li>
-                <li>Comply with all applicable laws and regulations</li>
-              </ul>
-            </div>
-
-            {/* User Accounts */}
-            <div>
-              <h2 className="text-2xl font-bold text-dark mb-4">3. User Accounts</h2>
-              <h3 className="text-xl font-semibold text-dark mb-3">Account Types</h3>
-              <p className="text-gray-700 mb-3">BantuBuzz offers two types of accounts:</p>
-              <ul className="list-disc list-inside space-y-2 text-gray-700 ml-4">
-                <li><strong>Creator Accounts:</strong> For content creators offering services</li>
-                <li><strong>Brand Accounts:</strong> For businesses seeking creator partnerships</li>
-              </ul>
-
-              <h3 className="text-xl font-semibold text-dark mb-3 mt-6">Account Responsibilities</h3>
-              <p className="text-gray-700 mb-3">You are responsible for:</p>
-              <ul className="list-disc list-inside space-y-2 text-gray-700 ml-4">
-                <li>Maintaining the confidentiality of your account</li>
-                <li>All activities that occur under your account</li>
-                <li>Notifying us immediately of any unauthorized use</li>
-                <li>Ensuring your profile information is accurate and up-to-date</li>
-              </ul>
-            </div>
-
-            {/* Creator Obligations */}
-            <div>
-              <h2 className="text-2xl font-bold text-dark mb-4">4. Creator Obligations</h2>
-              <p className="text-gray-700 mb-3">As a creator, you agree to:</p>
-              <ul className="list-disc list-inside space-y-2 text-gray-700 ml-4">
-                <li>Provide services as described in your packages</li>
-                <li>Deliver work on time and to the agreed specifications</li>
-                <li>Communicate professionally with brands</li>
-                <li>Only showcase content you have the rights to display</li>
-                <li>Disclose sponsored content in accordance with applicable laws</li>
-                <li>Maintain accurate follower counts and engagement metrics</li>
-              </ul>
-            </div>
-
-            {/* Brand Obligations */}
-            <div>
-              <h2 className="text-2xl font-bold text-dark mb-4">5. Brand Obligations</h2>
-              <p className="text-gray-700 mb-3">As a brand, you agree to:</p>
-              <ul className="list-disc list-inside space-y-2 text-gray-700 ml-4">
-                <li>Provide clear and accurate campaign briefs</li>
-                <li>Make timely payments for completed work</li>
-                <li>Respect intellectual property rights of creators</li>
-                <li>Communicate professionally and respectfully</li>
-                <li>Honor agreed-upon terms in booking agreements</li>
-                <li>Not request services outside the scope of booked packages</li>
-              </ul>
-            </div>
-
-            {/* Payments and Fees */}
-            <div>
-              <h2 className="text-2xl font-bold text-dark mb-4">6. Payments and Fees</h2>
-              <h3 className="text-xl font-semibold text-dark mb-3">Service Fees</h3>
-              <p className="text-gray-700 mb-3">
-                BantuBuzz charges a service fee on all transactions. The current fee structure is available on our platform and may be updated with notice to users.
-              </p>
-
-              <h3 className="text-xl font-semibold text-dark mb-3 mt-4">Payment Processing</h3>
-              <p className="text-gray-700 mb-3">
-                Payments are held in escrow until work is completed and approved. Funds are released to creators according to our payment schedule, typically within 30 days of completion for quality assurance.
-              </p>
-
-              <h3 className="text-xl font-semibold text-dark mb-3 mt-4">Refunds</h3>
-              <p className="text-gray-700">
-                Refunds are handled on a case-by-case basis. If work is not delivered as described or disputes arise, contact our support team for resolution.
-              </p>
-            </div>
-
-            {/* Content and Intellectual Property */}
-            <div>
-              <h2 className="text-2xl font-bold text-dark mb-4">7. Content and Intellectual Property</h2>
-              <h3 className="text-xl font-semibold text-dark mb-3">Your Content</h3>
-              <p className="text-gray-700 mb-3">
-                You retain ownership of all content you upload to BantuBuzz. By uploading content, you grant us a worldwide, non-exclusive license to use, display, and distribute your content for the purpose of operating the platform.
-              </p>
-
-              <h3 className="text-xl font-semibold text-dark mb-3 mt-4">Prohibited Content</h3>
-              <p className="text-gray-700 mb-3">You may not upload content that:</p>
-              <ul className="list-disc list-inside space-y-2 text-gray-700 ml-4">
-                <li>Infringes on intellectual property rights</li>
-                <li>Contains hate speech, harassment, or discrimination</li>
-                <li>Is sexually explicit or promotes illegal activities</li>
-                <li>Violates any applicable laws or regulations</li>
-              </ul>
-            </div>
-
-            {/* Prohibited Activities */}
-            <div>
-              <h2 className="text-2xl font-bold text-dark mb-4">8. Prohibited Activities</h2>
-              <p className="text-gray-700 mb-3">Users may not:</p>
-              <ul className="list-disc list-inside space-y-2 text-gray-700 ml-4">
-                <li>Use the platform for fraudulent purposes</li>
-                <li>Manipulate metrics or engagement numbers</li>
-                <li>Circumvent platform fees by conducting transactions off-platform</li>
-                <li>Share account credentials with others</li>
-                <li>Use automated bots or scripts</li>
-                <li>Harass, threaten, or abuse other users</li>
-                <li>Attempt to gain unauthorized access to the platform</li>
-              </ul>
-            </div>
-
-            {/* Termination */}
-            <div>
-              <h2 className="text-2xl font-bold text-dark mb-4">9. Termination</h2>
-              <p className="text-gray-700 leading-relaxed">
-                We reserve the right to suspend or terminate your account at any time for violations of these Terms of Service. You may also terminate your account at any time through your account settings. Upon termination, pending transactions will be completed according to our policies.
-              </p>
-            </div>
-
-            {/* Disclaimers */}
-            <div>
-              <h2 className="text-2xl font-bold text-dark mb-4">10. Disclaimers and Limitation of Liability</h2>
-              <p className="text-gray-700 mb-3">
-                BantuBuzz is provided "as is" without warranties of any kind. We do not guarantee:
-              </p>
-              <ul className="list-disc list-inside space-y-2 text-gray-700 ml-4">
-                <li>Uninterrupted or error-free service</li>
-                <li>Specific results from using the platform</li>
-                <li>The quality or outcomes of creator-brand collaborations</li>
-              </ul>
-              <p className="text-gray-700 mt-3">
-                We are not liable for any indirect, incidental, or consequential damages arising from your use of the platform.
-              </p>
-            </div>
-
-            {/* Dispute Resolution */}
-            <div>
-              <h2 className="text-2xl font-bold text-dark mb-4">11. Dispute Resolution</h2>
-              <p className="text-gray-700 leading-relaxed">
-                If disputes arise between users, we encourage resolution through our platform's messaging system and support team. For unresolved disputes, parties agree to seek resolution through mediation before pursuing legal action.
-              </p>
-            </div>
-
-            {/* Governing Law */}
-            <div>
-              <h2 className="text-2xl font-bold text-dark mb-4">12. Governing Law</h2>
-              <p className="text-gray-700 leading-relaxed">
-                These Terms of Service are governed by the laws of Zimbabwe. Any legal actions or proceedings shall be brought exclusively in the courts of Zimbabwe.
-              </p>
-            </div>
-
-            {/* Contact */}
-            <div className="bg-primary/10 p-6 rounded-lg">
-              <h2 className="text-2xl font-bold text-dark mb-4">13. Contact Information</h2>
-              <p className="text-gray-700 mb-3">
-                For questions about these Terms of Service, contact us:
-              </p>
-              <ul className="space-y-2 text-gray-700">
-                <li><strong>Email:</strong> support@bantubuzz.com</li>
-                <li><strong>Location:</strong> Harare, Zimbabwe</li>
-              </ul>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <Footer />
-    </div>
-  );
-};
+const TermsOfService = () => (
+  <PolicyPage
+    title="Terms of Service"
+    description="Read the BantuBuzz Terms of Service for creators, brands, agencies, enterprise users, campaigns, payments, AI-powered features, and marketplace conduct."
+    keywords="BantuBuzz terms of service, creator marketplace terms, brand collaboration terms"
+    intro={[
+      'These Terms of Service govern your access to and use of the BantuBuzz platform, including all related websites, applications, creator marketplaces, campaign systems, collaboration tools, messaging systems, payment systems, analytics features, AI-powered systems, and related services.',
+      'By accessing or using BantuBuzz, you agree to these Terms. If you do not agree, you may not use the platform.'
+    ]}
+    sections={[
+      {
+        heading: '1. About BantuBuzz',
+        body: [
+          'BantuBuzz is an AI-powered creator marketplace that helps creators, brands, agencies, and enterprises discover creators, manage campaigns, and scale creator collaborations.',
+          'BantuBuzz facilitates creator discovery, campaign management, collaboration workflows, creator recommendations, creator matching, and marketplace transactions through platform tools and AI-powered systems. BantuBuzz facilitates connections and transactions between independent users but is not a direct party to collaborations unless explicitly stated otherwise.'
+        ],
+        items: [
+          'Creators can showcase profiles, packages, and analytics.',
+          'Brands can discover creators and manage campaigns.',
+          'Agencies can manage creator collaborations on behalf of clients.',
+          'Enterprises can manage multiple brands, teams, and campaigns under one plan.'
+        ]
+      },
+      {
+        heading: '2. Eligibility',
+        body: ['To use BantuBuzz, you must:'],
+        items: [
+          'Be at least 18 years old or the age of majority in your jurisdiction.',
+          'Have legal authority to enter binding agreements.',
+          'Provide accurate account information.',
+          'Comply with applicable laws and regulations.',
+          'Not use BantuBuzz if your account has been suspended or terminated, you are prohibited from using marketplace or financial services, or you intend to use the platform for unlawful, deceptive, or fraudulent purposes.'
+        ]
+      },
+      {
+        heading: '3. User Accounts',
+        body: ['Users may register as Creator, Brand, Agency, or Enterprise accounts. Users are responsible for maintaining account confidentiality, all activity under their account, and keeping information accurate and updated.'],
+        items: [
+          'BantuBuzz may verify identities, request documentation, suspend suspicious accounts, remove fraudulent accounts, and restrict platform features.',
+          'Accounts may not be sold, transferred, shared, impersonated, or duplicated for deceptive purposes.'
+        ]
+      },
+      {
+        heading: '4. AI-Powered Features',
+        body: ['BantuBuzz may provide AI-powered marketplace features including creator matching, creator recommendations, smart search, campaign recommendations, marketplace insights, and related recommendation systems.'],
+        items: [
+          'AI recommendations are informational tools and are not guarantees of performance or outcomes.',
+          'Recommendation quality depends on available platform data.',
+          'AI systems may produce inaccurate or incomplete results.',
+          'Users remain responsible for their own business decisions and creator selections.',
+          'BantuBuzz does not guarantee campaign success, creator performance, engagement outcomes, conversions, or return on investment from AI-powered recommendations.'
+        ]
+      },
+      {
+        heading: '5. Creator Accounts',
+        body: ['Creators may create public profiles, upload portfolio content, create packages, apply to campaigns, submit proposals, connect social media accounts, and receive collaboration requests.'],
+        items: [
+          'Creators are responsible for truthful analytics and audience data, timely delivery, advertising disclosures, and ownership or rights to uploaded content.',
+          'Creators may not manipulate analytics, purchase fake engagement, use bots or deceptive practices, upload infringing content, or misrepresent audience performance.',
+          'BantuBuzz may suspend or remove creator accounts suspected of fraud or marketplace abuse.'
+        ]
+      },
+      {
+        heading: '6. Brand Accounts',
+        body: ['Brands may browse creators and packages, create campaigns, review proposals, purchase creator services, manage collaborations, and approve deliverables.'],
+        items: [
+          'Brands are responsible for accurate campaign information, respecting creator rights, reviewing deliverables in good faith, and making payments through platform systems.',
+          'Brands may not create misleading campaigns, request unpaid work outside agreed scope, misuse creator content, harass creators, or circumvent platform payment systems.'
+        ]
+      },
+      {
+        heading: '7. Agency and Enterprise Accounts',
+        body: ['Agencies may manage creator collaborations and campaigns on behalf of clients. Enterprise accounts may manage multiple brands, teams, organization workspaces, and campaigns across departments or clients.'],
+        items: [
+          'Agency and enterprise users are responsible for authorization, internal users and permissions, campaign compliance, communication, approvals, and payments.',
+          'BantuBuzz is not responsible for disputes between agencies, enterprise users, brands, or clients.'
+        ]
+      },
+      {
+        heading: '8. Creator Packages, Campaigns, and Collaborations',
+        body: [
+          'Creators may create predefined service packages with pricing, deliverables, timelines, platforms, revisions, and package-specific terms. Once purchased, packages become binding service agreements between users.',
+          'Brands may create campaigns with objectives, deliverables, milestones, timelines, budgets, deadlines, and creator targeting criteria. A collaboration is formed when a package is purchased, a proposal is accepted, or a creator is formally selected for a campaign.'
+        ],
+        items: [
+          'Agreed deliverables become binding once a collaboration begins.',
+          'Milestone timelines apply and scope changes require agreement between the involved parties.',
+          'BantuBuzz is not the employer, contractor, or representative of creators, brands, agencies, or enterprise users.'
+        ]
+      },
+      {
+        heading: '9. Payments, Escrow, and Platform Fees',
+        body: ['BantuBuzz may facilitate payments, payouts, escrow services, and transaction processing between users. BantuBuzz may collect platform fees, deduct transaction fees, hold funds in escrow, delay payouts for safety or compliance, and process refunds and disputes.'],
+        items: [
+          'Funds related to completed collaborations may be held in escrow for up to 14 days after milestone approval, deliverable approval, or automatic approval.',
+          'If a brand, agency, or enterprise user does not review submitted deliverables within the required review period, BantuBuzz may automatically approve the milestone or deliverable.',
+          'Platform fees may vary by service, change over time, and may be non-refundable unless required by law.',
+          'BantuBuzz may delay, restrict, or withhold payouts for fraud prevention, suspicious activity, disputes, chargebacks, identity verification, legal compliance, or policy violations.',
+          'Fraudulent or abusive chargebacks may result in account suspension, frozen payouts, restricted access, recovery efforts, or termination.'
+        ]
+      },
+      {
+        heading: '10. Messaging, Conduct, and Content',
+        body: ['BantuBuzz may provide messaging systems, collaboration communication tools, file sharing, and notifications. Users acknowledge that platform communications may be reviewed for fraud prevention and safety purposes and that off-platform communication may reduce platform protections.'],
+        items: [
+          'Harassment, spam, abuse, scams, and attempts to bypass platform systems or avoid fees are prohibited.',
+          'Users retain ownership of original content but grant BantuBuzz a non-exclusive, worldwide, royalty-free license to display content, operate platform functionality, promote marketplace listings, generate previews and analytics, and market the platform.',
+          'BantuBuzz may remove content, restrict visibility, suspend accounts, remove campaigns, limit proposals, or restrict platform access if content violates laws or platform policies.'
+        ]
+      },
+      {
+        heading: '11. Reviews, Analytics, and Third-Party Data',
+        body: ['Users may leave reviews after completed collaborations. Reviews must reflect genuine experiences and avoid false or misleading claims. BantuBuzz may remove manipulative reviews, detect fraudulent activity, adjust trust indicators, modify ranking systems, and change recommendation systems.'],
+        items: [
+          'Platform rankings, creator recommendations, badges, and AI-powered suggestions are algorithmic and do not constitute endorsements or guarantees.',
+          'BantuBuzz relies on third-party platform APIs for connected social data and cannot guarantee data accuracy, platform availability, real-time synchronization, or uninterrupted integrations.'
+        ]
+      },
+      {
+        heading: '12. Disputes, Suspension, and Termination',
+        body: ['Users may raise disputes regarding deliverables, timelines, payments, intellectual property, or collaboration conduct. BantuBuzz may review messages and submissions, request evidence, freeze escrow, issue partial refunds, release funds, or suspend accounts. BantuBuzz dispute decisions are final unless otherwise required by law.'],
+        items: [
+          'BantuBuzz may suspend or terminate accounts for fraud, abuse, illegal activity, payment circumvention, repeated disputes, chargeback abuse, or policy violations.',
+          'Termination does not remove outstanding obligations or ongoing dispute responsibilities.'
+        ]
+      },
+      {
+        heading: '13. Marketplace Independence and Availability',
+        body: ['BantuBuzz is a technology platform that facilitates creator-brand collaborations. BantuBuzz is not an employer, talent agency, contracting party, legal representative, or guarantor of collaboration outcomes. BantuBuzz does not guarantee uninterrupted access, error-free operation, guaranteed earnings, campaign performance, creator success, or uninterrupted third-party integrations.']
+      },
+      {
+        heading: '14. Limitation of Liability and Indemnification',
+        body: ['To the maximum extent permitted by law, BantuBuzz shall not be liable for indirect damages, lost profits, collaboration failures, third-party actions, reputation damage, platform downtime, user-generated content, or missed business opportunities. Total liability shall not exceed the amount paid to BantuBuzz within the preceding 12 months. Users agree to indemnify and hold harmless BantuBuzz from claims arising from their platform use, collaborations, uploaded content, violations of these Terms, or violations of laws or third-party rights.']
+      },
+      {
+        heading: '15. Privacy, Modifications, and Contact',
+        body: ['Use of BantuBuzz is also governed by the Privacy Policy. BantuBuzz may update these Terms at any time. Material changes may be communicated through email, platform notifications, or website updates. Continued use after updates constitutes acceptance of revised Terms.'],
+        items: ['For support, legal requests, or platform inquiries, contact BantuBuzz Support at support@bantubuzz.com or visit https://bantubuzz.com/.']
+      }
+    ]}
+  />
+);
 
 export default TermsOfService;
