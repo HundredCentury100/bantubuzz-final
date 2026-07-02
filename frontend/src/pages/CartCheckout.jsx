@@ -7,6 +7,7 @@ import { bookingsAPI } from '../services/api';
 import api from '../services/api';
 import Navbar from '../components/Navbar';
 import SmilePayPaymentModal from '../components/SmilePayPaymentModal';
+import BankTransferDetails from '../components/BankTransferDetails';
 
 const CartCheckout = () => {
   const navigate = useNavigate();
@@ -589,17 +590,9 @@ const CartCheckout = () => {
                       </svg>
                       Bank Transfer Instructions
                     </h3>
-                    <div className="space-y-1.5 text-sm text-blue-900 mb-4">
-                      <p><strong>Bank Name:</strong> Example Bank</p>
-                      <p><strong>Account Name:</strong> BantuBuzz Platform</p>
-                      <p><strong>Account Number:</strong> 1234567890</p>
-                      <p>
-                        <strong>Reference:</strong>{' '}
-                        <span className="font-mono bg-blue-100 px-2 py-0.5 rounded text-blue-800">
-                          {checkoutData?.payment_reference || `CART-${user?.id || 'BRAND'}`}
-                        </span>
-                      </p>
-                      <p><strong>Amount:</strong> {formatCurrency(totalAmount)}</p>
+                    <div className="text-blue-900 mb-4">
+                      <BankTransferDetails reference={checkoutData?.payment_reference || `CART-${user?.id || 'BRAND'}`} />
+                      <p className="mt-3 text-sm"><strong>Amount:</strong> {formatCurrency(totalAmount)}</p>
                     </div>
                     <p className="text-xs text-blue-700 italic mb-3">
                       Use the reference above when making your transfer so we can match your payment.

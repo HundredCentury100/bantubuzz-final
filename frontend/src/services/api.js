@@ -197,6 +197,11 @@ export const campaignsAPI = {
   completePackagePayment: (campaignId, packageId, bookingId) =>
     api.post(`/campaigns/${campaignId}/packages/${packageId}/complete-payment`, { booking_id: bookingId }),
 
+  // AI Creator Matching
+  getCreatorMatches: (campaignId, params) => api.get(`/campaigns/${campaignId}/creator-matches`, { params }),
+  submitCreatorMatchFeedback: (campaignId, creatorId, data) =>
+    api.post(`/campaigns/${campaignId}/creator-matches/${creatorId}/feedback`, data),
+
   // Analytics
   getPerformance: (campaignId, params) => api.get(`/campaigns/${campaignId}/performance`, { params }),
   downloadSentimentReport: (campaignId, params) => api.get(
@@ -220,6 +225,7 @@ export const campaignsAPI = {
 
   // Campaign Cart (NEW - unpaid additions workflow)
   getCart: (campaignId, params) => api.get(`/campaigns/${campaignId}/cart`, { params }),
+  getCartScenarios: (campaignId, params) => api.get(`/campaigns/${campaignId}/cart/scenarios`, { params }),
   addInvitationToCart: (campaignId, data) => api.post(`/campaigns/${campaignId}/cart/add-invitation`, data),
   addApplicationToCart: (campaignId, data) => api.post(`/campaigns/${campaignId}/cart/add-application`, data),
   addPackageToCart: (campaignId, data) => api.post(`/campaigns/${campaignId}/cart/add-package`, data),
@@ -486,6 +492,8 @@ export const briefsAPI = {
 
   // Proposals for Brief
   getBriefProposals: (id) => api.get(`/briefs/${id}/proposals`),
+  createBulkSend: (id, data) => api.post(`/briefs/${id}/bulk-send`, data),
+  getBulkSends: (id) => api.get(`/briefs/${id}/bulk-sends`),
 };
 
 // Proposals API

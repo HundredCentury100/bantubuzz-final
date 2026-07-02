@@ -10,6 +10,7 @@ import CampaignPaymentModal from '../components/CampaignPaymentModal';
 import CampaignChatPanel from '../components/CampaignChatPanel';
 import CampaignChatWindow from '../components/CampaignChatWindow';
 import CampaignCart from '../components/CampaignCart';
+import CampaignCreatorMatches from '../components/CampaignCreatorMatches';
 import toast from 'react-hot-toast';
 import { Bolt, Megaphone, PackagePlus, Send } from 'lucide-react';
 
@@ -441,6 +442,16 @@ const CampaignDetails = () => {
           >
             Overview
           </button>
+          <button
+            onClick={() => setActiveTab('matches')}
+            className={`px-6 py-3 font-medium transition-colors whitespace-nowrap ${
+              activeTab === 'matches'
+                ? 'border-b-2 border-primary text-primary'
+                : 'text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            AI Matches
+          </button>
           {campaign.allows_applications && (
             <button
               onClick={() => setActiveTab('applications')}
@@ -676,6 +687,11 @@ const CampaignDetails = () => {
               </div>
             )}
           </div>
+        )}
+
+        {/* AI Matches Tab */}
+        {activeTab === 'matches' && (
+          <CampaignCreatorMatches campaignId={campaign.id} />
         )}
 
         {/* Applications Tab */}

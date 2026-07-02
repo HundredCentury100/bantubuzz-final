@@ -3,6 +3,7 @@ Admin Collaboration Management routes - Payments, cancellations, and collaborati
 """
 from flask import jsonify, request
 from datetime import datetime
+from decimal import Decimal
 from sqlalchemy import cast, String
 from app import db
 from app.models import (
@@ -66,15 +67,15 @@ def get_collaborations():
         for collab in paginated.items:
             collab_dict = collab.to_dict()
             collab_dict['brand'] = {
-                'id': collab.brand.id,
-                'company_name': collab.brand.company_name,
-                'email': collab.brand.user.email
-            }
+                'id': collab.brand.id if collab.brand else None,
+                'company_name': collab.brand.company_name if collab.brand else 'Unknown Brand',
+                'email': collab.brand.user.email if collab.brand and collab.brand.user else None
+            } if collab.brand else {'id': None, 'company_name': 'Unknown Brand', 'email': None}
             collab_dict['creator'] = {
-                'id': collab.creator.id,
-                'username': collab.creator.username,
-                'email': collab.creator.user.email
-            }
+                'id': collab.creator.id if collab.creator else None,
+                'username': collab.creator.username if collab.creator else 'Unknown Creator',
+                'email': collab.creator.user.email if collab.creator and collab.creator.user else None
+            } if collab.creator else {'id': None, 'username': 'Unknown Creator', 'email': None}
 
             # Include payment information for admin
             payment = Payment.query.filter_by(collaboration_id=collab.id).first()
@@ -116,8 +117,8 @@ def get_collaboration_details(collaboration_id):
             return jsonify({'error': 'Collaboration not found'}), 404
 
         data = collab.to_dict()
-        data['brand'] = collab.brand.to_dict()
-        data['creator'] = collab.creator.to_dict()
+        data['brand'] = collab.brand.to_dict() if collab.brand else None
+        data['creator'] = collab.creator.to_dict() if collab.creator else None
 
         # Get payment information
         payment = Payment.query.filter_by(
@@ -271,38 +272,9 @@ def release_escrow(collaboration_id):
                 'message': 'Collaboration must be completed first'
             }), 400
 
-        # Get creator's wallet
-        creator_wallet = Wallet.query.filter_by(
-            user_id=collab.creator.user_id
-        ).first()
+        from app.services.payment_service import release_escrow_to_wallet
 
-        if not creator_wallet:
-            return jsonify({'error': 'Creator wallet not found'}), 404
-
-        # Add funds to wallet
-        creator_wallet.balance += collab.amount
-        creator_wallet.total_earned = (creator_wallet.total_earned or 0) + collab.amount
-
-        # Create transaction record
-        transaction = WalletTransaction(
-            wallet_id=creator_wallet.id,
-            type='credit',
-            amount=collab.amount,
-            description=f'Payment for collaboration: {collab.title}',
-            status='completed',
-            collaboration_id=collaboration_id
-        )
-        db.session.add(transaction)
-
-        # Update payment record
-        payment = Payment.query.filter_by(
-            collaboration_id=collaboration_id
-        ).first()
-        if payment:
-            payment.status = 'released'
-            payment.released_at = datetime.utcnow()
-
-        db.session.commit()
+        transaction = release_escrow_to_wallet(collaboration_id)
 
         # Send notification to creator
         notification = Notification(
@@ -320,7 +292,7 @@ def release_escrow(collaboration_id):
             'data': {
                 'collaboration_id': collaboration_id,
                 'amount': float(collab.amount),
-                'creator_new_balance': float(creator_wallet.balance)
+                'creator_pending_clearance': float(transaction.wallet.pending_clearance or 0)
             }
         }), 200
 
@@ -411,7 +383,7 @@ def approve_cancellation(collaboration_id):
 
         # Calculate refund based on progress
         progress = collab.progress_percentage or 0
-        total_amount = collab.amount
+        total_amount = Decimal(str(collab.amount or 0))
 
         if progress == 0:
             # No work done - full refund to brand
@@ -419,12 +391,12 @@ def approve_cancellation(collaboration_id):
             creator_payment = 0
         elif progress < 50:
             # Less than 50% done - 75% refund to brand, 25% to creator
-            brand_refund = total_amount * 0.75
-            creator_payment = total_amount * 0.25
+            brand_refund = total_amount * Decimal('0.75')
+            creator_payment = total_amount * Decimal('0.25')
         else:
             # 50% or more done - 25% refund to brand, 75% to creator
-            brand_refund = total_amount * 0.25
-            creator_payment = total_amount * 0.75
+            brand_refund = total_amount * Decimal('0.25')
+            creator_payment = total_amount * Decimal('0.75')
 
         # Get wallets
         brand_wallet = Wallet.query.filter_by(user_id=collab.brand.user_id).first()
@@ -432,28 +404,36 @@ def approve_cancellation(collaboration_id):
 
         # Refund brand
         if brand_refund > 0 and brand_wallet:
-            brand_wallet.balance += brand_refund
+            brand_wallet.available_balance = Decimal(str(brand_wallet.available_balance or 0)) + brand_refund
+            brand_wallet.updated_at = datetime.utcnow()
             brand_transaction = WalletTransaction(
                 wallet_id=brand_wallet.id,
-                type='credit',
+                user_id=collab.brand.user_id,
+                transaction_type='refund',
                 amount=brand_refund,
                 description=f'Refund for cancelled collaboration: {collab.title}',
-                status='completed',
-                collaboration_id=collaboration_id
+                status='available',
+                clearance_required=False,
+                collaboration_id=collaboration_id,
             )
             db.session.add(brand_transaction)
 
         # Pay creator for work done
         if creator_payment > 0 and creator_wallet:
-            creator_wallet.balance += creator_payment
-            creator_wallet.total_earned = (creator_wallet.total_earned or 0) + creator_payment
+            creator_wallet.pending_clearance = Decimal(str(creator_wallet.pending_clearance or 0)) + creator_payment
+            creator_wallet.total_earned = Decimal(str(creator_wallet.total_earned or 0)) + creator_payment
+            creator_wallet.updated_at = datetime.utcnow()
             creator_transaction = WalletTransaction(
                 wallet_id=creator_wallet.id,
-                type='credit',
+                user_id=collab.creator.user_id,
+                transaction_type='earning',
                 amount=creator_payment,
                 description=f'Partial payment for cancelled collaboration: {collab.title}',
-                status='completed',
-                collaboration_id=collaboration_id
+                status='pending_clearance',
+                clearance_required=True,
+                clearance_days=1,
+                completed_at=datetime.utcnow(),
+                collaboration_id=collaboration_id,
             )
             db.session.add(creator_transaction)
 

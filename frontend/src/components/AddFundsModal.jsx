@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { brandWalletAPI } from '../services/api';
 import toast from 'react-hot-toast';
+import BankTransferDetails from './BankTransferDetails';
 
 const AddFundsModal = ({ isOpen, onClose, currentBalance, onDepositSuccess }) => {
   const [amount, setAmount] = useState('');
@@ -8,6 +9,7 @@ const AddFundsModal = ({ isOpen, onClose, currentBalance, onDepositSuccess }) =>
   const [proofFile, setProofFile] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [depositId, setDepositId] = useState(null);
+  const [depositReference, setDepositReference] = useState(null);
   const [showProofUpload, setShowProofUpload] = useState(false);
 
   if (!isOpen) return null;
@@ -67,6 +69,7 @@ const AddFundsModal = ({ isOpen, onClose, currentBalance, onDepositSuccess }) =>
 
         if (response.data.success) {
           setDepositId(response.data.deposit.id);
+          setDepositReference(response.data.deposit.deposit_reference);
           setShowProofUpload(true);
           toast.success('Deposit request created. Please upload your proof of payment.');
         }
@@ -123,6 +126,7 @@ const AddFundsModal = ({ isOpen, onClose, currentBalance, onDepositSuccess }) =>
     setPaymentMethod('paynow');
     setProofFile(null);
     setDepositId(null);
+    setDepositReference(null);
     setShowProofUpload(false);
     setIsSubmitting(false);
     onClose();
@@ -261,11 +265,8 @@ const AddFundsModal = ({ isOpen, onClose, currentBalance, onDepositSuccess }) =>
                     </svg>
                     Bank Transfer Details
                   </h4>
-                  <div className="text-sm text-blue-800 space-y-1">
-                    <p><strong>Bank:</strong> ABC Bank</p>
-                    <p><strong>Account Name:</strong> BantuBuzz Ltd</p>
-                    <p><strong>Account Number:</strong> 1234567890</p>
-                    <p><strong>Reference:</strong> Your email address</p>
+                  <div className="text-blue-800">
+                    <BankTransferDetails reference={depositReference || 'Your email address'} compact />
                   </div>
                   <p className="text-xs text-blue-700 mt-3">
                     After making the transfer, you'll upload proof of payment on the next screen.

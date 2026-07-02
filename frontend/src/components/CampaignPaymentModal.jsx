@@ -3,6 +3,7 @@ import { FaTimes, FaWallet, FaUniversity, FaCreditCard, FaCheckCircle, FaMobileA
 import { campaignPaymentsAPI } from '../services/campaignPaymentsAPI';
 import SmilePayPaymentModal from './SmilePayPaymentModal';
 import toast from 'react-hot-toast';
+import BankTransferDetails from './BankTransferDetails';
 
 const CampaignPaymentModal = ({ isOpen, onClose, campaign, selectedCollaborations, onPaymentSuccess }) => {
   const [paymentMethod, setPaymentMethod] = useState('wallet');
@@ -261,27 +262,8 @@ const CampaignPaymentModal = ({ isOpen, onClose, campaign, selectedCollaboration
                 <FaUniversity className="text-blue-600" />
                 Bank Transfer Details
               </h3>
-              <div className="space-y-3">
-                <div>
-                  <p className="text-sm text-blue-700 font-medium">Bank Name</p>
-                  <p className="text-blue-900 font-semibold">{bankDetails.bank_name}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-blue-700 font-medium">Account Name</p>
-                  <p className="text-blue-900 font-semibold">{bankDetails.account_name}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-blue-700 font-medium">Account Number</p>
-                  <p className="text-blue-900 font-semibold">{bankDetails.account_number}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-blue-700 font-medium">Branch</p>
-                  <p className="text-blue-900 font-semibold">{bankDetails.branch}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-blue-700 font-medium">Reference (Important!)</p>
-                  <p className="text-blue-900 font-semibold text-lg">{bankDetails.reference}</p>
-                </div>
+              <div className="text-blue-900">
+                <BankTransferDetails bankDetails={bankDetails} />
               </div>
             </div>
 

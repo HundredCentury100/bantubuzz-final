@@ -6,7 +6,7 @@ from flask import Blueprint, current_app, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from werkzeug.utils import secure_filename
 from app import db
-from app.models import Message, PushSubscription, User
+from app.models import Message, PushSubscription, User, UserBlock
 
 bp = Blueprint('messages', __name__)
 
@@ -63,6 +63,20 @@ def _message_payload_from_request(data):
     }
 
 
+def _messaging_block_status(user_id, other_user_id):
+    blocked_by_me = UserBlock.query.filter_by(
+        blocker_user_id=user_id,
+        blocked_user_id=other_user_id,
+        is_active=True,
+    ).first() is not None
+    blocked_me = UserBlock.query.filter_by(
+        blocker_user_id=other_user_id,
+        blocked_user_id=user_id,
+        is_active=True,
+    ).first() is not None
+    return blocked_by_me, blocked_me
+
+
 @bp.route('/', methods=['GET'])
 @jwt_required()
 def get_messages():
@@ -103,6 +117,13 @@ def send_message():
         if 'receiver_id' not in data:
             return jsonify({'error': 'Missing receiver_id'}), 400
 
+        receiver_id = int(data['receiver_id'])
+        blocked_by_me, blocked_me = _messaging_block_status(int(user_id), receiver_id)
+        if blocked_by_me:
+            return jsonify({'error': 'You have blocked this user. Unblock them before sending messages.'}), 403
+        if blocked_me:
+            return jsonify({'error': 'You cannot message this user.'}), 403
+
         try:
             payload = _message_payload_from_request(data)
         except ValueError as exc:
@@ -110,7 +131,7 @@ def send_message():
 
         message = Message(
             sender_id=user_id,
-            receiver_id=data['receiver_id'],
+            receiver_id=receiver_id,
             booking_id=data.get('booking_id'),
             **payload
         )
@@ -121,7 +142,7 @@ def send_message():
         try:
             from app.services.creator_score_service import queue_creator_score_recalculation
             sender = User.query.get(int(user_id))
-            receiver = User.query.get(int(data['receiver_id']))
+            receiver = User.query.get(receiver_id)
             if sender and sender.user_type == 'creator' and sender.creator_profile:
                 queue_creator_score_recalculation(sender.creator_profile.id)
             if receiver and receiver.user_type == 'creator' and receiver.creator_profile:

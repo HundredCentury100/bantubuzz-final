@@ -81,7 +81,7 @@ class CampaignPayment(db.Model):
         # Get collaborations - verify they belong to this campaign
         collaborations = Collaboration.query.filter(
             Collaboration.id.in_(collaboration_ids),
-            Collaboration.status == 'active'
+            Collaboration.status.in_(['active', 'in_progress'])
         ).all()
 
         # Verify all collaborations belong to this campaign
@@ -96,7 +96,7 @@ class CampaignPayment(db.Model):
         collaborations = valid_collaborations
 
         # Calculate total amount
-        subtotal = sum(float(collab.package.price) for collab in collaborations)
+        subtotal = sum(float(collab.amount or 0) for collab in collaborations)
         from app.utils.subscription_helper import get_brand_service_fee_percentage
         service_fee_percentage = get_brand_service_fee_percentage(brand_user_id)
         platform_fee = subtotal * (service_fee_percentage / 100)
@@ -120,7 +120,7 @@ class CampaignPayment(db.Model):
 
         # Create payment items
         for collab in collaborations:
-            item_amount = float(collab.package.price)
+            item_amount = float(collab.amount or 0)
             item_fee = item_amount * (service_fee_percentage / 100)
             item_net = item_amount
 

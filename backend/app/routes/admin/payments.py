@@ -5,6 +5,7 @@ Handles verification, viewing, and management of all payments and bookings
 
 from flask import jsonify, request
 from datetime import datetime, timedelta
+from sqlalchemy import inspect
 from app import db
 from app.models import Payment, Booking, User, BrandProfile, CreatorProfile, PaymentVerification, CreatorSubscription, CreatorSubscriptionPlan, Subscription, Collaboration, Package, WorkspaceAddon, CampaignPayment
 from app.services.agency_subscription_service import apply_brand_subscription_entitlements
@@ -12,6 +13,15 @@ from app.services.subscription_lifecycle_service import apply_paid_subscription,
 from app.decorators.admin import admin_required
 from flask_jwt_extended import get_jwt_identity
 from . import bp
+
+
+def campaign_payment_tables_available():
+    """Return whether the optional campaign cart payment tables are present."""
+    try:
+        inspector = inspect(db.engine)
+        return inspector.has_table('campaign_payments') and inspector.has_table('campaign_payment_items')
+    except Exception:
+        return False
 
 
 def ensure_direct_booking_collaboration(booking):
@@ -186,10 +196,12 @@ def get_pending_payments():
             WorkspaceAddon.payment_proof_path.isnot(None)
         ).all()
 
-        pending_campaign_cart_payments = CampaignPayment.query.filter(
-            CampaignPayment.payment_method == 'bank_transfer',
-            CampaignPayment.status == 'processing'
-        ).order_by(CampaignPayment.created_at.desc()).all()
+        pending_campaign_cart_payments = []
+        if campaign_payment_tables_available():
+            pending_campaign_cart_payments = CampaignPayment.query.filter(
+                CampaignPayment.payment_method == 'bank_transfer',
+                CampaignPayment.status == 'processing'
+            ).order_by(CampaignPayment.created_at.desc()).all()
 
         # Format payment data with user information
         payments_data = []
@@ -335,7 +347,7 @@ def get_pending_payments():
     except Exception as e:
         return jsonify({
             'success': False,
-            'error': str(e)
+            'error': 'Failed to load pending payments'
         }), 500
 
 
@@ -362,10 +374,12 @@ def get_payment_statistics():
         pending_count += len(pending_bookings)
         pending_amount += sum(float(b.amount) for b in pending_bookings)
 
-        pending_campaign_cart_payments = CampaignPayment.query.filter(
-            CampaignPayment.payment_method == 'bank_transfer',
-            CampaignPayment.status == 'processing'
-        ).all()
+        pending_campaign_cart_payments = []
+        if campaign_payment_tables_available():
+            pending_campaign_cart_payments = CampaignPayment.query.filter(
+                CampaignPayment.payment_method == 'bank_transfer',
+                CampaignPayment.status == 'processing'
+            ).all()
         pending_count += len(pending_campaign_cart_payments)
         pending_amount += sum(float(p.total_amount or 0) for p in pending_campaign_cart_payments)
 
@@ -407,7 +421,7 @@ def get_payment_statistics():
     except Exception as e:
         return jsonify({
             'success': False,
-            'error': str(e)
+            'error': 'Failed to load payment statistics'
         }), 500
 
 
@@ -952,6 +966,9 @@ def reject_workspace_addon_payment(addon_id):
 def verify_campaign_cart_payment(payment_id):
     """Verify a campaign cart bank-transfer payment and activate its collaborations."""
     try:
+        if not campaign_payment_tables_available():
+            return jsonify({'success': False, 'error': 'Campaign payment tables are not ready. Please run database migrations.'}), 503
+
         admin_id = int(get_jwt_identity())
         payment = CampaignPayment.query.get(payment_id)
 
@@ -979,7 +996,7 @@ def verify_campaign_cart_payment(payment_id):
         }), 200
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return jsonify({'success': False, 'error': 'Failed to verify campaign cart payment'}), 500
 
 
 @bp.route('/payments/campaign-cart/<int:payment_id>/reject', methods=['PUT'])
@@ -987,6 +1004,9 @@ def verify_campaign_cart_payment(payment_id):
 def reject_campaign_cart_payment(payment_id):
     """Reject a campaign cart bank-transfer proof."""
     try:
+        if not campaign_payment_tables_available():
+            return jsonify({'success': False, 'error': 'Campaign payment tables are not ready. Please run database migrations.'}), 503
+
         admin_id = int(get_jwt_identity())
         payment = CampaignPayment.query.get(payment_id)
 
@@ -1013,7 +1033,7 @@ def reject_campaign_cart_payment(payment_id):
         }), 200
     except Exception as e:
         db.session.rollback()
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return jsonify({'success': False, 'error': 'Failed to reject campaign cart payment'}), 500
 
 
 @bp.route('/bookings', methods=['GET'])

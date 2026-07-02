@@ -469,7 +469,7 @@ const CreatorProfile = () => {
                       )}
                       {creator.public_creator_score !== null && creator.public_creator_score !== undefined && (
                         <span className="rounded-md bg-primary px-3 py-1.5 text-sm font-bold text-dark">
-                          Score {creator.public_creator_score}
+                          BIQ {creator.public_creator_score}
                         </span>
                       )}
                     </div>

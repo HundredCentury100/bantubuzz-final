@@ -2,7 +2,7 @@ from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from datetime import datetime, timedelta
 from app import db
-from app.models import Brief, BriefMilestone, User, BrandProfile, CreatorProfile, Proposal
+from app.models import Brief, BriefMilestone, BulkBriefSend, User, BrandProfile, CreatorProfile, Proposal
 from app.utils.notifications import create_notification
 from app.services.workspace_service import (
     get_request_workspace_id,
@@ -195,6 +195,10 @@ def get_brief(brief_id):
             creator = CreatorProfile.query.filter_by(user_id=user_id).first()
             from app.utils.brief_matching import matches_brief_criteria
             meets_criteria = matches_brief_criteria(creator, brief)
+            recipient_id = request.args.get('bulk_recipient', type=int)
+            if recipient_id:
+                from app.services.bulk_brief_service import mark_recipient_opened
+                mark_recipient_opened(recipient_id, user_id)
 
         # Return brief data with eligibility flag
         brief_data = brief.to_dict(include_relations=True)
@@ -202,6 +206,67 @@ def get_brief(brief_id):
 
         return jsonify(brief_data), 200
 
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@bp.route('/<int:brief_id>/bulk-send', methods=['POST'])
+@jwt_required()
+def create_bulk_brief_send(brief_id):
+    """Send the same brief to up to 50 selected creators with optional scheduling."""
+    try:
+        user_id = int(get_jwt_identity())
+        user = User.query.get(user_id)
+        if not user or user.user_type != 'brand':
+            return jsonify({'error': 'Only brands can bulk-send briefs'}), 403
+
+        from app.services.bulk_brief_service import create_bulk_send, get_bulk_brief_access
+        access = get_bulk_brief_access(user_id)
+        if not access['enabled']:
+            return jsonify({
+                'error': access['message'],
+                'feature': 'bulk_brief_sending',
+                'access': access,
+            }), 403
+
+        bulk_send = create_bulk_send(user_id, brief_id, request.get_json() or {})
+        return jsonify({
+            'message': 'Bulk brief send scheduled',
+            'bulk_send': bulk_send.to_dict(include_recipients=True),
+        }), 201
+    except ValueError as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 400
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@bp.route('/<int:brief_id>/bulk-sends', methods=['GET'])
+@jwt_required()
+def get_bulk_brief_sends(brief_id):
+    """Get bulk-send tracking for a brief."""
+    try:
+        user_id = int(get_jwt_identity())
+        brand = BrandProfile.query.filter_by(user_id=user_id).first()
+        brief = Brief.query.get(brief_id)
+        if not brand or not brief or brief.brand_id != brand.id:
+            return jsonify({'error': 'Brief not found'}), 404
+
+        from app.services.bulk_brief_service import get_bulk_brief_access, sync_response_tracking
+        access = get_bulk_brief_access(user_id)
+        if not access['enabled']:
+            return jsonify({
+                'error': access['message'],
+                'feature': 'bulk_brief_sending',
+                'access': access,
+            }), 403
+
+        sync_response_tracking(brief_id)
+        sends = BulkBriefSend.query.filter_by(brief_id=brief_id, brand_id=brand.id).order_by(
+            BulkBriefSend.created_at.desc()
+        ).all()
+        return jsonify({'bulk_sends': [send.to_dict(include_recipients=True) for send in sends]}), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

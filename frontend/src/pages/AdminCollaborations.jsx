@@ -140,12 +140,17 @@ export default function AdminCollaborations() {
   };
 
   const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
+    if (!dateString) return 'Not set';
+    const date = new Date(dateString);
+    if (Number.isNaN(date.getTime())) return 'Not set';
+    return date.toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
       day: 'numeric'
     });
   };
+
+  const formatAmount = (amount) => Number(amount || 0).toFixed(2);
 
 
   const hasCancellationRequest = (collab) => {
@@ -224,7 +229,7 @@ export default function AdminCollaborations() {
                     <tr key={collab.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 text-sm font-medium text-gray-900">#{collab.id}</td>
                       <td className="px-6 py-4">
-                        <div className="text-sm font-medium text-gray-900">{collab.title}</div>
+                        <div className="text-sm font-medium text-gray-900">{collab.title || 'Collaboration'}</div>
                         {hasCancellationRequest(collab) && (
                           <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800">
                             Cancellation Requested
@@ -232,13 +237,13 @@ export default function AdminCollaborations() {
                         )}
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-900">
-                        {collab.creator?.username || collab.creator?.email}
+                        {collab.creator?.username || collab.creator?.email || 'Unknown Creator'}
                       </td>
                       <td className="px-6 py-4 text-sm text-gray-900">
-                        {collab.brand?.company_name || collab.brand?.email}
+                        {collab.brand?.company_name || collab.brand?.email || 'Unknown Brand'}
                       </td>
                       <td className="px-6 py-4 text-sm font-semibold text-gray-900">
-                        ${collab.amount?.toFixed(2) || '0.00'}
+                        ${formatAmount(collab.amount)}
                       </td>
                       <td className="px-6 py-4">
                         <StatusBadge status={collab.status} />

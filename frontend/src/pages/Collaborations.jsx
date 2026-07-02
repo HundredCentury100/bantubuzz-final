@@ -21,6 +21,25 @@ const Collaborations = () => {
 
   const isBrand = user?.user_type === 'brand';
 
+  const formatStatus = (status) => String(status || 'in_progress').replace('_', ' ');
+  const formatDate = (value, fallback = 'Not set') => {
+    if (!value) return fallback;
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? fallback : date.toLocaleDateString();
+  };
+  const getPartnerName = (collab) => {
+    if (isBrand) {
+      return collab?.creator?.display_name
+        || collab?.creator?.username
+        || collab?.creator?.user?.email?.split('@')[0]
+        || 'Creator';
+    }
+    return collab?.brand?.company_name
+      || collab?.brand?.business_name
+      || collab?.brand?.user?.email?.split('@')[0]
+      || 'Brand';
+  };
+
   useEffect(() => {
     fetchCollaborations();
   }, [statusFilter, typeFilter, pagination.current_page]);
@@ -81,9 +100,7 @@ const Collaborations = () => {
 
     const query = searchQuery.toLowerCase();
     const title = (collab?.title || '').toLowerCase();
-    const partnerName = isBrand
-      ? (collab?.creator?.user?.email?.split('@')[0] || '').toLowerCase()
-      : (collab?.brand?.company_name || '').toLowerCase();
+    const partnerName = getPartnerName(collab).toLowerCase();
     const status = (collab?.status || '').toLowerCase();
     const lastUpdate = (collab?.last_update || '').toLowerCase();
 
@@ -213,7 +230,7 @@ const Collaborations = () => {
                         />
                       </div>
                       <span className={`sm:hidden px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(collab.status)}`}>
-                        {collab.status.replace('_', ' ')}
+                        {formatStatus(collab.status)}
                       </span>
                     </div>
 
@@ -226,15 +243,15 @@ const Collaborations = () => {
                               {getTypeIcon(collab.collaboration_type)}
                             </div>
                             <h3 className="text-base sm:text-lg font-bold text-gray-900 truncate">
-                              {collab.title}
+                              {collab.title || 'Collaboration'}
                             </h3>
                           </div>
                           <p className="text-sm text-gray-600">
-                            {isBrand ? 'With' : 'For'}: {isBrand ? collab.creator?.user?.email?.split('@')[0] : collab.brand?.company_name}
+                            {isBrand ? 'With' : 'For'}: {getPartnerName(collab)}
                           </p>
                         </div>
                         <span className={`hidden sm:inline-block flex-shrink-0 px-3 py-1 rounded-full text-xs font-medium ${getStatusColor(collab.status)}`}>
-                          {collab.status.replace('_', ' ')}
+                          {formatStatus(collab.status)}
                         </span>
                       </div>
 
@@ -242,7 +259,7 @@ const Collaborations = () => {
                       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
                         <div>
                           <p className="text-xs text-gray-600">Amount</p>
-                          <p className="text-base sm:text-lg font-bold text-primary">${collab.amount}</p>
+                          <p className="text-base sm:text-lg font-bold text-primary">${Number(collab.amount || 0).toFixed(2)}</p>
                         </div>
                         <div>
                           <p className="text-xs text-gray-600">Progress</p>
@@ -250,23 +267,23 @@ const Collaborations = () => {
                             <div className="flex-1 bg-gray-200 rounded-full h-2">
                               <div
                                 className="bg-primary h-2 rounded-full transition-all"
-                                style={{ width: `${collab.progress_percentage}%` }}
+                                style={{ width: `${Math.min(100, Math.max(0, Number(collab.progress_percentage || 0)))}%` }}
                               ></div>
                             </div>
-                            <span className="text-xs sm:text-sm font-semibold text-gray-900">{collab.progress_percentage}%</span>
+                            <span className="text-xs sm:text-sm font-semibold text-gray-900">{Math.min(100, Math.max(0, Number(collab.progress_percentage || 0)))}%</span>
                           </div>
                         </div>
                         <div>
                           <p className="text-xs text-gray-600">Start Date</p>
                           <p className="text-xs sm:text-sm font-medium text-gray-900">
-                            {new Date(collab.start_date).toLocaleDateString()}
+                            {formatDate(collab.start_date)}
                           </p>
                         </div>
                         <div>
                           <p className="text-xs text-gray-600">Due Date</p>
                           <p className="text-xs sm:text-sm font-medium text-gray-900">
                             {collab.expected_completion_date
-                              ? new Date(collab.expected_completion_date).toLocaleDateString()
+                              ? formatDate(collab.expected_completion_date)
                               : 'Not set'}
                           </p>
                         </div>
@@ -278,7 +295,7 @@ const Collaborations = () => {
                           <p className="text-xs font-medium text-gray-700 mb-1">Latest Update:</p>
                           <p className="text-sm text-gray-600">{collab.last_update}</p>
                           <p className="text-xs text-gray-500 mt-1">
-                            {new Date(collab.last_update_date).toLocaleDateString()}
+                            {formatDate(collab.last_update_date, '')}
                           </p>
                         </div>
                       )}

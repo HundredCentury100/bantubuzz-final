@@ -3,7 +3,9 @@ from html import escape
 
 from flask import Blueprint, Response, jsonify
 from flask_jwt_extended import get_jwt_identity, jwt_required
+from sqlalchemy import inspect
 
+from app import db
 from app.models import (
     Booking,
     BrandProfile,
@@ -19,6 +21,14 @@ from app.utils.subscription_helper import get_brand_service_fee_percentage
 from app.services.referral_service import account_credit_balance
 
 bp = Blueprint('billing', __name__)
+
+
+def _campaign_payment_tables_available():
+    try:
+        inspector = inspect(db.engine)
+        return inspector.has_table('campaign_payments')
+    except Exception:
+        return False
 
 
 def _money(value):
@@ -149,6 +159,7 @@ def _subscription_invoice(subscription):
     price = subscription.plan.price_monthly if subscription.plan and billing_cycle == 'monthly' else None
     if subscription.plan and billing_cycle == 'yearly':
         price = subscription.plan.price_yearly
+    is_paid = bool(subscription.payment_verified or subscription.payment_status in ['paid', 'verified'] or subscription.status == 'active')
 
     return {
         'id': f'subscription-{subscription.id}',
@@ -157,11 +168,12 @@ def _subscription_invoice(subscription):
         'source_id': subscription.id,
         'title': plan_name,
         'description': f'{billing_cycle.title()} subscription',
-        'amount': _money(price or subscription.last_payment_amount),
+        'amount': _money(subscription.last_payment_amount or price),
         'currency': 'USD',
-        'status': 'upcoming',
-        'payment_status': subscription.status,
+        'status': 'paid' if is_paid else 'upcoming',
+        'payment_status': subscription.payment_status or subscription.status,
         'payment_method': subscription.payment_method,
+        'payment_reference': subscription.payment_reference,
         'issued_at': _date(subscription.created_at),
         'paid_at': _date(subscription.last_payment_date),
         'due_at': _date(subscription.next_payment_date or subscription.current_period_end),
@@ -226,11 +238,12 @@ def _get_user_invoices(user, workspace_id=None):
             bookings = booking_query.order_by(Booking.created_at.desc()).all()
             invoices.extend(_booking_invoice(booking, 'brand') for booking in bookings)
 
-            payment_query = CampaignPayment.query.filter_by(brand_user_id=user.id)
-            if workspace_id:
-                payment_query = payment_query.filter_by(workspace_id=workspace_id)
-            campaign_payments = payment_query.order_by(CampaignPayment.initiated_at.desc()).all()
-            invoices.extend(_campaign_payment_invoice(payment) for payment in campaign_payments)
+            if _campaign_payment_tables_available():
+                payment_query = CampaignPayment.query.filter_by(brand_user_id=user.id)
+                if workspace_id:
+                    payment_query = payment_query.filter_by(workspace_id=workspace_id)
+                campaign_payments = payment_query.order_by(CampaignPayment.initiated_at.desc()).all()
+                invoices.extend(_campaign_payment_invoice(payment) for payment in campaign_payments)
 
         subscriptions = Subscription.query.filter_by(user_id=user.id).order_by(Subscription.created_at.desc()).all()
         invoices.extend(_subscription_invoice(subscription) for subscription in subscriptions)

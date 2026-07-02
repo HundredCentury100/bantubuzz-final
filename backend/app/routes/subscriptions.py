@@ -4,6 +4,7 @@ User-facing Subscription routes - Subscribe, manage, and view plans
 from flask import Blueprint, jsonify, request
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from datetime import datetime
+from decimal import Decimal
 import os
 from werkzeug.utils import secure_filename
 from app import db
@@ -695,15 +696,22 @@ def pay_subscription_with_wallet():
         if not wallet:
             return jsonify({'success': False, 'error': 'Wallet not found'}), 404
 
+        available_balance = Decimal(str(wallet.available_balance or 0))
+        pending_clearance = Decimal(str(wallet.pending_clearance or 0))
+        spendable_balance = available_balance + pending_clearance
+
         # Check sufficient balance
-        if wallet.available_balance < amount:
+        if spendable_balance < amount:
             return jsonify({
                 'success': False,
-                'error': f'Insufficient wallet balance. Available: ${float(wallet.available_balance):.2f}, Required: ${float(amount):.2f}'
+                'error': f'Insufficient wallet balance. Available: ${float(spendable_balance):.2f}, Required: ${float(amount):.2f}'
             }), 400
 
-        # Deduct from wallet
-        wallet.available_balance -= amount
+        # Deduct from wallet, using available funds before pending clearance.
+        available_deduction = min(available_balance, amount)
+        pending_deduction = amount - available_deduction
+        wallet.available_balance = available_balance - available_deduction
+        wallet.pending_clearance = pending_clearance - pending_deduction
         wallet.total_spent = float(wallet.total_spent or 0) + float(amount)
         wallet.updated_at = datetime.utcnow()
 
@@ -715,13 +723,16 @@ def pay_subscription_with_wallet():
             transaction_type='payment',
             status='available',
             clearance_required=False,
-            description=f'Payment for {plan.name} subscription ({billing_cycle})',
+            description=f'Payment for {plan.name} subscription ({billing_cycle}) - SUB-{subscription.id}',
             transaction_metadata={
                 'payment_type': 'subscription',
+                'subscription_reference': f'SUB-{subscription.id}',
                 'subscription_id': subscription.id,
                 'plan_id': plan.id,
                 'plan_name': plan.name,
-                'billing_cycle': billing_cycle
+                'billing_cycle': billing_cycle,
+                'available_balance_used': float(available_deduction),
+                'pending_clearance_used': float(pending_deduction),
             }
         )
         db.session.add(transaction)
@@ -742,6 +753,8 @@ def pay_subscription_with_wallet():
             'data': {
                 'subscription': subscription.to_dict(),
                 'wallet_balance': float(wallet.available_balance),
+                'wallet_pending_clearance': float(wallet.pending_clearance or 0),
+                'wallet_spendable_balance': float((wallet.available_balance or 0) + (wallet.pending_clearance or 0)),
                 'transaction_id': transaction.id
             }
         }), 200

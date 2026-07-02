@@ -2,6 +2,24 @@
 
 This file is a living handoff guide for future AI/Codex sessions working on the BantuBuzz Platform. Start here before making changes, deploying, or debugging production.
 
+## Creator Score / BIQ
+
+- The internal creator ranking score is now productized as **BIQ — BantuBuzz
+  Intelligence Quotient** on creator-owned surfaces. Public/brand-facing pages
+  may show the creator's rank and optional BIQ value only when leaderboard
+  preferences allow it; never expose formula internals publicly by default.
+- `CreatorScoreService.owner_score_payload()` is the owner-facing payload for
+  creator dashboards. It returns BIQ tier, benchmark, history, change
+  explanations, recovery roadmap, dimensions, badges, and leaderboard display
+  preferences.
+- Public profile and leaderboard labels should say `BIQ`, not generic `Score`,
+  when referring to creator ranking values. Sentiment metrics can still use
+  `Score` because that is a separate analytics metric.
+- Deploy BIQ presentation updates to the new VPS with
+  `deployment\DEPLOY-NEW-VPS-BIQ-PRODUCTIZATION.bat`. This targeted deployment
+  uploads the creator score service plus the compiled frontend, restarts the
+  backend, reloads Apache, and does not run database migrations.
+
 ## Headless CMS Integration
 
 - CMS source and Payload admin run at `https://app.bantubuzz.com`.
@@ -211,6 +229,24 @@ This file is a living handoff guide for future AI/Codex sessions working on the 
 ```powershell
 .\deployment\DEPLOY-REFERRALS.bat
 ```
+
+## Direct Messaging - June 24, 2026
+
+- Direct messages use two services:
+  - Flask API under `/api/messages/*` for persistence, attachments, push subscriptions, and fallback sends.
+  - Node/Socket.IO service under `/messaging` for realtime delivery, online status, typing indicators, read receipts, and conversation reads.
+- Message history is stored indefinitely in the PostgreSQL `messages` table.
+- Rich message support is already in the schema through migration `202606051000_add_rich_messaging_and_push.py`: text, image/file attachments, and content links use `message_type`, `attachment_*`, and `link_*` fields.
+- Browser/mobile push notifications use `push_subscriptions`, `frontend/public/message-push-sw.js`, and `backend/app/services/push_service.py`. Production requires valid `VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, and `pywebpush`.
+- Trust and Safety uses `user_blocks`, `message_reports`, `message_risk_signals`, and `message_safety_warnings` through `backend/app/routes/messaging_safety.py`.
+- Active blocks must be enforced on every send path. Both the Flask fallback endpoint `POST /api/messages/` and the Node Socket.IO `send_message` handler check `user_blocks` before inserting a message. The frontend composer also disables input/actions when `check-block` returns `can_message: false`.
+- Frontend messaging screen: `frontend/src/pages/Messages.jsx`.
+- Frontend socket state: `frontend/src/contexts/MessagingContext.jsx`.
+- Messaging API wrapper: `frontend/src/services/messagingAPI.js`.
+- Node service: `messaging-service/server.js`.
+- New VPS messaging service is systemd unit `bantubuzz-messaging.service` on port `3002`. Restart it after `messaging-service/server.js` changes.
+- Deploy the June 24 direct-message safety hardening with `deployment\DEPLOY-NEW-VPS-DIRECT-MESSAGING-SAFETY.bat`; it deploys only `backend/app/routes/messages.py`, `messaging-service/server.js`, the frontend build, and restarts backend/messaging/Apache.
+- Direct message feature status after this pass: realtime chat, persistent history, text/images/files/links, read receipts, typing indicators, block/report UI/API, and push subscription support are implemented. When debugging, verify both the Node service and Flask fallback because users can send through either path depending on socket availability.
 
 ### Frontend Deploy Location
 
@@ -1237,6 +1273,40 @@ Deployment note:
   - The task itself also exits on non-Mondays so stale/daily scheduler cache entries cannot send emails.
   - `users.inactive_reminder_sent_at` stores the weekly guard; the checker reserves users for the current week before queueing emails to avoid duplicate Monday sends.
   - Targeted deploy script: `deployment\DEPLOY-NEW-VPS-WEEKLY-INACTIVE-EMAIL.bat`. It uploads the task/model/migration/schedule files, runs migration `202606181000`, clears Celery Beat's persisted schedule file, and restarts backend/Celery services.
+- Admin payment verification and collaborations:
+  - Campaign cart payments require real `campaign_payments` and `campaign_payment_items` tables; do not rely on the older raw SQL file alone. The Alembic migration `202606221100_ensure_campaign_payment_tables.py` creates/repairs those tables and the related collaboration payment columns.
+  - Some production databases already contain Trust & Safety tables from a manual deploy while Alembic has not recorded `202603091200_trust_safety_phase1`. Keep that migration idempotent; otherwise `flask db upgrade heads` can fail on duplicate `user_blocks`.
+  - Admin payment pages should never expose raw SQL/driver errors to the UI. If optional campaign payment tables are unavailable before migration, return a clean admin-facing migration message or skip optional campaign cart rows.
+  - Collaboration serialization must tolerate legacy rows with missing dates, missing relations, or decimal values. Keep `Collaboration.to_dict()` returning JSON-safe values.
+  - Targeted deploy script: `deployment\DEPLOY-NEW-VPS-ADMIN-PAYMENTS-COLLABORATIONS-FIX.bat`. It uploads only the payment/collaboration/billing backend files, the migration, rebuilt frontend dist, runs `flask db upgrade heads`, then restarts backend/Celery and reloads Apache.
+- Brand subscription wallet payments:
+  - Brand subscription checkout supports wallet payment through `POST /api/subscriptions/pay-with-wallet`.
+  - The subscription payment page should show wallet balance available for subscription as `available_balance + pending_clearance`, while still displaying the available and pending portions separately.
+  - Wallet subscription deductions use available funds first, then pending clearance if needed, and activate the subscription immediately through `apply_paid_subscription`.
+  - Wallet transactions for subscription payments must include `subscription_reference` in metadata and a readable `SUB-<id>` reference in the description so billing/history can identify the payment.
+  - Billing subscription invoices should show `paid` for verified/active paid subscriptions and include `payment_reference`.
+  - Targeted deploy script: `deployment\DEPLOY-NEW-VPS-BRAND-SUBSCRIPTION-WALLET-PAYMENT.bat`. It deploys only the subscription/wallet/billing routes plus rebuilt frontend and does not run migrations.
+- Payment service audit notes:
+  - The current wallet schema uses `available_balance` and `pending_clearance`; do not use legacy `wallet.balance`.
+  - Brand/customer spending transactions should use `transaction_type='payment'` with a negative amount and metadata identifying the source payment.
+  - Creator earnings should not be credited directly on payment confirmation. Keep funds escrowed and release to creator `pending_clearance` through the escrow release service when the collaboration completes.
+  - Campaign cart payments are the primary campaign payment flow. Legacy campaign payment routes must still tolerate `in_progress` collaborations and use `Collaboration.amount/title`, not nonexistent `collab.package` relationships.
+  - SmilePay `payment_type='subscription'` activates the main `Subscription` model. Creator add-ons must use `payment_type='creator_subscription'` so `CreatorSubscription` records and badge/feature effects activate correctly.
+  - Bank-transfer receiving accounts are centralized in `backend/app/utils/bank_details.py` and `frontend/src/utils/bankDetails.js`. Keep all bank-transfer screens using `BankTransferDetails` and preserve the generated payment/deposit reference beside the account list.
+- Bulk brief sending:
+  - Premium/Agency bulk outreach lives on top of the existing brief system, not campaigns. Brands open `Brand Briefs`, choose an open brief, then use `/brand/briefs/<id>/bulk-send`.
+  - Access is enforced server-side in `backend/app/services/bulk_brief_service.py`; eligible plans are Premium, Agency, and Enterprise. The frontend can show the screen, but the route must return a clean 403 upgrade gate for lower tiers.
+  - Bulk sends store a parent `bulk_brief_sends` row and one `bulk_brief_recipients` row per creator. Keep the hard cap at 50 unique creators.
+  - Supported personalization tags are `{creator_name}`, `{username}`, `{follower_count}`, `{category}`, `{location}`, and `{top_platform}`. Unknown tags should remain visible rather than being silently removed.
+  - Scheduled sends are processed by Celery Beat through `app.tasks.bulk_brief_tasks.send_due_bulk_briefs` every 10 minutes. Response tracking syncs proposals back into recipient rows hourly.
+  - Open tracking is based on creator visits to `/briefs/<id>?bulk_recipient=<recipient_id>`. Response tracking is based on proposals submitted for the same brief by the same creator.
+  - Targeted deploy script: `deployment\DEPLOY-NEW-VPS-BULK-BRIEF-SENDING.bat`. It uploads changed brief/backend/Celery files, migration `202606251000_add_bulk_brief_sending.py`, rebuilt frontend dist, runs `flask db upgrade heads`, and restarts backend plus Celery worker/beat.
+- Campaign scenario analysis:
+  - First production slice is a live cart-preview estimator, not the future offline ML training pipeline. It uses `backend/app/services/campaign_scenario_service.py` to estimate worst/base/predicted/best outcomes from campaign cart items, creator connected-platform averages, package deliverables, and historical `post_metrics`.
+  - API endpoint: `GET /api/campaigns/<campaign_id>/cart/scenarios`. It is brand-owned and lives in `campaign_cart.py` because the first trigger is the cart before payment.
+  - Frontend panel: `frontend/src/components/CampaignScenarioPanel.jsx`, mounted above the cart payment controls in `CampaignCart.jsx`. It refreshes with an 800ms debounce when cart items change and shows reach, engagement rate, CPM, sentiment, confidence, similar-campaign count, and optimisation suggestions.
+  - Current v1 does not persist predictions. When live scenario tracking is implemented, store a prediction snapshot at payment/activation time so actual campaign performance can be compared against the original bands.
+  - Targeted deploy script: `deployment\DEPLOY-NEW-VPS-CAMPAIGN-SCENARIO-ANALYSIS.bat`. It uploads the scenario service, cart route, rebuilt frontend dist, and restarts backend/Apache. No migration is required for v1.
 - Remaining hardening for future slices:
   - Improve team invitation onboarding so new invitees land directly back on the invite after signup/login.
   - Build tailored onboarding steps after Agency/Enterprise signup.

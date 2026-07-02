@@ -119,6 +119,28 @@ io.on('connection', (socket) => {
         return;
       }
 
+      const blockCheck = await pool.query(`
+        SELECT blocker_user_id, blocked_user_id
+        FROM user_blocks
+        WHERE is_active = true
+          AND (
+            (blocker_user_id = $1 AND blocked_user_id = $2)
+            OR (blocker_user_id = $2 AND blocked_user_id = $1)
+          )
+        LIMIT 1
+      `, [socket.userId, receiverId]);
+
+      if (blockCheck.rows.length > 0) {
+        const block = blockCheck.rows[0];
+        const blockedBySender = block.blocker_user_id.toString() === socket.userId.toString();
+        socket.emit('error', {
+          message: blockedBySender
+            ? 'You have blocked this user. Unblock them before sending messages.'
+            : 'You cannot message this user.'
+        });
+        return;
+      }
+
       // Save message to database (PostgreSQL)
       const insertQuery = `
         INSERT INTO messages (

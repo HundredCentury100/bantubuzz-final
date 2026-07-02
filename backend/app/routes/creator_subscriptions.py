@@ -458,11 +458,18 @@ def pay_with_wallet():
         transaction = WalletTransaction(
             wallet_id=wallet.id,
             user_id=current_user_id,
-            amount=amount,
-            transaction_type='debit',
-            status='completed',
-            description=f'Payment for {plan.name} subscription',
-            clearance_required=False
+            amount=-abs(float(amount)),
+            transaction_type='payment',
+            status='available',
+            description=f'Payment for {plan.name} subscription - CREATOR_SUB_{subscription.id}',
+            clearance_required=False,
+            transaction_metadata={
+                'payment_type': 'creator_subscription',
+                'subscription_reference': f'CREATOR_SUB_{subscription.id}',
+                'subscription_id': subscription.id,
+                'plan_id': plan.id,
+                'plan_name': plan.name,
+            }
         )
 
         db.session.add(transaction)

@@ -4,6 +4,7 @@ import { bookingsAPI } from '../services/api';
 import Navbar from '../components/Navbar';
 import toast from 'react-hot-toast';
 import api from '../services/api';
+import BankTransferDetails from '../components/BankTransferDetails';
 
 const Payment = () => {
   const { id } = useParams();
@@ -437,17 +438,9 @@ const Payment = () => {
                     </svg>
                     Bank Transfer Instructions
                   </h3>
-                  <div className="space-y-2 text-sm text-blue-900">
-                    <p><strong>Bank Name:</strong> Example Bank</p>
-                    <p><strong>Account Name:</strong> BantuBuzz Platform</p>
-                    <p><strong>Account Number:</strong> 1234567890</p>
-                    <p>
-                      <strong>Reference:</strong>{' '}
-                      <span className="font-mono bg-blue-100 px-2 py-0.5 rounded text-blue-800">
-                        {booking?.payment_reference || `BOOKING-${id}`}
-                      </span>
-                    </p>
-                    <p><strong>Amount:</strong> ${(Number(booking?.amount) || 0).toFixed(2)}</p>
+                  <div className="text-blue-900">
+                    <BankTransferDetails reference={booking?.payment_reference || `BOOKING-${id}`} />
+                    <p className="mt-3 text-sm"><strong>Amount:</strong> ${(Number(booking?.amount) || 0).toFixed(2)}</p>
                   </div>
                   <p className="text-xs text-blue-700 italic mt-3">
                     Use the reference above when making your transfer so we can match your payment.

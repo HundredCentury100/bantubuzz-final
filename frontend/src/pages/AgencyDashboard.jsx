@@ -5,6 +5,7 @@ import { workspacesAPI } from '../services/api';
 import { useWorkspace } from '../contexts/WorkspaceContext';
 import toast from 'react-hot-toast';
 import SmilePayPaymentModal from '../components/SmilePayPaymentModal';
+import BankTransferDetails from '../components/BankTransferDetails';
 import {
   ArrowDownTrayIcon,
   BuildingOffice2Icon,
@@ -589,12 +590,9 @@ const AgencyDashboard = () => {
               {!pendingAddonAwaitingVerification && addonPaymentMethod === 'bank_transfer' && (
                 <div className="mt-5 rounded-3xl border border-blue-200 bg-blue-50 p-5">
                   <h3 className="font-bold text-blue-900">Bank Transfer Instructions</h3>
-                  <div className="mt-3 space-y-1 text-sm text-blue-900">
-                    <p><strong>Bank Name:</strong> Example Bank</p>
-                    <p><strong>Account Name:</strong> BantuBuzz Platform</p>
-                    <p><strong>Account Number:</strong> 1234567890</p>
-                    <p><strong>Reference:</strong> WORKSPACE-{pendingAddon.id}</p>
-                    <p><strong>Amount:</strong> {money(pendingAddon.amount)}</p>
+                  <div className="mt-3 text-blue-900">
+                    <BankTransferDetails reference={`WORKSPACE-${pendingAddon.id}`} />
+                    <p className="mt-3 text-sm"><strong>Amount:</strong> {money(pendingAddon.amount)}</p>
                   </div>
                   <input
                     type="file"

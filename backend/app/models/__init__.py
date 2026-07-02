@@ -57,6 +57,7 @@ from .proposal_milestone import ProposalMilestone
 
 # Now import parent models that reference milestone models (including CampaignMilestone)
 from .brief import Brief
+from .bulk_brief import BulkBriefRecipient, BulkBriefSend
 from .proposal import Proposal
 from .campaign import Campaign, CampaignApplication, CampaignProposal, CampaignMilestone
 from .campaign_invitation import CampaignInvitation
@@ -65,6 +66,7 @@ from .campaign_chat import CampaignChat, CampaignChatParticipant, CampaignChatMe
 from .campaign_cart import CampaignCartItem
 from .spotlight_boost import SpotlightBoost
 from .campaign_report import CampaignReportSchedule, CampaignReportShare
+from .creator_match_feedback import CreatorMatchFeedback
 from .referral import (
     AccountCreditTransaction,
     Referral,
@@ -111,6 +113,8 @@ __all__ = [
     'MilestoneDeliverable',
     'PackageDeliverable',
     'Brief',
+    'BulkBriefSend',
+    'BulkBriefRecipient',
     'BriefMilestone',
     'CampaignMilestone',
     'ThunziAccount',
@@ -136,6 +140,7 @@ __all__ = [
     'SpotlightBoost',
     'CampaignReportSchedule',
     'CampaignReportShare',
+    'CreatorMatchFeedback',
     'PortfolioItem',
     'SmilePayTransaction',
     'ClientWorkspace',
