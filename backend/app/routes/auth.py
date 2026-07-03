@@ -20,6 +20,7 @@ from app.services.email_service import (
 )
 from app.services.referral_service import attach_referral, mark_referral_activated
 from app.services.creator_score_service import CreatorScoreService, queue_creator_score_recalculation
+from app.utils.recaptcha_enterprise import RecaptchaVerificationError, verify_recaptcha_token
 
 bp = Blueprint('auth', __name__)
 MAX_FAILED_LOGIN_ATTEMPTS = 5
@@ -141,7 +142,12 @@ def _parse_optional_int(value):
 def register_creator():
     """Register a new creator account"""
     try:
-        data = request.get_json()
+        data = request.get_json() or {}
+
+        try:
+            verify_recaptcha_token(data.get('recaptcha_token'), 'REGISTER_CREATOR')
+        except RecaptchaVerificationError as exc:
+            return jsonify({'error': str(exc)}), 400
 
         # Validate required fields
         required_fields = ['email', 'password', 'username']
@@ -234,7 +240,12 @@ def register_creator():
 def register_brand():
     """Register a new brand account"""
     try:
-        data = request.get_json()
+        data = request.get_json() or {}
+
+        try:
+            verify_recaptcha_token(data.get('recaptcha_token'), 'REGISTER_BRAND')
+        except RecaptchaVerificationError as exc:
+            return jsonify({'error': str(exc)}), 400
 
         # Validate required fields
         required_fields = ['email', 'password', 'company_name']

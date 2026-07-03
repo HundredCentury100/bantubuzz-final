@@ -71,6 +71,20 @@ class Config:
     VAPID_PRIVATE_KEY = os.getenv('VAPID_PRIVATE_KEY')
     VAPID_SUBJECT = os.getenv('VAPID_SUBJECT', 'mailto:noreply@bantubuzz.com')
 
+    # Google reCAPTCHA Enterprise
+    RECAPTCHA_ENTERPRISE_SITE_KEY = os.getenv('RECAPTCHA_ENTERPRISE_SITE_KEY', '6LfxaEItAAAAAPQZBzfWSIUV0yyFGz88OFZJE3KE')
+    RECAPTCHA_ENTERPRISE_PROJECT_ID = os.getenv('RECAPTCHA_ENTERPRISE_PROJECT_ID', 'bantubuzz')
+    RECAPTCHA_ENTERPRISE_API_KEY = os.getenv('RECAPTCHA_ENTERPRISE_API_KEY')
+    RECAPTCHA_ENTERPRISE_MIN_SCORE = float(os.getenv('RECAPTCHA_ENTERPRISE_MIN_SCORE', '0.5'))
+    RECAPTCHA_ENTERPRISE_ALLOWED_HOSTNAMES = [
+        host.strip().lower()
+        for host in os.getenv(
+            'RECAPTCHA_ENTERPRISE_ALLOWED_HOSTNAMES',
+            'bantubuzz.com,www.bantubuzz.com,localhost,127.0.0.1'
+        ).split(',')
+        if host.strip()
+    ]
+
 
 class DevelopmentConfig(Config):
     """Development configuration"""

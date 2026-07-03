@@ -5,6 +5,7 @@ import { authAPI } from '../services/api';
 import Navbar from '../components/Navbar';
 import SEO from '../components/SEO';
 import { clearReferralAttribution, getReferralCode } from '../utils/referrals';
+import { getRecaptchaEnterpriseToken } from '../utils/recaptchaEnterprise';
 
 const RegisterBrand = () => {
   const navigate = useNavigate();
@@ -68,6 +69,7 @@ const RegisterBrand = () => {
     setLoading(true);
     setError('');
     try {
+      const recaptchaToken = await getRecaptchaEnterpriseToken('REGISTER_BRAND');
       const response = await authAPI.registerBrand({
         email: data.email,
         password: data.password,
@@ -75,6 +77,7 @@ const RegisterBrand = () => {
         account_type: accountType || 'brand',
         expected_workspace_count: parseWorkspaceCount(data.expected_workspace_count),
         referral_code: getReferralCode(),
+        recaptcha_token: recaptchaToken,
       });
       clearReferralAttribution();
 
@@ -86,7 +89,7 @@ const RegisterBrand = () => {
         }
       });
     } catch (err) {
-      setError(err.response?.data?.error || 'Registration failed. Please try again.');
+      setError(err.response?.data?.error || err.message || 'Registration failed. Please try again.');
     } finally {
       setLoading(false);
     }

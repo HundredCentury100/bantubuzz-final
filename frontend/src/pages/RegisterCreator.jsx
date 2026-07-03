@@ -7,6 +7,7 @@ import { GoogleLogin } from '@react-oauth/google';
 import Navbar from '../components/Navbar';
 import SEO from '../components/SEO';
 import { clearReferralAttribution, getReferralCode } from '../utils/referrals';
+import { getRecaptchaEnterpriseToken } from '../utils/recaptchaEnterprise';
 
 const RegisterCreator = () => {
   const navigate = useNavigate();
@@ -29,12 +30,14 @@ const RegisterCreator = () => {
     setLoading(true);
     setError('');
     try {
+      const recaptchaToken = await getRecaptchaEnterpriseToken('REGISTER_CREATOR');
       const response = await authAPI.registerCreator({
         email: data.email,
         password: data.password,
         username: data.username,
         phone_number: data.phone_number,
         referral_code: getReferralCode(),
+        recaptcha_token: recaptchaToken,
       });
       clearReferralAttribution();
 
@@ -46,7 +49,7 @@ const RegisterCreator = () => {
         }
       });
     } catch (err) {
-      setError(err.response?.data?.error || 'Registration failed. Please try again.');
+      setError(err.response?.data?.error || err.message || 'Registration failed. Please try again.');
     } finally {
       setLoading(false);
     }
