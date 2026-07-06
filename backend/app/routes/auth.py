@@ -56,7 +56,10 @@ def _issue_auth_response(user):
 def _has_active_paid_subscription(user):
     now = datetime.utcnow()
     if user.user_type == 'brand':
-        subscription = Subscription.query.join(SubscriptionPlan).filter(
+        subscription = Subscription.query.join(
+            SubscriptionPlan,
+            Subscription.plan_id == SubscriptionPlan.id
+        ).filter(
             Subscription.user_id == user.id,
             Subscription.status == 'active',
             SubscriptionPlan.price_monthly > 0,
@@ -74,7 +77,10 @@ def _has_active_paid_subscription(user):
         if creator_subscription:
             return True
 
-        subscription = Subscription.query.join(SubscriptionPlan).filter(
+        subscription = Subscription.query.join(
+            SubscriptionPlan,
+            Subscription.plan_id == SubscriptionPlan.id
+        ).filter(
             Subscription.user_id == user.id,
             Subscription.status == 'active',
             SubscriptionPlan.price_monthly > 0,

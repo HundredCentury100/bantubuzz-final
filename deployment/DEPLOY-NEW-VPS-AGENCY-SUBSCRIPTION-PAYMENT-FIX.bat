@@ -26,6 +26,7 @@ echo This targeted deployment will:
 echo   - Stop Agency upgrades from using the old Paynow initiation path
 echo   - Send paid subscriptions/upgrades to the unified payment page
 echo   - Keep wallet, Smile^&Pay, and bank-transfer activation intact
+echo   - Fix brand profile subscription/security metadata loading
 echo   - Build and deploy the frontend subscription page
 echo   - Restart backend and reload Apache
 echo.
@@ -39,7 +40,7 @@ pause
 echo.
 echo [1/6] Local backend syntax check...
 pushd "%ROOT%\backend"
-venv\Scripts\python.exe -m py_compile app\routes\subscriptions.py
+venv\Scripts\python.exe -m py_compile app\routes\subscriptions.py app\routes\auth.py
 if errorlevel 1 goto :failed_popd
 popd
 
@@ -53,7 +54,7 @@ popd
 echo.
 echo [3/6] Packaging targeted backend file...
 if exist "%BACKEND_ARCHIVE%" del /q "%BACKEND_ARCHIVE%"
-tar -czf "%BACKEND_ARCHIVE%" -C "%ROOT%\backend" app/routes/subscriptions.py
+tar -czf "%BACKEND_ARCHIVE%" -C "%ROOT%\backend" app/routes/subscriptions.py app/routes/auth.py
 if errorlevel 1 goto :failed
 
 echo.

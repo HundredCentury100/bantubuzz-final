@@ -41,25 +41,27 @@ BACKUP="/var/backups/bantubuzz/agency-subscription-payment-before-$TS"
 echo "Creating targeted backup at $BACKUP"
 mkdir -p "$BACKUP"
 tar --ignore-failed-read -czf "$BACKUP/backend-targeted.tar.gz" -C backend \
-  app/routes/subscriptions.py
+  app/routes/subscriptions.py \
+  app/routes/auth.py
 tar --ignore-failed-read -czf "$BACKUP/frontend-current.tar.gz" -C "$FRONTEND_ROOT" .
 
-echo "Installing backend file"
+echo "Installing backend files"
 tar -xzf /tmp/bantubuzz-agency-subscription-payment-backend.tar.gz -C backend
-chown bantubuzz:www-data backend/app/routes/subscriptions.py
+chown bantubuzz:www-data backend/app/routes/subscriptions.py backend/app/routes/auth.py
 
 echo "Installing frontend files"
 rm -rf "$FRONTEND_ROOT/assets" "$FRONTEND_ROOT/index.html" "$FRONTEND_ROOT/favicon.ico" "$FRONTEND_ROOT/manifest.json" "$FRONTEND_ROOT/message-push-sw.js"
 tar -xzf /tmp/bantubuzz-agency-subscription-payment-frontend.tar.gz -C "$FRONTEND_ROOT"
 chown -R bantubuzz:www-data "$FRONTEND_ROOT"
 
-echo "Compiling backend route"
+echo "Compiling backend routes"
 cd backend
 venv/bin/python - <<'PY'
 import py_compile
-py_compile.compile('app/routes/subscriptions.py', cfile='/tmp/app_routes_subscriptions.pyc', doraise=True)
+for path in ['app/routes/subscriptions.py', 'app/routes/auth.py']:
+    py_compile.compile(path, cfile=f"/tmp/{path.replace('/', '_')}.pyc", doraise=True)
 PY
-rm -f /tmp/app_routes_subscriptions.pyc
+rm -f /tmp/app_routes_*.pyc
 
 echo "Restarting backend and Apache"
 systemctl restart bantubuzz-backend.service
