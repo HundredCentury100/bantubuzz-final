@@ -239,8 +239,8 @@ class ThunziAIService:
         """
         try:
             endpoints = [
-                f"{self.BASE_URL}/api/creators/register",
                 f"{self.BASE_URL}/api/creator/register",
+                f"{self.BASE_URL}/api/creators/register",
                 f"{self.BASE_URL}/api/register",
             ]
             headers = {
@@ -386,13 +386,16 @@ class ThunziAIService:
         try:
             payload = {
                 "name": name,
+                "size": "1",
                 "country": country,
-                "description": "BantuBuzz connected social analytics workspace"
+                "city": "Harare",
+                "address": "BantuBuzz",
+                "description": "BantuBuzz connected social analytics workspace",
+                "industry": industry or "Creator Analytics",
+                "keywords": ["bantubuzz", "creator", "analytics"]
             }
             if email:
                 payload["contactEmail"] = email
-            if industry:
-                payload["industry"] = industry
 
             url = f"{self.BASE_URL}/api/company"
             log_external_api_call(
@@ -404,11 +407,32 @@ class ThunziAIService:
 
             response = self._request_with_api_key_fallback('POST', url, json=payload, timeout=30)
 
-            # Some older Thunzi builds rejected optional company fields. Retry
-            # with the legacy minimal payload before failing the connection flow.
-            if response.status_code == 400 and any(key in payload for key in ['contactEmail', 'industry', 'description']):
-                legacy_payload = {"name": name, "country": country}
-                response = self._request_with_api_key_fallback('POST', url, json=legacy_payload, timeout=30)
+            # Thunzi has alternated between accepting a minimal payload and
+            # requiring the full documented company shape. Try both directions
+            # so creator platform connection does not break on schema drift.
+            if response.status_code == 400:
+                fallback_payloads = [
+                    {
+                        "name": name,
+                        "size": "1",
+                        "contactEmail": email or "support@bantubuzz.com",
+                        "industry": industry or "Creator Analytics",
+                        "address": "BantuBuzz",
+                        "city": "Harare",
+                        "country": country,
+                        "keywords": ["bantubuzz", "creator", "analytics"],
+                    },
+                    {"name": name, "country": country},
+                ]
+                for fallback_payload in fallback_payloads:
+                    response = self._request_with_api_key_fallback(
+                        'POST',
+                        url,
+                        json=fallback_payload,
+                        timeout=30
+                    )
+                    if response.status_code in [200, 201]:
+                        break
 
             log_external_api_response(
                 service='ThunziAI',

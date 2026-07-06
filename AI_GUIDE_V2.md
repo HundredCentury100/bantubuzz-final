@@ -1316,6 +1316,15 @@ Deployment note:
   - Scheduled sends are processed by Celery Beat through `app.tasks.bulk_brief_tasks.send_due_bulk_briefs` every 10 minutes. Response tracking syncs proposals back into recipient rows hourly.
   - Open tracking is based on creator visits to `/briefs/<id>?bulk_recipient=<recipient_id>`. Response tracking is based on proposals submitted for the same brief by the same creator.
   - Targeted deploy script: `deployment\DEPLOY-NEW-VPS-BULK-BRIEF-SENDING.bat`. It uploads changed brief/backend/Celery files, migration `202606251000_add_bulk_brief_sending.py`, rebuilt frontend dist, runs `flask db upgrade heads`, and restarts backend plus Celery worker/beat.
+- Agency workspace team access:
+  - Agency plans must always allow at least 10 inviteable team seats, even if an older production plan row has `max_team_members=0` or an unexpected Agency slug variant. Use `is_agency_plan(plan)` before falling back to generic plan-seat defaults.
+  - Workspace owner memberships are internal owner access and should not consume an inviteable team seat. `get_workspace_seat_usage()` counts non-owner members plus pending invitations.
+  - If the Invite Member form is greyed out for an Agency account, inspect `/api/workspaces/<id>/members` and its `seat_usage` payload first.
+- ThunziAI creator setup:
+  - Prefer the documented singular creator-registration endpoint `/api/creator/register`; keep plural `/api/creators/register` only as a fallback.
+  - Thunzi `/api/company` currently rejects minimal company payloads with a blank 400. Send the full documented company payload: `name`, `size`, `contactEmail`, `industry`, `address`, `city`, `country`, and `keywords`. The response may wrap the ID under `newCompany.id`.
+  - If creators see "Failed to create ThunziAI account" while connecting TikTok/other platforms, the failing step is usually company creation before platform connection, not the OAuth provider callback itself.
+  - Targeted deploy for Agency invite and Thunzi company payload fixes: `deployment\DEPLOY-NEW-VPS-AGENCY-INVITES-THUNZI-FIX.bat`.
 - Campaign scenario analysis:
   - First production slice is a live cart-preview estimator, not the future offline ML training pipeline. It uses `backend/app/services/campaign_scenario_service.py` to estimate worst/base/predicted/best outcomes from campaign cart items, creator connected-platform averages, package deliverables, and historical `post_metrics`.
   - API endpoint: `GET /api/campaigns/<campaign_id>/cart/scenarios`. It is brand-owned and lives in `campaign_cart.py` because the first trigger is the cart before payment.
