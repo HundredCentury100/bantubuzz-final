@@ -114,11 +114,12 @@ def delete_users(query):
     print('mode=execute')
     print(f'target_users={total}')
 
-    cleanup_user_references(user_ids)
-    deleted = User.query.filter(User.id.in_(user_ids)).delete(synchronize_session=False)
-
+    deleted = recursive_delete('users', 'id', user_ids)
     db.session.commit()
-    print(f'deleted_users={deleted}')
+    print(f'deleted_users={deleted.get("users", 0)}')
+    print('deleted_rows_by_table:')
+    for table_name in sorted(deleted):
+        print(f'  {table_name}={deleted[table_name]}')
     print('status=success')
 
 
@@ -126,7 +127,27 @@ def quote_ident(identifier):
     return '"' + identifier.replace('"', '""') + '"'
 
 
-def cleanup_user_references(user_ids):
+def get_primary_key_column(table_name):
+    row = db.session.execute(
+        text(
+            """
+            SELECT kcu.column_name
+            FROM information_schema.table_constraints tc
+            JOIN information_schema.key_column_usage kcu
+                ON tc.constraint_name = kcu.constraint_name
+                AND tc.table_schema = kcu.table_schema
+            WHERE tc.table_schema = 'public'
+                AND tc.table_name = :table_name
+                AND tc.constraint_type = 'PRIMARY KEY'
+            ORDER BY kcu.ordinal_position
+            """
+        ),
+        {'table_name': table_name},
+    ).first()
+    return row[0] if row else None
+
+
+def get_child_foreign_keys(parent_table, parent_column):
     rows = db.session.execute(
         text(
             """
@@ -143,31 +164,86 @@ def cleanup_user_references(user_ids):
                 AND ccu.table_schema = tc.table_schema
             WHERE tc.constraint_type = 'FOREIGN KEY'
                 AND ccu.table_schema = 'public'
-                AND ccu.table_name = 'users'
-                AND ccu.column_name = 'id'
+                AND ccu.table_name = :parent_table
+                AND ccu.column_name = :parent_column
                 AND tc.table_schema = 'public'
-                AND tc.table_name <> 'users'
+                AND tc.table_name <> :parent_table
             ORDER BY tc.table_name, kcu.column_name
             """
-        )
+        ),
+        {'parent_table': parent_table, 'parent_column': parent_column},
     ).mappings().all()
+    return rows
 
-    # OTPs are commonly present and deleting them first keeps the preview cleanup obvious.
-    OTP.query.filter(OTP.user_id.in_(user_ids)).delete(synchronize_session=False)
 
-    for row in rows:
-        table = row['table_name']
-        column = row['column_name']
-        if table == 'otps' and column == 'user_id':
-            continue
+def recursive_delete(table_name, pk_column, ids, path=None, totals=None):
+    if path is None:
+        path = []
+    if totals is None:
+        totals = {}
+    ids = [item for item in ids if item is not None]
+    if not ids:
+        return totals
 
-        statement = text(
-            f'DELETE FROM {quote_ident(table)} '
-            f'WHERE {quote_ident(column)} = ANY(:user_ids)'
+    path_key = (table_name, pk_column)
+    if path_key in path:
+        raise RuntimeError(
+            'Foreign-key cycle detected while cleaning unverified users: '
+            + ' -> '.join([f'{table}.{column}' for table, column in path + [path_key]])
         )
-        result = db.session.execute(statement, {'user_ids': user_ids})
+
+    child_fks = get_child_foreign_keys(table_name, pk_column)
+    for row in child_fks:
+        child_table = row['table_name']
+        child_fk_column = row['column_name']
+        child_pk_column = get_primary_key_column(child_table)
+
+        if child_pk_column:
+            child_ids = [
+                result[0]
+                for result in db.session.execute(
+                    text(
+                        f'SELECT {quote_ident(child_pk_column)} '
+                        f'FROM {quote_ident(child_table)} '
+                        f'WHERE {quote_ident(child_fk_column)} = ANY(:ids)'
+                    ),
+                    {'ids': ids},
+                ).all()
+            ]
+            if child_ids:
+                recursive_delete(
+                    child_table,
+                    child_pk_column,
+                    child_ids,
+                    path + [path_key],
+                    totals,
+                )
+
+        # Remove any remaining child rows. This also covers tables without a usable PK.
+        statement = text(
+            f'DELETE FROM {quote_ident(child_table)} '
+            f'WHERE {quote_ident(child_fk_column)} = ANY(:ids)'
+        )
+        result = db.session.execute(statement, {'ids': ids})
         if result.rowcount:
-            print(f'  deleted_references table={table} column={column} rows={result.rowcount}')
+            totals[child_table] = totals.get(child_table, 0) + result.rowcount
+            print(
+                f'  deleted_references table={child_table} '
+                f'column={child_fk_column} rows={result.rowcount}'
+            )
+
+    result = db.session.execute(
+        text(
+            f'DELETE FROM {quote_ident(table_name)} '
+            f'WHERE {quote_ident(pk_column)} = ANY(:ids)'
+        ),
+        {'ids': ids},
+    )
+    if result.rowcount:
+        totals[table_name] = totals.get(table_name, 0) + result.rowcount
+        print(f'  deleted_rows table={table_name} rows={result.rowcount}')
+
+    return totals
 
 
 def main():
