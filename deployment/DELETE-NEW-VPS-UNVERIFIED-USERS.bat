@@ -7,6 +7,7 @@ set "SCRIPT_DIR=%~dp0"
 set "ROOT_DIR=%SCRIPT_DIR%.."
 set "REPORT_DIR=%ROOT_DIR%\deployment\vps\reports"
 set "REMOTE_SCRIPT=/tmp/delete_unverified_users.py"
+set "REMOTE_PYTHON=cd /var/www/bantubuzz/backend && set -a && source /etc/bantubuzz/platform.env && set +a && source venv/bin/activate && python %REMOTE_SCRIPT%"
 
 for /f %%I in ('powershell -NoProfile -Command "Get-Date -Format yyyyMMdd-HHmmss"') do set "STAMP=%%I"
 set "REPORT=%REPORT_DIR%\delete-unverified-users-%VPS_HOST%-%STAMP%.txt"
@@ -49,7 +50,7 @@ echo [2/4] Running dry run preview...
 echo ============================================================
 echo PASSWORD PROMPT: NEW VPS %VPS_HOST%
 echo ============================================================
-ssh "%VPS_USER%@%VPS_HOST%" "cd /var/www/bantubuzz/backend && source venv/bin/activate && python %REMOTE_SCRIPT% --sample 30" >> "%REPORT%" 2>&1
+ssh "%VPS_USER%@%VPS_HOST%" "%REMOTE_PYTHON% --sample 30" >> "%REPORT%" 2>&1
 if errorlevel 1 goto fail
 
 echo.
@@ -69,14 +70,14 @@ echo [3/4] Deleting unverified users...
 echo ============================================================
 echo PASSWORD PROMPT: NEW VPS %VPS_HOST%
 echo ============================================================
-ssh "%VPS_USER%@%VPS_HOST%" "cd /var/www/bantubuzz/backend && source venv/bin/activate && python %REMOTE_SCRIPT% --execute" >> "%REPORT%" 2>&1
+ssh "%VPS_USER%@%VPS_HOST%" "%REMOTE_PYTHON% --execute" >> "%REPORT%" 2>&1
 if errorlevel 1 goto fail
 
 echo [4/4] Final dry run verification...
 echo ============================================================
 echo PASSWORD PROMPT: NEW VPS %VPS_HOST%
 echo ============================================================
-ssh "%VPS_USER%@%VPS_HOST%" "cd /var/www/bantubuzz/backend && source venv/bin/activate && python %REMOTE_SCRIPT% --sample 10" >> "%REPORT%" 2>&1
+ssh "%VPS_USER%@%VPS_HOST%" "%REMOTE_PYTHON% --sample 10" >> "%REPORT%" 2>&1
 if errorlevel 1 goto fail
 
 echo.
