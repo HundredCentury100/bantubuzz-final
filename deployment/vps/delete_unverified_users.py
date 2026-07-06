@@ -7,8 +7,42 @@ BACKEND_ROOT = os.getenv('BANTUBUZZ_BACKEND_ROOT', '/var/www/bantubuzz/backend')
 if BACKEND_ROOT not in sys.path:
     sys.path.insert(0, BACKEND_ROOT)
 
+ENV_FILE = os.getenv('BANTUBUZZ_ENV_FILE', '/etc/bantubuzz/platform.env')
+
+
+def load_env_file(path):
+    if not os.path.exists(path):
+        return
+
+    with open(path, 'r', encoding='utf-8') as env_file:
+        for raw_line in env_file:
+            line = raw_line.strip()
+            if not line or line.startswith('#') or '=' not in line:
+                continue
+
+            key, value = line.split('=', 1)
+            key = key.strip()
+            value = value.strip()
+
+            if not key:
+                continue
+
+            if (
+                len(value) >= 2
+                and value[0] == value[-1]
+                and value[0] in ("'", '"')
+            ):
+                value = value[1:-1]
+
+            os.environ.setdefault(key, value)
+
+
+load_env_file(ENV_FILE)
+os.environ.setdefault('FLASK_ENV', 'production')
+
 from app import create_app, db
 from app.models import OTP, User
+from sqlalchemy import text
 
 
 def parse_args():
@@ -80,31 +114,60 @@ def delete_users(query):
     print('mode=execute')
     print(f'target_users={total}')
 
-    OTP.query.filter(OTP.user_id.in_(user_ids)).delete(synchronize_session=False)
-
-    deleted = 0
-    failed = []
-    for user in users:
-        try:
-            db.session.delete(user)
-            db.session.flush()
-            deleted += 1
-        except Exception as exc:
-            db.session.rollback()
-            failed.append((user.id, user.email, str(exc)))
-
-    if failed:
-        db.session.rollback()
-        print(f'deleted_users=0')
-        print('status=failed')
-        print('Deletion was rolled back because at least one user could not be deleted safely.')
-        for user_id, email, error in failed[:20]:
-            print(f'  failed id={user_id} email={email} error={error}')
-        raise SystemExit(1)
+    cleanup_user_references(user_ids)
+    deleted = User.query.filter(User.id.in_(user_ids)).delete(synchronize_session=False)
 
     db.session.commit()
     print(f'deleted_users={deleted}')
     print('status=success')
+
+
+def quote_ident(identifier):
+    return '"' + identifier.replace('"', '""') + '"'
+
+
+def cleanup_user_references(user_ids):
+    rows = db.session.execute(
+        text(
+            """
+            SELECT
+                tc.table_schema,
+                tc.table_name,
+                kcu.column_name
+            FROM information_schema.table_constraints AS tc
+            JOIN information_schema.key_column_usage AS kcu
+                ON tc.constraint_name = kcu.constraint_name
+                AND tc.table_schema = kcu.table_schema
+            JOIN information_schema.constraint_column_usage AS ccu
+                ON ccu.constraint_name = tc.constraint_name
+                AND ccu.table_schema = tc.table_schema
+            WHERE tc.constraint_type = 'FOREIGN KEY'
+                AND ccu.table_schema = 'public'
+                AND ccu.table_name = 'users'
+                AND ccu.column_name = 'id'
+                AND tc.table_schema = 'public'
+                AND tc.table_name <> 'users'
+            ORDER BY tc.table_name, kcu.column_name
+            """
+        )
+    ).mappings().all()
+
+    # OTPs are commonly present and deleting them first keeps the preview cleanup obvious.
+    OTP.query.filter(OTP.user_id.in_(user_ids)).delete(synchronize_session=False)
+
+    for row in rows:
+        table = row['table_name']
+        column = row['column_name']
+        if table == 'otps' and column == 'user_id':
+            continue
+
+        statement = text(
+            f'DELETE FROM {quote_ident(table)} '
+            f'WHERE {quote_ident(column)} = ANY(:user_ids)'
+        )
+        result = db.session.execute(statement, {'user_ids': user_ids})
+        if result.rowcount:
+            print(f'  deleted_references table={table} column={column} rows={result.rowcount}')
 
 
 def main():

@@ -14,10 +14,22 @@ if [ ! -f "$ENV_FILE" ]; then
   exit 1
 fi
 
-set -a
-# shellcheck disable=SC1090
-source "$ENV_FILE"
-set +a
+read_env_value() {
+  local key="$1"
+  local line value
+  line="$(grep -E "^${key}=" "$ENV_FILE" | tail -n 1 || true)"
+  value="${line#*=}"
+  if [[ "$value" == \"*\" && "$value" == *\" ]]; then
+    value="${value:1:${#value}-2}"
+  elif [[ "$value" == \'*\' && "$value" == *\' ]]; then
+    value="${value:1:${#value}-2}"
+  fi
+  printf '%s' "$value"
+}
+
+RECAPTCHA_ENTERPRISE_SITE_KEY="$(read_env_value RECAPTCHA_ENTERPRISE_SITE_KEY)"
+RECAPTCHA_ENTERPRISE_PROJECT_ID="$(read_env_value RECAPTCHA_ENTERPRISE_PROJECT_ID)"
+RECAPTCHA_ENTERPRISE_API_KEY="$(read_env_value RECAPTCHA_ENTERPRISE_API_KEY)"
 
 missing=0
 for name in RECAPTCHA_ENTERPRISE_SITE_KEY RECAPTCHA_ENTERPRISE_PROJECT_ID RECAPTCHA_ENTERPRISE_API_KEY; do
