@@ -118,7 +118,7 @@ const VerificationPending = () => {
 
               <p className="text-lg text-gray-600 max-w-xl mx-auto">
                 {isPending
-                  ? 'Your verification subscription payment is awaiting confirmation. This usually takes a few minutes for Paynow payments or up to 24 hours for bank transfers.'
+                  ? 'Your verification subscription payment is awaiting confirmation. This usually takes a few minutes for secure online payments or up to 24 hours for bank transfers.'
                   : 'Your payment has been confirmed! You can now proceed to fill out your verification application.'}
               </p>
             </div>
@@ -227,7 +227,7 @@ const VerificationPending = () => {
                   <ul className="text-sm text-blue-800 space-y-2">
                     <li className="flex items-start gap-2">
                       <span className="text-blue-600 font-bold">1.</span>
-                      <span>Your payment will be verified automatically (Paynow) or manually by our admin team (Bank Transfer)</span>
+                      <span>Your payment will be verified automatically for secure online payments or manually by our admin team for bank transfers</span>
                     </li>
                     <li className="flex items-start gap-2">
                       <span className="text-blue-600 font-bold">2.</span>

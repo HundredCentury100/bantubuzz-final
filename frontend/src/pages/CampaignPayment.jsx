@@ -143,7 +143,7 @@ const CampaignPayment = () => {
         });
 
         if (response.data.payment_url) {
-          toast.success('Redirecting to Paynow...');
+          toast.success('Redirecting to secure payment...');
           window.location.href = response.data.payment_url;
         } else {
           toast.error('Failed to initiate payment');
@@ -292,9 +292,9 @@ const CampaignPayment = () => {
                 className="mt-1"
               />
               <div className="ml-3 flex-1">
-                <span className="font-semibold text-gray-900">Paynow</span>
+                <span className="font-semibold text-gray-900">Secure Payment</span>
                 <p className="text-sm text-gray-600 mt-1">
-                  Pay instantly using <strong>EcoCash</strong>, <strong>Innbucks</strong>, <strong>OneMoney</strong>, <strong>Omari</strong>, <strong>Visa</strong>, or <strong>Mastercard</strong> via Paynow
+                  Secure Payment - all Payment Methods Accepted, including <strong>EcoCash</strong>, <strong>Innbucks</strong>, <strong>OneMoney</strong>, <strong>Omari</strong>, <strong>Visa</strong>, and <strong>Mastercard</strong>
                 </p>
               </div>
             </label>
@@ -392,7 +392,7 @@ const CampaignPayment = () => {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
                 </svg>
                 {paymentMethod === 'wallet' ? 'Pay with Wallet' :
-                 paymentMethod === 'paynow' ? 'Proceed to Paynow' :
+                 paymentMethod === 'paynow' ? 'Proceed to Secure Payment' :
                  'Submit Payment'}
               </>
             )}
@@ -410,7 +410,7 @@ const CampaignPayment = () => {
           <ul className="text-sm text-yellow-900 space-y-1 list-disc list-inside">
             <li>Your payment will be held in escrow until collaboration completion</li>
             <li>Bank transfers require admin verification (1-2 business days)</li>
-            <li>Paynow payments are processed instantly</li>
+            <li>Secure online payments are processed instantly</li>
             {paymentData.type === 'campaign_application' && (
               <li>The application will be automatically accepted after payment verification</li>
             )}

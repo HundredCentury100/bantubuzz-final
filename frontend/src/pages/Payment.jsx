@@ -262,7 +262,7 @@ const Payment = () => {
           {/* Header */}
           <div className="mb-8 text-center">
             <h1 className="text-4xl font-bold text-dark mb-2">Complete Payment</h1>
-            <p className="text-gray-600">Secure payment via Paynow</p>
+            <p className="text-gray-600">Secure Payment - all Payment Methods Accepted</p>
           </div>
 
           {/* Booking Summary Card */}
@@ -402,9 +402,9 @@ const Payment = () => {
                     className="mt-1"
                   />
                   <div className="ml-3 flex-1">
-                    <span className="font-semibold text-dark">Paynow</span>
+                    <span className="font-semibold text-dark">Secure Payment</span>
                     <p className="text-sm text-gray-600 mt-1">
-                      Pay instantly using <strong>EcoCash</strong>, <strong>Innbucks</strong>, <strong>OneMoney</strong>, <strong>Omari</strong>, <strong>Visa</strong>, or <strong>Mastercard</strong> via Paynow
+                      Secure Payment - all Payment Methods Accepted, including <strong>EcoCash</strong>, <strong>Innbucks</strong>, <strong>OneMoney</strong>, <strong>Omari</strong>, <strong>Visa</strong>, and <strong>Mastercard</strong>
                     </p>
                   </div>
                 </label>
@@ -556,7 +556,7 @@ const Payment = () => {
               <div>
                 <h3 className="font-medium text-primary-dark mb-1">Secure Payment</h3>
                 <p className="text-sm text-primary-dark">
-                  All payments are processed securely through Paynow. Your financial information is encrypted and protected.
+                  Secure Payment - all Payment Methods Accepted. Your financial information is encrypted and protected.
                 </p>
               </div>
             </div>

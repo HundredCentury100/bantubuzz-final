@@ -1293,6 +1293,16 @@ Deployment note:
   - Campaign cart payments are the primary campaign payment flow. Legacy campaign payment routes must still tolerate `in_progress` collaborations and use `Collaboration.amount/title`, not nonexistent `collab.package` relationships.
   - SmilePay `payment_type='subscription'` activates the main `Subscription` model. Creator add-ons must use `payment_type='creator_subscription'` so `CreatorSubscription` records and badge/feature effects activate correctly.
   - Bank-transfer receiving accounts are centralized in `backend/app/utils/bank_details.py` and `frontend/src/utils/bankDetails.js`. Keep all bank-transfer screens using `BankTransferDetails` and preserve the generated payment/deposit reference beside the account list.
+  - User-facing payment pages should not say "Paynow" as the primary method label. Use "Secure Payment - all Payment Methods Accepted" for online payments while keeping the internal `paynow` payment method value for compatibility with existing backend routes.
+  - Targeted frontend-only deploy for the payment copy change: `deployment\DEPLOY-NEW-VPS-PAYMENT-WORDING.bat`.
+- Signup bot protection:
+  - Creator and brand email signup pages use Google reCAPTCHA Enterprise through `frontend/src/utils/recaptchaEnterprise.js` and submit `recaptcha_token` with actions `REGISTER_CREATOR` and `REGISTER_BRAND`.
+  - Backend verification lives in `backend/app/utils/recaptcha_enterprise.py` and is called from `backend/app/routes/auth.py` before account creation.
+  - Production enforcement requires `RECAPTCHA_ENTERPRISE_API_KEY` in `/etc/bantubuzz/platform.env`; if it is missing, the backend logs a warning and fails open so signups are not accidentally blocked.
+  - Use `deployment\SET-NEW-VPS-RECAPTCHA-ENV.bat` to set or rotate the API key on the VPS without committing secrets.
+  - Use `deployment\CHECK-NEW-VPS-RECAPTCHA-STATUS.bat` to verify production env vars, frontend script loading, Google assessment API reachability, and backend health.
+  - Use `deployment\DEPLOY-NEW-VPS-RECAPTCHA-SIGNUP.bat` when deploying frontend/backend reCAPTCHA code changes.
+  - For bot cleanup, use `deployment\DELETE-NEW-VPS-UNVERIFIED-USERS.bat`. It runs a dry run first, opens the report, and deletes only unverified non-admin creator/brand users after typing `DELETE`.
 - Bulk brief sending:
   - Premium/Agency bulk outreach lives on top of the existing brief system, not campaigns. Brands open `Brand Briefs`, choose an open brief, then use `/brand/briefs/<id>/bulk-send`.
   - Access is enforced server-side in `backend/app/services/bulk_brief_service.py`; eligible plans are Premium, Agency, and Enterprise. The frontend can show the screen, but the route must return a clean 403 upgrade gate for lower tiers.

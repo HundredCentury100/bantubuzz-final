@@ -261,8 +261,8 @@ const RevisionPayment = () => {
                   className="h-4 w-4 text-primary focus:ring-primary"
                 />
                 <div className="ml-3 flex-1">
-                  <p className="font-medium text-gray-900">Paynow (Instant)</p>
-                  <p className="text-sm text-gray-500">Pay instantly using <strong>EcoCash</strong>, <strong>Innbucks</strong>, <strong>OneMoney</strong>, <strong>Omari</strong>, <strong>Visa</strong>, or <strong>Mastercard</strong> via Paynow</p>
+                  <p className="font-medium text-gray-900">Secure Payment (Instant)</p>
+                  <p className="text-sm text-gray-500">Secure Payment - all Payment Methods Accepted, including <strong>EcoCash</strong>, <strong>Innbucks</strong>, <strong>OneMoney</strong>, <strong>Omari</strong>, <strong>Visa</strong>, and <strong>Mastercard</strong></p>
                 </div>
               </label>
 

@@ -351,7 +351,7 @@ const RegisterCreator = () => {
             </div>
             <div className="bg-white rounded-lg p-4 shadow-sm">
               <div className="text-primary font-bold text-lg mb-1">Get Paid Fast</div>
-              <p className="text-sm text-gray-600">Direct payments via Paynow</p>
+              <p className="text-sm text-gray-600">Secure Payment - all Payment Methods Accepted</p>
             </div>
           </div>
         </div>

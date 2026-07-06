@@ -175,7 +175,7 @@ export default function BrandWallet() {
                 <li>• Refunds are automatically added when creators decline your paid bookings</li>
                 <li>• Credits are added when you cancel paid collaborations</li>
                 <li>• Use your balance to pay for future bookings and collaborations</li>
-                <li>• Top up your wallet anytime via Paynow or Bank Transfer</li>
+                <li>• Top up your wallet anytime via secure online payment or Bank Transfer</li>
               </ul>
             </div>
           </div>
@@ -311,7 +311,7 @@ export default function BrandWallet() {
                             <td className="px-4 py-4 text-sm text-gray-900">{formatDate(deposit.created_at)}</td>
                             <td className="px-4 py-4 text-sm text-gray-600 font-mono">{deposit.reference}</td>
                             <td className="px-4 py-4 text-sm text-gray-600 capitalize">
-                              {deposit.payment_method === 'bank_transfer' ? 'Bank Transfer' : 'Paynow'}
+                              {deposit.payment_method === 'bank_transfer' ? 'Bank Transfer' : 'Secure Payment'}
                             </td>
                             <td className="px-4 py-4 text-sm text-right font-medium text-primary-dark">
                               {formatCurrency(deposit.amount)}
