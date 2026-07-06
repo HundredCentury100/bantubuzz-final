@@ -518,7 +518,7 @@ def check_payment_status_endpoint(subscription_id):
     Check payment status for a subscription
     """
     try:
-        user_id = get_jwt_identity()
+        user_id = int(get_jwt_identity())
 
         subscription = Subscription.query.get_or_404(subscription_id)
 
@@ -556,7 +556,7 @@ def upload_payment_proof():
     Requires admin verification before subscription activates
     """
     try:
-        user_id = get_jwt_identity()
+        user_id = int(get_jwt_identity())
         user = User.query.get(user_id)
 
         if 'file' not in request.files:
