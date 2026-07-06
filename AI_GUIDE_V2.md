@@ -1281,11 +1281,14 @@ Deployment note:
   - Targeted deploy script: `deployment\DEPLOY-NEW-VPS-ADMIN-PAYMENTS-COLLABORATIONS-FIX.bat`. It uploads only the payment/collaboration/billing backend files, the migration, rebuilt frontend dist, runs `flask db upgrade heads`, then restarts backend/Celery and reloads Apache.
 - Brand subscription wallet payments:
   - Brand subscription checkout supports wallet payment through `POST /api/subscriptions/pay-with-wallet`.
+  - Brand plan subscribe/upgrade endpoints must not initiate the legacy Paynow flow. `POST /api/subscriptions/subscribe` creates a pending paid subscription and `PUT /api/subscriptions/upgrade` prepares a pending paid upgrade, then both return `requires_payment`, `amount_due`, `billing_cycle`, `subscription_id`, and `payment_reference` so the unified payment page can handle Wallet, Smile&Pay, or bank-transfer proof.
+  - Agency upgrade is just a paid brand-plan upgrade. After Wallet/Smile&Pay/admin-approved bank transfer calls `apply_paid_subscription`, `apply_brand_subscription_entitlements` converts the brand profile to `account_type='agency'` and unlocks the Agency dashboard/workspaces.
   - The subscription payment page should show wallet balance available for subscription as `available_balance + pending_clearance`, while still displaying the available and pending portions separately.
   - Wallet subscription deductions use available funds first, then pending clearance if needed, and activate the subscription immediately through `apply_paid_subscription`.
   - Wallet transactions for subscription payments must include `subscription_reference` in metadata and a readable `SUB-<id>` reference in the description so billing/history can identify the payment.
   - Billing subscription invoices should show `paid` for verified/active paid subscriptions and include `payment_reference`.
   - Targeted deploy script: `deployment\DEPLOY-NEW-VPS-BRAND-SUBSCRIPTION-WALLET-PAYMENT.bat`. It deploys only the subscription/wallet/billing routes plus rebuilt frontend and does not run migrations.
+  - Targeted Agency upgrade handoff fix deploy: `deployment\DEPLOY-NEW-VPS-AGENCY-SUBSCRIPTION-PAYMENT-FIX.bat`. It deploys `backend/app/routes/subscriptions.py` plus rebuilt frontend and does not run migrations.
 - Payment service audit notes:
   - The current wallet schema uses `available_balance` and `pending_clearance`; do not use legacy `wallet.balance`.
   - Brand/customer spending transactions should use `transaction_type='payment'` with a negative amount and metadata identifying the source payment.
