@@ -19,6 +19,7 @@ read_env_value() {
   local line value
   line="$(grep -E "^${key}=" "$ENV_FILE" | tail -n 1 || true)"
   value="${line#*=}"
+  value="${value//$'\r'/}"
   if [[ "$value" == \"*\" && "$value" == *\" ]]; then
     value="${value:1:${#value}-2}"
   elif [[ "$value" == \'*\' && "$value" == *\' ]]; then
@@ -48,10 +49,12 @@ fi
 
 echo "Checking frontend script tag"
 html="$(curl -fsS "$SITE_URL/register/creator" || curl -fsS "$SITE_URL")"
-if printf "%s" "$html" | grep -q "recaptcha/enterprise.js?render=${RECAPTCHA_ENTERPRISE_SITE_KEY}"; then
+if printf "%s" "$html" | grep -Fq "recaptcha/enterprise.js?render=${RECAPTCHA_ENTERPRISE_SITE_KEY}"; then
   echo "frontend_recaptcha_script=present"
 else
   echo "frontend_recaptcha_script=missing"
+  echo "expected=recaptcha/enterprise.js?render=<configured-site-key>"
+  echo "hint=Deploy the current frontend build with DEPLOY-NEW-VPS-PAYMENT-WORDING.bat or DEPLOY-NEW-VPS-RECAPTCHA-SIGNUP.bat, then rerun this check."
   exit 1
 fi
 
