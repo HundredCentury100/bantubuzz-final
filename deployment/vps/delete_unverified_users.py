@@ -1,5 +1,11 @@
 import argparse
+import os
+import sys
 from datetime import datetime, timedelta
+
+BACKEND_ROOT = os.getenv('BANTUBUZZ_BACKEND_ROOT', '/var/www/bantubuzz/backend')
+if BACKEND_ROOT not in sys.path:
+    sys.path.insert(0, BACKEND_ROOT)
 
 from app import create_app, db
 from app.models import OTP, User
