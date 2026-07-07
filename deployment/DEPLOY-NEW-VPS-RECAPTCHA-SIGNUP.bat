@@ -23,7 +23,7 @@ for /f %%i in ('powershell.exe -NoProfile -Command "Get-Date -Format yyyyMMdd-HH
 set "REPORT=%REPORT_DIR%\new-vps-recaptcha-signup-%NEW_SERVER%-%TIMESTAMP%.txt"
 
 echo ============================================================
-echo BantuBuzz reCAPTCHA Enterprise Signup Deployment
+echo BantuBuzz Signup Protection Deployment
 echo ============================================================
 echo.
 echo NEW VPS: %SSH_USER%@%NEW_SERVER%
@@ -31,7 +31,7 @@ echo.
 echo This deployment will:
 echo   - Build the frontend locally
 echo   - Upload only the compiled frontend dist
-echo   - Upload targeted backend files for signup verification and rate limits
+echo   - Upload targeted backend files for signup rate limits and honeypots
 echo   - Restart backend and Celery services
 echo   - Reload Apache and verify signup routes
 echo.
@@ -41,9 +41,8 @@ echo   - Touch CMS or messaging services
 echo   - Edit production environment secrets
 echo.
 echo Important:
-echo   Add RECAPTCHA_ENTERPRISE_API_KEY to /etc/bantubuzz/platform.env
-echo   for production enforcement. Without it, signup protection fails closed
-echo   unless RECAPTCHA_ENTERPRISE_FAIL_OPEN=true is explicitly set.
+echo   reCAPTCHA Enterprise is disabled for now. Signup protection currently
+echo   relies on backend IP/email rate limits plus hidden honeypot fields.
 echo.
 echo Report:
 echo %REPORT%

@@ -31,6 +31,26 @@ read_env_value() {
 RECAPTCHA_ENTERPRISE_SITE_KEY="$(read_env_value RECAPTCHA_ENTERPRISE_SITE_KEY)"
 RECAPTCHA_ENTERPRISE_PROJECT_ID="$(read_env_value RECAPTCHA_ENTERPRISE_PROJECT_ID)"
 RECAPTCHA_ENTERPRISE_API_KEY="$(read_env_value RECAPTCHA_ENTERPRISE_API_KEY)"
+RECAPTCHA_ENTERPRISE_ENABLED="$(read_env_value RECAPTCHA_ENTERPRISE_ENABLED)"
+
+if [ -z "$RECAPTCHA_ENTERPRISE_ENABLED" ]; then
+  RECAPTCHA_ENTERPRISE_ENABLED="False"
+fi
+
+echo "RECAPTCHA_ENTERPRISE_ENABLED=${RECAPTCHA_ENTERPRISE_ENABLED}"
+
+case "${RECAPTCHA_ENTERPRISE_ENABLED,,}" in
+  true|1|yes)
+    ;;
+  *)
+    echo "recaptcha_env_status=disabled"
+    echo "Checking signup pages without reCAPTCHA script requirement"
+    curl -L -fsS -o /dev/null -w "creator_signup_http=%{http_code}\n" "$SITE_URL/register/creator"
+    curl -L -fsS -o /dev/null -w "brand_signup_http=%{http_code}\n" "$SITE_URL/register/brand"
+    echo "BANTUBUZZ_RECAPTCHA_STATUS_OK_DISABLED"
+    exit 0
+    ;;
+esac
 
 missing=0
 for name in RECAPTCHA_ENTERPRISE_SITE_KEY RECAPTCHA_ENTERPRISE_PROJECT_ID RECAPTCHA_ENTERPRISE_API_KEY; do

@@ -7,7 +7,6 @@ import { GoogleLogin } from '@react-oauth/google';
 import Navbar from '../components/Navbar';
 import SEO from '../components/SEO';
 import { clearReferralAttribution, getReferralCode } from '../utils/referrals';
-import { getRecaptchaEnterpriseToken } from '../utils/recaptchaEnterprise';
 
 const RegisterCreator = () => {
   const navigate = useNavigate();
@@ -30,14 +29,12 @@ const RegisterCreator = () => {
     setLoading(true);
     setError('');
     try {
-      const recaptchaToken = await getRecaptchaEnterpriseToken('REGISTER_CREATOR');
       const response = await authAPI.registerCreator({
         email: data.email,
         password: data.password,
         username: data.username,
         phone_number: data.phone_number,
         referral_code: getReferralCode(),
-        recaptcha_token: recaptchaToken,
         website_url: data.website_url || '',
         profile_url_confirm: data.profile_url_confirm || '',
       });

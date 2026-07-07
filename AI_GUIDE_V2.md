@@ -1301,10 +1301,9 @@ Deployment note:
   - User-facing payment pages should not say "Paynow" as the primary method label. Use "Secure Payment - all Payment Methods Accepted" for online payments while keeping the internal `paynow` payment method value for compatibility with existing backend routes.
   - Targeted frontend-only deploy for the payment copy change: `deployment\DEPLOY-NEW-VPS-PAYMENT-WORDING.bat`.
 - Signup bot protection:
-  - Creator and brand email signup pages use Google reCAPTCHA Enterprise through `frontend/src/utils/recaptchaEnterprise.js` and submit `recaptcha_token` with actions `REGISTER_CREATOR` and `REGISTER_BRAND`.
-  - Backend verification lives in `backend/app/utils/recaptcha_enterprise.py` and is called from `backend/app/routes/auth.py` before account creation.
-  - Production enforcement requires `RECAPTCHA_ENTERPRISE_API_KEY` in `/etc/bantubuzz/platform.env`; if it is missing, the backend now fails closed unless `RECAPTCHA_ENTERPRISE_FAIL_OPEN=true` is explicitly set.
-  - Default `RECAPTCHA_ENTERPRISE_MIN_SCORE` is `0.8`. Keep that in `/etc/bantubuzz/platform.env` if product wants a stricter threshold to survive future code defaults.
+  - Google reCAPTCHA Enterprise is intentionally disabled for now because it was blocking legitimate signups. `RECAPTCHA_ENTERPRISE_ENABLED` defaults to `False`, and the frontend signup forms do not call `grecaptcha`.
+  - If reCAPTCHA is re-enabled later, backend verification lives in `backend/app/utils/recaptcha_enterprise.py` and should be tested with `deployment\CHECK-NEW-VPS-RECAPTCHA-STATUS.bat` before exposing signup traffic.
+  - Production reCAPTCHA enforcement requires `RECAPTCHA_ENTERPRISE_API_KEY` in `/etc/bantubuzz/platform.env`; if enabled and missing, the backend fails closed unless `RECAPTCHA_ENTERPRISE_FAIL_OPEN=true` is explicitly set.
   - Local bot controls live in `backend/app/utils/signup_protection.py`: Redis-backed IP/email signup rate limits plus hidden honeypot fields. Defaults are 5 attempts per IP per 15 minutes and 3 attempts per email per hour.
   - Hidden honeypot fields are posted by the creator/brand signup forms but are invisible to real users. Any non-empty honeypot value is rejected before account creation.
   - Google creator signup is also rate-limited by IP and verified Google email so OAuth cannot bypass local signup throttles.

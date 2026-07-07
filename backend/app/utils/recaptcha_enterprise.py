@@ -11,6 +11,10 @@ class RecaptchaVerificationError(Exception):
 
 def verify_recaptcha_token(token, expected_action):
     """Validate a Google reCAPTCHA Enterprise token for a signup action."""
+    if not current_app.config.get('RECAPTCHA_ENTERPRISE_ENABLED'):
+        current_app.logger.info('reCAPTCHA Enterprise disabled; skipping assessment for action=%s', expected_action)
+        return {'configured': False, 'enabled': False, 'score': None}
+
     if not token:
         raise RecaptchaVerificationError('Security verification is required. Please refresh and try again.')
 

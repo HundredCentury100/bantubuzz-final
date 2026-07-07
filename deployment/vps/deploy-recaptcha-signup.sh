@@ -39,11 +39,16 @@ chown -R www-data:www-data "${FRONTEND_DIR}"
 
 echo "Checking reCAPTCHA Enterprise production configuration"
 if [ -f /etc/bantubuzz/platform.env ]; then
+  if grep -q '^RECAPTCHA_ENTERPRISE_ENABLED=' /etc/bantubuzz/platform.env; then
+    sed -n 's/^RECAPTCHA_ENTERPRISE_ENABLED=/RECAPTCHA_ENTERPRISE_ENABLED=/p' /etc/bantubuzz/platform.env
+  else
+    echo "RECAPTCHA_ENTERPRISE_ENABLED not set; backend code default is False"
+  fi
   if grep -q '^RECAPTCHA_ENTERPRISE_API_KEY=' /etc/bantubuzz/platform.env; then
     echo "RECAPTCHA_ENTERPRISE_API_KEY is present in /etc/bantubuzz/platform.env"
   else
-    echo "WARNING: RECAPTCHA_ENTERPRISE_API_KEY is not set in /etc/bantubuzz/platform.env"
-    echo "Signup protection will fail closed unless RECAPTCHA_ENTERPRISE_FAIL_OPEN=true is explicitly set."
+    echo "RECAPTCHA_ENTERPRISE_API_KEY is not set in /etc/bantubuzz/platform.env"
+    echo "That is acceptable while RECAPTCHA_ENTERPRISE_ENABLED=False."
   fi
   if grep -q '^RECAPTCHA_ENTERPRISE_MIN_SCORE=' /etc/bantubuzz/platform.env; then
     grep '^RECAPTCHA_ENTERPRISE_MIN_SCORE=' /etc/bantubuzz/platform.env
