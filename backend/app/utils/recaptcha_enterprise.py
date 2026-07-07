@@ -19,8 +19,11 @@ def verify_recaptcha_token(token, expected_action):
     site_key = current_app.config.get('RECAPTCHA_ENTERPRISE_SITE_KEY')
 
     if not api_key:
-        current_app.logger.warning('RECAPTCHA_ENTERPRISE_API_KEY is not configured; signup reCAPTCHA enforcement is disabled.')
-        return {'configured': False, 'score': None}
+        current_app.logger.error('RECAPTCHA_ENTERPRISE_API_KEY is not configured; signup reCAPTCHA enforcement cannot run.')
+        if current_app.config.get('RECAPTCHA_ENTERPRISE_FAIL_OPEN'):
+            current_app.logger.warning('RECAPTCHA_ENTERPRISE_FAIL_OPEN is enabled; allowing request without assessment.')
+            return {'configured': False, 'score': None}
+        raise RecaptchaVerificationError('Security verification is temporarily unavailable. Please contact support.')
 
     assessment_url = (
         f'https://recaptchaenterprise.googleapis.com/v1/projects/{project_id}/assessments'

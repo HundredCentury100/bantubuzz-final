@@ -78,6 +78,8 @@ const RegisterBrand = () => {
         expected_workspace_count: parseWorkspaceCount(data.expected_workspace_count),
         referral_code: getReferralCode(),
         recaptcha_token: recaptchaToken,
+        company_website_url: data.company_website_url || '',
+        signup_notes: data.signup_notes || '',
       });
       clearReferralAttribution();
 
@@ -160,6 +162,25 @@ const RegisterBrand = () => {
                   <p className="text-red-800 text-sm">{error}</p>
                 </div>
               )}
+
+              <div className="hidden" aria-hidden="true">
+                <label htmlFor="company_website_url">Company Website</label>
+                <input
+                  id="company_website_url"
+                  type="text"
+                  tabIndex={-1}
+                  autoComplete="off"
+                  {...register('company_website_url')}
+                />
+                <label htmlFor="signup_notes">Signup Notes</label>
+                <input
+                  id="signup_notes"
+                  type="text"
+                  tabIndex={-1}
+                  autoComplete="off"
+                  {...register('signup_notes')}
+                />
+              </div>
 
               {/* Company Name */}
               <div>

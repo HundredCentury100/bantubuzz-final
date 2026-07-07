@@ -21,6 +21,11 @@ from app.services.email_service import (
 from app.services.referral_service import attach_referral, mark_referral_activated
 from app.services.creator_score_service import CreatorScoreService, queue_creator_score_recalculation
 from app.utils.recaptcha_enterprise import RecaptchaVerificationError, verify_recaptcha_token
+from app.utils.signup_protection import (
+    SignupProtectionError,
+    check_signup_honeypot,
+    enforce_signup_rate_limit,
+)
 
 bp = Blueprint('auth', __name__)
 MAX_FAILED_LOGIN_ATTEMPTS = 5
@@ -151,7 +156,11 @@ def register_creator():
         data = request.get_json() or {}
 
         try:
+            check_signup_honeypot(data)
+            enforce_signup_rate_limit(data.get('email'), 'register_creator')
             verify_recaptcha_token(data.get('recaptcha_token'), 'REGISTER_CREATOR')
+        except SignupProtectionError as exc:
+            return jsonify({'error': str(exc)}), exc.status_code
         except RecaptchaVerificationError as exc:
             return jsonify({'error': str(exc)}), 400
 
@@ -249,7 +258,11 @@ def register_brand():
         data = request.get_json() or {}
 
         try:
+            check_signup_honeypot(data)
+            enforce_signup_rate_limit(data.get('email'), 'register_brand')
             verify_recaptcha_token(data.get('recaptcha_token'), 'REGISTER_BRAND')
+        except SignupProtectionError as exc:
+            return jsonify({'error': str(exc)}), exc.status_code
         except RecaptchaVerificationError as exc:
             return jsonify({'error': str(exc)}), 400
 
@@ -716,7 +729,12 @@ def google_creator_auth():
         from google.auth.transport import requests as google_requests
         import os
 
-        data = request.get_json()
+        data = request.get_json() or {}
+        try:
+            check_signup_honeypot(data)
+        except SignupProtectionError as exc:
+            return jsonify({'error': str(exc)}), exc.status_code
+
         credential = data.get('credential')  # Google ID token
         referral_code = data.get('referral_code')
 
@@ -791,6 +809,12 @@ def google_creator_auth():
             }), 200
 
         else:
+            try:
+                enforce_signup_rate_limit(None, 'google_creator')
+                enforce_signup_rate_limit(email, 'google_creator_email')
+            except SignupProtectionError as exc:
+                return jsonify({'error': str(exc)}), exc.status_code
+
             # New user - create account but needs profile completion
             # Create a temporary token for the profile completion step
             import secrets as secrets_module

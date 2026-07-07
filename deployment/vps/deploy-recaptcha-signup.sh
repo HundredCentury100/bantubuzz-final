@@ -16,17 +16,20 @@ cp -a "${BACKEND_DIR}/app/routes/auth.py" "${BACKUP_DIR}/recaptcha-signup-before
 if [ -f "${BACKEND_DIR}/app/utils/recaptcha_enterprise.py" ]; then
   cp -a "${BACKEND_DIR}/app/utils/recaptcha_enterprise.py" "${BACKUP_DIR}/recaptcha-signup-before-${STAMP}/recaptcha_enterprise.py"
 fi
+if [ -f "${BACKEND_DIR}/app/utils/signup_protection.py" ]; then
+  cp -a "${BACKEND_DIR}/app/utils/signup_protection.py" "${BACKUP_DIR}/recaptcha-signup-before-${STAMP}/signup_protection.py"
+fi
 if [ -d "${FRONTEND_DIR}" ]; then
   tar -czf "${BACKUP_DIR}/frontend-before-recaptcha-signup-${STAMP}.tar.gz" -C "${APP_DIR}" frontend
 fi
 
 echo "Installing backend files"
 tar -xzf "${BACKEND_ARCHIVE}" -C "${BACKEND_DIR}"
-chown -R bantubuzz:www-data "${BACKEND_DIR}/app/config.py" "${BACKEND_DIR}/app/routes/auth.py" "${BACKEND_DIR}/app/utils/recaptcha_enterprise.py"
+chown -R bantubuzz:www-data "${BACKEND_DIR}/app/config.py" "${BACKEND_DIR}/app/routes/auth.py" "${BACKEND_DIR}/app/utils/recaptcha_enterprise.py" "${BACKEND_DIR}/app/utils/signup_protection.py"
 
 echo "Compiling backend files"
 cd "${BACKEND_DIR}"
-venv/bin/python -m py_compile app/config.py app/routes/auth.py app/utils/recaptcha_enterprise.py
+venv/bin/python -m py_compile app/config.py app/routes/auth.py app/utils/recaptcha_enterprise.py app/utils/signup_protection.py
 
 echo "Installing frontend dist"
 rm -rf "${FRONTEND_DIR}"
@@ -40,7 +43,12 @@ if [ -f /etc/bantubuzz/platform.env ]; then
     echo "RECAPTCHA_ENTERPRISE_API_KEY is present in /etc/bantubuzz/platform.env"
   else
     echo "WARNING: RECAPTCHA_ENTERPRISE_API_KEY is not set in /etc/bantubuzz/platform.env"
-    echo "Signup will still work, but backend enforcement will be disabled until the key is added and services are restarted."
+    echo "Signup protection will fail closed unless RECAPTCHA_ENTERPRISE_FAIL_OPEN=true is explicitly set."
+  fi
+  if grep -q '^RECAPTCHA_ENTERPRISE_MIN_SCORE=' /etc/bantubuzz/platform.env; then
+    grep '^RECAPTCHA_ENTERPRISE_MIN_SCORE=' /etc/bantubuzz/platform.env
+  else
+    echo "RECAPTCHA_ENTERPRISE_MIN_SCORE not set; backend code default is 0.8"
   fi
 else
   echo "WARNING: /etc/bantubuzz/platform.env was not found."

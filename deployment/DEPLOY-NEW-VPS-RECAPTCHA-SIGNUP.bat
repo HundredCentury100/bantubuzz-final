@@ -31,7 +31,7 @@ echo.
 echo This deployment will:
 echo   - Build the frontend locally
 echo   - Upload only the compiled frontend dist
-echo   - Upload targeted backend files for signup verification
+echo   - Upload targeted backend files for signup verification and rate limits
 echo   - Restart backend and Celery services
 echo   - Reload Apache and verify signup routes
 echo.
@@ -42,8 +42,8 @@ echo   - Edit production environment secrets
 echo.
 echo Important:
 echo   Add RECAPTCHA_ENTERPRISE_API_KEY to /etc/bantubuzz/platform.env
-echo   for production enforcement. Without it, the backend will warn and
-echo   temporarily allow signups so QA/users are not blocked.
+echo   for production enforcement. Without it, signup protection fails closed
+echo   unless RECAPTCHA_ENTERPRISE_FAIL_OPEN=true is explicitly set.
 echo.
 echo Report:
 echo %REPORT%
@@ -62,7 +62,9 @@ popd >nul
 echo.
 echo [2/6] Compiling targeted backend files locally...
 pushd "%ROOT%" >nul
-python -m py_compile backend\app\config.py backend\app\routes\auth.py backend\app\utils\recaptcha_enterprise.py >> "%REPORT%" 2>&1
+set "PYTHON_EXE=python"
+if exist "%BACKEND_DIR%\venv\Scripts\python.exe" set "PYTHON_EXE=%BACKEND_DIR%\venv\Scripts\python.exe"
+"%PYTHON_EXE%" -m py_compile backend\app\config.py backend\app\routes\auth.py backend\app\utils\recaptcha_enterprise.py backend\app\utils\signup_protection.py >> "%REPORT%" 2>&1
 if errorlevel 1 (
     popd >nul
     goto :failed
@@ -72,7 +74,7 @@ echo.
 echo [3/6] Packaging targeted files...
 if exist "%BACKEND_ARCHIVE%" del /q "%BACKEND_ARCHIVE%"
 if exist "%FRONTEND_ARCHIVE%" del /q "%FRONTEND_ARCHIVE%"
-tar -czf "%BACKEND_ARCHIVE%" -C "%BACKEND_DIR%" app/config.py app/routes/auth.py app/utils/recaptcha_enterprise.py
+tar -czf "%BACKEND_ARCHIVE%" -C "%BACKEND_DIR%" app/config.py app/routes/auth.py app/utils/recaptcha_enterprise.py app/utils/signup_protection.py
 if errorlevel 1 (
     popd >nul
     goto :failed

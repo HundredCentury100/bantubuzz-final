@@ -75,7 +75,8 @@ class Config:
     RECAPTCHA_ENTERPRISE_SITE_KEY = os.getenv('RECAPTCHA_ENTERPRISE_SITE_KEY', '6LfxaEItAAAAAPQZBzfWSIUV0yyFGz88OFZJE3KE')
     RECAPTCHA_ENTERPRISE_PROJECT_ID = os.getenv('RECAPTCHA_ENTERPRISE_PROJECT_ID', 'bantubuzz')
     RECAPTCHA_ENTERPRISE_API_KEY = os.getenv('RECAPTCHA_ENTERPRISE_API_KEY')
-    RECAPTCHA_ENTERPRISE_MIN_SCORE = float(os.getenv('RECAPTCHA_ENTERPRISE_MIN_SCORE', '0.5'))
+    RECAPTCHA_ENTERPRISE_MIN_SCORE = float(os.getenv('RECAPTCHA_ENTERPRISE_MIN_SCORE', '0.8'))
+    RECAPTCHA_ENTERPRISE_FAIL_OPEN = os.getenv('RECAPTCHA_ENTERPRISE_FAIL_OPEN', 'False').lower() == 'true'
     RECAPTCHA_ENTERPRISE_ALLOWED_HOSTNAMES = [
         host.strip().lower()
         for host in os.getenv(
@@ -83,6 +84,18 @@ class Config:
             'bantubuzz.com,www.bantubuzz.com,localhost,127.0.0.1'
         ).split(',')
         if host.strip()
+    ]
+    SIGNUP_RATE_LIMIT_IP_MAX = int(os.getenv('SIGNUP_RATE_LIMIT_IP_MAX', 5))
+    SIGNUP_RATE_LIMIT_IP_WINDOW_SECONDS = int(os.getenv('SIGNUP_RATE_LIMIT_IP_WINDOW_SECONDS', 15 * 60))
+    SIGNUP_RATE_LIMIT_EMAIL_MAX = int(os.getenv('SIGNUP_RATE_LIMIT_EMAIL_MAX', 3))
+    SIGNUP_RATE_LIMIT_EMAIL_WINDOW_SECONDS = int(os.getenv('SIGNUP_RATE_LIMIT_EMAIL_WINDOW_SECONDS', 60 * 60))
+    SIGNUP_HONEYPOT_FIELDS = [
+        field.strip()
+        for field in os.getenv(
+            'SIGNUP_HONEYPOT_FIELDS',
+            'website_url,company_website_url,profile_url_confirm,signup_notes'
+        ).split(',')
+        if field.strip()
     ]
 
 

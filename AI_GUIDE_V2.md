@@ -1303,10 +1303,14 @@ Deployment note:
 - Signup bot protection:
   - Creator and brand email signup pages use Google reCAPTCHA Enterprise through `frontend/src/utils/recaptchaEnterprise.js` and submit `recaptcha_token` with actions `REGISTER_CREATOR` and `REGISTER_BRAND`.
   - Backend verification lives in `backend/app/utils/recaptcha_enterprise.py` and is called from `backend/app/routes/auth.py` before account creation.
-  - Production enforcement requires `RECAPTCHA_ENTERPRISE_API_KEY` in `/etc/bantubuzz/platform.env`; if it is missing, the backend logs a warning and fails open so signups are not accidentally blocked.
+  - Production enforcement requires `RECAPTCHA_ENTERPRISE_API_KEY` in `/etc/bantubuzz/platform.env`; if it is missing, the backend now fails closed unless `RECAPTCHA_ENTERPRISE_FAIL_OPEN=true` is explicitly set.
+  - Default `RECAPTCHA_ENTERPRISE_MIN_SCORE` is `0.8`. Keep that in `/etc/bantubuzz/platform.env` if product wants a stricter threshold to survive future code defaults.
+  - Local bot controls live in `backend/app/utils/signup_protection.py`: Redis-backed IP/email signup rate limits plus hidden honeypot fields. Defaults are 5 attempts per IP per 15 minutes and 3 attempts per email per hour.
+  - Hidden honeypot fields are posted by the creator/brand signup forms but are invisible to real users. Any non-empty honeypot value is rejected before account creation.
+  - Google creator signup is also rate-limited by IP and verified Google email so OAuth cannot bypass local signup throttles.
   - Use `deployment\SET-NEW-VPS-RECAPTCHA-ENV.bat` to set or rotate the API key on the VPS without committing secrets.
   - Use `deployment\CHECK-NEW-VPS-RECAPTCHA-STATUS.bat` to verify production env vars, frontend script loading, Google assessment API reachability, and backend health.
-  - Use `deployment\DEPLOY-NEW-VPS-RECAPTCHA-SIGNUP.bat` when deploying frontend/backend reCAPTCHA code changes.
+  - Use `deployment\DEPLOY-NEW-VPS-RECAPTCHA-SIGNUP.bat` when deploying frontend/backend reCAPTCHA and signup-hardening code changes.
   - For bot cleanup, use `deployment\DELETE-NEW-VPS-UNVERIFIED-USERS.bat`. It runs a dry run first, opens the report, and deletes only unverified non-admin creator/brand users after typing `DELETE`.
 - Bulk brief sending:
   - Premium/Agency bulk outreach lives on top of the existing brief system, not campaigns. Brands open `Brand Briefs`, choose an open brief, then use `/brand/briefs/<id>/bulk-send`.

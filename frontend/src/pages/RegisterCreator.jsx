@@ -38,6 +38,8 @@ const RegisterCreator = () => {
         phone_number: data.phone_number,
         referral_code: getReferralCode(),
         recaptcha_token: recaptchaToken,
+        website_url: data.website_url || '',
+        profile_url_confirm: data.profile_url_confirm || '',
       });
       clearReferralAttribution();
 
@@ -123,6 +125,25 @@ const RegisterCreator = () => {
                   <p className="text-red-800 text-sm">{error}</p>
                 </div>
               )}
+
+              <div className="hidden" aria-hidden="true">
+                <label htmlFor="website_url">Website</label>
+                <input
+                  id="website_url"
+                  type="text"
+                  tabIndex={-1}
+                  autoComplete="off"
+                  {...register('website_url')}
+                />
+                <label htmlFor="profile_url_confirm">Profile URL</label>
+                <input
+                  id="profile_url_confirm"
+                  type="text"
+                  tabIndex={-1}
+                  autoComplete="off"
+                  {...register('profile_url_confirm')}
+                />
+              </div>
 
               {/* Email */}
               <div>
