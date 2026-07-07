@@ -44,7 +44,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -Command ^
   "try { $plain = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($bstr) } finally { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($bstr) };" ^
   "if ([string]::IsNullOrWhiteSpace($plain)) { throw 'API key is required' };" ^
   "$tmp = Join-Path $env:TEMP ('bantubuzz-recaptcha-' + [guid]::NewGuid().ToString('N') + '.env');" ^
-  "$lines = @('RECAPTCHA_ENTERPRISE_SITE_KEY=%SITE_KEY%','RECAPTCHA_ENTERPRISE_PROJECT_ID=%PROJECT_ID%','RECAPTCHA_ENTERPRISE_API_KEY=' + $plain,'RECAPTCHA_ENTERPRISE_MIN_SCORE=0.5','RECAPTCHA_ENTERPRISE_ALLOWED_HOSTNAMES=bantubuzz.com,www.bantubuzz.com');" ^
+  "$lines = @('RECAPTCHA_ENTERPRISE_SITE_KEY=%SITE_KEY%','RECAPTCHA_ENTERPRISE_PROJECT_ID=%PROJECT_ID%','RECAPTCHA_ENTERPRISE_API_KEY=' + $plain,'RECAPTCHA_ENTERPRISE_MIN_SCORE=0.8','RECAPTCHA_ENTERPRISE_FAIL_OPEN=False','RECAPTCHA_ENTERPRISE_ALLOWED_HOSTNAMES=bantubuzz.com,www.bantubuzz.com');" ^
   "[IO.File]::WriteAllLines($tmp, $lines, [Text.UTF8Encoding]::new($false));" ^
   "Set-Content -Path (Join-Path $env:TEMP 'bantubuzz-recaptcha-env-path.txt') -Value $tmp -NoNewline;"
 
