@@ -36,9 +36,10 @@ const StatCard = ({ label, value, icon: Icon }) => (
   </div>
 );
 
-const FeatureLink = ({ to, icon: Icon, title, description }) => (
+const FeatureLink = ({ to, icon: Icon, title, description, onClick }) => (
   <Link
     to={to}
+    onClick={onClick}
     className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm transition-colors hover:border-primary"
   >
     <div className="flex items-start gap-3">
@@ -686,6 +687,13 @@ const AgencyDashboard = () => {
                     />
                     <FeatureLink
                       to={clients[0] ? `/brand/workspaces/${clients[0].id}` : '/brand/agency'}
+                      onClick={(event) => {
+                        if (!clients[0]) {
+                          event.preventDefault();
+                          setShowCreateForm(true);
+                          toast('Add your first workspace before inviting team members.');
+                        }
+                      }}
                       icon={UserGroupIcon}
                       title="Team permissions"
                       description={`Invite teammates and assign access per ${workspaceLabel}.`}

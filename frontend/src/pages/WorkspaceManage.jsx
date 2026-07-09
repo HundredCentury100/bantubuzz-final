@@ -38,6 +38,7 @@ const WorkspaceManage = () => {
   const [auditLogs, setAuditLogs] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [inviting, setInviting] = useState(false);
   const [memberForm, setMemberForm] = useState({ email: '', role: 'manager' });
   const [form, setForm] = useState({
     name: '',
@@ -107,6 +108,7 @@ const WorkspaceManage = () => {
     }
 
     try {
+      setInviting(true);
       const response = await workspacesAPI.saveMember(id, memberForm);
       if (response.data.member) {
         setMembers((current) => {
@@ -128,6 +130,8 @@ const WorkspaceManage = () => {
       toast.success(response.data.invitation ? 'Team invitation sent' : 'Team member assigned');
     } catch (err) {
       toast.error(err.response?.data?.error || 'Failed to assign team member');
+    } finally {
+      setInviting(false);
     }
   };
 
@@ -154,6 +158,7 @@ const WorkspaceManage = () => {
   };
 
   const seatsFull = seatUsage && seatUsage.available === 0;
+  const inviteDisabled = inviting;
   const seatLimitLabel = seatUsage?.limit ?? 1;
   const seatUsedLabel = seatUsage?.used ?? members.length + invitations.length;
 
@@ -268,7 +273,7 @@ const WorkspaceManage = () => {
               <form onSubmit={handleAddMember} className="mb-5 space-y-3 rounded-2xl bg-light p-4">
                 {seatsFull && (
                   <div className="rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
-                    This workspace has reached its team seat limit. Remove a member, cancel a pending invitation, or upgrade before inviting another teammate.
+                    This workspace appears to have reached its team seat limit. You can still submit an invite and BantuBuzz will re-check the latest seat availability.
                   </div>
                 )}
                 <label className="block">
@@ -278,7 +283,6 @@ const WorkspaceManage = () => {
                     onChange={(event) => setMemberForm((current) => ({ ...current, email: event.target.value }))}
                     placeholder="team@company.com"
                     className="input"
-                    disabled={seatsFull}
                   />
                 </label>
                 <label className="block">
@@ -287,7 +291,6 @@ const WorkspaceManage = () => {
                     value={memberForm.role}
                     onChange={(event) => setMemberForm((current) => ({ ...current, role: event.target.value }))}
                     className="input"
-                    disabled={seatsFull}
                   >
                     {roleOptions.map((role) => (
                       <option key={role.value} value={role.value}>{role.label}</option>
@@ -296,11 +299,11 @@ const WorkspaceManage = () => {
                 </label>
                 <button
                   type="submit"
-                  disabled={seatsFull}
+                  disabled={inviteDisabled}
                   className="inline-flex items-center gap-2 rounded-full bg-dark px-4 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:bg-gray-300 disabled:text-gray-600"
                 >
                   <UserPlusIcon className="h-4 w-4" />
-                  Invite Member
+                  {inviting ? 'Sending...' : 'Invite Member'}
                 </button>
               </form>
 

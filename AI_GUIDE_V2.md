@@ -1323,6 +1323,8 @@ Deployment note:
   - Agency plans must always allow at least 10 inviteable team seats, even if an older production plan row has `max_team_members=0` or an unexpected Agency slug variant. Use `is_agency_plan(plan)` before falling back to generic plan-seat defaults.
   - Workspace owner memberships are internal owner access and should not consume an inviteable team seat. `get_workspace_seat_usage()` counts non-owner members plus pending invitations.
   - If the Invite Member form is greyed out for an Agency account, inspect `/api/workspaces/<id>/members` and its `seat_usage` payload first.
+  - Agency dashboard "Team permissions" must guide the user to add their first workspace when none exists; otherwise it appears to do nothing because there is no workspace-level permission page yet.
+  - Targeted frontend deploy for the team-permissions click/UI fix: `deployment\DEPLOY-NEW-VPS-AGENCY-TEAM-PERMISSIONS-FIX.bat`.
 - ThunziAI creator setup:
   - Prefer the documented singular creator-registration endpoint `/api/creator/register`; keep plural `/api/creators/register` only as a fallback.
   - Thunzi `/api/company` currently rejects minimal company payloads with a blank 400. Send the full documented company payload: `name`, `size`, `contactEmail`, `industry`, `address`, `city`, `country`, and `keywords`. The response may wrap the ID under `newCompany.id`.
