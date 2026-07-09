@@ -1328,6 +1328,11 @@ Deployment note:
   - Thunzi `/api/company` currently rejects minimal company payloads with a blank 400. Send the full documented company payload: `name`, `size`, `contactEmail`, `industry`, `address`, `city`, `country`, and `keywords`. The response may wrap the ID under `newCompany.id`.
   - If creators see "Failed to create ThunziAI account" while connecting TikTok/other platforms, the failing step is usually company creation before platform connection, not the OAuth provider callback itself.
   - Targeted deploy for Agency invite and Thunzi company payload fixes: `deployment\DEPLOY-NEW-VPS-AGENCY-INVITES-THUNZI-FIX.bat`.
+- Admin featured creators and browse search:
+  - Admin featured type options are `general`, `facebook`, `tiktok`, `instagram`, `youtube`, and `ugc`.
+  - Platform-specific featured validation must check connected-platform records as well as legacy `creator_profiles.social_links` and `creator_profiles.platforms`; many real creators no longer maintain manual social links.
+  - Browse creator search should treat `@username` and `username` the same and search creator username before pagination.
+  - Targeted deploy script: `deployment\DEPLOY-NEW-VPS-FEATURED-CREATORS-SEARCH-FIX.bat`.
 - Campaign scenario analysis:
   - First production slice is a live cart-preview estimator, not the future offline ML training pipeline. It uses `backend/app/services/campaign_scenario_service.py` to estimate worst/base/predicted/best outcomes from campaign cart items, creator connected-platform averages, package deliverables, and historical `post_metrics`.
   - API endpoint: `GET /api/campaigns/<campaign_id>/cart/scenarios`. It is brand-owned and lives in `campaign_cart.py` because the first trigger is the cart before payment.

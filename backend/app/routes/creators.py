@@ -210,7 +210,7 @@ def get_creators():
         max_followers = request.args.get('max_followers', type=int)
         min_price = request.args.get('min_price', type=float)
         max_price = request.args.get('max_price', type=float)
-        search = request.args.get('search')
+        search = (request.args.get('search') or '').strip()
         platform = request.args.get('platform')
         page = request.args.get('page', 1, type=int)
         per_page = request.args.get('per_page', 12, type=int)
@@ -282,7 +282,7 @@ def get_creators():
 
         # Apply search filter - check bio, username, email, AND categories
         if search:
-            search_lower = search.lower()
+            search_lower = search.lower().lstrip('@')
             all_creators = [
                 c for c in all_creators
                 if (
@@ -292,8 +292,12 @@ def get_creators():
                     or (c.bio and search_lower in c.bio.lower())
                     # Search in username
                     or (c.username and search_lower in c.username.lower())
+                    # Search in display name fallback
+                    or ((c.username or '').replace('_', ' ') and search_lower in (c.username or '').replace('_', ' ').lower())
+                    # Search in user username if present
+                    or (c.user and getattr(c.user, 'username', None) and search_lower in c.user.username.lower())
                     # Search in email
-                    or (c.user.email and search_lower in c.user.email.lower())
+                    or (c.user and c.user.email and search_lower in c.user.email.lower())
                 )
             ]
 
