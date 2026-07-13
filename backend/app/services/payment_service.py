@@ -466,6 +466,7 @@ def _money(value):
 def get_creator_commission_percentage(creator_user_id):
     """Get creator-side commission from the active creator subscription plan."""
     from app.models import Subscription
+    from app.services.account_fee_override_service import get_active_fee_override
 
     subscription = Subscription.query.filter_by(
         user_id=creator_user_id,
@@ -473,6 +474,10 @@ def get_creator_commission_percentage(creator_user_id):
     ).first()
 
     plan_rate = subscription.get_commission_rate() if subscription and subscription.plan else 15.0
+    admin_override = get_active_fee_override(creator_user_id, 'creator_commission')
+    if admin_override:
+        return float(admin_override.percentage)
+
     from app.services.referral_service import effective_creator_commission
     return effective_creator_commission(creator_user_id, plan_rate)
 

@@ -44,7 +44,7 @@ class SubscriptionPlan(db.Model):
 
     # Priority & Visibility
     featured_priority = db.Column(db.Integer, default=0)  # Higher = shown first in search
-    badge_label = db.Column(db.String(30))  # "Pro Creator", "Agency Partner", etc.
+    badge_label = db.Column(db.String(30))  # "Creator Pro", "Agency Partner", etc.
     search_boost = db.Column(db.Float, default=1.0)  # Search ranking multiplier
 
     # Platform Features

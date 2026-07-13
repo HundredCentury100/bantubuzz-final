@@ -316,7 +316,7 @@ def run_migration():
 
             if not pro_creator_exists:
                 pro_creator = SubscriptionPlan(
-                    name='Pro Creator',
+                    name='Creator Pro',
                     slug='pro-creator',
                     description='Maximum visibility and minimum fees for professional creators',
                     user_type='creator',
@@ -338,16 +338,16 @@ def run_migration():
                     has_advanced_analytics=True,
                     has_priority_listing=True,
                     featured_priority=3,
-                    badge_label='Pro Creator',
+                    badge_label='Creator Pro',
                     search_boost=1.5,
                     is_active=True,
                     is_default=False,
                     display_order=3
                 )
                 db.session.add(pro_creator)
-                print("  ✓ Added Pro Creator plan ($19/mo)")
+                print("  ✓ Added Creator Pro plan ($19/mo)")
             else:
-                print("  ⊘ Pro Creator plan already exists, skipping")
+                print("  ⊘ Creator Pro plan already exists, skipping")
 
             db.session.commit()
             print("\n✓ New creator plans inserted successfully\n")

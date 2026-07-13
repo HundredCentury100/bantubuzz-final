@@ -87,6 +87,22 @@ export const deleteUser = (userId) => {
   return adminAPI.delete(`/admin/users/${userId}`);
 };
 
+export const updateCreatorControls = (userId, data) => {
+  return adminAPI.put(`/admin/users/${userId}/creator-controls`, data);
+};
+
+export const fundBrandWallet = (userId, data) => {
+  return adminAPI.post(`/admin/users/${userId}/fund-wallet`, data);
+};
+
+export const createFeeOverride = (userId, data) => {
+  return adminAPI.post(`/admin/users/${userId}/fee-overrides`, data);
+};
+
+export const deactivateFeeOverride = (userId, overrideId) => {
+  return adminAPI.delete(`/admin/users/${userId}/fee-overrides/${overrideId}`);
+};
+
 // ============================================================================
 // CATEGORY MANAGEMENT
 // ============================================================================

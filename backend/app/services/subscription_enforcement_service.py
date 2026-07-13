@@ -239,7 +239,7 @@ class SubscriptionEnforcementService:
         can_message = subscription.plan.can_message_brands_first
 
         if not can_message:
-            return False, 'Your plan does not allow initiating messages with brands. Upgrade to Pro Creator to unlock this feature.', {
+            return False, 'Your plan does not allow initiating messages with brands. Upgrade to Creator Pro to unlock this feature.', {
                 'feature': 'message_brands_first',
                 'plan_name': subscription.plan.name,
                 'upgrade_required': True

@@ -381,7 +381,7 @@ export default function CreatorSubscriptions() {
                     { name: 'Open to work badge', value: true }
                   );
                 } else if (plan.slug === 'pro-creator') {
-                  // Pro Creator Plan Features
+                  // Creator Pro Plan Features
                   categories.profile.items.push(
                     { name: 'Verified badge included', value: true },
                     { name: 'Portfolio items', value: 'Unlimited' },

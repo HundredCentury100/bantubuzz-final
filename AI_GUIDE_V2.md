@@ -1335,6 +1335,13 @@ Deployment note:
   - Platform-specific featured validation must check connected-platform records as well as legacy `creator_profiles.social_links` and `creator_profiles.platforms`; many real creators no longer maintain manual social links.
   - Browse creator search should treat `@username` and `username` the same and search creator username before pagination.
   - Targeted deploy script: `deployment\DEPLOY-NEW-VPS-FEATURED-CREATORS-SEARCH-FIX.bat`.
+- Admin account controls:
+  - Public creator profiles must show the Message button to visitors. If the visitor is not logged in, send them to login/signup with a redirect back into messaging.
+  - The creator paid tier should be displayed as `Creator Pro`; keep the existing `pro-creator` slug stable for compatibility.
+  - Admin user profiles now expose creator controls for Top Creator status and granting Rising/Creator Pro account tiers through the main `subscriptions` table with `payment_method='admin_grant'`.
+  - Admin brand wallet funding should use `credit_brand_wallet()` so credits appear as normal wallet transactions and can be spent immediately.
+  - Account fee overrides live in `account_fee_overrides`. Creator commission overrides apply before referral rewards; brand service/platform fee overrides apply before plan defaults.
+  - Targeted deploy script: `deployment\vps\DEPLOY-NEW-VPS-ADMIN-ACCOUNT-CONTROLS.bat`. It uploads changed backend files, migration `202607131500_add_admin_account_controls.py`, rebuilt frontend dist, runs `flask db upgrade heads`, and restarts backend/Celery/Apache.
 - Campaign scenario analysis:
   - First production slice is a live cart-preview estimator, not the future offline ML training pipeline. It uses `backend/app/services/campaign_scenario_service.py` to estimate worst/base/predicted/best outcomes from campaign cart items, creator connected-platform averages, package deliverables, and historical `post_metrics`.
   - API endpoint: `GET /api/campaigns/<campaign_id>/cart/scenarios`. It is brand-owned and lives in `campaign_cart.py` because the first trigger is the cart before payment.
