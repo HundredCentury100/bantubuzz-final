@@ -179,7 +179,9 @@ export default function VerificationQueue() {
                         <td className="px-6 py-4">
                           <div className="flex items-center justify-center gap-2">
                             <button
-                              onClick={() => navigate(`/admin/users/${user.id}`)}
+                              onClick={() => navigate(`/admin/users/${user.id}`, {
+                                state: { returnTo: '/admin/verification', returnLabel: 'Verification Queue' },
+                              })}
                               className="px-3 py-1 text-xs bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition"
                             >
                               View Profile

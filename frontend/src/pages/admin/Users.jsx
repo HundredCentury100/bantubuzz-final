@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import {
   getUsers,
@@ -25,6 +26,7 @@ export default function AdminUsers() {
   });
   const [pagination, setPagination] = useState({ page: 1, per_page: 20, total: 0 });
   const [actionLoading, setActionLoading] = useState(null);
+  const userProfileLinkState = { returnTo: '/admin/users', returnLabel: 'Users' };
 
   useEffect(() => {
     fetchUsers();
@@ -205,9 +207,21 @@ export default function AdminUsers() {
                     <tr key={user.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div>
-                          <div className="font-medium text-gray-900">{user.email}</div>
+                          <Link
+                            to={`/admin/users/${user.id}`}
+                            state={userProfileLinkState}
+                            className="font-medium text-gray-900 hover:text-primary hover:underline"
+                          >
+                            {user.email}
+                          </Link>
                           {user.profile?.username && (
-                            <div className="text-sm text-gray-500">@{user.profile.username}</div>
+                            <Link
+                              to={`/admin/users/${user.id}`}
+                              state={userProfileLinkState}
+                              className="block text-sm text-gray-500 hover:text-primary hover:underline"
+                            >
+                              @{user.profile.username}
+                            </Link>
                           )}
                         </div>
                       </td>
@@ -227,7 +241,15 @@ export default function AdminUsers() {
                         {new Date(user.created_at).toLocaleDateString()}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <div className="flex justify-end space-x-2">
+                        <div className="flex justify-end items-center space-x-3">
+                          <Link
+                            to={`/admin/users/${user.id}`}
+                            state={userProfileLinkState}
+                            className="text-primary hover:text-primary-dark font-semibold"
+                            title="View profile and admin controls"
+                          >
+                            View
+                          </Link>
                           {user.is_verified ? (
                             <button
                               onClick={() => handleUnverify(user.id)}

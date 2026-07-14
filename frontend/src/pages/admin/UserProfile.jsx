@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import AdminLayout from '../../components/admin/AdminLayout';
 import StatusBadge from '../../components/admin/StatusBadge';
@@ -8,6 +8,9 @@ import api from '../../services/api';
 export default function AdminUserProfile() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  const returnTo = location.state?.returnTo || '/admin/users';
+  const returnLabel = location.state?.returnLabel || 'Users';
 
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -30,7 +33,7 @@ export default function AdminUserProfile() {
       setUser(res.data.data || res.data);
     } catch (err) {
       toast.error('Failed to load user profile');
-      navigate('/admin/users');
+      navigate(returnTo);
     } finally {
       setLoading(false);
     }
@@ -260,11 +263,11 @@ export default function AdminUserProfile() {
 
         {/* Back */}
         <div className="flex items-center gap-3">
-          <button onClick={() => navigate('/admin/users')} className="text-gray-500 hover:text-gray-900 flex items-center gap-1 text-sm">
+          <button onClick={() => navigate(returnTo)} className="text-gray-500 hover:text-gray-900 flex items-center gap-1 text-sm">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
-            Back to Users
+            Back to {returnLabel}
           </button>
         </div>
 
