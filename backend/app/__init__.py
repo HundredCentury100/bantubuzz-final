@@ -76,7 +76,7 @@ def create_app(config_name=None):
         return {'error': 'Token has been revoked'}, 401
 
     # Register blueprints
-    from .routes import auth, users, creators, brands, packages, campaigns, bookings, messages, notifications, analytics, collaborations, reviews, wallet, categories, brand_wallet, custom_packages, disputes, subscriptions, briefs, creator_subscriptions, verification, proposals, platforms, admin_extended, messaging_safety, support, admin_logs, internal, campaign_invitations, campaign_payments, campaign_chats, campaign_cart, portfolio, smilepay_payments, billing, workspaces, spotlight_boosts, campaign_reports, referrals, content_bridge
+    from .routes import auth, users, creators, brands, packages, campaigns, bookings, messages, notifications, analytics, collaborations, reviews, wallet, categories, brand_wallet, custom_packages, disputes, subscriptions, briefs, creator_subscriptions, creator_team, verification, proposals, platforms, admin_extended, messaging_safety, support, admin_logs, internal, campaign_invitations, campaign_payments, campaign_chats, campaign_cart, portfolio, smilepay_payments, billing, workspaces, spotlight_boosts, campaign_reports, referrals, content_bridge
     from .routes import admin  # New admin module structure
 
     app.register_blueprint(auth.bp, url_prefix='/api/auth')
@@ -103,6 +103,7 @@ def create_app(config_name=None):
     app.register_blueprint(briefs.bp, url_prefix='/api/briefs')  # Briefs routes
     app.register_blueprint(proposals.bp, url_prefix='/api/proposals')  # Proposals routes
     app.register_blueprint(creator_subscriptions.creator_subscriptions_bp)  # Creator subscription routes
+    app.register_blueprint(creator_team.bp, url_prefix='/api/creator/team')  # Creator team member routes
     app.register_blueprint(verification.verification_bp)  # Verification routes
     app.register_blueprint(platforms.platforms_bp)  # Platform connection routes
     app.register_blueprint(messaging_safety.bp, url_prefix='/api/messaging')  # Trust & Safety messaging routes

@@ -20,6 +20,8 @@ import BrandDashboard from './pages/BrandDashboard';
 import AgencyDashboard from './pages/AgencyDashboard';
 import WorkspaceManage from './pages/WorkspaceManage';
 import WorkspaceInvite from './pages/WorkspaceInvite';
+import CreatorTeamManage from './pages/CreatorTeamManage';
+import CreatorTeamInvite from './pages/CreatorTeamInvite';
 import BrandProfileEdit from './pages/BrandProfileEdit';
 import BrandAnalytics from './pages/BrandAnalytics';
 import BrandAnalyticsOverview from './pages/BrandAnalyticsOverview';
@@ -283,6 +285,7 @@ function App() {
       <Route path="/reset-password/:token" element={<ResetPassword />} />
       <Route path="/register/creator/complete-profile" element={<GoogleProfileComplete />} />
       <Route path="/youtube/callback" element={<YouTubeCallback />} />
+      <Route path="/creator/team-invite/:token" element={<CreatorTeamInvite />} />
 
       {/* Creator Protected Routes */}
       <Route
@@ -442,6 +445,14 @@ function App() {
         element={
           <ProtectedRoute requiredType="creator">
             <CreatorSubscriptions />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/creator/team"
+        element={
+          <ProtectedRoute requiredType="creator">
+            <CreatorTeamManage />
           </ProtectedRoute>
         }
       />

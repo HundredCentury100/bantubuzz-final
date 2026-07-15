@@ -33,6 +33,7 @@ from .post_sentiment_comment import PostSentimentComment
 from .portfolio_item import PortfolioItem
 from .smilepay_transaction import SmilePayTransaction
 from .client_workspace import ClientWorkspace, WorkspaceAddon, WorkspaceAuditLog, WorkspaceInvitation, WorkspaceMemberPermission
+from .creator_team import CreatorTeamAuditLog, CreatorTeamInvitation, CreatorTeamMember
 
 # Trust & Safety models
 from .user_block import UserBlock
@@ -152,6 +153,9 @@ __all__ = [
     'WorkspaceAuditLog',
     'WorkspaceInvitation',
     'WorkspaceMemberPermission',
+    'CreatorTeamAuditLog',
+    'CreatorTeamInvitation',
+    'CreatorTeamMember',
     'CreatorSubscriptionPlan',
     'CreatorSubscription',
     'VerificationApplication',

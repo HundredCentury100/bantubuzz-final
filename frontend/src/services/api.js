@@ -476,6 +476,16 @@ export const workspacesAPI = {
   cancelInvitation: (invitationId) => api.delete(`/workspaces/invitations/${invitationId}`),
 };
 
+// Creator Team Access API
+export const creatorTeamAPI = {
+  getTeam: () => api.get('/creator/team'),
+  saveMember: (data) => api.post('/creator/team/members', data),
+  removeMember: (memberId) => api.delete(`/creator/team/members/${memberId}`),
+  cancelInvitation: (invitationId) => api.delete(`/creator/team/invitations/${invitationId}`),
+  getInvitation: (token) => api.get(`/creator/team/invitations/${token}`),
+  acceptInvitation: (token) => api.post(`/creator/team/invitations/${token}/accept`),
+};
+
 // Briefs API
 export const briefsAPI = {
   // Basic CRUD

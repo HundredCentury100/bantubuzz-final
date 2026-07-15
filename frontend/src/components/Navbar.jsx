@@ -405,6 +405,20 @@ const Navbar = () => {
                             </Link>
                           )}
                         </Menu.Item>
+                        {user?.user_type === 'creator' && (
+                          <Menu.Item>
+                            {({ active }) => (
+                              <Link
+                                to="/creator/team"
+                                className={`${
+                                  active || isActive('/creator/team') ? 'bg-light' : ''
+                                } block px-4 py-2 text-sm text-gray-700 rounded-lg`}
+                              >
+                                Team Access
+                              </Link>
+                            )}
+                          </Menu.Item>
+                        )}
                         <Menu.Item>
                           {({ active }) => (
                             <Link

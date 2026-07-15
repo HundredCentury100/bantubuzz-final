@@ -1325,6 +1325,14 @@ Deployment note:
   - If the Invite Member form is greyed out for an Agency account, inspect `/api/workspaces/<id>/members` and its `seat_usage` payload first.
   - Agency dashboard "Team permissions" must guide the user to add their first workspace when none exists; otherwise it appears to do nothing because there is no workspace-level permission page yet.
   - Targeted frontend deploy for the team-permissions click/UI fix: `deployment\DEPLOY-NEW-VPS-AGENCY-TEAM-PERMISSIONS-FIX.bat`.
+- Creator team access:
+  - Creator teams are separate from Agency workspaces. Use `creator_team_members`, `creator_team_invitations`, and `creator_team_audit_logs`, not `client_workspaces`.
+  - Creator owner is always the `creator_profiles.user_id` account and does not consume a team seat.
+  - Rising creators get 2 team seats; Creator Pro creators get 5 team seats; free creators get 0. Limits are derived from the active main `subscriptions` row for the creator user, using stable slugs `rising` and `pro-creator`.
+  - Inviteable creator team roles are `manager` and `agent`. Manager can manage profile/packages/collaborations/messages/analytics but not billing. Agent can manage collaborations/messages/analytics only.
+  - Creator team invitation emails are sent synchronously for reliable QA feedback. If SMTP fails, the API returns a visible error rather than a false "sent".
+  - Frontend entry points are `/creator/team` for owners and `/creator/team-invite/<token>` for invite recipients.
+  - Targeted deploy script: `deployment\vps\DEPLOY-NEW-VPS-CREATOR-TEAM-ACCESS.bat`. It uploads creator team backend files, migration `202607151000_add_creator_team_access.py`, rebuilt frontend dist, runs `flask db upgrade heads`, and restarts backend/Celery/Apache.
 - ThunziAI creator setup:
   - Prefer the documented singular creator-registration endpoint `/api/creator/register`; keep plural `/api/creators/register` only as a fallback.
   - Thunzi `/api/company` currently rejects minimal company payloads with a blank 400. Send the full documented company payload: `name`, `size`, `contactEmail`, `industry`, `address`, `city`, `country`, and `keywords`. The response may wrap the ID under `newCompany.id`.
