@@ -27,7 +27,7 @@ echo.
 echo NEW VPS: %SSH_USER%@%NEW_SERVER%
 echo.
 echo This targeted deployment will:
-echo   - Upload backend/app/config.py only
+echo   - Upload backend/app/config.py and backend/app/__init__.py only
 echo   - Allow Capacitor mobile app origins in backend CORS
 echo   - Restart backend and Apache
 echo   - Check local and public API health
@@ -52,7 +52,7 @@ echo [1/5] Compiling backend config locally...
 pushd "%ROOT%" >nul
 set "PYTHON_EXE=python"
 if exist "%BACKEND_DIR%\venv\Scripts\python.exe" set "PYTHON_EXE=%BACKEND_DIR%\venv\Scripts\python.exe"
-"%PYTHON_EXE%" -m py_compile backend\app\config.py >> "%REPORT%" 2>&1
+"%PYTHON_EXE%" -m py_compile backend\app\config.py backend\app\__init__.py >> "%REPORT%" 2>&1
 if errorlevel 1 (
     popd >nul
     goto :failed
@@ -63,7 +63,7 @@ echo [2/5] Packaging backend config...
 if exist "%BACKEND_ARCHIVE%" del /q "%BACKEND_ARCHIVE%"
 if exist "%NORMALIZED_SCRIPT%" del /q "%NORMALIZED_SCRIPT%"
 
-tar -czf "%BACKEND_ARCHIVE%" -C "%BACKEND_DIR%" app/config.py >> "%REPORT%" 2>&1
+tar -czf "%BACKEND_ARCHIVE%" -C "%BACKEND_DIR%" app/config.py app/__init__.py >> "%REPORT%" 2>&1
 if errorlevel 1 (
     popd >nul
     goto :failed

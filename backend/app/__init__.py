@@ -43,6 +43,25 @@ def create_app(config_name=None):
          allow_headers=['Content-Type', 'Authorization'],
          methods=['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
          expose_headers=['Content-Type', 'Authorization'])
+
+    @app.after_request
+    def add_mobile_cors_headers(response):
+        origin = request.headers.get('Origin')
+        allowed_origins = set(app.config.get('CORS_ORIGINS') or [])
+        if origin and origin in allowed_origins:
+            response.headers['Access-Control-Allow-Origin'] = origin
+            response.headers['Access-Control-Allow-Credentials'] = 'true'
+            response.headers['Vary'] = 'Origin'
+            response.headers.setdefault(
+                'Access-Control-Allow-Headers',
+                'Content-Type, Authorization, X-Workspace-Id'
+            )
+            response.headers.setdefault(
+                'Access-Control-Allow-Methods',
+                'GET, POST, PUT, PATCH, DELETE, OPTIONS'
+            )
+        return response
+
     socketio.init_app(app, cors_allowed_origins=app.config['CORS_ORIGINS'], async_mode='threading')
     migrate.init_app(app, db)
 

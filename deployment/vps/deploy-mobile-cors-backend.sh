@@ -40,15 +40,15 @@ BACKUP="/var/backups/bantubuzz/mobile-cors-backend-before-$TS"
 echo "Creating targeted backup at $BACKUP"
 mkdir -p "$BACKUP"
 tar --ignore-failed-read --exclude='__pycache__' --exclude='*.pyc' \
-  -czf "$BACKUP/backend-config.tar.gz" -C backend app/config.py
+  -czf "$BACKUP/backend-config.tar.gz" -C backend app/config.py app/__init__.py
 
-echo "Installing backend config"
+echo "Installing backend CORS files"
 tar -xzf /tmp/bantubuzz-mobile-cors-backend.tar.gz -C backend
-chown bantubuzz:www-data backend/app/config.py
+chown bantubuzz:www-data backend/app/config.py backend/app/__init__.py
 
-echo "Compiling backend config"
+echo "Compiling backend CORS files"
 cd backend
-venv/bin/python -m py_compile app/config.py
+venv/bin/python -m py_compile app/config.py app/__init__.py
 
 echo "Restarting backend and Apache"
 systemctl restart bantubuzz-backend.service
