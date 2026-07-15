@@ -88,7 +88,6 @@ def create_app(config_name=None):
          allow_headers=['Content-Type', 'Authorization', 'X-Workspace-Id'],
          methods=['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
          expose_headers=['Content-Type', 'Authorization'])
-    app.wsgi_app = MobileCorsMiddleware(app.wsgi_app, app.config['CORS_ORIGINS'])
     socketio.init_app(app, cors_allowed_origins=app.config['CORS_ORIGINS'], async_mode='threading')
     migrate.init_app(app, db)
 
@@ -217,5 +216,7 @@ def create_app(config_name=None):
     # Register Socket.IO handlers
     with app.app_context():
         from . import socket_handlers
+
+    app.wsgi_app = MobileCorsMiddleware(app.wsgi_app, app.config['CORS_ORIGINS'])
 
     return app
