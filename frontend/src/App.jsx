@@ -1,4 +1,5 @@
-import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { useEffect } from 'react';
+import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from './hooks/useAuth';
 import ScrollToTop from './components/ScrollToTop';
 import { SubscriptionProvider } from './contexts/SubscriptionContext';
@@ -12,6 +13,7 @@ import Login from './pages/Login';
 import RegisterCreator from './pages/RegisterCreator';
 import RegisterBrand from './pages/RegisterBrand';
 import VerifyOTP from './pages/VerifyOTP';
+import MobileOnboarding from './pages/MobileOnboarding';
 import CreatorDashboard from './pages/CreatorDashboard';
 import CreatorProfileEdit from './pages/CreatorProfileEdit';
 import PackageManagement from './pages/PackageManagement';
@@ -209,6 +211,7 @@ const AdminRoute = ({ children }) => {
 function App() {
   const { isAuthenticated } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
   const routesWithLocalFooter = [
     '/',
     '/about',
@@ -237,6 +240,22 @@ function App() {
     path.startsWith('/help-center/submit') ||
     path.startsWith('/tickets/');
   const showAuthenticatedFooter = isAuthenticated && !path.startsWith('/admin') && !hasLocalFooter;
+
+  useEffect(() => {
+    const isNativeApp =
+      typeof window !== 'undefined' &&
+      window.Capacitor &&
+      (typeof window.Capacitor.isNativePlatform !== 'function' ||
+        window.Capacitor.isNativePlatform());
+
+    if (
+      isNativeApp &&
+      path === '/' &&
+      localStorage.getItem('bantubuzz_mobile_onboarding_seen') !== 'true'
+    ) {
+      navigate('/mobile/onboarding', { replace: true });
+    }
+  }, [navigate, path]);
 
   return (
     <SubscriptionProvider>
@@ -281,6 +300,7 @@ function App() {
         }
       />
       <Route path="/verify-otp" element={<VerifyOTP />} />
+      <Route path="/mobile/onboarding" element={<MobileOnboarding />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password/:token" element={<ResetPassword />} />
       <Route path="/register/creator/complete-profile" element={<GoogleProfileComplete />} />
