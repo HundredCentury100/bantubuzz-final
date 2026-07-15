@@ -7,6 +7,15 @@ import toast from 'react-hot-toast';
 import Avatar from '../components/Avatar';
 import { SparklesIcon, RocketLaunchIcon, BuildingOfficeIcon, ArrowUpIcon } from '@heroicons/react/24/outline';
 
+const withDashboardTimeout = (promise, label, timeoutMs = 10000) => (
+  Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      setTimeout(() => reject(new Error(`${label} request timed out`)), timeoutMs);
+    }),
+  ])
+);
+
 const BrandDashboard = () => {
   const location = useLocation();
   const authUser = JSON.parse(localStorage.getItem('user') || '{}');
@@ -45,38 +54,48 @@ const BrandDashboard = () => {
 
   const fetchDashboardData = async () => {
     try {
-      // Fetch profile
-      const profileRes = await brandsAPI.getOwnProfile();
-      setProfile(profileRes.data);
+      const [
+        profileRes,
+        subsRes,
+        platformsRes,
+        savedRes,
+        bookingsRes,
+      ] = await Promise.allSettled([
+        withDashboardTimeout(brandsAPI.getOwnProfile(), 'brand profile'),
+        withDashboardTimeout(api.get('/subscriptions/my-subscription'), 'brand subscription'),
+        withDashboardTimeout(api.get('/brand/platforms'), 'brand platforms'),
+        withDashboardTimeout(brandsAPI.getSavedCreators(), 'saved creators'),
+        withDashboardTimeout(bookingsAPI.getMyBookings(), 'brand bookings'),
+      ]);
 
-      // Fetch subscription
-      try {
-        const subsRes = await api.get('/subscriptions/my-subscription');
-        setSubscription(subsRes.data.data);
-      } catch (error) {
-        console.error('Error fetching subscription:', error);
-        // Don't fail dashboard load if subscription fails
-      }
-
-      // Fetch connected platforms
-      try {
-        const platformsRes = await api.get('/brand/platforms');
-        if (platformsRes.data.success) {
-          setConnectedPlatforms(platformsRes.data.platforms || []);
+      [
+        ['profile', profileRes],
+        ['subscription', subsRes],
+        ['platforms', platformsRes],
+        ['saved creators', savedRes],
+        ['bookings', bookingsRes],
+      ].forEach(([label, result]) => {
+        if (result.status === 'rejected') {
+          console.warn(`Brand dashboard ${label} unavailable:`, result.reason);
         }
-      } catch (error) {
-        console.error('Error fetching connected platforms:', error);
-        // Don't fail dashboard load if platforms fail
+      });
+
+      if (profileRes.status === 'fulfilled') {
+        setProfile(profileRes.value.data);
       }
 
-      // Fetch saved creators
-      const savedRes = await brandsAPI.getSavedCreators();
-      const saved = savedRes.data.creators || [];
+      if (subsRes.status === 'fulfilled') {
+        setSubscription(subsRes.value.data.data);
+      }
+
+      if (platformsRes.status === 'fulfilled' && platformsRes.value.data.success) {
+        setConnectedPlatforms(platformsRes.value.data.platforms || []);
+      }
+
+      const saved = savedRes.status === 'fulfilled' ? (savedRes.value.data.creators || []) : [];
       setSavedCreators(saved.slice(0, 6));
 
-      // Fetch bookings
-      const bookingsRes = await bookingsAPI.getMyBookings();
-      const bks = bookingsRes.data.bookings || [];
+      const bks = bookingsRes.status === 'fulfilled' ? (bookingsRes.value.data.bookings || []) : [];
       setBookings(bks.slice(0, 5));
 
       // Calculate stats

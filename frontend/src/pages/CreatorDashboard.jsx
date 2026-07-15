@@ -8,6 +8,15 @@ import CreatorBadge from '../components/CreatorBadge';
 import toast from 'react-hot-toast';
 import { SparklesIcon, RocketLaunchIcon, BuildingOfficeIcon, ArrowUpIcon } from '@heroicons/react/24/outline';
 
+const withDashboardTimeout = (promise, label, timeoutMs = 10000) => (
+  Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      setTimeout(() => reject(new Error(`${label} request timed out`)), timeoutMs);
+    }),
+  ])
+);
+
 const CreatorDashboard = () => {
   const location = useLocation();
   const authUser = JSON.parse(localStorage.getItem('user') || '{}');
@@ -136,16 +145,32 @@ const CreatorDashboard = () => {
         platformsRes,
         pendingCollabsRes
       ] = await Promise.allSettled([
-        creatorsAPI.getOwnProfile(),
-        packagesAPI.getMyPackages(),
-        bookingsAPI.getMyBookings(),
-        opportunitiesAPI.getMyApplications({ limit: 5 }),
-        api.get('/subscriptions/my-subscription'),
-        api.get('/creator/verification/status'),
-        api.get('/creator/subscriptions/my-subscription'),
-        api.get('/creator/platforms'),
-        collaborationsAPI.getPendingCollaborations()
+        withDashboardTimeout(creatorsAPI.getOwnProfile(), 'creator profile'),
+        withDashboardTimeout(packagesAPI.getMyPackages(), 'creator packages'),
+        withDashboardTimeout(bookingsAPI.getMyBookings(), 'creator bookings'),
+        withDashboardTimeout(opportunitiesAPI.getMyApplications({ limit: 5 }), 'creator applications'),
+        withDashboardTimeout(api.get('/subscriptions/my-subscription'), 'creator subscription'),
+        withDashboardTimeout(api.get('/creator/verification/status'), 'creator verification'),
+        withDashboardTimeout(api.get('/creator/subscriptions/my-subscription'), 'creator verification subscription'),
+        withDashboardTimeout(api.get('/creator/platforms'), 'creator platforms'),
+        withDashboardTimeout(collaborationsAPI.getPendingCollaborations(), 'pending collaborations')
       ]);
+
+      [
+        ['profile', profileRes],
+        ['packages', packagesRes],
+        ['bookings', bookingsRes],
+        ['applications', applicationsRes],
+        ['subscription', subsRes],
+        ['verification', verRes],
+        ['verification subscription', verSubRes],
+        ['platforms', platformsRes],
+        ['pending collaborations', pendingCollabsRes],
+      ].forEach(([label, result]) => {
+        if (result.status === 'rejected') {
+          console.warn(`Creator dashboard ${label} unavailable:`, result.reason);
+        }
+      });
 
       // Handle profile
       if (profileRes.status === 'fulfilled') {
