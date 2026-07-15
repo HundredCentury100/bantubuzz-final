@@ -37,12 +37,6 @@ def create_app(config_name=None):
     db.init_app(app)
     jwt.init_app(app)
     mail.init_app(app)
-    CORS(app,
-         origins=app.config['CORS_ORIGINS'],
-         supports_credentials=True,
-         allow_headers=['Content-Type', 'Authorization'],
-         methods=['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-         expose_headers=['Content-Type', 'Authorization'])
 
     @app.after_request
     def add_mobile_cors_headers(response):
@@ -62,6 +56,12 @@ def create_app(config_name=None):
             )
         return response
 
+    CORS(app,
+         origins=app.config['CORS_ORIGINS'],
+         supports_credentials=True,
+         allow_headers=['Content-Type', 'Authorization', 'X-Workspace-Id'],
+         methods=['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+         expose_headers=['Content-Type', 'Authorization'])
     socketio.init_app(app, cors_allowed_origins=app.config['CORS_ORIGINS'], async_mode='threading')
     migrate.init_app(app, db)
 
