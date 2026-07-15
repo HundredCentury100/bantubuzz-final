@@ -28,7 +28,7 @@ echo NEW VPS: %SSH_USER%@%NEW_SERVER%
 echo.
 echo This targeted deployment will:
 echo   - Upload backend/app/config.py and backend/app/__init__.py only
-echo   - Allow Capacitor mobile app origins in backend CORS
+echo   - Allow Capacitor mobile app origins in backend and Apache CORS
 echo   - Restart backend and Apache
 echo   - Check local and public API health
 echo.
