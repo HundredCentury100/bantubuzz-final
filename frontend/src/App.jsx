@@ -197,7 +197,7 @@ const PublicRoute = ({ children }) => {
 const AdminRoute = ({ children }) => {
   const { location } = window;
   const user = JSON.parse(localStorage.getItem('user') || '{}');
-  const token = localStorage.getItem('token');
+  const token = localStorage.getItem('access_token') || localStorage.getItem('token');
 
   if (!token || !user.is_admin) {
     // Save the intended URL for redirect after login

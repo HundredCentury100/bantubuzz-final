@@ -5,6 +5,30 @@ import toast from 'react-hot-toast';
 
 const AuthContext = createContext(null);
 
+const storeAuthSession = ({ access_token, refresh_token, user, profile }) => {
+  if (access_token) {
+    localStorage.setItem('access_token', access_token);
+    localStorage.setItem('token', access_token);
+  }
+  if (refresh_token) {
+    localStorage.setItem('refresh_token', refresh_token);
+  }
+  if (user) {
+    localStorage.setItem('user', JSON.stringify(user));
+  }
+  if (profile !== undefined) {
+    localStorage.setItem('profile', JSON.stringify(profile));
+  }
+};
+
+const clearAuthSession = () => {
+  localStorage.removeItem('access_token');
+  localStorage.removeItem('refresh_token');
+  localStorage.removeItem('token');
+  localStorage.removeItem('user');
+  localStorage.removeItem('profile');
+};
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
@@ -38,10 +62,7 @@ export const AuthProvider = ({ children }) => {
             // Only logout if it's truly an auth error (401/403)
             if (error.response && (error.response.status === 401 || error.response.status === 403)) {
               // Token invalid, clear auth
-              localStorage.removeItem('access_token');
-              localStorage.removeItem('refresh_token');
-              localStorage.removeItem('user');
-              localStorage.removeItem('profile');
+              clearAuthSession();
               setUser(null);
               setProfile(null);
             }
@@ -64,11 +85,12 @@ export const AuthProvider = ({ children }) => {
       }
       const { access_token, refresh_token, user: userData, profile: profileData } = response.data;
 
-      // Store tokens and user data
-      localStorage.setItem('access_token', access_token);
-      localStorage.setItem('refresh_token', refresh_token);
-      localStorage.setItem('user', JSON.stringify(userData));
-      localStorage.setItem('profile', JSON.stringify(profileData));
+      storeAuthSession({
+        access_token,
+        refresh_token,
+        user: userData,
+        profile: profileData,
+      });
 
       setUser(userData);
       setProfile(profileData);
@@ -109,10 +131,12 @@ export const AuthProvider = ({ children }) => {
       const response = await authAPI.verifyLogin2FA(data);
       const { access_token, refresh_token, user: userData, profile: profileData } = response.data;
 
-      localStorage.setItem('access_token', access_token);
-      localStorage.setItem('refresh_token', refresh_token);
-      localStorage.setItem('user', JSON.stringify(userData));
-      localStorage.setItem('profile', JSON.stringify(profileData));
+      storeAuthSession({
+        access_token,
+        refresh_token,
+        user: userData,
+        profile: profileData,
+      });
 
       setUser(userData);
       setProfile(profileData);
@@ -169,6 +193,7 @@ export const AuthProvider = ({ children }) => {
       if (data.needs_profile_completion) {
         // New Google user - store temp token and redirect to profile completion
         localStorage.setItem('access_token', data.temp_token);
+        localStorage.setItem('token', data.temp_token);
         localStorage.setItem('google_signup_pending', 'true');
         localStorage.setItem('user', JSON.stringify(data.user));
         setUser(data.user);
@@ -181,10 +206,12 @@ export const AuthProvider = ({ children }) => {
       } else {
         // Existing user - full login
         const { access_token, refresh_token, user: userData, profile: profileData } = data;
-        localStorage.setItem('access_token', access_token);
-        localStorage.setItem('refresh_token', refresh_token);
-        localStorage.setItem('user', JSON.stringify(userData));
-        localStorage.setItem('profile', JSON.stringify(profileData));
+        storeAuthSession({
+          access_token,
+          refresh_token,
+          user: userData,
+          profile: profileData,
+        });
         localStorage.removeItem('google_signup_pending');
         setUser(userData);
         setProfile(profileData);
@@ -204,10 +231,12 @@ export const AuthProvider = ({ children }) => {
       const response = await authAPI.googleCompleteProfile(formData);
       const { access_token, refresh_token, user: userData, profile: profileData } = response.data;
 
-      localStorage.setItem('access_token', access_token);
-      localStorage.setItem('refresh_token', refresh_token);
-      localStorage.setItem('user', JSON.stringify(userData));
-      localStorage.setItem('profile', JSON.stringify(profileData));
+      storeAuthSession({
+        access_token,
+        refresh_token,
+        user: userData,
+        profile: profileData,
+      });
       localStorage.removeItem('google_signup_pending');
       localStorage.removeItem('bantubuzz_referral_code');
       localStorage.removeItem('bantubuzz_referral_visitor');
@@ -229,10 +258,7 @@ export const AuthProvider = ({ children }) => {
       // Ignore errors on logout
     });
 
-    localStorage.removeItem('access_token');
-    localStorage.removeItem('refresh_token');
-    localStorage.removeItem('user');
-    localStorage.removeItem('profile');
+    clearAuthSession();
 
     setUser(null);
     setProfile(null);

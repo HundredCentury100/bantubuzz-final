@@ -22,7 +22,7 @@ const api = axios.create({
 // Request interceptor to add auth token
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('access_token');
+    const token = localStorage.getItem('access_token') || localStorage.getItem('token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -61,6 +61,7 @@ api.interceptors.response.use(
 
           const { access_token } = response.data;
           localStorage.setItem('access_token', access_token);
+          localStorage.setItem('token', access_token);
 
           // Retry original request with new token
           originalRequest.headers.Authorization = `Bearer ${access_token}`;
@@ -70,6 +71,7 @@ api.interceptors.response.use(
         // Refresh failed, logout user
         localStorage.removeItem('access_token');
         localStorage.removeItem('refresh_token');
+        localStorage.removeItem('token');
         localStorage.removeItem('user');
         window.location.href = '/login';
         return Promise.reject(refreshError);

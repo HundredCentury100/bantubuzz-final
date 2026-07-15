@@ -23,7 +23,7 @@ const messagingAPI = axios.create({
 // Add auth token to requests
 messagingAPI.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('access_token');
+    const token = localStorage.getItem('access_token') || localStorage.getItem('token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -46,6 +46,7 @@ messagingAPI.interceptors.response.use(
 
         const { access_token } = response.data;
         localStorage.setItem('access_token', access_token);
+        localStorage.setItem('token', access_token);
 
         // Retry original request
         error.config.headers.Authorization = `Bearer ${access_token}`;
@@ -72,7 +73,7 @@ const mainAPI = axios.create({
 // Add auth token to main API requests
 mainAPI.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('access_token');
+    const token = localStorage.getItem('access_token') || localStorage.getItem('token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -95,6 +96,7 @@ mainAPI.interceptors.response.use(
 
         const { access_token } = response.data;
         localStorage.setItem('access_token', access_token);
+        localStorage.setItem('token', access_token);
 
         // Retry original request
         error.config.headers.Authorization = `Bearer ${access_token}`;
