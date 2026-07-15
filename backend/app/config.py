@@ -58,6 +58,10 @@ class Config:
         'http://www.bantubuzz.com',
         'https://www.bantubuzz.com',
         'https://app.bantubuzz.com',
+        'http://localhost',
+        'https://localhost',
+        'capacitor://localhost',
+        'ionic://localhost',
         'http://173.212.245.22:8080'
     ]
 

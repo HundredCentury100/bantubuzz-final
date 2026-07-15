@@ -1,7 +1,16 @@
 import axios from 'axios';
+import { isNativeAppRuntime } from '../utils/nativeApp';
 
-const MESSAGING_API_URL = import.meta.env.VITE_MESSAGING_URL || '/messaging/api';
-const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
+const configuredMessagingApiUrl = import.meta.env.VITE_MESSAGING_URL || '/messaging/api';
+const configuredApiBaseUrl = import.meta.env.VITE_API_URL || '/api';
+const MESSAGING_API_URL =
+  isNativeAppRuntime() && configuredMessagingApiUrl.startsWith('/')
+    ? `https://bantubuzz.com${configuredMessagingApiUrl}`
+    : configuredMessagingApiUrl;
+const API_BASE_URL =
+  isNativeAppRuntime() && configuredApiBaseUrl.startsWith('/')
+    ? `https://bantubuzz.com${configuredApiBaseUrl}`
+    : configuredApiBaseUrl;
 
 // Create axios instance for messaging service
 const messagingAPI = axios.create({

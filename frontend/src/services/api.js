@@ -1,6 +1,11 @@
 import axios from 'axios';
+import { isNativeAppRuntime } from '../utils/nativeApp';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
+const configuredApiBaseUrl = import.meta.env.VITE_API_URL || '/api';
+const API_BASE_URL =
+  isNativeAppRuntime() && configuredApiBaseUrl.startsWith('/')
+    ? `https://bantubuzz.com${configuredApiBaseUrl}`
+    : configuredApiBaseUrl;
 const apiOrigin = API_BASE_URL.endsWith('/api')
   ? API_BASE_URL.slice(0, -4)
   : API_BASE_URL;
