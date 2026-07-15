@@ -56,12 +56,39 @@ def create_app(config_name=None):
             )
         return response
 
+    class MobileCorsMiddleware:
+        def __init__(self, wsgi_app, allowed_origins):
+            self.wsgi_app = wsgi_app
+            self.allowed_origins = set(allowed_origins or [])
+
+        def __call__(self, environ, start_response):
+            origin = environ.get('HTTP_ORIGIN')
+
+            def cors_start_response(status, headers, exc_info=None):
+                if origin and origin in self.allowed_origins:
+                    header_names = {name.lower() for name, _ in headers}
+                    if 'access-control-allow-origin' not in header_names:
+                        headers.append(('Access-Control-Allow-Origin', origin))
+                    if 'access-control-allow-credentials' not in header_names:
+                        headers.append(('Access-Control-Allow-Credentials', 'true'))
+                    if 'access-control-allow-headers' not in header_names:
+                        headers.append(('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Workspace-Id'))
+                    if 'access-control-allow-methods' not in header_names:
+                        headers.append(('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS'))
+                    vary = next((value for name, value in headers if name.lower() == 'vary'), '')
+                    if 'origin' not in vary.lower():
+                        headers.append(('Vary', 'Origin'))
+                return start_response(status, headers, exc_info)
+
+            return self.wsgi_app(environ, cors_start_response)
+
     CORS(app,
          origins=app.config['CORS_ORIGINS'],
          supports_credentials=True,
          allow_headers=['Content-Type', 'Authorization', 'X-Workspace-Id'],
          methods=['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
          expose_headers=['Content-Type', 'Authorization'])
+    app.wsgi_app = MobileCorsMiddleware(app.wsgi_app, app.config['CORS_ORIGINS'])
     socketio.init_app(app, cors_allowed_origins=app.config['CORS_ORIGINS'], async_mode='threading')
     migrate.init_app(app, db)
 
