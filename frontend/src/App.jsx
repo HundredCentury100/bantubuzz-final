@@ -6,6 +6,7 @@ import { SubscriptionProvider } from './contexts/SubscriptionContext';
 import { WorkspaceProvider } from './contexts/WorkspaceContext';
 import SubscriptionWrapper from './components/SubscriptionWrapper';
 import Footer from './components/Footer';
+import { isNativeAppRuntime } from './utils/nativeApp';
 
 // Pages
 import Home from './pages/Home';
@@ -242,14 +243,8 @@ function App() {
   const showAuthenticatedFooter = isAuthenticated && !path.startsWith('/admin') && !hasLocalFooter;
 
   useEffect(() => {
-    const isNativeApp =
-      typeof window !== 'undefined' &&
-      window.Capacitor &&
-      (typeof window.Capacitor.isNativePlatform !== 'function' ||
-        window.Capacitor.isNativePlatform());
-
     if (
-      isNativeApp &&
+      isNativeAppRuntime() &&
       path === '/' &&
       localStorage.getItem('bantubuzz_mobile_onboarding_seen') !== 'true'
     ) {

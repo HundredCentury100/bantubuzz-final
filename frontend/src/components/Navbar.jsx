@@ -24,6 +24,7 @@ import { creatorsAPI, brandsAPI, messagesAPI } from '../services/api';
 import Avatar from './Avatar';
 import api from '../services/api';
 import { useWorkspace } from '../contexts/WorkspaceContext';
+import { isNativeAppRuntime } from '../utils/nativeApp';
 
 const Navbar = () => {
   const { isAuthenticated, user, logout } = useAuth();
@@ -43,6 +44,7 @@ const Navbar = () => {
   const workspaceLanguage = workspaceMeta?.language || {};
   const workspaceNavLabel = workspaceLanguage.account_type === 'enterprise' ? 'Enterprise' : 'Agency';
   const workspacePluralLabel = workspaceLanguage.workspace_plural || 'clients';
+  const isNativeApp = isNativeAppRuntime();
 
   // Helper function to check if a link is active
   const isActive = (path) => {
@@ -150,7 +152,34 @@ const Navbar = () => {
     window.location.reload();
   };
 
-  const mobileBottomItems = user?.user_type === 'brand'
+  const guestMobileBottomItems = [
+    {
+      label: 'Home',
+      to: '/',
+      active: location.pathname === '/',
+      icon: HomeIcon
+    },
+    {
+      label: 'Search',
+      to: '/browse/creators',
+      active: isActive('/browse/creators'),
+      icon: MagnifyingGlassIcon
+    },
+    {
+      label: 'Pricing',
+      to: '/pricing',
+      active: isActive('/pricing'),
+      icon: CurrencyDollarIcon
+    },
+    {
+      label: 'Login',
+      to: '/login',
+      active: isActive('/login'),
+      icon: UserCircleIcon
+    }
+  ];
+
+  const authenticatedMobileBottomItems = user?.user_type === 'brand'
     ? [
         {
           label: 'Dashboard',
@@ -211,6 +240,7 @@ const Navbar = () => {
           icon: UserCircleIcon
         }
       ];
+  const mobileBottomItems = isAuthenticated ? authenticatedMobileBottomItems : guestMobileBottomItems;
 
   return (
     <nav className="bg-white border-b border-gray-200 sticky top-0 z-50">
@@ -556,7 +586,7 @@ const Navbar = () => {
           </div>
 
           {/* Mobile menu button */}
-          <div className="md:hidden">
+          <div className={`md:hidden ${isNativeApp ? 'hidden' : ''}`}>
             <Menu as="div" className="relative">
               <Menu.Button className="p-2">
                 <Bars3Icon className="h-6 w-6 text-gray-700" />
@@ -873,8 +903,8 @@ const Navbar = () => {
         </div>
       </div>
 
-      {/* Mobile Bottom Navigation - Only show when authenticated */}
-      {isAuthenticated && (
+      {/* Mobile Bottom Navigation */}
+      {(isAuthenticated || isNativeApp) && (
         <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50">
           <div className="flex justify-around items-center h-16">
             {mobileBottomItems.map(({ label, to, active, icon: Icon, badge }) => (

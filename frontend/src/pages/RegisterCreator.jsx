@@ -7,6 +7,7 @@ import { GoogleLogin } from '@react-oauth/google';
 import Navbar from '../components/Navbar';
 import SEO from '../components/SEO';
 import { clearReferralAttribution, getReferralCode } from '../utils/referrals';
+import { isNativeAppRuntime, openLiveAppRoute } from '../utils/nativeApp';
 
 const RegisterCreator = () => {
   const navigate = useNavigate();
@@ -16,6 +17,7 @@ const RegisterCreator = () => {
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const isNativeApp = isNativeAppRuntime();
   const {
     register,
     handleSubmit,
@@ -80,6 +82,17 @@ const RegisterCreator = () => {
                     <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-primary mr-2"></div>
                     <span className="text-sm text-gray-600">Connecting to Google...</span>
                   </div>
+                ) : isNativeApp ? (
+                  <button
+                    type="button"
+                    onClick={() => openLiveAppRoute('/register/creator')}
+                    className="flex w-[300px] max-w-full items-center justify-center gap-3 rounded-lg border border-gray-300 bg-white px-4 py-3 text-sm font-semibold text-gray-700 shadow-sm transition hover:bg-gray-50"
+                  >
+                    <span className="flex h-5 w-5 items-center justify-center rounded-full border border-gray-200 text-xs font-bold text-blue-600">
+                      G
+                    </span>
+                    Sign up with Google
+                  </button>
                 ) : (
                   <GoogleLogin
                     onSuccess={async (credentialResponse) => {
