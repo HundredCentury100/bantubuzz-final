@@ -7,7 +7,7 @@ import { GoogleLogin } from '@react-oauth/google';
 import Navbar from '../components/Navbar';
 import SEO from '../components/SEO';
 import { clearReferralAttribution, getReferralCode } from '../utils/referrals';
-import { isNativeAppRuntime, openLiveAppRoute } from '../utils/nativeApp';
+import { isNativeAppRuntime, openExternalAppRoute } from '../utils/nativeApp';
 
 const RegisterCreator = () => {
   const navigate = useNavigate();
@@ -85,7 +85,7 @@ const RegisterCreator = () => {
                 ) : isNativeApp ? (
                   <button
                     type="button"
-                    onClick={() => openLiveAppRoute('/register/creator')}
+                    onClick={() => openExternalAppRoute('/register/creator', { native_google: '1' })}
                     className="flex w-[300px] max-w-full items-center justify-center gap-3 rounded-lg border border-gray-300 bg-white px-4 py-3 text-sm font-semibold text-gray-700 shadow-sm transition hover:bg-gray-50"
                   >
                     <svg className="h-5 w-5" viewBox="0 0 48 48" aria-hidden="true">

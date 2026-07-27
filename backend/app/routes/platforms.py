@@ -9,7 +9,7 @@ from app.models import User, CreatorProfile, BrandProfile, ThunziAccount, Connec
 from app.services.thunzi_service import thunzi_service
 from app.utils.logger import log_incoming_request, log_response, log_error
 from datetime import datetime
-from urllib.parse import urlencode
+from urllib.parse import urlencode, unquote
 import json
 import requests
 import os
@@ -53,6 +53,46 @@ def _oauth_callback_url(provider, code=None, state=None, error=None, error_descr
     return f"{frontend_url}/creator/platforms?{urlencode(params)}"
 
 
+def _mobile_oauth_return_url(provider, code=None, state=None, error=None, error_description=None):
+    frontend_url = os.getenv('FRONTEND_URL', 'https://bantubuzz.com').rstrip('/')
+    target = '/creator/platforms'
+    params = {
+        'target': target,
+        'oauth_provider': provider,
+    }
+
+    if code:
+        params['code'] = code
+    if state:
+        params['state'] = state
+    if error:
+        params['error'] = error
+    if error_description:
+        params['error_description'] = error_description
+
+    return f"{frontend_url}/mobile/return?{urlencode(params)}"
+
+
+def _is_native_oauth_state(state):
+    if not state:
+        return False
+
+    candidates = [state]
+    try:
+        candidates.append(unquote(state))
+    except (TypeError, ValueError):
+        pass
+
+    for candidate in candidates:
+        try:
+            decoded = json.loads(candidate)
+            return decoded.get('runtime') == 'native'
+        except (TypeError, ValueError):
+            continue
+
+    return False
+
+
 def _oauth_callback_html(provider, message, post_message_type, code=None, error=None, error_description=None, state=None):
     frontend_url = os.getenv('FRONTEND_URL', 'https://bantubuzz.com').rstrip('/')
     fallback_url = _oauth_callback_url(
@@ -62,6 +102,14 @@ def _oauth_callback_html(provider, message, post_message_type, code=None, error=
         error=error,
         error_description=error_description
     )
+    if _is_native_oauth_state(state):
+        fallback_url = _mobile_oauth_return_url(
+            provider=provider,
+            code=code,
+            state=state,
+            error=error,
+            error_description=error_description
+        )
     payload = {
         'type': post_message_type,
         'code': code,

@@ -7,6 +7,7 @@ import toast from 'react-hot-toast';
 import { useAuth } from '../hooks/useAuth';
 import { useFacebookOAuth } from '../hooks/useFacebookOAuth';
 import { LinkIcon, ArrowPathIcon, XMarkIcon, CheckCircleIcon, ClockIcon } from '@heroicons/react/24/outline';
+import { isNativeAppRuntime, mobileReturnState, openExternalUrl } from '../utils/nativeApp';
 
 const ConnectPlatforms = () => {
   const navigate = useNavigate();
@@ -104,26 +105,55 @@ const ConnectPlatforms = () => {
     }
     fetchPlatforms();
 
-    // Check if returning from TikTok or Instagram OAuth redirect
+    // Check if returning from OAuth redirect. Mobile returns include oauth_provider
+    // because there is no popup opener to post a message back to this page.
     const urlParams = new URLSearchParams(window.location.search);
     const code = urlParams.get('code');
+    const error = urlParams.get('error');
     const state = urlParams.get('state');
+    const oauthProvider = urlParams.get('oauth_provider');
 
-    if (code && state) {
+    if (code || error) {
       try {
-        const stateData = JSON.parse(decodeURIComponent(state));
+        let stateData = {};
+        if (state) {
+          stateData = JSON.parse(decodeURIComponent(state));
+        }
+        const actionProvider = stateData.action?.replace('_connect', '');
+        const provider = oauthProvider || actionProvider;
+        const callbackKey = provider && code ? `oauth_processed_${provider}_${code.slice(0, 24)}` : '';
 
-        if (stateData.action === 'tiktok_connect') {
+        if (error) {
+          toast.error(urlParams.get('error_description') || error || 'Authentication failed');
+          window.history.replaceState({}, document.title, window.location.pathname);
+          return;
+        }
+
+        if (callbackKey && sessionStorage.getItem(callbackKey) === '1') {
+          window.history.replaceState({}, document.title, window.location.pathname);
+          return;
+        }
+        if (callbackKey) sessionStorage.setItem(callbackKey, '1');
+
+        if (provider === 'youtube') {
+          handleYouTubeRedirect(code);
+          window.history.replaceState({}, document.title, window.location.pathname);
+        } else if (provider === 'tiktok') {
           handleTikTokRedirect(code);
-          // Clean up URL
           window.history.replaceState({}, document.title, window.location.pathname);
-        } else if (stateData.action === 'instagram_connect') {
+        } else if (provider === 'instagram') {
           handleInstagramRedirect(code);
-          // Clean up URL
           window.history.replaceState({}, document.title, window.location.pathname);
+        } else if (provider === 'facebook') {
+          // Facebook is processed by useFacebookOAuth; keep URL cleanup there.
+          console.log('[ConnectPlatforms] Facebook OAuth return detected; hook will process it.');
+        } else {
+          console.warn('[ConnectPlatforms] Unknown OAuth provider in callback:', { provider, stateData });
+          if (callbackKey) sessionStorage.removeItem(callbackKey);
         }
       } catch (error) {
         console.error('Error parsing OAuth state:', error);
+        toast.error('Could not complete platform connection. Please try again.');
       }
     }
   }, [user]);
@@ -157,8 +187,23 @@ const ConnectPlatforms = () => {
         const left = window.screen.width / 2 - width / 2;
         const top = window.screen.height / 2 - height / 2;
 
+        const state = encodeURIComponent(JSON.stringify(mobileReturnState({
+          action: 'youtube_connect',
+          returnTarget: '/creator/platforms',
+          timestamp: Date.now()
+        })));
+        const authUrl = new URL(response.data.authUrl);
+        authUrl.searchParams.set('state', state);
+
+        if (isNativeAppRuntime()) {
+          sessionStorage.setItem('oauth_connecting', 'youtube');
+          await openExternalUrl(authUrl.toString());
+          setConnecting(null);
+          return;
+        }
+
         const authWindow = window.open(
-          response.data.authUrl,
+          authUrl.toString(),
           'YouTube OAuth',
           `width=${width},height=${height},left=${left},top=${top}`
         );
@@ -237,6 +282,35 @@ const ConnectPlatforms = () => {
     }
   };
 
+  const handleYouTubeRedirect = async (code) => {
+    setConnecting('youtube');
+
+    try {
+      console.log('[ConnectPlatforms] Processing YouTube authorization code...');
+
+      const connectResponse = await api.post('/creator/platforms/connect', {
+        platform: 'youtube',
+        accountName: 'YouTube Channel',
+        accessToken: code
+      });
+
+      if (connectResponse.data.success) {
+        toast.success('YouTube connected successfully!');
+        sessionStorage.removeItem('oauth_connecting');
+        fetchPlatforms();
+      }
+    } catch (error) {
+      console.error('[ConnectPlatforms] YouTube redirect error:', error);
+      const details = error.response?.data?.details;
+      const detailMessage = typeof details?.body === 'string'
+        ? details.body
+        : details?.body?.message || details?.body?.error || details?.message;
+      toast.error(detailMessage || error.response?.data?.error || 'Failed to connect YouTube');
+    } finally {
+      setConnecting(null);
+    }
+  };
+
   // Handle TikTok OAuth redirect (called when user returns from TikTok login)
   const handleTikTokRedirect = async (code) => {
     setConnecting('tiktok');
@@ -255,6 +329,7 @@ const ConnectPlatforms = () => {
 
       if (connectResponse.data.success) {
         toast.success('TikTok connected successfully!');
+        sessionStorage.removeItem('oauth_connecting');
         fetchPlatforms();
       }
     } catch (error) {
@@ -275,10 +350,11 @@ const ConnectPlatforms = () => {
       if (response.data.success) {
         // IMPORTANT: Use full-page redirect instead of popup for iOS compatibility
         // Build the OAuth URL with state for callback handling
-        const state = encodeURIComponent(JSON.stringify({
+        const state = encodeURIComponent(JSON.stringify(mobileReturnState({
           action: 'tiktok_connect',
+          returnTarget: '/creator/platforms',
           timestamp: Date.now()
-        }));
+        })));
 
         const authUrl = new URL(response.data.authUrl);
         authUrl.searchParams.set('state', state);
@@ -288,8 +364,7 @@ const ConnectPlatforms = () => {
         // Save connecting state to session storage (will survive page reload)
         sessionStorage.setItem('oauth_connecting', 'tiktok');
 
-        // Full page redirect (works on all devices including iOS)
-        window.location.href = authUrl.toString();
+        await openExternalUrl(authUrl.toString());
       }
     } catch (error) {
       console.error('TikTok OAuth error:', error);
@@ -316,6 +391,7 @@ const ConnectPlatforms = () => {
 
       if (connectResponse.data.success) {
         toast.success('Instagram connected successfully!');
+        sessionStorage.removeItem('oauth_connecting');
         fetchPlatforms();
       }
     } catch (error) {
@@ -336,10 +412,11 @@ const ConnectPlatforms = () => {
       if (response.data.success) {
         // IMPORTANT: Use full-page redirect instead of popup for iOS compatibility
         // Build the OAuth URL with state for callback handling
-        const state = encodeURIComponent(JSON.stringify({
+        const state = encodeURIComponent(JSON.stringify(mobileReturnState({
           action: 'instagram_connect',
+          returnTarget: '/creator/platforms',
           timestamp: Date.now()
-        }));
+        })));
 
         const authUrl = new URL(response.data.authUrl);
         authUrl.searchParams.set('state', state);
@@ -349,8 +426,7 @@ const ConnectPlatforms = () => {
         // Save connecting state to session storage (will survive page reload)
         sessionStorage.setItem('oauth_connecting', 'instagram');
 
-        // Full page redirect (works on all devices including iOS)
-        window.location.href = authUrl.toString();
+        await openExternalUrl(authUrl.toString());
       }
     } catch (error) {
       console.error('Instagram OAuth error:', error);
@@ -599,14 +675,14 @@ const ConnectPlatforms = () => {
                     ) : platform.id === 'facebook' ? (
                       <button
                         onClick={() => setShowFacebookAccountTypeModal(true)}
-                        disabled={connected || isFacebookConnecting || !isSDKLoaded}
+                        disabled={connected || isFacebookConnecting || (!isNativeAppRuntime() && !isSDKLoaded)}
                         className={`w-full py-2.5 md:py-3 rounded-full font-medium transition-colors text-sm md:text-base ${
                           connected
                             ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
                             : 'bg-dark text-white hover:bg-gray-800 disabled:opacity-50'
                         }`}
                       >
-                        {connected ? 'Already Connected' : isFacebookConnecting ? 'Connecting...' : !isSDKLoaded ? 'Loading Facebook...' : 'Connect with Facebook'}
+                        {connected ? 'Already Connected' : isFacebookConnecting ? 'Connecting...' : (!isNativeAppRuntime() && !isSDKLoaded) ? 'Loading Facebook...' : 'Connect with Facebook'}
                       </button>
                     ) : platform.id === 'youtube' ? (
                       <button

@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { authAPI } from '../services/api';
 import toast from 'react-hot-toast';
+import { encodeNativePayload, nativeReturnUrl } from '../utils/nativeApp';
 
 const AuthContext = createContext(null);
 
@@ -186,6 +187,8 @@ export const AuthProvider = ({ children }) => {
 
   const googleLoginCreator = async (credential) => {
     try {
+      const searchParams = new URLSearchParams(window.location.search);
+      const nativeGoogleReturn = searchParams.get('native_google') === '1';
       const referralCode = localStorage.getItem('bantubuzz_referral_code');
       const response = await authAPI.googleCreatorAuth(credential, referralCode);
       const data = response.data;
@@ -197,6 +200,17 @@ export const AuthProvider = ({ children }) => {
         localStorage.setItem('google_signup_pending', 'true');
         localStorage.setItem('user', JSON.stringify(data.user));
         setUser(data.user);
+        if (nativeGoogleReturn) {
+          window.location.href = nativeReturnUrl('/register/creator/complete-profile', {
+            native_auth: '1',
+            native_refresh: '1',
+            access_token: data.temp_token,
+            user: encodeNativePayload(data.user),
+            google_name: data.google_name || '',
+            google_email: data.google_email || '',
+          });
+          return data;
+        }
         navigate('/register/creator/complete-profile', {
           state: {
             googleName: data.google_name,
@@ -215,6 +229,17 @@ export const AuthProvider = ({ children }) => {
         localStorage.removeItem('google_signup_pending');
         setUser(userData);
         setProfile(profileData);
+        if (nativeGoogleReturn) {
+          window.location.href = nativeReturnUrl('/creator/dashboard', {
+            native_auth: '1',
+            native_refresh: '1',
+            access_token,
+            refresh_token,
+            user: encodeNativePayload(userData),
+            profile: encodeNativePayload(profileData),
+          });
+          return data;
+        }
         toast.success('Signed in with Google!');
         navigate('/creator/dashboard');
       }

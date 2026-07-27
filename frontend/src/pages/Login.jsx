@@ -5,7 +5,7 @@ import { useAuth } from '../hooks/useAuth';
 import { GoogleLogin } from '@react-oauth/google';
 import Navbar from '../components/Navbar';
 import SEO from '../components/SEO';
-import { isNativeAppRuntime, openLiveAppRoute } from '../utils/nativeApp';
+import { isNativeAppRuntime, openExternalAppRoute } from '../utils/nativeApp';
 
 const Login = () => {
   const { login, verifyLogin2FA, googleLoginCreator } = useAuth();
@@ -210,7 +210,7 @@ const Login = () => {
                 ) : isNativeApp ? (
                   <button
                     type="button"
-                    onClick={() => openLiveAppRoute('/login')}
+                    onClick={() => openExternalAppRoute('/login', { native_google: '1' })}
                     className="flex w-[300px] max-w-full items-center justify-center gap-3 rounded-lg border border-gray-300 bg-white px-4 py-3 text-sm font-semibold text-gray-700 shadow-sm transition hover:bg-gray-50"
                   >
                     <svg className="h-5 w-5" viewBox="0 0 48 48" aria-hidden="true">

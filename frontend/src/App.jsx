@@ -7,6 +7,7 @@ import { WorkspaceProvider } from './contexts/WorkspaceContext';
 import SubscriptionWrapper from './components/SubscriptionWrapper';
 import Footer from './components/Footer';
 import { isNativeAppRuntime } from './utils/nativeApp';
+import NativeDeepLinkHandler from './components/NativeDeepLinkHandler';
 
 // Pages
 import Home from './pages/Home';
@@ -128,6 +129,7 @@ import PublicCampaignReport from './pages/PublicCampaignReport';
 import ReferralLanding from './pages/ReferralLanding';
 import Referrals from './pages/Referrals';
 import Leaderboard from './pages/Leaderboard';
+import MobileReturn from './pages/MobileReturn';
 
 // Support Pages
 import HelpCenter from './pages/HelpCenter';
@@ -256,6 +258,7 @@ function App() {
     <SubscriptionProvider>
       <WorkspaceProvider>
         <SubscriptionWrapper>
+        <NativeDeepLinkHandler />
         <ScrollToTop />
         <Routes>
       {/* Public Routes */}
@@ -296,6 +299,7 @@ function App() {
       />
       <Route path="/verify-otp" element={<VerifyOTP />} />
       <Route path="/mobile/onboarding" element={<MobileOnboarding />} />
+      <Route path="/mobile/return" element={<MobileReturn />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password/:token" element={<ResetPassword />} />
       <Route path="/register/creator/complete-profile" element={<GoogleProfileComplete />} />

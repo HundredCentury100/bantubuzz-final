@@ -5,6 +5,7 @@ import { Menu, Transition } from '@headlessui/react';
 import {
   Bars3Icon,
   XMarkIcon,
+  ArrowPathIcon,
   UserCircleIcon,
   ArrowRightOnRectangleIcon,
   Cog6ToothIcon,
@@ -152,6 +153,10 @@ const Navbar = () => {
     window.location.reload();
   };
 
+  const handleNativeRefresh = () => {
+    window.location.reload();
+  };
+
   const guestMobileBottomItems = [
     {
       label: 'Home',
@@ -166,10 +171,10 @@ const Navbar = () => {
       icon: MagnifyingGlassIcon
     },
     {
-      label: 'Pricing',
-      to: '/pricing',
-      active: isActive('/pricing'),
-      icon: CurrencyDollarIcon
+      label: 'How It Works',
+      to: '/how-it-works',
+      active: isActive('/how-it-works'),
+      icon: QuestionMarkCircleIcon
     },
     {
       label: 'Login',
@@ -241,6 +246,18 @@ const Navbar = () => {
         }
       ];
   const mobileBottomItems = isAuthenticated ? authenticatedMobileBottomItems : guestMobileBottomItems;
+  const visibleMobileBottomItems = isNativeApp
+    ? [
+        ...mobileBottomItems.slice(0, Math.max(0, mobileBottomItems.length - 1)),
+        {
+          label: 'Refresh',
+          action: handleNativeRefresh,
+          active: false,
+          icon: ArrowPathIcon,
+        },
+        mobileBottomItems[mobileBottomItems.length - 1],
+      ].filter(Boolean)
+    : mobileBottomItems;
 
   return (
     <nav className="bg-white border-b border-gray-200 sticky top-0 z-50">
@@ -907,24 +924,38 @@ const Navbar = () => {
       {(isAuthenticated || isNativeApp) && (
         <div className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50">
           <div className="flex justify-around items-center h-16">
-            {mobileBottomItems.map(({ label, to, active, icon: Icon, badge }) => (
-              <Link
-                key={to}
-                to={to}
-                className={`relative flex h-full min-w-0 flex-1 flex-col items-center justify-center px-1 ${
-                  active ? 'text-primary' : 'text-gray-600'
-                }`}
-              >
-                <Icon className="w-6 h-6 mb-1 flex-shrink-0" />
-                {badge > 0 && (
-                  <span className="absolute top-1 right-1/4 inline-flex items-center justify-center w-4 h-4 text-xs font-bold text-white bg-primary rounded-full">
-                    {badge > 9 ? '9+' : badge}
+            {visibleMobileBottomItems.map(({ label, to, action, active, icon: Icon, badge }) => (
+              action ? (
+                <button
+                  key={label}
+                  type="button"
+                  onClick={action}
+                  className="relative flex h-full min-w-0 flex-1 flex-col items-center justify-center px-1 text-gray-600"
+                >
+                  <Icon className="w-6 h-6 mb-1 flex-shrink-0" />
+                  <span className="w-full truncate text-center text-[10px] font-medium leading-tight">
+                    {label}
                   </span>
-                )}
-                <span className="w-full truncate text-center text-[10px] font-medium leading-tight">
-                  {label}
-                </span>
-              </Link>
+                </button>
+              ) : (
+                <Link
+                  key={to}
+                  to={to}
+                  className={`relative flex h-full min-w-0 flex-1 flex-col items-center justify-center px-1 ${
+                    active ? 'text-primary' : 'text-gray-600'
+                  }`}
+                >
+                  <Icon className="w-6 h-6 mb-1 flex-shrink-0" />
+                  {badge > 0 && (
+                    <span className="absolute top-1 right-1/4 inline-flex items-center justify-center w-4 h-4 text-xs font-bold text-white bg-primary rounded-full">
+                      {badge > 9 ? '9+' : badge}
+                    </span>
+                  )}
+                  <span className="w-full truncate text-center text-[10px] font-medium leading-tight">
+                    {label}
+                  </span>
+                </Link>
+              )
             ))}
           </div>
         </div>
