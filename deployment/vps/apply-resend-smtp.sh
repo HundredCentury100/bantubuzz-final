@@ -55,10 +55,13 @@ lines = env_path.read_text(encoding="utf-8").splitlines()
 seen = set()
 new_lines = []
 def env_line(key, value):
-    return f"{key}={shlex.quote(str(value))}"
+    escaped = str(value).replace('"', '\\"')
+    return f'{key}="{escaped}"'
 
 for line in lines:
     stripped = line.strip()
+    if stripped == api_key:
+        continue
     if not stripped or stripped.startswith("#") or "=" not in line:
         new_lines.append(line)
         continue
