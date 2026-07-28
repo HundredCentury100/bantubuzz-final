@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { FaTimes, FaSearch, FaCheckCircle, FaPaperPlane, FaUser, FaShoppingCart } from 'react-icons/fa';
-import { creatorsAPI, campaignsAPI } from '../services/api';
+import { creatorsAPI, campaignsAPI, packagesAPI } from '../services/api';
 import { campaignInvitationsAPI } from '../services/campaignInvitationsAPI';
 import toast from 'react-hot-toast';
 
@@ -29,7 +29,7 @@ const InviteCreatorsModal = ({ isOpen, onClose, campaign }) => {
   const loadCreators = async () => {
     try {
       setSearchLoading(true);
-      const response = await creatorsAPI.getAll();
+      const response = await creatorsAPI.getCreators({ per_page: 1000 });
       setCreators(response.data.creators || []);
     } catch (error) {
       console.error('Failed to load creators:', error);
@@ -41,7 +41,7 @@ const InviteCreatorsModal = ({ isOpen, onClose, campaign }) => {
 
   const loadPackages = async () => {
     try {
-      const response = await creatorsAPI.getPackages();
+      const response = await packagesAPI.getPackages({ per_page: 1000 });
       setPackages(response.data.packages || []);
     } catch (error) {
       console.error('Failed to load packages:', error);
@@ -157,6 +157,7 @@ const InviteCreatorsModal = ({ isOpen, onClose, campaign }) => {
     const query = searchQuery.toLowerCase();
     return (
       creator.display_name?.toLowerCase().includes(query) ||
+      creator.username?.toLowerCase().includes(query) ||
       creator.category?.toLowerCase().includes(query) ||
       creator.location?.toLowerCase().includes(query)
     );
@@ -338,10 +339,10 @@ const InviteCreatorsModal = ({ isOpen, onClose, campaign }) => {
             <div className="space-y-3">
               {filteredCreators.map((creator) => (
                 <div
-                  key={creator.user_id}
-                  onClick={() => toggleCreatorSelection(creator.user_id)}
+                  key={creator.id}
+                  onClick={() => toggleCreatorSelection(creator.id)}
                   className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${
-                    selectedCreators.includes(creator.user_id)
+                    selectedCreators.includes(creator.id)
                       ? 'border-primary bg-primary/5'
                       : 'border-gray-200 hover:border-gray-300'
                   }`}
@@ -349,11 +350,11 @@ const InviteCreatorsModal = ({ isOpen, onClose, campaign }) => {
                   <div className="flex items-center gap-4">
                     {/* Checkbox */}
                     <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${
-                      selectedCreators.includes(creator.user_id)
+                      selectedCreators.includes(creator.id)
                         ? 'bg-primary border-primary'
                         : 'border-gray-300'
                     }`}>
-                      {selectedCreators.includes(creator.user_id) && (
+                      {selectedCreators.includes(creator.id) && (
                         <FaCheckCircle className="text-white" size={12} />
                       )}
                     </div>

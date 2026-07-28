@@ -147,12 +147,16 @@ def add_invitation_to_cart(campaign_id):
 
         # Validate based on invitation type
         if invitation_type == 'invite_with_package':
-            if not package_id:
-                return jsonify({'error': 'package_id is required for package invitation'}), 400
+            package = None
+            if package_id:
+                package = Package.query.get(package_id)
+                if not package or package.creator_id != creator_id:
+                    return jsonify({'error': 'Package not found or does not belong to creator'}), 404
+                if not package.has_deliverables():
+                    return jsonify({'error': 'This package cannot be added because it has no deliverables'}), 400
 
-            package = Package.query.get(package_id)
-            if not package or package.creator_id != creator_id:
-                return jsonify({'error': 'Package not found or does not belong to creator'}), 404
+            if not package and not amount:
+                return jsonify({'error': 'Select a package or enter a proposed amount'}), 400
 
             invitation_amount = Decimal(str(amount or package.price))
         else:
@@ -361,6 +365,8 @@ def add_package_to_cart(campaign_id):
         package = Package.query.get(package_id)
         if not package:
             return jsonify({'error': 'Package not found'}), 404
+        if not package.has_deliverables():
+            return jsonify({'error': 'This package cannot be added because it has no deliverables'}), 400
 
         # Verify creator_id matches
         if creator_id and package.creator_id != creator_id:
