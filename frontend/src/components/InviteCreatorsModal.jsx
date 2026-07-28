@@ -280,7 +280,7 @@ const InviteCreatorsModal = ({ isOpen, onClose, campaign }) => {
                       const price = Number(pkg.price || 0);
                       return (
                       <option key={pkg.id} value={pkg.id}>
-                        {pkg.title} - R{Number.isFinite(price) ? price.toFixed(2) : '0.00'}
+                        {pkg.title} - ${Number.isFinite(price) ? price.toFixed(2) : '0.00'}
                       </option>
                       );
                     })}
@@ -289,7 +289,7 @@ const InviteCreatorsModal = ({ isOpen, onClose, campaign }) => {
               )}
               <div>
                 <label className="block text-xs text-gray-600 mb-2">
-                  Or Enter Proposed Amount (ZAR)
+                  Or Enter Proposed Amount (USD)
                 </label>
                 <input
                   type="number"

@@ -35,6 +35,7 @@ echo This targeted deployment will:
 echo   - Deploy the fixed campaign invite creator search modal
 echo   - Deploy creator search support for campaign invites
 echo   - Deploy campaign cart support for direct invites with a proposed amount
+echo   - Deploy USD wording for related campaign payment emails
 echo   - Restart the backend and reload Apache
 echo.
 echo It will NOT touch CMS, DNS, migrations, or messaging.
@@ -67,7 +68,7 @@ echo [2/5] Compiling backend route locally...
 pushd "%ROOT%" >nul
 set "PYTHON_EXE=python"
 if exist "%BACKEND_DIR%\venv\Scripts\python.exe" set "PYTHON_EXE=%BACKEND_DIR%\venv\Scripts\python.exe"
-"%PYTHON_EXE%" -m py_compile backend\app\routes\campaign_cart.py backend\app\routes\creators.py >> "%REPORT%" 2>&1
+"%PYTHON_EXE%" -m py_compile backend\app\routes\campaign_cart.py backend\app\routes\creators.py backend\app\services\email_service.py >> "%REPORT%" 2>&1
 if errorlevel 1 (
   popd >nul
   goto :failed
@@ -86,7 +87,7 @@ set "TAR_FRONTEND_STATUS=%ERRORLEVEL%"
 popd >nul
 if not "%TAR_FRONTEND_STATUS%"=="0" goto :failed
 
-tar -czf "%BACKEND_ARCHIVE%" -C "%BACKEND_DIR%" app/routes/campaign_cart.py app/routes/creators.py >> "%REPORT%" 2>&1
+tar -czf "%BACKEND_ARCHIVE%" -C "%BACKEND_DIR%" app/routes/campaign_cart.py app/routes/creators.py app/services/email_service.py >> "%REPORT%" 2>&1
 if errorlevel 1 goto :failed
 
 powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$src='%LOCAL_SCRIPT%'; $dst='%NORMALIZED_SCRIPT%'; $text=[IO.File]::ReadAllText($src) -replace \"`r`n\",\"`n\"; [IO.File]::WriteAllText($dst,$text,(New-Object Text.UTF8Encoding($false)))" >> "%REPORT%" 2>&1

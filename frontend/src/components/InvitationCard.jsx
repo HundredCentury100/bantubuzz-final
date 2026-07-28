@@ -179,7 +179,7 @@ const InvitationCard = ({ invitation, onUpdate }) => {
           {invitation.proposed_amount && (
             <div className="flex items-center gap-2">
               <p className="text-lg font-bold text-green-700">
-                R{parseFloat(invitation.proposed_amount).toFixed(2)}
+                ${parseFloat(invitation.proposed_amount).toFixed(2)}
               </p>
               <p className="text-xs text-gray-600">proposed amount</p>
             </div>
