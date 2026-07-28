@@ -43,13 +43,29 @@ const InviteCreatorsModal = ({ isOpen, onClose, campaign }) => {
   };
 
   const loadPackages = async () => {
+    if (selectedCreators.length !== 1) {
+      setPackages([]);
+      setSelectedPackage(null);
+      return;
+    }
+
     try {
-      const response = await packagesAPI.getPackages({ per_page: 1000 });
+      const response = await packagesAPI.getPackages({
+        creator_id: selectedCreators[0],
+        per_page: 100
+      });
       setPackages(response.data.packages || []);
     } catch (error) {
       console.error('Failed to load packages:', error);
+      setPackages([]);
     }
   };
+
+  useEffect(() => {
+    if (isOpen && invitationType === 'join') {
+      loadPackages();
+    }
+  }, [isOpen, invitationType, selectedCreators]);
 
   const handleSearch = (query) => {
     setSearchQuery(query);
@@ -260,11 +276,14 @@ const InviteCreatorsModal = ({ isOpen, onClose, campaign }) => {
                     className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent"
                   >
                     <option value="">Choose a package...</option>
-                    {packages.map(pkg => (
+                    {packages.map(pkg => {
+                      const price = Number(pkg.price || 0);
+                      return (
                       <option key={pkg.id} value={pkg.id}>
-                        {pkg.title} - R{pkg.price?.toFixed(2)}
+                        {pkg.title} - R{Number.isFinite(price) ? price.toFixed(2) : '0.00'}
                       </option>
-                    ))}
+                      );
+                    })}
                   </select>
                 </div>
               )}
