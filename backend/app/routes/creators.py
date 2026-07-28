@@ -215,6 +215,7 @@ def get_creators():
         page = request.args.get('page', 1, type=int)
         per_page = request.args.get('per_page', 12, type=int)
         sort_by = request.args.get('sort_by', '')
+        include_without_packages = request.args.get('include_without_packages', 'false').lower() in ('1', 'true', 'yes')
 
         # New filter parameters
         languages = request.args.getlist('languages[]') or request.args.get('languages', '').split(',') if request.args.get('languages') else []
@@ -346,8 +347,9 @@ def get_creators():
                 if any(category_lower in cat.lower() for cat in (c.categories or []))
             ]
 
-        # Add review stats and cheapest package price
-        # ONLY include creators with at least one active package
+        # Add review stats and cheapest package price. Public marketplace browsing
+        # keeps the historic behavior of only showing creators with active
+        # packages, while campaign invites can opt into all active creators.
         creators_with_stats = []
         private_scores = {
             row.creator_profile_id: float(row.final_score or 0)
@@ -367,8 +369,7 @@ def get_creators():
             # Get active packages for this creator
             packages = Package.query.filter_by(creator_id=creator.id, is_active=True).all()
 
-            # Skip creators without any active packages
-            if not packages:
+            if not packages and not include_without_packages:
                 continue
 
             creator_dict = creator.to_dict(include_user=True, public_view=True)
@@ -379,9 +380,8 @@ def get_creators():
                 'total_reviews': review_stats['total_reviews']
             }
 
-            # Get cheapest package price (we already know packages exist)
             prices = [p.price for p in packages]
-            creator_dict['cheapest_package_price'] = min(prices)
+            creator_dict['cheapest_package_price'] = min(prices) if prices else None
             creator_dict['total_packages'] = len(packages)
             creator_dict['rank'] = (
                 {'position': public_ranks[creator.id], 'type': 'overall'}

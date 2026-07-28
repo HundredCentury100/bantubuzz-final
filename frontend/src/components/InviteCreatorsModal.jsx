@@ -29,7 +29,10 @@ const InviteCreatorsModal = ({ isOpen, onClose, campaign }) => {
   const loadCreators = async () => {
     try {
       setSearchLoading(true);
-      const response = await creatorsAPI.getCreators({ per_page: 1000 });
+      const response = await creatorsAPI.getCreators({
+        per_page: 1000,
+        include_without_packages: true
+      });
       setCreators(response.data.creators || []);
     } catch (error) {
       console.error('Failed to load creators:', error);

@@ -5,6 +5,7 @@ set "NEW_SERVER=13.140.159.150"
 set "SSH_USER=root"
 set "ROOT=%~dp0..\.."
 set "FRONTEND_DIR=%ROOT%\frontend"
+set "FRONTEND_DIST=%FRONTEND_DIR%\dist"
 set "BACKEND_DIR=%ROOT%\backend"
 set "REPORT_DIR=%ROOT%\deployment\vps\reports"
 set "LOCAL_SCRIPT=%ROOT%\deployment\vps\deploy-campaign-creator-invite-fix.sh"
@@ -32,6 +33,7 @@ echo NEW VPS: %SSH_USER%@%NEW_SERVER%
 echo.
 echo This targeted deployment will:
 echo   - Deploy the fixed campaign invite creator search modal
+echo   - Deploy creator search support for campaign invites
 echo   - Deploy campaign cart support for direct invites with a proposed amount
 echo   - Restart the backend and reload Apache
 echo.
@@ -65,7 +67,7 @@ echo [2/5] Compiling backend route locally...
 pushd "%ROOT%" >nul
 set "PYTHON_EXE=python"
 if exist "%BACKEND_DIR%\venv\Scripts\python.exe" set "PYTHON_EXE=%BACKEND_DIR%\venv\Scripts\python.exe"
-"%PYTHON_EXE%" -m py_compile backend\app\routes\campaign_cart.py >> "%REPORT%" 2>&1
+"%PYTHON_EXE%" -m py_compile backend\app\routes\campaign_cart.py backend\app\routes\creators.py >> "%REPORT%" 2>&1
 if errorlevel 1 (
   popd >nul
   goto :failed
@@ -78,10 +80,13 @@ if exist "%FRONTEND_ARCHIVE%" del /q "%FRONTEND_ARCHIVE%"
 if exist "%BACKEND_ARCHIVE%" del /q "%BACKEND_ARCHIVE%"
 if exist "%NORMALIZED_SCRIPT%" del /q "%NORMALIZED_SCRIPT%"
 
-tar -czf "%FRONTEND_ARCHIVE%" -C "%FRONTEND_DIR%" dist >> "%REPORT%" 2>&1
-if errorlevel 1 goto :failed
+pushd "%FRONTEND_DIST%" >nul
+tar -czf "%FRONTEND_ARCHIVE%" . >> "%REPORT%" 2>&1
+set "TAR_FRONTEND_STATUS=%ERRORLEVEL%"
+popd >nul
+if not "%TAR_FRONTEND_STATUS%"=="0" goto :failed
 
-tar -czf "%BACKEND_ARCHIVE%" -C "%BACKEND_DIR%" app/routes/campaign_cart.py >> "%REPORT%" 2>&1
+tar -czf "%BACKEND_ARCHIVE%" -C "%BACKEND_DIR%" app/routes/campaign_cart.py app/routes/creators.py >> "%REPORT%" 2>&1
 if errorlevel 1 goto :failed
 
 powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "$src='%LOCAL_SCRIPT%'; $dst='%NORMALIZED_SCRIPT%'; $text=[IO.File]::ReadAllText($src) -replace \"`r`n\",\"`n\"; [IO.File]::WriteAllText($dst,$text,(New-Object Text.UTF8Encoding($false)))" >> "%REPORT%" 2>&1
