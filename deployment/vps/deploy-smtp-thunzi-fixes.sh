@@ -170,6 +170,6 @@ for path in paths[:12]:
         print(line[:700])
 PY
 
-rm -f /tmp/bantubuzz-smtp-thunzi-fixes-backend.tar.gz /tmp/deploy-smtp-thunzi-fixes.sh
+rm -f /tmp/bantubuzz-smtp-thunzi-fixes-backend.tar.gz /tmp/deploy-smtp-thunzi-fixes.sh /tmp/deploy-smtp-thunzi-fixes.lf.sh
 
 echo BANTUBUZZ_SMTP_THUNZI_FIXES_SUCCESS
