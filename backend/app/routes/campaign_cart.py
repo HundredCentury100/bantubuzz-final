@@ -176,8 +176,8 @@ def add_invitation_to_cart(campaign_id):
         invitation = CampaignInvitation(
             campaign_id=campaign_id,
             creator_user_id=creator.user_id,
-            invited_by_user_id=user_id,
-            invitation_type='join' if invitation_type == 'invite_with_package' else 'apply',
+            invited_by_user_id=user.id,
+            invitation_type='invite_to_join' if invitation_type == 'invite_with_package' else 'invite_to_apply',
             package_id=package_id,
             proposed_amount=invitation_amount if invitation_type == 'invite_with_package' else None,
             message=message,
@@ -190,6 +190,18 @@ def add_invitation_to_cart(campaign_id):
         # Only create cart item for invite_with_package (requires payment)
         cart_item = None
         if invitation_type == 'invite_with_package':
+            custom_deliverables = None
+            if not package_id:
+                custom_deliverables = []
+                for milestone in campaign.milestones.all():
+                    custom_deliverables.extend(milestone.deliverables or [])
+
+                if not custom_deliverables:
+                    db.session.rollback()
+                    return jsonify({
+                        'error': 'This campaign must have at least one deliverable before using a proposed amount invite'
+                    }), 400
+
             cart_item = CampaignCartItem(
                 campaign_id=campaign_id,
                 brand_id=brand.id,
@@ -198,7 +210,8 @@ def add_invitation_to_cart(campaign_id):
                 creator_id=creator_id,
                 package_id=package_id,
                 amount=invitation_amount,
-                notes=message
+                notes=message,
+                custom_deliverables=custom_deliverables
             )
             db.session.add(cart_item)
 

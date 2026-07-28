@@ -7,9 +7,10 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 from app import db
 from app.models import (
     User, Campaign, CampaignInvitation, CreatorProfile,
-    Notification, CampaignApplication, CampaignProposal
+    Notification
 )
-from datetime import datetime
+from app.services.workspace_service import require_workspace_access
+from datetime import datetime, timedelta
 
 bp = Blueprint('campaign_invitations', __name__, url_prefix='/api/campaign-invitations')
 
@@ -57,6 +58,7 @@ def send_invitation():
 
         if invitation_type not in ['apply', 'join']:
             return jsonify({'error': 'Invalid invitation_type. Use "apply" or "join"'}), 400
+        stored_invitation_type = 'invite_to_join' if invitation_type == 'join' else 'invite_to_apply'
 
         # For 'join' invitations, validate package or amount
         if invitation_type == 'join':
@@ -69,16 +71,26 @@ def send_invitation():
                 package = Package.query.get(package_id)
                 if not package:
                     return jsonify({'error': 'Package not found'}), 404
+                if not package.has_deliverables():
+                    return jsonify({'error': 'This package cannot be invited with because it has no deliverables'}), 400
 
         # Verify campaign ownership
         campaign = Campaign.query.get(campaign_id)
         if not campaign:
             return jsonify({'error': 'Campaign not found'}), 404
 
-        # Use helper function to check ownership
-        from app.utils.campaign_helpers import user_owns_campaign
-        if not user_owns_campaign(campaign, user_id):
-            return jsonify({'error': 'Unauthorized: You do not own this campaign'}), 403
+        if campaign.workspace_id:
+            _, workspace_error, workspace_status = require_workspace_access(
+                user_id,
+                campaign.workspace_id,
+                'can_manage_campaigns',
+            )
+            if workspace_error:
+                return jsonify({'error': workspace_error}), workspace_status
+        else:
+            from app.utils.campaign_helpers import user_owns_campaign
+            if not user_owns_campaign(campaign, user_id):
+                return jsonify({'error': 'Unauthorized: You do not own this campaign'}), 403
 
         # Send invitations
         invitations_sent = []
@@ -87,8 +99,18 @@ def send_invitation():
         for creator_id in creator_ids:
             try:
                 # Verify creator exists
-                creator = User.query.get(creator_id)
-                if not creator or creator.user_type != 'creator':
+                creator_profile = CreatorProfile.query.get(creator_id)
+                if creator_profile:
+                    creator = User.query.get(creator_profile.user_id)
+                    creator_user_id = creator_profile.user_id
+                    creator_profile_id = creator_profile.id
+                else:
+                    creator = User.query.get(creator_id)
+                    creator_profile = CreatorProfile.query.filter_by(user_id=creator_id).first()
+                    creator_user_id = creator_id
+                    creator_profile_id = creator_profile.id if creator_profile else None
+
+                if not creator or creator.user_type != 'creator' or not creator_profile_id:
                     invitations_failed.append({
                         'creator_id': creator_id,
                         'reason': 'Creator not found or invalid user type'
@@ -98,14 +120,14 @@ def send_invitation():
                 # Check if invitation already exists
                 existing = CampaignInvitation.query.filter_by(
                     campaign_id=campaign_id,
-                    creator_user_id=creator_id
+                    creator_user_id=creator_user_id
                 ).first()
 
                 if existing:
                     # Update if previously declined or expired
                     if existing.status in ['declined', 'expired']:
                         existing.status = 'pending'
-                        existing.invitation_type = invitation_type
+                        existing.invitation_type = stored_invitation_type
                         existing.package_id = package_id if invitation_type == 'join' else None
                         existing.proposed_amount = proposed_amount if invitation_type == 'join' else None
                         existing.message = message
@@ -122,12 +144,11 @@ def send_invitation():
                         continue
                 else:
                     # Create new invitation
-                    from datetime import timedelta
                     invitation = CampaignInvitation(
                         campaign_id=campaign_id,
-                        creator_user_id=creator_id,
+                        creator_user_id=creator_user_id,
                         invited_by_user_id=user_id,
-                        invitation_type=invitation_type,
+                        invitation_type=stored_invitation_type,
                         package_id=package_id if invitation_type == 'join' else None,
                         proposed_amount=proposed_amount if invitation_type == 'join' else None,
                         message=message,
@@ -140,7 +161,7 @@ def send_invitation():
 
                 # Create notification for creator
                 notification = Notification(
-                    user_id=creator_id,
+                    user_id=creator_user_id,
                     type='campaign_invitation',
                     title=f'Campaign Invitation: {campaign.title}',
                     message=f'You have been invited to {"apply for" if invitation_type == "apply" else "join"} the campaign "{campaign.title}"',
@@ -152,9 +173,9 @@ def send_invitation():
                 # Send email notification
                 try:
                     from app.services.email_service import send_campaign_invitation_email
-                    creator_profile = CreatorProfile.query.filter_by(user_id=creator_id).first()
                     creator_name = creator_profile.display_name if creator_profile else creator.email
-                    brand_name = user.brand_profile.company_name if hasattr(user, 'brand_profile') else user.email
+                    brand_profile = getattr(user, 'brand_profile', None)
+                    brand_name = brand_profile.company_name if brand_profile else user.email
 
                     send_campaign_invitation_email(
                         creator_email=creator.email,
@@ -228,9 +249,18 @@ def get_campaign_invitations(campaign_id):
         if not campaign:
             return jsonify({'error': 'Campaign not found'}), 404
 
-        from app.utils.campaign_helpers import user_owns_campaign
-        if not user_owns_campaign(campaign, user_id):
-            return jsonify({'error': 'Unauthorized: You do not own this campaign'}), 403
+        if campaign.workspace_id:
+            _, workspace_error, workspace_status = require_workspace_access(
+                user_id,
+                campaign.workspace_id,
+                'can_manage_campaigns',
+            )
+            if workspace_error:
+                return jsonify({'error': workspace_error}), workspace_status
+        else:
+            from app.utils.campaign_helpers import user_owns_campaign
+            if not user_owns_campaign(campaign, user_id):
+                return jsonify({'error': 'Unauthorized: You do not own this campaign'}), 403
 
         # Get invitations with optional status filter
         status = request.args.get('status')
@@ -333,79 +363,11 @@ def accept_invitation(invitation_id):
             response_data['redirect_url'] = f'/campaigns/{campaign.id}'
 
         elif inv_type == 'join':
-            # Auto-create proposal and collaboration
-            if not creator_profile:
-                db.session.rollback()
-                return jsonify({'error': 'Creator profile not found'}), 404
-
-            # Check if proposal already exists
-            existing_proposal = CampaignProposal.query.filter_by(
-                campaign_id=campaign.id,
-                creator_id=creator_profile.id
-            ).first()
-
-            if existing_proposal:
-                # Check if collaboration exists
-                from app.models import Collaboration
-                existing_collab = Collaboration.query.filter_by(
-                    campaign_application_id=existing_proposal.id
-                ).first()
-
-                if existing_collab:
-                    response_data['proposal_id'] = existing_proposal.id
-                    response_data['collaboration_id'] = existing_collab.id
-                    response_data['next_step'] = 'collaboration_exists'
-                else:
-                    # Create collaboration
-                    collaboration = Collaboration(
-                        campaign_application_id=existing_proposal.id,
-                        creator_id=creator_profile.id,
-                        status='pending',
-                        agreed_amount=invitation.proposed_amount or (
-                            invitation.package.price if invitation.package else 0
-                        ),
-                        created_at=datetime.utcnow()
-                    )
-                    db.session.add(collaboration)
-                    db.session.flush()
-
-                    response_data['proposal_id'] = existing_proposal.id
-                    response_data['collaboration_id'] = collaboration.id
-                    response_data['next_step'] = 'collaboration_created'
-            else:
-                # Create new proposal
-                proposal_amount = invitation.proposed_amount or (
-                    invitation.package.price if invitation.package else 0
-                )
-
-                proposal = CampaignProposal(
-                    campaign_id=campaign.id,
-                    creator_id=creator_profile.id,
-                    package_id=invitation.package_id,
-                    status='approved',  # Auto-approved since invited directly
-                    proposal_message=f"Accepted invitation. {response_message}",
-                    proposed_amount=proposal_amount,
-                    created_at=datetime.utcnow()
-                )
-                db.session.add(proposal)
-                db.session.flush()
-
-                # Create collaboration
-                from app.models import Collaboration
-                collaboration = Collaboration(
-                    campaign_application_id=proposal.id,
-                    creator_id=creator_profile.id,
-                    status='pending',
-                    agreed_amount=proposal_amount,
-                    created_at=datetime.utcnow()
-                )
-                db.session.add(collaboration)
-                db.session.flush()
-
-                response_data['proposal_id'] = proposal.id
-                response_data['collaboration_id'] = collaboration.id
-                response_data['next_step'] = 'collaboration_created'
-                response_data['redirect_url'] = f'/bookings/{collaboration.id}'
+            # Direct-join invitations are activated by the campaign cart payment flow.
+            # Accepting the invitation records creator consent; the collaboration is
+            # created only after the brand pays for the campaign cart item.
+            response_data['next_step'] = 'awaiting_brand_payment'
+            response_data['redirect_url'] = '/creator/applications'
 
         db.session.commit()
 
