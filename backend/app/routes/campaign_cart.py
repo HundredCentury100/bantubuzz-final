@@ -18,6 +18,7 @@ from app.services.campaign_cart_payment_service import (
     pay_campaign_cart_with_wallet,
 )
 from app.services.campaign_scenario_service import CampaignScenarioService
+from app.services.workspace_service import require_workspace_access
 from app.utils.notifications import create_notification
 from datetime import datetime, timedelta
 from decimal import Decimal
@@ -30,6 +31,34 @@ bp = Blueprint('campaign_cart', __name__, url_prefix='/api/campaigns')
 UPLOAD_FOLDER = '/var/www/bantubuzz/backend/uploads/payment_proofs'
 
 
+def _load_brand_campaign(campaign_id, permission='can_manage_campaigns'):
+    user_id = int(get_jwt_identity())
+    user = User.query.get(user_id)
+    if not user or user.user_type != 'brand':
+        return None, None, None, (jsonify({'error': 'Unauthorized'}), 403)
+
+    brand = BrandProfile.query.filter_by(user_id=user_id).first()
+    if not brand:
+        return None, None, None, (jsonify({'error': 'Brand profile not found'}), 404)
+
+    campaign = Campaign.query.get(campaign_id)
+    if not campaign:
+        return None, None, None, (jsonify({'error': 'Campaign not found'}), 404)
+
+    if campaign.workspace_id:
+        _, workspace_error, workspace_status = require_workspace_access(
+            user_id,
+            campaign.workspace_id,
+            permission,
+        )
+        if workspace_error:
+            return None, None, None, (jsonify({'error': workspace_error}), workspace_status)
+    elif campaign.brand_id != brand.id:
+        return None, None, None, (jsonify({'error': 'Campaign not found or access denied'}), 404)
+
+    return user, brand, campaign, None
+
+
 @bp.route('/<int:campaign_id>/cart', methods=['GET'])
 @jwt_required()
 def get_campaign_cart(campaign_id):
@@ -38,20 +67,9 @@ def get_campaign_cart(campaign_id):
     Returns both pending and paid items (can filter by status)
     """
     try:
-        user_id = int(get_jwt_identity())
-        user = User.query.get(user_id)
-
-        if not user or user.user_type != 'brand':
-            return jsonify({'error': 'Unauthorized'}), 403
-
-        brand = BrandProfile.query.filter_by(user_id=user_id).first()
-        if not brand:
-            return jsonify({'error': 'Brand profile not found'}), 404
-
-        # Verify brand owns the campaign
-        campaign = Campaign.query.get(campaign_id)
-        if not campaign or campaign.brand_id != brand.id:
-            return jsonify({'error': 'Campaign not found or access denied'}), 404
+        user, brand, campaign, error = _load_brand_campaign(campaign_id, 'can_manage_campaigns')
+        if error:
+            return error
 
         # Get filter parameters
         payment_status = request.args.get('payment_status', 'pending')  # 'pending', 'paid', 'all'
@@ -85,18 +103,9 @@ def get_campaign_cart(campaign_id):
 def get_campaign_cart_scenarios(campaign_id):
     """Predict campaign outcome scenarios for the current cart selection."""
     try:
-        user_id = int(get_jwt_identity())
-        user = User.query.get(user_id)
-        if not user or user.user_type != 'brand':
-            return jsonify({'error': 'Unauthorized'}), 403
-
-        brand = BrandProfile.query.filter_by(user_id=user_id).first()
-        if not brand:
-            return jsonify({'error': 'Brand profile not found'}), 404
-
-        campaign = Campaign.query.get(campaign_id)
-        if not campaign or campaign.brand_id != brand.id:
-            return jsonify({'error': 'Campaign not found or access denied'}), 404
+        user, brand, campaign, error = _load_brand_campaign(campaign_id, 'can_manage_campaigns')
+        if error:
+            return error
 
         item_ids = request.args.getlist('cart_item_ids', type=int)
         prediction = CampaignScenarioService.predict_for_cart(campaign_id, item_ids or None)
@@ -117,19 +126,9 @@ def add_invitation_to_cart(campaign_id):
     Supports both 'invite_to_apply' and 'invite_with_package' types
     """
     try:
-        user_id = int(get_jwt_identity())
-        user = User.query.get(user_id)
-
-        if not user or user.user_type != 'brand':
-            return jsonify({'error': 'Unauthorized'}), 403
-
-        brand = BrandProfile.query.filter_by(user_id=user_id).first()
-        if not brand:
-            return jsonify({'error': 'Brand profile not found'}), 404
-
-        campaign = Campaign.query.get(campaign_id)
-        if not campaign or campaign.brand_id != brand.id:
-            return jsonify({'error': 'Campaign not found or access denied'}), 404
+        user, brand, campaign, error = _load_brand_campaign(campaign_id, 'can_manage_campaigns')
+        if error:
+            return error
 
         data = request.get_json()
         creator_id = data.get('creator_id')
@@ -257,19 +256,9 @@ def add_application_to_cart(campaign_id):
     Accept a creator's application and add to cart (no immediate payment)
     """
     try:
-        user_id = int(get_jwt_identity())
-        user = User.query.get(user_id)
-
-        if not user or user.user_type != 'brand':
-            return jsonify({'error': 'Unauthorized'}), 403
-
-        brand = BrandProfile.query.filter_by(user_id=user_id).first()
-        if not brand:
-            return jsonify({'error': 'Brand profile not found'}), 404
-
-        campaign = Campaign.query.get(campaign_id)
-        if not campaign or campaign.brand_id != brand.id:
-            return jsonify({'error': 'Campaign not found or access denied'}), 404
+        user, brand, campaign, error = _load_brand_campaign(campaign_id, 'can_manage_campaigns')
+        if error:
+            return error
 
         data = request.get_json()
         proposal_id = data.get('proposal_id')
@@ -340,19 +329,9 @@ def add_package_to_cart(campaign_id):
     Add a creator's package to campaign cart (no immediate payment)
     """
     try:
-        user_id = int(get_jwt_identity())
-        user = User.query.get(user_id)
-
-        if not user or user.user_type != 'brand':
-            return jsonify({'error': 'Unauthorized'}), 403
-
-        brand = BrandProfile.query.filter_by(user_id=user_id).first()
-        if not brand:
-            return jsonify({'error': 'Brand profile not found'}), 404
-
-        campaign = Campaign.query.get(campaign_id)
-        if not campaign or campaign.brand_id != brand.id:
-            return jsonify({'error': 'Campaign not found or access denied'}), 404
+        user, brand, campaign, error = _load_brand_campaign(campaign_id, 'can_manage_campaigns')
+        if error:
+            return error
 
         data = request.get_json()
         package_id = data.get('package_id')
@@ -417,15 +396,9 @@ def remove_from_cart(campaign_id, cart_item_id):
     Remove item from cart (only if not yet paid)
     """
     try:
-        user_id = int(get_jwt_identity())
-        user = User.query.get(user_id)
-
-        if not user or user.user_type != 'brand':
-            return jsonify({'error': 'Unauthorized'}), 403
-
-        brand = BrandProfile.query.filter_by(user_id=user_id).first()
-        if not brand:
-            return jsonify({'error': 'Brand profile not found'}), 404
+        user, brand, campaign, error = _load_brand_campaign(campaign_id, 'can_manage_campaigns')
+        if error:
+            return error
 
         cart_item = CampaignCartItem.query.get(cart_item_id)
         if not cart_item or cart_item.campaign_id != campaign_id:
@@ -461,22 +434,6 @@ def remove_from_cart(campaign_id, cart_item_id):
 
 
 # PAYMENT ENDPOINTS
-
-def _load_brand_campaign(campaign_id):
-    user_id = int(get_jwt_identity())
-    user = User.query.get(user_id)
-    if not user or user.user_type != 'brand':
-        return None, None, None, (jsonify({'error': 'Unauthorized'}), 403)
-
-    brand = BrandProfile.query.filter_by(user_id=user_id).first()
-    if not brand:
-        return None, None, None, (jsonify({'error': 'Brand profile not found'}), 404)
-
-    campaign = Campaign.query.get(campaign_id)
-    if not campaign or campaign.brand_id != brand.id:
-        return None, None, None, (jsonify({'error': 'Campaign not found or access denied'}), 404)
-
-    return user, brand, campaign, None
 
 
 def _payment_response(payment, collaborations=None):

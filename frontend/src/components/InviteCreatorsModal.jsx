@@ -104,6 +104,7 @@ const InviteCreatorsModal = ({ isOpen, onClose, campaign }) => {
       if (invitationType === 'join') {
         let successCount = 0;
         let failCount = 0;
+        const failureMessages = [];
 
         for (const creatorId of selectedCreators) {
           try {
@@ -125,6 +126,10 @@ const InviteCreatorsModal = ({ isOpen, onClose, campaign }) => {
             successCount++;
           } catch (error) {
             console.error(`Failed to add invitation for creator ${creatorId}:`, error);
+            const backendMessage = error.response?.data?.error || error.response?.data?.message;
+            if (backendMessage && !failureMessages.includes(backendMessage)) {
+              failureMessages.push(backendMessage);
+            }
             failCount++;
           }
         }
@@ -133,7 +138,11 @@ const InviteCreatorsModal = ({ isOpen, onClose, campaign }) => {
           toast.success(`Added ${successCount} invitation(s) to cart! Go to Cart tab to complete payment.`);
         }
         if (failCount > 0) {
-          toast.error(`Failed to add ${failCount} invitation(s) to cart`);
+          toast.error(
+            failureMessages.length > 0
+              ? failureMessages.join('; ')
+              : `Failed to add ${failCount} invitation(s) to cart`
+          );
         }
       } else {
         // For 'apply' invitations, use existing flow (no payment)
