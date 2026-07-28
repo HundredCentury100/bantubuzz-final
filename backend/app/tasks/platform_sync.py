@@ -70,20 +70,24 @@ def sync_platform(platform_id):
             logger.error(f"No ThunziAccount found for user {platform.user_id}")
             return {'status': 'error', 'message': 'ThunziAccount not found'}
 
-        # Login to ThunziAI (password is same as email)
-        login_success = thunzi_service.login(
-            email=thunzi_account.thunzi_email,
-            password=thunzi_account.thunzi_email
-        )
-
-        if not login_success:
-            logger.error(f"Failed to login to ThunziAI for platform {platform_id}")
-            return {'status': 'error', 'message': 'ThunziAI login failed'}
+        # API-key-created Thunzi users may not be able to cookie-login yet.
+        # Use the same resilient setup path as the request routes.
+        user_registered = thunzi_service.ensure_user_registered(email=thunzi_account.thunzi_email)
+        if not user_registered:
+            logger.error(f"Failed to authenticate/register ThunziAI user for platform {platform_id}")
+            return {
+                'status': 'error',
+                'message': 'ThunziAI authentication failed',
+                'details': getattr(thunzi_service, 'last_error', None)
+            }
 
         # Sync platform using ThunziAI's async endpoint. The service falls back
         # to the legacy endpoint if the async endpoint is unavailable.
         result = thunzi_service.sync_platform_and_poll(
             platform_id=platform.thunzi_platform_id,
+            account_id=platform.account_id,
+            company_id=thunzi_account.thunzi_company_id,
+            platform=platform.platform,
             timeout_seconds=120,
             poll_interval_seconds=5
         )

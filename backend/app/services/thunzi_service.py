@@ -192,12 +192,14 @@ class ThunziAIService:
         """
         print("WARNING: register_user() is deprecated. Use register_creator() instead.")
         try:
-            response = self.session.post(
+            response = self._request_with_api_key_fallback(
+                'POST',
                 f"{self.BASE_URL}/api/register",
                 json={
                     "email": email,
                     "password": password
-                }
+                },
+                timeout=30
             )
 
             if response.status_code in [200, 201]:  # Accept both 200 OK and 201 Created
@@ -279,6 +281,14 @@ class ThunziAIService:
 
             if response.status_code in [200, 201]:
                 return response.json()
+
+            if response.status_code in [400, 409] and self._is_email_exists_response(response):
+                return {
+                    "email": email,
+                    "existing": True,
+                    "companyId": None,
+                    "setupStep": "existing"
+                }
 
             self._set_last_error('register_creator', response)
             log_error('ThunziAI.register_creator',
@@ -724,16 +734,20 @@ class ThunziAIService:
         self._ensure_authenticated()
 
         try:
-            response = self.session.put(
-                f"{self.BASE_URL}/api/connect-platform/{platform_id}"
+            response = self._request_with_api_key_fallback(
+                'PUT',
+                f"{self.BASE_URL}/api/connect-platform/{platform_id}",
+                timeout=30
             )
 
             if response.status_code == 200:
                 return self._normalize_platform(response.json())
 
+            self._set_last_error('connect_platform', response)
             print(f"ThunziAI connect platform failed: {response.status_code}")
             return None
         except Exception as e:
+            self._set_last_error('connect_platform', message=str(e))
             print(f"ThunziAI connect platform error: {str(e)}")
             return None
 
@@ -742,17 +756,21 @@ class ThunziAIService:
         self._ensure_authenticated()
 
         try:
-            response = self.session.get(
+            response = self._request_with_api_key_fallback(
+                'GET',
                 f"{self.BASE_URL}/api/platforms",
-                params={"companyId": company_id}
+                params={"companyId": company_id},
+                timeout=30
             )
 
             if response.status_code == 200:
                 return [self._normalize_platform(platform) for platform in response.json()]
 
+            self._set_last_error('get_platforms', response)
             print(f"ThunziAI get platforms failed: {response.status_code}")
             return []
         except Exception as e:
+            self._set_last_error('get_platforms', message=str(e))
             print(f"ThunziAI get platforms error: {str(e)}")
             return []
 
@@ -794,7 +812,7 @@ class ThunziAIService:
                 payload=payload
             )
 
-            response = self.session.post(url, json=payload)
+            response = self._request_with_api_key_fallback('POST', url, json=payload, timeout=60)
 
             log_external_api_response(
                 service='ThunziAI',
@@ -804,16 +822,32 @@ class ThunziAIService:
                 response_body=response.text[:500] if response.status_code != 200 else 'Sync triggered successfully'
             )
 
-            if response.status_code != 200:
+            if response.status_code not in [200, 201, 202]:
+                self._set_last_error('sync_platform', response)
                 log_error('ThunziAI.sync_platform',
                          f"Sync failed with status {response.status_code}: {response.text[:200]}")
 
-            return response.status_code == 200
+            return response.status_code in [200, 201, 202]
         except Exception as e:
+            self._set_last_error('sync_platform', message=str(e))
             log_error('ThunziAI.sync_platform', e)
             return False
 
-    def start_async_platform_sync(self, platform_id: int) -> Optional[Dict]:
+    def _sync_payload(self, platform_id: int, account_id: str = None,
+                      company_id: int = None, platform: str = None) -> Dict:
+        payload = {"platformId": platform_id}
+        platform_name = (platform or '').lower()
+
+        if account_id and platform_name not in ['facebook', 'instagram']:
+            payload["accountId"] = account_id
+        if company_id:
+            payload["companyId"] = company_id
+        if platform:
+            payload["platform"] = platform_name or platform
+        return payload
+
+    def start_async_platform_sync(self, platform_id: int, account_id: str = None,
+                                  company_id: int = None, platform: str = None) -> Optional[Dict]:
         """
         Start asynchronous platform sync using the updated ThunziAI endpoint.
 
@@ -827,7 +861,12 @@ class ThunziAIService:
 
         try:
             url = f"{self.BASE_URL}/api/platforms/sync"
-            payload = {"platformId": platform_id}
+            payload = self._sync_payload(
+                platform_id=platform_id,
+                account_id=account_id,
+                company_id=company_id,
+                platform=platform
+            )
 
             log_external_api_call(
                 service='ThunziAI',
@@ -836,7 +875,7 @@ class ThunziAIService:
                 payload=payload
             )
 
-            response = self.session.post(url, json=payload, timeout=30)
+            response = self._request_with_api_key_fallback('POST', url, json=payload, timeout=30)
             response_body = self._log_response_body(response)
 
             log_external_api_response(
@@ -853,10 +892,12 @@ class ThunziAIService:
                     data['status'] = self._normalize_sync_status(data.get('status'))
                 return data
 
+            self._set_last_error('start_async_platform_sync', response)
             log_error('ThunziAI.start_async_platform_sync',
                      f"Failed with status {response.status_code}: {response.text[:200]}")
             return None
         except Exception as e:
+            self._set_last_error('start_async_platform_sync', message=str(e))
             log_error('ThunziAI.start_async_platform_sync', e)
             return None
 
@@ -874,7 +915,7 @@ class ThunziAIService:
                 payload={'platform_id': platform_id}
             )
 
-            response = self.session.get(url, timeout=30)
+            response = self._request_with_api_key_fallback('GET', url, timeout=30)
             response_body = self._log_response_body(response)
 
             log_external_api_response(
@@ -888,23 +929,38 @@ class ThunziAIService:
             if response.status_code == 200:
                 return self._normalize_sync_status(response.json().get('status'))
 
+            self._set_last_error('get_platform_sync_status', response)
             log_error('ThunziAI.get_platform_sync_status',
                      f"Failed with status {response.status_code}: {response.text[:200]}")
             return None
         except Exception as e:
+            self._set_last_error('get_platform_sync_status', message=str(e))
             log_error('ThunziAI.get_platform_sync_status', e)
             return None
 
     def sync_platform_and_poll(self, platform_id: int, timeout_seconds: int = 120,
-                               poll_interval_seconds: int = 5) -> Dict:
+                               poll_interval_seconds: int = 5,
+                               account_id: str = None,
+                               company_id: int = None,
+                               platform: str = None) -> Dict:
         """
         Start async platform sync and poll until it completes, fails, or times out.
         Falls back to the legacy sync endpoint if the async endpoint is unavailable.
         """
-        started = self.start_async_platform_sync(platform_id)
+        started = self.start_async_platform_sync(
+            platform_id=platform_id,
+            account_id=account_id,
+            company_id=company_id,
+            platform=platform
+        )
 
         if not started:
-            legacy_success = self.sync_platform(platform_id=platform_id)
+            legacy_success = self.sync_platform(
+                platform_id=platform_id,
+                account_id=account_id,
+                company_id=company_id,
+                platform=platform
+            )
             return {
                 'success': legacy_success,
                 'status': 'success' if legacy_success else 'failed',
@@ -933,16 +989,20 @@ class ThunziAIService:
         self._ensure_authenticated()
 
         try:
-            response = self.session.put(
+            response = self._request_with_api_key_fallback(
+                'PUT',
                 f"{self.BASE_URL}/api/platforms/{platform_id}",
-                json=updates
+                json=updates,
+                timeout=30
             )
 
             if response.status_code == 200:
-                return response.json()
+                return self._normalize_platform(response.json())
 
+            self._set_last_error('update_platform', response)
             return None
         except Exception as e:
+            self._set_last_error('update_platform', message=str(e))
             print(f"ThunziAI update platform error: {str(e)}")
             return None
 
@@ -963,20 +1023,24 @@ class ThunziAIService:
         self._ensure_authenticated()
 
         try:
-            response = self.session.put(
+            response = self._request_with_api_key_fallback(
+                'PUT',
                 f"{self.BASE_URL}/api/platforms/{platform_id}/reconnect",
                 json={
                     "accountName": account_name,
                     "accessToken": access_token
-                }
+                },
+                timeout=30
             )
 
             if response.status_code == 200:
-                return response.json()
+                return self._normalize_platform(response.json())
 
+            self._set_last_error('reconnect_platform', response)
             print(f"ThunziAI reconnect platform failed: {response.status_code} - {response.text}")
             return None
         except Exception as e:
+            self._set_last_error('reconnect_platform', message=str(e))
             print(f"ThunziAI reconnect platform error: {str(e)}")
             return None
 
@@ -995,16 +1059,20 @@ class ThunziAIService:
         self._ensure_authenticated()
 
         try:
-            response = self.session.delete(
-                f"{self.BASE_URL}/api/platforms/{platform_id}"
+            response = self._request_with_api_key_fallback(
+                'DELETE',
+                f"{self.BASE_URL}/api/platforms/{platform_id}",
+                timeout=30
             )
 
             if response.status_code in [200, 204]:  # 200 OK or 204 No Content
                 return True
 
+            self._set_last_error('delete_platform', response)
             print(f"ThunziAI delete platform failed: {response.status_code} - {response.text}")
             return False
         except Exception as e:
+            self._set_last_error('delete_platform', message=str(e))
             print(f"ThunziAI delete platform error: {str(e)}")
             return False
 
@@ -1026,8 +1094,10 @@ class ThunziAIService:
 
         try:
             # Try the platforms endpoint (may not be publicly available)
-            response = self.session.get(
-                f"{self.BASE_URL}/api/platforms/{platform_id}/posts"
+            response = self._request_with_api_key_fallback(
+                'GET',
+                f"{self.BASE_URL}/api/platforms/{platform_id}/posts",
+                timeout=30
             )
 
             # Check if we got JSON response (not HTML)
@@ -1057,12 +1127,14 @@ class ThunziAIService:
         self._ensure_authenticated()
 
         try:
-            response = self.session.get(
+            response = self._request_with_api_key_fallback(
+                'GET',
                 f"{self.BASE_URL}/api/creators/{creator_id}/posts",
                 params={
                     "startDate": start_date,
                     "endDate": end_date
-                }
+                },
+                timeout=30
             )
 
             if response.status_code == 200:
@@ -1089,12 +1161,14 @@ class ThunziAIService:
         self._ensure_authenticated()
 
         try:
-            response = self.session.get(
+            response = self._request_with_api_key_fallback(
+                'GET',
                 f"{self.BASE_URL}/api/creators/{bantubuzz_id}/posts",
                 params={
                     "startDate": start_date,
                     "endDate": end_date
-                }
+                },
+                timeout=30
             )
 
             if response.status_code == 200:
@@ -1124,13 +1198,15 @@ class ThunziAIService:
         self._ensure_authenticated()
 
         try:
-            response = self.session.get(
+            response = self._request_with_api_key_fallback(
+                'GET',
                 f"{self.BASE_URL}/api/posts",
                 params={
                     "companyId": company_id,
                     "startDate": start_date,
                     "endDate": end_date
-                }
+                },
+                timeout=30
             )
 
             if response.status_code == 200:
@@ -1169,7 +1245,7 @@ class ThunziAIService:
                 payload=payload
             )
 
-            response = self.session.post(endpoint, json=payload, timeout=30)
+            response = self._request_with_api_key_fallback('POST', endpoint, json=payload, timeout=30)
             response_body = self._log_response_body(response)
 
             log_external_api_response(
@@ -1206,8 +1282,10 @@ class ThunziAIService:
         self._ensure_authenticated()
 
         try:
-            response = self.session.get(
-                f"{self.BASE_URL}/api/posts/{post_id}"
+            response = self._request_with_api_key_fallback(
+                'GET',
+                f"{self.BASE_URL}/api/posts/{post_id}",
+                timeout=30
             )
 
             if response.status_code == 200:
@@ -1254,8 +1332,10 @@ class ThunziAIService:
         self._ensure_authenticated()
 
         try:
-            response = self.session.get(
-                f"{self.BASE_URL}/api/posts/{post_id}/insights"
+            response = self._request_with_api_key_fallback(
+                'GET',
+                f"{self.BASE_URL}/api/posts/{post_id}/insights",
+                timeout=30
             )
 
             if response.status_code == 200:
@@ -1302,9 +1382,11 @@ class ThunziAIService:
             if end_date:
                 params['endDate'] = end_date
 
-            response = self.session.get(
+            response = self._request_with_api_key_fallback(
+                'GET',
                 f"{self.BASE_URL}/api/posts/{post_id}/comments",
-                params=params if params else None
+                params=params if params else None,
+                timeout=30
             )
 
             if response.status_code == 200:
@@ -1369,7 +1451,7 @@ class ThunziAIService:
                 payload={'bantubuzz_id': bantubuzz_id}
             )
 
-            response = self.session.get(url)
+            response = self._request_with_api_key_fallback('GET', url, timeout=30)
 
             log_external_api_response(
                 service='ThunziAI',
@@ -1404,7 +1486,7 @@ class ThunziAIService:
         try:
             url = f"{self.BASE_URL}/api/posts/{original_post_id}"
 
-            response = self.session.get(url)
+            response = self._request_with_api_key_fallback('GET', url, timeout=30)
 
             if response.status_code == 200:
                 return response.json()
@@ -1447,7 +1529,7 @@ class ThunziAIService:
                 payload={'original_post_id': original_post_id}
             )
 
-            response = self.session.get(url)
+            response = self._request_with_api_key_fallback('GET', url, timeout=30)
 
             log_external_api_response(
                 service='ThunziAI',
@@ -1515,7 +1597,7 @@ class ThunziAIService:
                 payload={'original_post_id': original_post_id, **params}
             )
 
-            response = self.session.get(url, params=params if params else None)
+            response = self._request_with_api_key_fallback('GET', url, params=params if params else None, timeout=30)
 
             log_external_api_response(
                 service='ThunziAI',
@@ -1566,7 +1648,7 @@ class ThunziAIService:
                 payload={'platform_id': platform_id}
             )
 
-            response = self.session.get(url)
+            response = self._request_with_api_key_fallback('GET', url, timeout=30)
 
             # Log response safely
             try:

@@ -47,6 +47,7 @@ backend\venv\Scripts\python.exe -m py_compile ^
   "%ROOT%\backend\app\services\thunzi_service.py" ^
   "%ROOT%\backend\app\routes\auth.py" ^
   "%ROOT%\backend\app\routes\platforms.py" ^
+  "%ROOT%\backend\app\tasks\platform_sync.py" ^
   "%ROOT%\backend\app\tasks\analytics_tasks.py"
 if errorlevel 1 goto :failed
 
@@ -59,6 +60,7 @@ tar -czf "%BACKEND_ARCHIVE%" -C "%ROOT%\backend" ^
   app/services/thunzi_service.py ^
   app/routes/auth.py ^
   app/routes/platforms.py ^
+  app/tasks/platform_sync.py ^
   app/tasks/analytics_tasks.py
 if errorlevel 1 goto :failed
 

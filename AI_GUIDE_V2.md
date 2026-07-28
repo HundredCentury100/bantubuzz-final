@@ -156,11 +156,12 @@ This file is a living handoff guide for future AI/Codex sessions working on the 
   create ThunziAI account" means `ThunziAIService.create_company()` failed
   before the platform connection step. Check `thunzi_service.last_error` in
   masked logs; the deploy script above prints recent Thunzi lines.
-- ThunziAI docs have drifted around API key, login body, and creator-register
-  endpoint naming. `backend/app/services/thunzi_service.py` therefore sends
-  `x-api-key` on requests, retries documented API key candidates on 401/403,
-  uses `username` for `/api/login` with `email` fallback, and falls back from
-  `/api/creator/register` to `/api/creators/register` if needed.
+- ThunziAI docs have drifted around API key, login body, creator-register
+  endpoint naming, and sync payload fields. `backend/app/services/thunzi_service.py`
+  therefore sends `x-api-key` on all Thunzi requests, retries documented API key
+  candidates on 401/403, uses `username` for `/api/login` with `email` fallback,
+  and falls back from `/api/creator/register` to `/api/creators/register` if
+  needed.
 - First-time Thunzi account setup must not assume API-key registration creates
   a normal logged-in cookie session. The correct flow is: register/login the
   Thunzi user, create `/api/company` using `x-api-key`, then attach the
@@ -168,6 +169,9 @@ This file is a living handoff guide for future AI/Codex sessions working on the 
   Store both `thunzi_user_id` and `thunzi_company_id` locally before adding
   platforms. Existing accounts can still use login, which is why they may work
   while new account setup fails.
+- If Thunzi registration returns an "email already exists" response after login
+  failed, treat that as recoverable and continue with API-key company/platform
+  setup. This handles users left half-created by earlier failed attempts.
   Gunicorn's `app:create_app()` and `celery_worker.py` to run DevelopmentConfig
   even when `/etc/bantubuzz/platform.env` says production. The factory now uses
   `create_app(config_name=None)` and reads `FLASK_ENV`. New-VPS hotfix:
@@ -184,6 +188,51 @@ This file is a living handoff guide for future AI/Codex sessions working on the 
   HTTP ACME vhost, installs `deployment\vps\bantubuzz-platform.conf`, verifies
   `https://bantubuzz.com/api/health`, verifies the frontend, and confirms
   `https://app.bantubuzz.com/admin` remains healthy.
+
+## Mobile App / Capacitor
+
+- The Android app in `mobile_app` is a Capacitor shell over the React frontend
+  build from `frontend/dist`; it is not a separate React Native codebase.
+- Native runtime must use production API and socket origins. Relative API paths
+  are resolved to `https://bantubuzz.com/api`, and Socket.IO must not default to
+  `window.location.origin` because Capacitor origin is `https://localhost`.
+- The Messages navbar badge and inbox should use the Node messaging service as
+  the primary source (`/messaging/api/conversations`) in both web and native
+  runtime. Flask `/api/messages/conversations` is only a fallback. Flask may
+  return `last_message` as an object while Node returns a string, so message UI
+  must derive a string preview before filtering or rendering.
+- The Node Socket.IO service must allow Capacitor origins
+  `https://localhost`, `capacitor://localhost`, and `ionic://localhost`, plus
+  the production web origins. If these are missing, Android can load REST pages
+  but realtime messages and foreground notifications will fail.
+- Native Android push uses Firebase Cloud Messaging through
+  `@capacitor/push-notifications` and backend `PushSubscription.endpoint`
+  values prefixed with `native:android:`. Browser Web Push/VAPID can be disabled
+  without blocking native FCM.
+- Native app-open welcome notifications use
+  `@capacitor/local-notifications`; install this plugin in both `frontend` for
+  bundling dynamic imports and `mobile_app` for Android Capacitor sync.
+- Foreground direct-message notifications are local notifications scheduled
+  from the Socket.IO `new_message` event. Firebase FCM is still used for
+  background/offline delivery through `backend/app/services/push_service.py`.
+- After frontend/native notification changes, run `npm run build` in
+  `frontend`, then `npx cap sync android` in `mobile_app`, then rebuild the APK
+  in Android Studio. Backend-only deployment is not enough for native plugin
+  changes.
+- External OAuth/payment returns in the Android app use the mobile return
+  bridge. Public web fallback route: `/mobile/return`; native deep link scheme:
+  `bantubuzz://return`. `NativeDeepLinkHandler` listens for Capacitor
+  `appUrlOpen` events and routes back into the packaged React app while
+  preserving query params such as OAuth `code`, `state`, and payment ids.
+  Use `nativeReturnUrl()`, `mobileReturnState()`, and `openExternalUrl()` from
+  `frontend/src/utils/nativeApp.js` when adding new third-party redirects.
+  Desktop web behavior should continue to use the existing normal return URLs
+  and popup/postMessage flows.
+- Deploy the backend/frontend side of mobile messaging/push fixes with
+  `deployment\vps\DEPLOY-NEW-VPS-MOBILE-NOTIFICATIONS.bat`; it should include
+  `messages.py`, `messaging_safety.py`, `push_service.py`,
+  `messaging-service/server.js`, and the compiled frontend dist. It must
+  restart both `bantubuzz-backend.service` and `bantubuzz-messaging.service`.
 ## Current Project Context
 
 - Workspace: `D:\Bantubuzz Platform`
@@ -701,7 +750,10 @@ Read these before touching social platform connection, creator analytics, post m
 
 ### Core ThunziAI Endpoints Used
 
-- Current API docs now say every request must include `x-api-key`. Existing code only sends the key for creator registration, so check this before changing or debugging Thunzi calls.
+- Current API docs say every request must include `x-api-key`. The service uses
+  `_request_with_api_key_fallback()` across platform, sync, post, and audience
+  calls so both documented key variants keep working when Thunzi enforcement
+  changes.
 - `POST /api/creator/register`: API-key creator registration, bypasses normal OTP onboarding.
 - `POST /api/login`: session login.
 - `POST /api/company`: create a company/account container for a BantuBuzz user.
@@ -734,6 +786,14 @@ Creator route: `POST /api/creator/platforms/connect`
 8. Add platform through `thunzi_service.add_platform`.
 9. Save local `ConnectedPlatform`.
 10. Trigger background sync through `app.tasks.platform_sync.sync_platform.delay(...)`.
+
+Manual/worker sync must call `sync_platform_and_poll()` with full context:
+`platform_id`, `account_id`, `company_id`, and `platform`. The service omits
+`accountId` for Facebook/Instagram but sends it for non-Meta platforms when
+available. Creator and brand sync routes refresh the local `ConnectedPlatform`
+from `GET /api/platforms?companyId=...` even when Thunzi reports `pending`,
+`in_progress`, or a local timeout, because metrics can complete asynchronously
+after the trigger returns.
 
 Brand route: `POST /api/brand/platforms/connect` follows a similar pattern but creates a Thunzi company for the brand and does not create a creator entity.
 
