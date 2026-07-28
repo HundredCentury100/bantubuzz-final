@@ -1691,7 +1691,7 @@ def send_booking_auto_accepted_email(creator_email, creator_name, brand_name, pa
                 <h3 style="color: #1E40AF; margin-top: 0;">Collaboration Details</h3>
                 <p style="color: #1E3A8A; margin: 10px 0;">
                     <strong>Package:</strong> {package_title}<br>
-                    <strong>Amount:</strong> R {amount:.2f}<br>
+                    <strong>Amount:</strong> ${amount:.2f} USD<br>
                     <strong>Expected Delivery:</strong> {duration_text}
                 </p>
 

@@ -20,6 +20,7 @@ tar -czf "${BACKUP_ROOT}/campaign-creator-invite-before-${STAMP}/backend-files.t
   app/routes/campaign_cart.py \
   app/routes/creators.py \
   app/services/email_service.py \
+  app/services/campaign_analytics_service.py \
   2>/dev/null || true
 
 echo "Installing frontend build"
@@ -35,11 +36,12 @@ chown -R www-data:www-data \
   "$BACKEND_DIR/app/routes/campaign_cart.py" \
   "$BACKEND_DIR/app/routes/creators.py" \
   "$BACKEND_DIR/app/services/email_service.py" \
+  "$BACKEND_DIR/app/services/campaign_analytics_service.py" \
   || true
 
 echo "Compiling backend routes"
 cd "$BACKEND_DIR"
-venv/bin/python -m py_compile app/routes/campaign_cart.py app/routes/creators.py app/services/email_service.py
+venv/bin/python -m py_compile app/routes/campaign_cart.py app/routes/creators.py app/services/email_service.py app/services/campaign_analytics_service.py
 
 echo "Restarting backend and Apache"
 pkill -f 'gunicorn.*app:create_app' || true

@@ -148,7 +148,7 @@ class CampaignAnalyticsService:
         cpe = (total_spend / total_engagements) if total_engagements > 0 else 0  # Cost per engagement
 
         # Estimated ROI (simplified calculation)
-        # Assuming each engagement is worth R0.10 (ZAR)
+        # Assuming each engagement is worth $0.10 USD
         estimated_value = total_engagements * 0.10
         roi_percentage = ((estimated_value - total_spend) / total_spend * 100) if total_spend > 0 else 0
 
