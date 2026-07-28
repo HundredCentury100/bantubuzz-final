@@ -60,7 +60,9 @@ def env_line(key, value):
 
 for line in lines:
     stripped = line.strip()
-    if stripped == api_key:
+    if stripped == api_key or (stripped and "=" not in stripped and not stripped.startswith("#") and (
+        stripped.startswith(("re_", "AQ.")) or len(stripped) >= 32
+    )):
         continue
     if not stripped or stripped.startswith("#") or "=" not in line:
         new_lines.append(line)
@@ -89,10 +91,20 @@ else
   pkill -f 'gunicorn.*app:create_app' || true
   sleep 2
   cd /var/www/bantubuzz/backend
-  set -a
-  # shellcheck disable=SC1090
-  source "$ENV_FILE"
-  set +a
+  while IFS= read -r line || [ -n "$line" ]; do
+    case "$line" in
+      ""|\#*) continue ;;
+    esac
+    key="${line%%=*}"
+    value="${line#*=}"
+    if printf '%s' "$key" | grep -Eq '^[A-Za-z_][A-Za-z0-9_]*$' && [ "$line" != "$key" ]; then
+      value="${value%\"}"
+      value="${value#\"}"
+      value="${value%\'}"
+      value="${value#\'}"
+      export "$key=$value"
+    fi
+  done < "$ENV_FILE"
   venv/bin/gunicorn -w 4 -b 0.0.0.0:8002 --timeout 120 --error-logfile gunicorn_error.log --access-logfile gunicorn_access.log 'app:create_app()' --daemon
 fi
 
@@ -110,10 +122,20 @@ curl -fsS https://bantubuzz.com/api/health
 echo
 
 echo "Verifying Resend SMTP login"
-set -a
-# shellcheck disable=SC1090
-source "$ENV_FILE"
-set +a
+while IFS= read -r line || [ -n "$line" ]; do
+  case "$line" in
+    ""|\#*) continue ;;
+  esac
+  key="${line%%=*}"
+  value="${line#*=}"
+  if printf '%s' "$key" | grep -Eq '^[A-Za-z_][A-Za-z0-9_]*$' && [ "$line" != "$key" ]; then
+    value="${value%\"}"
+    value="${value#\"}"
+    value="${value%\'}"
+    value="${value#\'}"
+    export "$key=$value"
+  fi
+done < "$ENV_FILE"
 
 cd /var/www/bantubuzz/backend
 venv/bin/python - <<'PY'
