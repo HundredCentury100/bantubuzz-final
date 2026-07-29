@@ -112,9 +112,7 @@ venv/bin/flask db upgrade heads
 echo "Installing frontend build at Apache document root"
 rm -rf "$FRONTEND_ROOT"
 mkdir -p "$FRONTEND_ROOT"
-tar -xzf "$FRONTEND_ARCHIVE" -C /tmp
-cp -a /tmp/dist/. "$FRONTEND_ROOT/"
-rm -rf /tmp/dist
+tar -xzf "$FRONTEND_ARCHIVE" -C "$FRONTEND_ROOT"
 chown -R www-data:www-data "$FRONTEND_ROOT" "$BACKEND_ROOT/app" "$MESSAGING_ROOT" || true
 
 echo "Restarting backend, messaging, and Apache"
