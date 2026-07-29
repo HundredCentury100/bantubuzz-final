@@ -1363,7 +1363,7 @@ const CollaborationDetails = () => {
             )}
 
             {/* Review Button - Brand */}
-            {collaboration.status === 'completed' && isBrand && (
+            {collaboration.status === 'completed' && isBrand && !collaboration.has_review && (
               <div className="bg-white rounded-lg shadow p-6">
                 <h3 className="text-lg font-bold text-gray-900 mb-4">Feedback</h3>
                 <Link
@@ -1372,6 +1372,13 @@ const CollaborationDetails = () => {
                 >
                   Leave a Review
                 </Link>
+              </div>
+            )}
+
+            {collaboration.status === 'completed' && isBrand && collaboration.has_review && (
+              <div className="bg-white rounded-lg shadow p-6">
+                <h3 className="text-lg font-bold text-gray-900 mb-2">Feedback</h3>
+                <p className="text-sm text-gray-600">Review submitted for this collaboration.</p>
               </div>
             )}
 

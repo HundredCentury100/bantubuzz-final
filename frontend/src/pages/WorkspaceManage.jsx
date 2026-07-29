@@ -127,7 +127,16 @@ const WorkspaceManage = () => {
       }
       await fetchData();
       setMemberForm({ email: '', role: 'manager' });
-      toast.success(response.data.invitation ? 'Team invitation sent' : 'Team member assigned');
+      if (response.data.invitation && response.data.email_sent === false) {
+        if (response.data.invitation_url && navigator.clipboard?.writeText) {
+          await navigator.clipboard.writeText(response.data.invitation_url);
+          toast.error('Invitation created, but email delivery could not be confirmed. Invite link copied to clipboard.');
+        } else {
+          toast.error('Invitation created, but email delivery could not be confirmed. Open the pending invitation and resend after SMTP is checked.');
+        }
+      } else {
+        toast.success(response.data.invitation ? 'Team invitation sent' : 'Team member assigned');
+      }
     } catch (err) {
       toast.error(err.response?.data?.error || 'Failed to assign team member');
     } finally {

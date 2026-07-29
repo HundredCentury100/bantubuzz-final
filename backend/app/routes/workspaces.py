@@ -271,6 +271,10 @@ This invite expires on {invitation.expires_at.strftime('%Y-%m-%d')}.
     return send_email(subject, invitation.email, text_body, html_body, async_send=False)
 
 
+def _workspace_invitation_url(invitation):
+    return _frontend_url(f'/brand/workspace-invite/{invitation.token}')
+
+
 def _send_workspace_member_updated_email(member, workspace, inviter, brand):
     account_language = _workspace_language(brand)
     workspace_label = account_language['workspace_singular']
@@ -938,12 +942,19 @@ def add_member(workspace_id):
 
     inviter = User.query.get(int(get_jwt_identity()))
     brand = BrandProfile.query.get(workspace.agency_brand_id)
-    if not _send_workspace_invitation_email(invitation, workspace, inviter, brand):
-        return jsonify({'error': 'Invitation was created, but the email could not be sent. Please check SMTP settings or resend the invite.'}), 502
+    email_sent = _send_workspace_invitation_email(invitation, workspace, inviter, brand)
+    if not email_sent:
+        current_app.logger.warning(
+            'Workspace invitation email could not be sent for invitation_id=%s email=%s',
+            invitation.id,
+            invitation.email,
+        )
 
     return jsonify({
-        'message': 'Workspace invitation sent',
+        'message': 'Workspace invitation sent' if email_sent else 'Workspace invitation created, but email delivery could not be confirmed',
         'invitation': invitation.to_dict(),
+        'invitation_url': _workspace_invitation_url(invitation),
+        'email_sent': email_sent,
         'seat_usage': _workspace_seat_payload(workspace),
     }), 202
 
