@@ -35,6 +35,22 @@ const getDeliveryTiming = (dateValue) => {
   };
 };
 
+const getDeliverableLabel = (deliverable, fallback = 'Deliverable') => {
+  if (typeof deliverable === 'string') return deliverable;
+  if (!deliverable || typeof deliverable !== 'object') return fallback;
+
+  const platform = deliverable.platform || deliverable.post_platform || deliverable.channel;
+  const contentType = deliverable.content_type || deliverable.type || deliverable.deliverable_type || deliverable.title || deliverable.name;
+  const quantity = deliverable.quantity || deliverable.count;
+
+  const parts = [];
+  if (platform) parts.push(String(platform));
+  if (quantity) parts.push(String(quantity));
+  if (contentType) parts.push(String(contentType));
+
+  return parts.length ? parts.join(' ') : fallback;
+};
+
 const CollaborationDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -445,7 +461,9 @@ const CollaborationDetails = () => {
     );
   }
 
-  const expectedDeliverables = Array.isArray(collaboration.deliverables) ? collaboration.deliverables : [];
+  const expectedDeliverables = Array.isArray(collaboration.deliverables)
+    ? collaboration.deliverables.map((deliverable, index) => getDeliverableLabel(deliverable, `Deliverable ${index + 1}`))
+    : [];
   const submittedDeliverables = Array.isArray(collaboration.submitted_deliverables) ? collaboration.submitted_deliverables : [];
   const draftDeliverables = Array.isArray(collaboration.draft_deliverables) ? collaboration.draft_deliverables : [];
   const packageDeliverables = Array.isArray(collaboration.package_deliverables) ? collaboration.package_deliverables : [];
