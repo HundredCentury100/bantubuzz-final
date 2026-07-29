@@ -51,6 +51,15 @@ class CreatorProfile(db.Model):
     bookings_as_creator = db.relationship('Booking', foreign_keys='Booking.creator_id', backref='creator', lazy='dynamic')
     saved_by_brands = db.relationship('SavedCreator', backref='creator', lazy='dynamic', cascade='all, delete-orphan')
 
+    @property
+    def display_name(self):
+        """Compatibility label for older code paths; creators use usernames."""
+        if self.username:
+            return self.username
+        if getattr(self, 'user', None) and self.user.email:
+            return self.user.email.split('@')[0]
+        return 'Creator'
+
     def get_total_followers(self):
         """Calculate total followers across all connected platforms"""
         from app.models.connected_platform import ConnectedPlatform
@@ -210,7 +219,7 @@ class CreatorProfile(db.Model):
             'id': self.id,
             'user_id': self.user_id,
             'username': self.username,
-            'display_name': self.username or 'Creator',  # Frontend-friendly fallback
+            'display_name': self.display_name,  # Frontend-friendly fallback
             'bio': self.bio,
             'profile_picture': self.profile_picture,
             'profile_picture_sizes': self.profile_picture_sizes or {},
