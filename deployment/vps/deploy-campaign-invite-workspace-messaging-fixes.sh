@@ -147,7 +147,21 @@ fi
 
 wait_for_url http://127.0.0.1:8002/api/health "Local API health"
 wait_for_url https://bantubuzz.com/api/health "Public API health"
-wait_for_url http://127.0.0.1:3002/health "Messaging health"
+
+MESSAGING_PORT="${PORT:-3001}"
+if systemctl list-unit-files | grep -q '^bantubuzz-messaging\.service'; then
+  service_port="$(systemctl show bantubuzz-messaging.service -p Environment --value 2>/dev/null | tr ' ' '\n' | awk -F= '$1=="PORT"{print $2; exit}' || true)"
+  if [ -n "$service_port" ]; then
+    MESSAGING_PORT="$service_port"
+  fi
+fi
+if ! wait_for_url "http://127.0.0.1:${MESSAGING_PORT}/health" "Messaging health"; then
+  if [ "$MESSAGING_PORT" != "3002" ]; then
+    wait_for_url http://127.0.0.1:3002/health "Messaging health on legacy port"
+  else
+    wait_for_url http://127.0.0.1:3001/health "Messaging health on default port"
+  fi
+fi
 
 echo "Socket.IO public polling smoke test:"
 curl -L -sS --max-time 20 'https://bantubuzz.com/socket.io/?EIO=4&transport=polling' | head -c 160
