@@ -8,6 +8,7 @@ class Message(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     sender_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
     receiver_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    workspace_id = db.Column(db.Integer, db.ForeignKey('client_workspaces.id', ondelete='SET NULL'), nullable=True, index=True)
     booking_id = db.Column(db.Integer, db.ForeignKey('bookings.id'), nullable=True)
     custom_request_id = db.Column(db.Integer, db.ForeignKey('custom_package_requests.id'), nullable=True)
     custom_offer_id = db.Column(db.Integer, db.ForeignKey('custom_package_offers.id'), nullable=True)
@@ -32,6 +33,7 @@ class Message(db.Model):
             'id': self.id,
             'sender_id': self.sender_id,
             'receiver_id': self.receiver_id,
+            'workspace_id': self.workspace_id,
             'booking_id': self.booking_id,
             'custom_request_id': self.custom_request_id,
             'custom_offer_id': self.custom_offer_id,

@@ -12,9 +12,32 @@ const API_BASE_URL =
     ? `https://bantubuzz.com${configuredApiBaseUrl}`
     : configuredApiBaseUrl;
 
+const getSelectedWorkspaceId = () => {
+  const workspaceId = localStorage.getItem('selected_workspace_id');
+  return workspaceId && workspaceId !== 'all' ? workspaceId : null;
+};
+
+const withWorkspaceHeaders = (config = {}) => {
+  const workspaceId = getSelectedWorkspaceId();
+  if (!workspaceId) return config;
+  return {
+    ...config,
+    headers: {
+      ...(config.headers || {}),
+      'X-Workspace-Id': workspaceId,
+    },
+  };
+};
+
+const withWorkspacePayload = (payload = {}) => {
+  const workspaceId = getSelectedWorkspaceId();
+  return workspaceId ? { ...payload, workspace_id: Number(workspaceId) } : payload;
+};
+
 // Create axios instance for messaging service
 const messagingAPI = axios.create({
   baseURL: MESSAGING_API_URL,
+  timeout: 15000,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -26,6 +49,10 @@ messagingAPI.interceptors.request.use(
     const token = localStorage.getItem('access_token') || localStorage.getItem('token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
+    }
+    const workspaceId = getSelectedWorkspaceId();
+    if (workspaceId) {
+      config.headers['X-Workspace-Id'] = workspaceId;
     }
     return config;
   },
@@ -65,6 +92,7 @@ messagingAPI.interceptors.response.use(
 // Create axios instance for main API (Flask backend)
 const mainAPI = axios.create({
   baseURL: API_BASE_URL,
+  timeout: 15000,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -76,6 +104,10 @@ mainAPI.interceptors.request.use(
     const token = localStorage.getItem('access_token') || localStorage.getItem('token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
+    }
+    const workspaceId = getSelectedWorkspaceId();
+    if (workspaceId) {
+      config.headers['X-Workspace-Id'] = workspaceId;
     }
     return config;
   },
@@ -114,20 +146,34 @@ mainAPI.interceptors.response.use(
 
 export const messagingService = {
   // Get all conversations
-  getConversations: () => messagingAPI.get('/conversations'),
+  getConversations: async () => {
+    try {
+      return await mainAPI.get('/messages/conversations');
+    } catch (error) {
+      console.warn('Flask conversations unavailable, using messaging service fallback:', error);
+    }
+
+    return messagingAPI.get('/conversations', withWorkspaceHeaders());
+  },
 
   // Get messages with a specific user
-  getConversation: (userId, params = {}) =>
-    messagingAPI.get(`/conversations/${userId}`, { params }),
+  getConversation: async (userId, params = {}) => {
+    try {
+      return await mainAPI.get('/messages/', { params: { ...params, user_id: userId } });
+    } catch (error) {
+      console.warn('Flask conversation unavailable, using messaging service fallback:', error);
+      return messagingAPI.get(`/conversations/${userId}`, withWorkspaceHeaders({ params }));
+    }
+  },
 
   // Send message through Flask fallback API when Socket.IO is unavailable
   sendMessage: (receiverId, content, bookingId = null, extra = {}) =>
-    mainAPI.post('/messages/', {
+    mainAPI.post('/messages/', withWorkspacePayload({
       receiver_id: receiverId,
       content,
       booking_id: bookingId,
       ...extra,
-    }),
+    })),
 
   uploadAttachment: (formData) =>
     mainAPI.post('/messages/attachments', formData, {
@@ -135,11 +181,17 @@ export const messagingService = {
     }),
 
   // Mark messages as read
-  markAsRead: (messageIds) =>
-    messagingAPI.post('/messages/read', { messageIds }),
+  markAsRead: async (messageIds) => {
+    try {
+      return await messagingAPI.post('/messages/read', withWorkspacePayload({ messageIds }));
+    } catch (error) {
+      console.warn('Messaging service mark-read unavailable, using Flask fallback:', error);
+      return mainAPI.post('/messages/read', withWorkspacePayload({ messageIds }));
+    }
+  },
 
   markAsReadFallback: (messageIds) =>
-    mainAPI.post('/messages/read', { messageIds }),
+    mainAPI.post('/messages/read', withWorkspacePayload({ messageIds })),
 
   // Report a user/message (uses main API)
   reportMessage: (data) => mainAPI.post('/messaging/report', data),
@@ -156,6 +208,11 @@ export const messagingService = {
   getVapidPublicKey: () => mainAPI.get('/messages/push/vapid-public-key'),
   savePushSubscription: (subscription) =>
     mainAPI.post('/messages/push-subscriptions', subscription),
+  saveNativePushToken: (data) =>
+    mainAPI.post('/messages/push-subscriptions', {
+      ...data,
+      native: true,
+    }),
   disablePushSubscription: (endpoint) =>
     mainAPI.delete('/messages/push-subscriptions', { data: { endpoint } }),
 };

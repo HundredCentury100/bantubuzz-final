@@ -162,29 +162,39 @@ def add_invitation_to_cart(campaign_id):
             # invite_to_apply - no upfront amount (creator will propose)
             invitation_amount = Decimal('0.00')
 
-        # Check if invitation already exists
+        # Reuse an existing pending invitation instead of failing. This makes the
+        # action safe to retry if the previous request created the invite but did
+        # not create the cart item or surface the notification.
         existing_invitation = CampaignInvitation.query.filter_by(
             campaign_id=campaign_id,
-            creator_user_id=creator.user_id,
-            status='pending'
+            creator_user_id=creator.user_id
         ).first()
 
         if existing_invitation:
-            return jsonify({'error': 'Invitation already sent to this creator'}), 400
-
-        # Create invitation (status='pending', in_cart=True)
-        invitation = CampaignInvitation(
-            campaign_id=campaign_id,
-            creator_user_id=creator.user_id,
-            invited_by_user_id=user.id,
-            invitation_type='invite_to_join' if invitation_type == 'invite_with_package' else 'invite_to_apply',
-            package_id=package_id,
-            proposed_amount=invitation_amount if invitation_type == 'invite_with_package' else None,
-            message=message,
-            status='pending',
-            expires_at=datetime.utcnow() + timedelta(days=int(data.get('expires_in_days', 7)))
-        )
-        db.session.add(invitation)
+            invitation = existing_invitation
+            invitation.invited_by_user_id = user.id
+            invitation.invitation_type = 'invite_to_join' if invitation_type == 'invite_with_package' else 'invite_to_apply'
+            invitation.package_id = package_id
+            invitation.proposed_amount = invitation_amount if invitation_type == 'invite_with_package' else None
+            invitation.message = message
+            invitation.status = 'pending'
+            invitation.responded_at = None
+            invitation.response_message = None
+            invitation.expires_at = datetime.utcnow() + timedelta(days=int(data.get('expires_in_days', 7)))
+            invitation.updated_at = datetime.utcnow()
+        else:
+            invitation = CampaignInvitation(
+                campaign_id=campaign_id,
+                creator_user_id=creator.user_id,
+                invited_by_user_id=user.id,
+                invitation_type='invite_to_join' if invitation_type == 'invite_with_package' else 'invite_to_apply',
+                package_id=package_id,
+                proposed_amount=invitation_amount if invitation_type == 'invite_with_package' else None,
+                message=message,
+                status='pending',
+                expires_at=datetime.utcnow() + timedelta(days=int(data.get('expires_in_days', 7)))
+            )
+            db.session.add(invitation)
         db.session.flush()
 
         # Only create cart item for invite_with_package (requires payment)
@@ -202,20 +212,45 @@ def add_invitation_to_cart(campaign_id):
                         'error': 'This campaign must have at least one deliverable before using a proposed amount invite'
                     }), 400
 
-            cart_item = CampaignCartItem(
+            cart_item = CampaignCartItem.query.filter_by(
                 campaign_id=campaign_id,
-                brand_id=brand.id,
-                item_type='invitation',
-                invitation_id=invitation.id,
                 creator_id=creator_id,
-                package_id=package_id,
-                amount=invitation_amount,
-                notes=message,
-                custom_deliverables=custom_deliverables
-            )
-            db.session.add(cart_item)
+                item_type='invitation',
+                payment_status='pending'
+            ).first()
+
+            if cart_item:
+                cart_item.invitation_id = invitation.id
+                cart_item.brand_id = brand.id
+                cart_item.package_id = package_id
+                cart_item.amount = invitation_amount
+                cart_item.notes = message
+                if custom_deliverables is not None:
+                    cart_item.custom_deliverables = custom_deliverables
+            else:
+                cart_item = CampaignCartItem(
+                    campaign_id=campaign_id,
+                    brand_id=brand.id,
+                    item_type='invitation',
+                    invitation_id=invitation.id,
+                    creator_id=creator_id,
+                    package_id=package_id,
+                    amount=invitation_amount,
+                    notes=message,
+                    custom_deliverables=custom_deliverables
+                )
+                db.session.add(cart_item)
 
         db.session.commit()
+
+        create_notification(
+            creator.user_id,
+            'campaign',
+            'Campaign Invitation',
+            f'{brand.company_name or brand.display_name or "A brand"} invited you to '
+            f'{"join" if invitation_type == "invite_with_package" else "apply to"} "{campaign.title}".',
+            f'/creator/campaigns/{campaign_id}'
+        )
 
         # Send email notification to creator (different for paid vs apply)
         creator_user = User.query.get(creator.user_id)
