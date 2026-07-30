@@ -11,13 +11,71 @@ import { StarIcon, UserCircleIcon } from '@heroicons/react/24/outline';
 import { StarIcon as StarSolidIcon } from '@heroicons/react/24/solid';
 import { BASE_URL } from '../../services/api';
 
+const FEATURED_TYPES = [
+  {
+    value: 'general',
+    label: 'General',
+    description: 'Appears on homepage for all visitors',
+  },
+  {
+    value: 'facebook',
+    label: 'Facebook',
+    platformKey: 'facebook',
+    description: 'Featured in Facebook creators section',
+  },
+  {
+    value: 'tiktok',
+    label: 'TikTok',
+    platformKey: 'tiktok',
+    description: 'Featured in TikTok creators section',
+  },
+  {
+    value: 'instagram',
+    label: 'Instagram',
+    platformKey: 'instagram',
+    description: 'Featured in Instagram creators section',
+  },
+  {
+    value: 'youtube',
+    label: 'YouTube',
+    platformKey: 'youtube',
+    description: 'Featured in YouTube creators section',
+  },
+  {
+    value: 'ugc',
+    label: 'UGC',
+    description: 'Featured in UGC creators section',
+  },
+];
+
+const platformAliases = {
+  fb: 'facebook',
+  meta: 'facebook',
+  ig: 'instagram',
+  yt: 'youtube',
+  'youtube shorts': 'youtube',
+};
+
+const normalizePlatform = (platform) => {
+  const key = String(platform || '').trim().toLowerCase();
+  return platformAliases[key] || key;
+};
+
+const getCreatorPlatformSet = (creator) => {
+  const platforms = new Set();
+  Object.keys(creator.social_links || {}).forEach((platform) => platforms.add(normalizePlatform(platform)));
+  (creator.platforms || []).forEach((platform) => platforms.add(normalizePlatform(platform)));
+  (creator.platform_stats || []).forEach((platform) => platforms.add(normalizePlatform(platform.platform)));
+  return platforms;
+};
+
 export default function AdminFeaturedCreators() {
   const [featuredCreators, setFeaturedCreators] = useState([]);
   const [eligibleCreators, setEligibleCreators] = useState([]);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(null);
-  const [featuredTypeFilter, setFeaturedTypeFilter] = useState('all'); // 'all', 'general', 'tiktok', 'instagram'
-  const [platformFilter, setPlatformFilter] = useState('all'); // 'all', 'tiktok', 'instagram'
+  const [featuredTypeFilter, setFeaturedTypeFilter] = useState('all');
+  const [platformFilter, setPlatformFilter] = useState('all');
   const [showFeatureModal, setShowFeatureModal] = useState(false);
   const [selectedCreator, setSelectedCreator] = useState(null);
   const [selectedFeaturedType, setSelectedFeaturedType] = useState('general');
@@ -88,7 +146,7 @@ export default function AdminFeaturedCreators() {
 
   const CreatorCard = ({ creator, featured = false }) => {
     // Get platforms creator has
-    const platforms = creator.social_links ? Object.keys(creator.social_links) : [];
+    const platforms = Array.from(getCreatorPlatformSet(creator));
     const featuredTypeBadge = creator.featured_info?.featured_type || creator.featured_type;
 
     return (
@@ -165,9 +223,9 @@ export default function AdminFeaturedCreators() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
               >
                 <option value="all">All Featured</option>
-                <option value="general">General Featured</option>
-                <option value="tiktok">TikTok Featured</option>
-                <option value="instagram">Instagram Featured</option>
+                {FEATURED_TYPES.map((type) => (
+                  <option key={type.value} value={type.value}>{type.label} Featured</option>
+                ))}
               </select>
             </div>
             <div>
@@ -178,8 +236,9 @@ export default function AdminFeaturedCreators() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary"
               >
                 <option value="all">All Platforms</option>
-                <option value="tiktok">TikTok Creators Only</option>
-                <option value="instagram">Instagram Creators Only</option>
+                {FEATURED_TYPES.filter((type) => type.platformKey).map((type) => (
+                  <option key={type.value} value={type.platformKey}>{type.label} Creators Only</option>
+                ))}
               </select>
             </div>
           </div>
@@ -240,60 +299,36 @@ export default function AdminFeaturedCreators() {
             <p className="text-gray-600 mb-4">Select the type of featured status for this creator:</p>
 
             <div className="space-y-3 mb-6">
-              <label className="flex items-center p-3 border-2 border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
-                <input
-                  type="radio"
-                  name="featured_type"
-                  value="general"
-                  checked={selectedFeaturedType === 'general'}
-                  onChange={(e) => setSelectedFeaturedType(e.target.value)}
-                  className="mr-3"
-                />
-                <div>
-                  <div className="font-semibold text-gray-900">General Featured</div>
-                  <div className="text-sm text-gray-600">Appears on homepage for all visitors</div>
-                </div>
-              </label>
-
-              <label className="flex items-center p-3 border-2 border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
-                <input
-                  type="radio"
-                  name="featured_type"
-                  value="tiktok"
-                  checked={selectedFeaturedType === 'tiktok'}
-                  onChange={(e) => setSelectedFeaturedType(e.target.value)}
-                  className="mr-3"
-                  disabled={!selectedCreator.social_links?.tiktok}
-                />
-                <div>
-                  <div className="font-semibold text-gray-900">TikTok Featured</div>
-                  <div className="text-sm text-gray-600">
-                    {selectedCreator.social_links?.tiktok
-                      ? 'Featured in TikTok creators section'
-                      : 'Creator has no TikTok account'}
-                  </div>
-                </div>
-              </label>
-
-              <label className="flex items-center p-3 border-2 border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
-                <input
-                  type="radio"
-                  name="featured_type"
-                  value="instagram"
-                  checked={selectedFeaturedType === 'instagram'}
-                  onChange={(e) => setSelectedFeaturedType(e.target.value)}
-                  className="mr-3"
-                  disabled={!selectedCreator.social_links?.instagram}
-                />
-                <div>
-                  <div className="font-semibold text-gray-900">Instagram Featured</div>
-                  <div className="text-sm text-gray-600">
-                    {selectedCreator.social_links?.instagram
-                      ? 'Featured in Instagram creators section'
-                      : 'Creator has no Instagram account'}
-                  </div>
-                </div>
-              </label>
+              {FEATURED_TYPES.map((type) => {
+                const creatorPlatforms = getCreatorPlatformSet(selectedCreator);
+                const hasPlatform = !type.platformKey || creatorPlatforms.has(type.platformKey);
+                return (
+                  <label
+                    key={type.value}
+                    className={`flex items-center p-3 border-2 rounded-lg cursor-pointer transition-colors ${
+                      hasPlatform
+                        ? 'border-gray-200 hover:bg-gray-50'
+                        : 'border-gray-100 bg-gray-50 cursor-not-allowed opacity-70'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="featured_type"
+                      value={type.value}
+                      checked={selectedFeaturedType === type.value}
+                      onChange={(e) => setSelectedFeaturedType(e.target.value)}
+                      className="mr-3"
+                      disabled={!hasPlatform}
+                    />
+                    <div>
+                      <div className="font-semibold text-gray-900">{type.label} Featured</div>
+                      <div className="text-sm text-gray-600">
+                        {hasPlatform ? type.description : `Creator has no ${type.label} account`}
+                      </div>
+                    </div>
+                  </label>
+                );
+              })}
             </div>
 
             <div className="flex justify-end space-x-3">

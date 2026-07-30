@@ -33,6 +33,7 @@ from .post_sentiment_comment import PostSentimentComment
 from .portfolio_item import PortfolioItem
 from .smilepay_transaction import SmilePayTransaction
 from .client_workspace import ClientWorkspace, WorkspaceAddon, WorkspaceAuditLog, WorkspaceInvitation, WorkspaceMemberPermission
+from .creator_team import CreatorTeamAuditLog, CreatorTeamInvitation, CreatorTeamMember
 
 # Trust & Safety models
 from .user_block import UserBlock
@@ -47,6 +48,7 @@ from .support_ticket_attachment import SupportTicketAttachment
 
 # Logging models
 from .request_log import RequestLog
+from .admin_activity_log import AdminActivityLog
 
 # Import milestone models BEFORE their parent models
 from .collaboration_milestone import CollaborationMilestone
@@ -67,6 +69,7 @@ from .campaign_cart import CampaignCartItem
 from .spotlight_boost import SpotlightBoost
 from .campaign_report import CampaignReportSchedule, CampaignReportShare
 from .creator_match_feedback import CreatorMatchFeedback
+from .account_fee_override import AccountFeeOverride
 from .referral import (
     AccountCreditTransaction,
     Referral,
@@ -130,6 +133,7 @@ __all__ = [
     'SupportTicketMessage',
     'SupportTicketAttachment',
     'RequestLog',
+    'AdminActivityLog',
     'CampaignInvitation',
     'CampaignPayment',
     'CampaignPaymentItem',
@@ -141,6 +145,7 @@ __all__ = [
     'CampaignReportSchedule',
     'CampaignReportShare',
     'CreatorMatchFeedback',
+    'AccountFeeOverride',
     'PortfolioItem',
     'SmilePayTransaction',
     'ClientWorkspace',
@@ -148,6 +153,9 @@ __all__ = [
     'WorkspaceAuditLog',
     'WorkspaceInvitation',
     'WorkspaceMemberPermission',
+    'CreatorTeamAuditLog',
+    'CreatorTeamInvitation',
+    'CreatorTeamMember',
     'CreatorSubscriptionPlan',
     'CreatorSubscription',
     'VerificationApplication',

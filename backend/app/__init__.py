@@ -37,10 +37,55 @@ def create_app(config_name=None):
     db.init_app(app)
     jwt.init_app(app)
     mail.init_app(app)
+
+    @app.after_request
+    def add_mobile_cors_headers(response):
+        origin = request.headers.get('Origin')
+        allowed_origins = set(app.config.get('CORS_ORIGINS') or [])
+        if origin and origin in allowed_origins:
+            response.headers['Access-Control-Allow-Origin'] = origin
+            response.headers['Access-Control-Allow-Credentials'] = 'true'
+            response.headers['Vary'] = 'Origin'
+            response.headers.setdefault(
+                'Access-Control-Allow-Headers',
+                'Content-Type, Authorization, X-Workspace-Id'
+            )
+            response.headers.setdefault(
+                'Access-Control-Allow-Methods',
+                'GET, POST, PUT, PATCH, DELETE, OPTIONS'
+            )
+        return response
+
+    class MobileCorsMiddleware:
+        def __init__(self, wsgi_app, allowed_origins):
+            self.wsgi_app = wsgi_app
+            self.allowed_origins = set(allowed_origins or [])
+
+        def __call__(self, environ, start_response):
+            origin = environ.get('HTTP_ORIGIN')
+
+            def cors_start_response(status, headers, exc_info=None):
+                if origin and origin in self.allowed_origins:
+                    header_names = {name.lower() for name, _ in headers}
+                    if 'access-control-allow-origin' not in header_names:
+                        headers.append(('Access-Control-Allow-Origin', origin))
+                    if 'access-control-allow-credentials' not in header_names:
+                        headers.append(('Access-Control-Allow-Credentials', 'true'))
+                    if 'access-control-allow-headers' not in header_names:
+                        headers.append(('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Workspace-Id'))
+                    if 'access-control-allow-methods' not in header_names:
+                        headers.append(('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS'))
+                    vary = next((value for name, value in headers if name.lower() == 'vary'), '')
+                    if 'origin' not in vary.lower():
+                        headers.append(('Vary', 'Origin'))
+                return start_response(status, headers, exc_info)
+
+            return self.wsgi_app(environ, cors_start_response)
+
     CORS(app,
          origins=app.config['CORS_ORIGINS'],
          supports_credentials=True,
-         allow_headers=['Content-Type', 'Authorization'],
+         allow_headers=['Content-Type', 'Authorization', 'X-Workspace-Id'],
          methods=['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
          expose_headers=['Content-Type', 'Authorization'])
     socketio.init_app(app, cors_allowed_origins=app.config['CORS_ORIGINS'], async_mode='threading')
@@ -76,7 +121,7 @@ def create_app(config_name=None):
         return {'error': 'Token has been revoked'}, 401
 
     # Register blueprints
-    from .routes import auth, users, creators, brands, packages, campaigns, bookings, messages, notifications, analytics, collaborations, reviews, wallet, categories, brand_wallet, custom_packages, disputes, subscriptions, briefs, creator_subscriptions, verification, proposals, platforms, admin_extended, messaging_safety, support, admin_logs, internal, campaign_invitations, campaign_payments, campaign_chats, campaign_cart, portfolio, smilepay_payments, billing, workspaces, spotlight_boosts, campaign_reports, referrals, content_bridge
+    from .routes import auth, users, creators, brands, packages, campaigns, bookings, messages, notifications, analytics, collaborations, reviews, wallet, categories, brand_wallet, custom_packages, disputes, subscriptions, briefs, creator_subscriptions, creator_team, verification, proposals, platforms, admin_extended, messaging_safety, support, admin_logs, internal, campaign_invitations, campaign_payments, campaign_chats, campaign_cart, portfolio, smilepay_payments, billing, workspaces, spotlight_boosts, campaign_reports, referrals, content_bridge
     from .routes import admin  # New admin module structure
 
     app.register_blueprint(auth.bp, url_prefix='/api/auth')
@@ -103,6 +148,7 @@ def create_app(config_name=None):
     app.register_blueprint(briefs.bp, url_prefix='/api/briefs')  # Briefs routes
     app.register_blueprint(proposals.bp, url_prefix='/api/proposals')  # Proposals routes
     app.register_blueprint(creator_subscriptions.creator_subscriptions_bp)  # Creator subscription routes
+    app.register_blueprint(creator_team.bp, url_prefix='/api/creator/team')  # Creator team member routes
     app.register_blueprint(verification.verification_bp)  # Verification routes
     app.register_blueprint(platforms.platforms_bp)  # Platform connection routes
     app.register_blueprint(messaging_safety.bp, url_prefix='/api/messaging')  # Trust & Safety messaging routes
@@ -170,5 +216,7 @@ def create_app(config_name=None):
     # Register Socket.IO handlers
     with app.app_context():
         from . import socket_handlers
+
+    app.wsgi_app = MobileCorsMiddleware(app.wsgi_app, app.config['CORS_ORIGINS'])
 
     return app

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import { workspacesAPI } from '../services/api';
@@ -36,9 +36,10 @@ const StatCard = ({ label, value, icon: Icon }) => (
   </div>
 );
 
-const FeatureLink = ({ to, icon: Icon, title, description }) => (
+const FeatureLink = ({ to, icon: Icon, title, description, onClick }) => (
   <Link
     to={to}
+    onClick={onClick}
     className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm transition-colors hover:border-primary"
   >
     <div className="flex items-start gap-3">
@@ -69,6 +70,7 @@ const SetupStep = ({ done, title, description, action }) => (
 const AgencyDashboard = () => {
   const navigate = useNavigate();
   const { selectWorkspace, refreshWorkspaces, workspaceMeta } = useWorkspace() || {};
+  const createWorkspaceRef = useRef(null);
   const [clients, setClients] = useState([]);
   const [totals, setTotals] = useState(null);
   const [agencyMeta, setAgencyMeta] = useState(null);
@@ -113,6 +115,16 @@ const AgencyDashboard = () => {
   const accountType = meta.account_type || language.account_type || 'agency';
   const workspaceLabel = language.workspace_singular || (accountType === 'enterprise' ? 'brand' : 'client');
   const workspacePlural = language.workspace_plural || (accountType === 'enterprise' ? 'brands' : 'clients');
+  const workspaceLimit = Number(meta.included_limit || 0);
+  const workspaceUsed = Number(meta.active_count ?? totals?.clients ?? clients.length ?? 0);
+  const workspaceRemaining = workspaceLimit ? Math.max(0, workspaceLimit - workspaceUsed) : null;
+
+  const openCreateWorkspaceForm = () => {
+    setShowCreateForm(true);
+    window.setTimeout(() => {
+      createWorkspaceRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 50);
+  };
 
   const fetchDashboard = async () => {
       try {
@@ -155,8 +167,10 @@ const AgencyDashboard = () => {
   }, [pendingAddon, workspaceMeta]);
 
   const handleClientSelect = async (workspaceId) => {
+    const selectedClient = clients.find((client) => String(client.id) === String(workspaceId));
     selectWorkspace?.(workspaceId);
     await refreshWorkspaces?.();
+    toast.success(`Switched to ${selectedClient?.name || 'selected'} ${workspaceLabel} workspace`);
   };
 
   const handleCreateWorkspace = async (event) => {
@@ -335,7 +349,7 @@ const AgencyDashboard = () => {
       action: meta.is_agency ? (
         <button
           type="button"
-          onClick={() => setShowCreateForm(true)}
+          onClick={openCreateWorkspaceForm}
           className="rounded-full bg-primary px-4 py-2 text-sm font-semibold text-dark hover:bg-primary/90"
         >
           {language.add_label}
@@ -647,7 +661,7 @@ const AgencyDashboard = () => {
                   </div>
                   <button
                     type="button"
-                    onClick={() => setShowCreateForm(true)}
+                    onClick={openCreateWorkspaceForm}
                     className="inline-flex items-center justify-center gap-2 rounded-full bg-primary px-5 py-3 text-sm font-semibold text-dark hover:bg-primary/90"
                   >
                     <PlusIcon className="h-5 w-5" />
@@ -673,7 +687,7 @@ const AgencyDashboard = () => {
                       description="Set logo, report colors, sender details, and email signature."
                     />
                     <FeatureLink
-                      to="/billing"
+                      to="/brand/billing"
                       icon={CurrencyDollarIcon}
                       title="Central billing"
                       description={`Review invoices and spend across all ${workspacePlural}.`}
@@ -686,6 +700,13 @@ const AgencyDashboard = () => {
                     />
                     <FeatureLink
                       to={clients[0] ? `/brand/workspaces/${clients[0].id}` : '/brand/agency'}
+                      onClick={(event) => {
+                        if (!clients[0]) {
+                          event.preventDefault();
+                          openCreateWorkspaceForm();
+                          toast('Add your first workspace before inviting team members.');
+                        }
+                      }}
                       icon={UserGroupIcon}
                       title="Team permissions"
                       description={`Invite teammates and assign access per ${workspaceLabel}.`}
@@ -701,11 +722,25 @@ const AgencyDashboard = () => {
               </section>
 
               <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
-                <StatCard label={language.workspace_plural[0].toUpperCase() + language.workspace_plural.slice(1)} value={totals?.clients || 0} icon={BuildingOffice2Icon} />
+                <StatCard
+                  label={`${language.workspace_plural[0].toUpperCase() + language.workspace_plural.slice(1)} Used`}
+                  value={workspaceLimit ? `${workspaceUsed}/${workspaceLimit}` : workspaceUsed}
+                  icon={BuildingOffice2Icon}
+                />
                 <StatCard label="Campaigns" value={totals?.campaigns || 0} icon={ChartBarIcon} />
                 <StatCard label="Active Collaborations" value={totals?.active_collaborations || 0} icon={CheckCircleIcon} />
                 <StatCard label="Total Spend" value={money(totals?.spend)} icon={CurrencyDollarIcon} />
               </div>
+
+              {workspaceLimit > 0 && (
+                <div className="rounded-3xl border border-primary/30 bg-primary/10 p-4 text-sm text-dark">
+                  <span className="font-semibold">{workspaceUsed}/{workspaceLimit} {workspacePlural} workspaces used.</span>
+                  {' '}
+                  {workspaceRemaining > 0
+                    ? `${workspaceRemaining} included ${workspaceRemaining === 1 ? 'workspace remains' : 'workspaces remain'} before extra workspace billing applies.`
+                    : 'Included workspace allowance has been used. Extra workspaces can still be added with add-on billing.'}
+                </div>
+              )}
 
               <section className="rounded-3xl bg-white p-6 shadow-sm">
                 <div className="mb-5 flex items-center justify-between">
@@ -720,7 +755,7 @@ const AgencyDashboard = () => {
                 </div>
 
                 {showCreateForm && (
-                  <form onSubmit={handleCreateWorkspace} className="mb-6 grid grid-cols-1 gap-3 rounded-2xl bg-light p-4 md:grid-cols-4">
+                  <form ref={createWorkspaceRef} onSubmit={handleCreateWorkspace} className="mb-6 grid grid-cols-1 gap-3 rounded-2xl bg-light p-4 md:grid-cols-4">
                     <input
                       value={form.name}
                       onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}

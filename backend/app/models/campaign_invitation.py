@@ -76,8 +76,14 @@ class CampaignInvitation(db.Model):
         # Get creator profile
         creator_profile = CreatorProfile.query.filter_by(user_id=self.creator_user_id).first()
 
-        # Get brand profile (inviter)
+        # Show the client workspace brand on agency campaigns. The agency parent
+        # owns the record, but creators should see the brand they will work with.
         brand_profile = BrandProfile.query.filter_by(user_id=self.invited_by_user_id).first()
+        display_brand_name = brand_profile.company_name if brand_profile else self.invited_by.email
+        display_brand_logo = brand_profile.logo if brand_profile else None
+        if self.campaign and self.campaign.workspace:
+            display_brand_name = self.campaign.workspace.name or display_brand_name
+            display_brand_logo = self.campaign.workspace.logo or display_brand_logo
 
         return {
             'id': self.id,
@@ -91,8 +97,8 @@ class CampaignInvitation(db.Model):
             },
             'invited_by': {
                 'user_id': self.invited_by_user_id,
-                'company_name': brand_profile.company_name if brand_profile else self.invited_by.email,
-                'logo': brand_profile.logo if brand_profile else None,
+                'company_name': display_brand_name,
+                'logo': display_brand_logo,
             },
             'invitation_type': self.invitation_type,
             'status': self.status,

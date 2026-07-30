@@ -96,6 +96,8 @@ def get_team_member_limit(user_id):
     slug = (plan.slug or '').lower()
     fallback_limit = PLAN_TEAM_MEMBER_LIMITS.get(slug)
     configured_limit = int(plan.max_team_members or 0)
+    if is_agency_plan(plan):
+        return max(configured_limit, PLAN_TEAM_MEMBER_LIMITS['agency']), plan
     if fallback_limit:
         return fallback_limit, plan
     return configured_limit or PLAN_TEAM_MEMBER_LIMITS['free'], plan
@@ -115,7 +117,10 @@ def expire_workspace_invitations(workspace_id):
 
 def get_workspace_seat_usage(workspace, exclude_invitation_id=None):
     expire_workspace_invitations(workspace.id)
-    member_count = WorkspaceMemberPermission.query.filter_by(workspace_id=workspace.id).count()
+    member_count = WorkspaceMemberPermission.query.filter(
+        WorkspaceMemberPermission.workspace_id == workspace.id,
+        WorkspaceMemberPermission.role != 'owner',
+    ).count()
     pending_query = WorkspaceInvitation.query.filter(
         WorkspaceInvitation.workspace_id == workspace.id,
         WorkspaceInvitation.status == 'pending',

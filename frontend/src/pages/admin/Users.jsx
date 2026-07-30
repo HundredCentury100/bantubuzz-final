@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import {
   getUsers,
@@ -25,6 +26,7 @@ export default function AdminUsers() {
   });
   const [pagination, setPagination] = useState({ page: 1, per_page: 20, total: 0 });
   const [actionLoading, setActionLoading] = useState(null);
+  const userProfileLinkState = { returnTo: '/admin/users', returnLabel: 'Users' };
 
   useEffect(() => {
     fetchUsers();
@@ -183,6 +185,7 @@ export default function AdminUsers() {
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Phone</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Joined</th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
@@ -191,27 +194,42 @@ export default function AdminUsers() {
               <tbody className="bg-white divide-y divide-gray-200">
                 {loading ? (
                   <tr>
-                    <td colSpan="5" className="px-6 py-12 text-center text-gray-500">
+                    <td colSpan="6" className="px-6 py-12 text-center text-gray-500">
                       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto" />
                     </td>
                   </tr>
                 ) : users.length === 0 ? (
                   <tr>
-                    <td colSpan="5" className="px-6 py-12 text-center text-gray-500">No users found</td>
+                    <td colSpan="6" className="px-6 py-12 text-center text-gray-500">No users found</td>
                   </tr>
                 ) : (
                   users.map((user) => (
                     <tr key={user.id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div>
-                          <div className="font-medium text-gray-900">{user.email}</div>
+                          <Link
+                            to={`/admin/users/${user.id}`}
+                            state={userProfileLinkState}
+                            className="font-medium text-gray-900 hover:text-primary hover:underline"
+                          >
+                            {user.email}
+                          </Link>
                           {user.profile?.username && (
-                            <div className="text-sm text-gray-500">@{user.profile.username}</div>
+                            <Link
+                              to={`/admin/users/${user.id}`}
+                              state={userProfileLinkState}
+                              className="block text-sm text-gray-500 hover:text-primary hover:underline"
+                            >
+                              @{user.profile.username}
+                            </Link>
                           )}
                         </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className="capitalize text-gray-900">{user.user_type}</span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                        {user.user_type === 'creator' ? (user.phone_number || 'Not provided') : '-'}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex flex-col space-y-1">
@@ -223,7 +241,15 @@ export default function AdminUsers() {
                         {new Date(user.created_at).toLocaleDateString()}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <div className="flex justify-end space-x-2">
+                        <div className="flex justify-end items-center space-x-3">
+                          <Link
+                            to={`/admin/users/${user.id}`}
+                            state={userProfileLinkState}
+                            className="text-primary hover:text-primary-dark font-semibold"
+                            title="View profile and admin controls"
+                          >
+                            View
+                          </Link>
                           {user.is_verified ? (
                             <button
                               onClick={() => handleUnverify(user.id)}

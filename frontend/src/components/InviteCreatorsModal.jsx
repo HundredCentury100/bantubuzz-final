@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { FaTimes, FaSearch, FaCheckCircle, FaPaperPlane, FaUser, FaShoppingCart } from 'react-icons/fa';
-import { creatorsAPI, campaignsAPI } from '../services/api';
+import { creatorsAPI, campaignsAPI, packagesAPI } from '../services/api';
 import { campaignInvitationsAPI } from '../services/campaignInvitationsAPI';
 import toast from 'react-hot-toast';
 
@@ -29,7 +29,10 @@ const InviteCreatorsModal = ({ isOpen, onClose, campaign }) => {
   const loadCreators = async () => {
     try {
       setSearchLoading(true);
-      const response = await creatorsAPI.getAll();
+      const response = await creatorsAPI.getCreators({
+        per_page: 1000,
+        include_without_packages: true
+      });
       setCreators(response.data.creators || []);
     } catch (error) {
       console.error('Failed to load creators:', error);
@@ -40,13 +43,29 @@ const InviteCreatorsModal = ({ isOpen, onClose, campaign }) => {
   };
 
   const loadPackages = async () => {
+    if (selectedCreators.length !== 1) {
+      setPackages([]);
+      setSelectedPackage(null);
+      return;
+    }
+
     try {
-      const response = await creatorsAPI.getPackages();
+      const response = await packagesAPI.getPackages({
+        creator_id: selectedCreators[0],
+        per_page: 100
+      });
       setPackages(response.data.packages || []);
     } catch (error) {
       console.error('Failed to load packages:', error);
+      setPackages([]);
     }
   };
+
+  useEffect(() => {
+    if (isOpen && invitationType === 'join') {
+      loadPackages();
+    }
+  }, [isOpen, invitationType, selectedCreators]);
 
   const handleSearch = (query) => {
     setSearchQuery(query);
@@ -85,6 +104,7 @@ const InviteCreatorsModal = ({ isOpen, onClose, campaign }) => {
       if (invitationType === 'join') {
         let successCount = 0;
         let failCount = 0;
+        const failureMessages = [];
 
         for (const creatorId of selectedCreators) {
           try {
@@ -106,6 +126,10 @@ const InviteCreatorsModal = ({ isOpen, onClose, campaign }) => {
             successCount++;
           } catch (error) {
             console.error(`Failed to add invitation for creator ${creatorId}:`, error);
+            const backendMessage = error.response?.data?.error || error.response?.data?.message;
+            if (backendMessage && !failureMessages.includes(backendMessage)) {
+              failureMessages.push(backendMessage);
+            }
             failCount++;
           }
         }
@@ -114,7 +138,11 @@ const InviteCreatorsModal = ({ isOpen, onClose, campaign }) => {
           toast.success(`Added ${successCount} invitation(s) to cart! Go to Cart tab to complete payment.`);
         }
         if (failCount > 0) {
-          toast.error(`Failed to add ${failCount} invitation(s) to cart`);
+          toast.error(
+            failureMessages.length > 0
+              ? failureMessages.join('; ')
+              : `Failed to add ${failCount} invitation(s) to cart`
+          );
         }
       } else {
         // For 'apply' invitations, use existing flow (no payment)
@@ -157,6 +185,7 @@ const InviteCreatorsModal = ({ isOpen, onClose, campaign }) => {
     const query = searchQuery.toLowerCase();
     return (
       creator.display_name?.toLowerCase().includes(query) ||
+      creator.username?.toLowerCase().includes(query) ||
       creator.category?.toLowerCase().includes(query) ||
       creator.location?.toLowerCase().includes(query)
     );
@@ -256,17 +285,20 @@ const InviteCreatorsModal = ({ isOpen, onClose, campaign }) => {
                     className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent"
                   >
                     <option value="">Choose a package...</option>
-                    {packages.map(pkg => (
+                    {packages.map(pkg => {
+                      const price = Number(pkg.price || 0);
+                      return (
                       <option key={pkg.id} value={pkg.id}>
-                        {pkg.title} - R{pkg.price?.toFixed(2)}
+                        {pkg.title} - ${Number.isFinite(price) ? price.toFixed(2) : '0.00'}
                       </option>
-                    ))}
+                      );
+                    })}
                   </select>
                 </div>
               )}
               <div>
                 <label className="block text-xs text-gray-600 mb-2">
-                  Or Enter Proposed Amount (ZAR)
+                  Or Enter Proposed Amount (USD)
                 </label>
                 <input
                   type="number"
@@ -338,10 +370,10 @@ const InviteCreatorsModal = ({ isOpen, onClose, campaign }) => {
             <div className="space-y-3">
               {filteredCreators.map((creator) => (
                 <div
-                  key={creator.user_id}
-                  onClick={() => toggleCreatorSelection(creator.user_id)}
+                  key={creator.id}
+                  onClick={() => toggleCreatorSelection(creator.id)}
                   className={`p-4 rounded-xl border-2 cursor-pointer transition-all ${
-                    selectedCreators.includes(creator.user_id)
+                    selectedCreators.includes(creator.id)
                       ? 'border-primary bg-primary/5'
                       : 'border-gray-200 hover:border-gray-300'
                   }`}
@@ -349,11 +381,11 @@ const InviteCreatorsModal = ({ isOpen, onClose, campaign }) => {
                   <div className="flex items-center gap-4">
                     {/* Checkbox */}
                     <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ${
-                      selectedCreators.includes(creator.user_id)
+                      selectedCreators.includes(creator.id)
                         ? 'bg-primary border-primary'
                         : 'border-gray-300'
                     }`}>
-                      {selectedCreators.includes(creator.user_id) && (
+                      {selectedCreators.includes(creator.id) && (
                         <FaCheckCircle className="text-white" size={12} />
                       )}
                     </div>

@@ -1,6 +1,11 @@
 import axios from 'axios';
+import { isNativeAppRuntime } from '../utils/nativeApp';
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
+const configuredApiBaseUrl = import.meta.env.VITE_API_URL || '/api';
+const API_BASE_URL =
+  isNativeAppRuntime() && configuredApiBaseUrl.startsWith('/')
+    ? `https://bantubuzz.com${configuredApiBaseUrl}`
+    : configuredApiBaseUrl;
 const apiOrigin = API_BASE_URL.endsWith('/api')
   ? API_BASE_URL.slice(0, -4)
   : API_BASE_URL;
@@ -17,7 +22,7 @@ const api = axios.create({
 // Request interceptor to add auth token
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('access_token');
+    const token = localStorage.getItem('access_token') || localStorage.getItem('token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
@@ -56,6 +61,7 @@ api.interceptors.response.use(
 
           const { access_token } = response.data;
           localStorage.setItem('access_token', access_token);
+          localStorage.setItem('token', access_token);
 
           // Retry original request with new token
           originalRequest.headers.Authorization = `Bearer ${access_token}`;
@@ -65,6 +71,7 @@ api.interceptors.response.use(
         // Refresh failed, logout user
         localStorage.removeItem('access_token');
         localStorage.removeItem('refresh_token');
+        localStorage.removeItem('token');
         localStorage.removeItem('user');
         window.location.href = '/login';
         return Promise.reject(refreshError);
@@ -474,6 +481,16 @@ export const workspacesAPI = {
   getInvitation: (token) => api.get(`/workspaces/invitations/${token}`),
   acceptInvitation: (token) => api.post(`/workspaces/invitations/${token}/accept`),
   cancelInvitation: (invitationId) => api.delete(`/workspaces/invitations/${invitationId}`),
+};
+
+// Creator Team Access API
+export const creatorTeamAPI = {
+  getTeam: () => api.get('/creator/team'),
+  saveMember: (data) => api.post('/creator/team/members', data),
+  removeMember: (memberId) => api.delete(`/creator/team/members/${memberId}`),
+  cancelInvitation: (invitationId) => api.delete(`/creator/team/invitations/${invitationId}`),
+  getInvitation: (token) => api.get(`/creator/team/invitations/${token}`),
+  acceptInvitation: (token) => api.post(`/creator/team/invitations/${token}/accept`),
 };
 
 // Briefs API

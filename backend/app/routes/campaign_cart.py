@@ -18,6 +18,7 @@ from app.services.campaign_cart_payment_service import (
     pay_campaign_cart_with_wallet,
 )
 from app.services.campaign_scenario_service import CampaignScenarioService
+from app.services.workspace_service import require_workspace_access
 from app.utils.notifications import create_notification
 from datetime import datetime, timedelta
 from decimal import Decimal
@@ -30,6 +31,55 @@ bp = Blueprint('campaign_cart', __name__, url_prefix='/api/campaigns')
 UPLOAD_FOLDER = '/var/www/bantubuzz/backend/uploads/payment_proofs'
 
 
+def _load_brand_campaign(campaign_id, permission='can_manage_campaigns'):
+    user_id = int(get_jwt_identity())
+    user = User.query.get(user_id)
+    if not user or user.user_type != 'brand':
+        return None, None, None, (jsonify({'error': 'Unauthorized'}), 403)
+
+    brand = BrandProfile.query.filter_by(user_id=user_id).first()
+    if not brand:
+        return None, None, None, (jsonify({'error': 'Brand profile not found'}), 404)
+
+    campaign = Campaign.query.get(campaign_id)
+    if not campaign:
+        return None, None, None, (jsonify({'error': 'Campaign not found'}), 404)
+
+    if campaign.workspace_id:
+        _, workspace_error, workspace_status = require_workspace_access(
+            user_id,
+            campaign.workspace_id,
+            permission,
+        )
+        if workspace_error:
+            return None, None, None, (jsonify({'error': workspace_error}), workspace_status)
+    elif campaign.brand_id != brand.id:
+        return None, None, None, (jsonify({'error': 'Campaign not found or access denied'}), 404)
+
+    return user, brand, campaign, None
+
+
+def _campaign_display_brand(campaign, fallback_brand=None):
+    """Show creators the client brand for agency workspace campaigns, not the agency parent."""
+    workspace = getattr(campaign, 'workspace', None)
+    if workspace:
+        return {
+            'name': workspace.name or 'A brand',
+            'logo': workspace.logo,
+        }
+
+    brand = fallback_brand or getattr(campaign, 'brand', None)
+    return {
+        'name': (
+            getattr(brand, 'company_name', None)
+            or getattr(brand, 'business_name', None)
+            or getattr(brand, 'display_name', None)
+            or 'A brand'
+        ),
+        'logo': getattr(brand, 'logo', None),
+    }
+
+
 @bp.route('/<int:campaign_id>/cart', methods=['GET'])
 @jwt_required()
 def get_campaign_cart(campaign_id):
@@ -38,20 +88,9 @@ def get_campaign_cart(campaign_id):
     Returns both pending and paid items (can filter by status)
     """
     try:
-        user_id = int(get_jwt_identity())
-        user = User.query.get(user_id)
-
-        if not user or user.user_type != 'brand':
-            return jsonify({'error': 'Unauthorized'}), 403
-
-        brand = BrandProfile.query.filter_by(user_id=user_id).first()
-        if not brand:
-            return jsonify({'error': 'Brand profile not found'}), 404
-
-        # Verify brand owns the campaign
-        campaign = Campaign.query.get(campaign_id)
-        if not campaign or campaign.brand_id != brand.id:
-            return jsonify({'error': 'Campaign not found or access denied'}), 404
+        user, brand, campaign, error = _load_brand_campaign(campaign_id, 'can_manage_campaigns')
+        if error:
+            return error
 
         # Get filter parameters
         payment_status = request.args.get('payment_status', 'pending')  # 'pending', 'paid', 'all'
@@ -85,18 +124,9 @@ def get_campaign_cart(campaign_id):
 def get_campaign_cart_scenarios(campaign_id):
     """Predict campaign outcome scenarios for the current cart selection."""
     try:
-        user_id = int(get_jwt_identity())
-        user = User.query.get(user_id)
-        if not user or user.user_type != 'brand':
-            return jsonify({'error': 'Unauthorized'}), 403
-
-        brand = BrandProfile.query.filter_by(user_id=user_id).first()
-        if not brand:
-            return jsonify({'error': 'Brand profile not found'}), 404
-
-        campaign = Campaign.query.get(campaign_id)
-        if not campaign or campaign.brand_id != brand.id:
-            return jsonify({'error': 'Campaign not found or access denied'}), 404
+        user, brand, campaign, error = _load_brand_campaign(campaign_id, 'can_manage_campaigns')
+        if error:
+            return error
 
         item_ids = request.args.getlist('cart_item_ids', type=int)
         prediction = CampaignScenarioService.predict_for_cart(campaign_id, item_ids or None)
@@ -117,19 +147,9 @@ def add_invitation_to_cart(campaign_id):
     Supports both 'invite_to_apply' and 'invite_with_package' types
     """
     try:
-        user_id = int(get_jwt_identity())
-        user = User.query.get(user_id)
-
-        if not user or user.user_type != 'brand':
-            return jsonify({'error': 'Unauthorized'}), 403
-
-        brand = BrandProfile.query.filter_by(user_id=user_id).first()
-        if not brand:
-            return jsonify({'error': 'Brand profile not found'}), 404
-
-        campaign = Campaign.query.get(campaign_id)
-        if not campaign or campaign.brand_id != brand.id:
-            return jsonify({'error': 'Campaign not found or access denied'}), 404
+        user, brand, campaign, error = _load_brand_campaign(campaign_id, 'can_manage_campaigns')
+        if error:
+            return error
 
         data = request.get_json()
         creator_id = data.get('creator_id')
@@ -147,59 +167,113 @@ def add_invitation_to_cart(campaign_id):
 
         # Validate based on invitation type
         if invitation_type == 'invite_with_package':
-            if not package_id:
-                return jsonify({'error': 'package_id is required for package invitation'}), 400
+            package = None
+            if package_id:
+                package = Package.query.get(package_id)
+                if not package or package.creator_id != creator_id:
+                    return jsonify({'error': 'Package not found or does not belong to creator'}), 404
+                if not package.has_deliverables():
+                    return jsonify({'error': 'This package cannot be added because it has no deliverables'}), 400
 
-            package = Package.query.get(package_id)
-            if not package or package.creator_id != creator_id:
-                return jsonify({'error': 'Package not found or does not belong to creator'}), 404
+            if not package and not amount:
+                return jsonify({'error': 'Select a package or enter a proposed amount'}), 400
 
             invitation_amount = Decimal(str(amount or package.price))
         else:
             # invite_to_apply - no upfront amount (creator will propose)
             invitation_amount = Decimal('0.00')
 
-        # Check if invitation already exists
+        # Reuse an existing pending invitation instead of failing. This makes the
+        # action safe to retry if the previous request created the invite but did
+        # not create the cart item or surface the notification.
         existing_invitation = CampaignInvitation.query.filter_by(
             campaign_id=campaign_id,
-            creator_user_id=creator.user_id,
-            status='pending'
+            creator_user_id=creator.user_id
         ).first()
 
         if existing_invitation:
-            return jsonify({'error': 'Invitation already sent to this creator'}), 400
-
-        # Create invitation (status='pending', in_cart=True)
-        invitation = CampaignInvitation(
-            campaign_id=campaign_id,
-            creator_user_id=creator.user_id,
-            invited_by_user_id=user_id,
-            invitation_type='join' if invitation_type == 'invite_with_package' else 'apply',
-            package_id=package_id,
-            proposed_amount=invitation_amount if invitation_type == 'invite_with_package' else None,
-            message=message,
-            status='pending',
-            expires_at=datetime.utcnow() + timedelta(days=int(data.get('expires_in_days', 7)))
-        )
-        db.session.add(invitation)
+            invitation = existing_invitation
+            invitation.invited_by_user_id = user.id
+            invitation.invitation_type = 'invite_to_join' if invitation_type == 'invite_with_package' else 'invite_to_apply'
+            invitation.package_id = package_id
+            invitation.proposed_amount = invitation_amount if invitation_type == 'invite_with_package' else None
+            invitation.message = message
+            invitation.status = 'pending'
+            invitation.responded_at = None
+            invitation.response_message = None
+            invitation.expires_at = datetime.utcnow() + timedelta(days=int(data.get('expires_in_days', 7)))
+            invitation.updated_at = datetime.utcnow()
+        else:
+            invitation = CampaignInvitation(
+                campaign_id=campaign_id,
+                creator_user_id=creator.user_id,
+                invited_by_user_id=user.id,
+                invitation_type='invite_to_join' if invitation_type == 'invite_with_package' else 'invite_to_apply',
+                package_id=package_id,
+                proposed_amount=invitation_amount if invitation_type == 'invite_with_package' else None,
+                message=message,
+                status='pending',
+                expires_at=datetime.utcnow() + timedelta(days=int(data.get('expires_in_days', 7)))
+            )
+            db.session.add(invitation)
         db.session.flush()
 
         # Only create cart item for invite_with_package (requires payment)
         cart_item = None
         if invitation_type == 'invite_with_package':
-            cart_item = CampaignCartItem(
+            custom_deliverables = None
+            if not package_id:
+                custom_deliverables = []
+                for milestone in campaign.milestones.all():
+                    custom_deliverables.extend(milestone.deliverables or [])
+
+                if not custom_deliverables:
+                    db.session.rollback()
+                    return jsonify({
+                        'error': 'This campaign must have at least one deliverable before using a proposed amount invite'
+                    }), 400
+
+            cart_item = CampaignCartItem.query.filter_by(
                 campaign_id=campaign_id,
-                brand_id=brand.id,
-                item_type='invitation',
-                invitation_id=invitation.id,
                 creator_id=creator_id,
-                package_id=package_id,
-                amount=invitation_amount,
-                notes=message
-            )
-            db.session.add(cart_item)
+                item_type='invitation',
+                payment_status='pending'
+            ).first()
+
+            if cart_item:
+                cart_item.invitation_id = invitation.id
+                cart_item.brand_id = brand.id
+                cart_item.package_id = package_id
+                cart_item.amount = invitation_amount
+                cart_item.notes = message
+                if custom_deliverables is not None:
+                    cart_item.custom_deliverables = custom_deliverables
+            else:
+                cart_item = CampaignCartItem(
+                    campaign_id=campaign_id,
+                    brand_id=brand.id,
+                    item_type='invitation',
+                    invitation_id=invitation.id,
+                    creator_id=creator_id,
+                    package_id=package_id,
+                    amount=invitation_amount,
+                    notes=message,
+                    custom_deliverables=custom_deliverables
+                )
+                db.session.add(cart_item)
 
         db.session.commit()
+        display_brand = _campaign_display_brand(campaign, brand)
+        stored_invitation_type = 'invite_to_join' if invitation_type == 'invite_with_package' else 'invite_to_apply'
+
+        create_notification(
+            creator.user_id,
+            'campaign',
+            'Campaign Invitation',
+            f'{display_brand["name"]} invited you to '
+            f'{"join" if invitation_type == "invite_with_package" else "apply to"} "{campaign.title}".',
+            f'/creator/campaigns/{campaign_id}'
+        )
 
         # Send email notification to creator (different for paid vs apply)
         creator_user = User.query.get(creator.user_id)
@@ -210,10 +284,10 @@ def add_invitation_to_cart(campaign_id):
                     EmailService.send_campaign_invitation_email(
                         creator_email=creator_user.email,
                         creator_name=creator.display_name or creator.username,
-                        brand_name=brand.company_name or brand.display_name,
+                        brand_name=display_brand["name"],
                         campaign_title=campaign.title,
                         campaign_url=f"https://bantubuzz.com/creator/campaigns/{campaign_id}",
-                        invitation_type='join directly',
+                        invitation_type=stored_invitation_type,
                         message=message
                     )
                 else:
@@ -221,10 +295,10 @@ def add_invitation_to_cart(campaign_id):
                     EmailService.send_campaign_invitation_email(
                         creator_email=creator_user.email,
                         creator_name=creator.display_name or creator.username,
-                        brand_name=brand.company_name or brand.display_name,
+                        brand_name=display_brand["name"],
                         campaign_title=campaign.title,
                         campaign_url=f"https://bantubuzz.com/creator/campaigns/{campaign_id}",
-                        invitation_type='apply to',
+                        invitation_type=stored_invitation_type,
                         message=message
                     )
             except Exception as email_error:
@@ -253,19 +327,9 @@ def add_application_to_cart(campaign_id):
     Accept a creator's application and add to cart (no immediate payment)
     """
     try:
-        user_id = int(get_jwt_identity())
-        user = User.query.get(user_id)
-
-        if not user or user.user_type != 'brand':
-            return jsonify({'error': 'Unauthorized'}), 403
-
-        brand = BrandProfile.query.filter_by(user_id=user_id).first()
-        if not brand:
-            return jsonify({'error': 'Brand profile not found'}), 404
-
-        campaign = Campaign.query.get(campaign_id)
-        if not campaign or campaign.brand_id != brand.id:
-            return jsonify({'error': 'Campaign not found or access denied'}), 404
+        user, brand, campaign, error = _load_brand_campaign(campaign_id, 'can_manage_campaigns')
+        if error:
+            return error
 
         data = request.get_json()
         proposal_id = data.get('proposal_id')
@@ -336,19 +400,9 @@ def add_package_to_cart(campaign_id):
     Add a creator's package to campaign cart (no immediate payment)
     """
     try:
-        user_id = int(get_jwt_identity())
-        user = User.query.get(user_id)
-
-        if not user or user.user_type != 'brand':
-            return jsonify({'error': 'Unauthorized'}), 403
-
-        brand = BrandProfile.query.filter_by(user_id=user_id).first()
-        if not brand:
-            return jsonify({'error': 'Brand profile not found'}), 404
-
-        campaign = Campaign.query.get(campaign_id)
-        if not campaign or campaign.brand_id != brand.id:
-            return jsonify({'error': 'Campaign not found or access denied'}), 404
+        user, brand, campaign, error = _load_brand_campaign(campaign_id, 'can_manage_campaigns')
+        if error:
+            return error
 
         data = request.get_json()
         package_id = data.get('package_id')
@@ -361,6 +415,8 @@ def add_package_to_cart(campaign_id):
         package = Package.query.get(package_id)
         if not package:
             return jsonify({'error': 'Package not found'}), 404
+        if not package.has_deliverables():
+            return jsonify({'error': 'This package cannot be added because it has no deliverables'}), 400
 
         # Verify creator_id matches
         if creator_id and package.creator_id != creator_id:
@@ -411,15 +467,9 @@ def remove_from_cart(campaign_id, cart_item_id):
     Remove item from cart (only if not yet paid)
     """
     try:
-        user_id = int(get_jwt_identity())
-        user = User.query.get(user_id)
-
-        if not user or user.user_type != 'brand':
-            return jsonify({'error': 'Unauthorized'}), 403
-
-        brand = BrandProfile.query.filter_by(user_id=user_id).first()
-        if not brand:
-            return jsonify({'error': 'Brand profile not found'}), 404
+        user, brand, campaign, error = _load_brand_campaign(campaign_id, 'can_manage_campaigns')
+        if error:
+            return error
 
         cart_item = CampaignCartItem.query.get(cart_item_id)
         if not cart_item or cart_item.campaign_id != campaign_id:
@@ -455,22 +505,6 @@ def remove_from_cart(campaign_id, cart_item_id):
 
 
 # PAYMENT ENDPOINTS
-
-def _load_brand_campaign(campaign_id):
-    user_id = int(get_jwt_identity())
-    user = User.query.get(user_id)
-    if not user or user.user_type != 'brand':
-        return None, None, None, (jsonify({'error': 'Unauthorized'}), 403)
-
-    brand = BrandProfile.query.filter_by(user_id=user_id).first()
-    if not brand:
-        return None, None, None, (jsonify({'error': 'Brand profile not found'}), 404)
-
-    campaign = Campaign.query.get(campaign_id)
-    if not campaign or campaign.brand_id != brand.id:
-        return None, None, None, (jsonify({'error': 'Campaign not found or access denied'}), 404)
-
-    return user, brand, campaign, None
 
 
 def _payment_response(payment, collaborations=None):

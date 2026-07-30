@@ -156,11 +156,12 @@ This file is a living handoff guide for future AI/Codex sessions working on the 
   create ThunziAI account" means `ThunziAIService.create_company()` failed
   before the platform connection step. Check `thunzi_service.last_error` in
   masked logs; the deploy script above prints recent Thunzi lines.
-- ThunziAI docs have drifted around API key, login body, and creator-register
-  endpoint naming. `backend/app/services/thunzi_service.py` therefore sends
-  `x-api-key` on requests, retries documented API key candidates on 401/403,
-  uses `username` for `/api/login` with `email` fallback, and falls back from
-  `/api/creator/register` to `/api/creators/register` if needed.
+- ThunziAI docs have drifted around API key, login body, creator-register
+  endpoint naming, and sync payload fields. `backend/app/services/thunzi_service.py`
+  therefore sends `x-api-key` on all Thunzi requests, retries documented API key
+  candidates on 401/403, uses `username` for `/api/login` with `email` fallback,
+  and falls back from `/api/creator/register` to `/api/creators/register` if
+  needed.
 - First-time Thunzi account setup must not assume API-key registration creates
   a normal logged-in cookie session. The correct flow is: register/login the
   Thunzi user, create `/api/company` using `x-api-key`, then attach the
@@ -168,6 +169,9 @@ This file is a living handoff guide for future AI/Codex sessions working on the 
   Store both `thunzi_user_id` and `thunzi_company_id` locally before adding
   platforms. Existing accounts can still use login, which is why they may work
   while new account setup fails.
+- If Thunzi registration returns an "email already exists" response after login
+  failed, treat that as recoverable and continue with API-key company/platform
+  setup. This handles users left half-created by earlier failed attempts.
   Gunicorn's `app:create_app()` and `celery_worker.py` to run DevelopmentConfig
   even when `/etc/bantubuzz/platform.env` says production. The factory now uses
   `create_app(config_name=None)` and reads `FLASK_ENV`. New-VPS hotfix:
@@ -184,6 +188,51 @@ This file is a living handoff guide for future AI/Codex sessions working on the 
   HTTP ACME vhost, installs `deployment\vps\bantubuzz-platform.conf`, verifies
   `https://bantubuzz.com/api/health`, verifies the frontend, and confirms
   `https://app.bantubuzz.com/admin` remains healthy.
+
+## Mobile App / Capacitor
+
+- The Android app in `mobile_app` is a Capacitor shell over the React frontend
+  build from `frontend/dist`; it is not a separate React Native codebase.
+- Native runtime must use production API and socket origins. Relative API paths
+  are resolved to `https://bantubuzz.com/api`, and Socket.IO must not default to
+  `window.location.origin` because Capacitor origin is `https://localhost`.
+- The Messages navbar badge and inbox should use the Node messaging service as
+  the primary source (`/messaging/api/conversations`) in both web and native
+  runtime. Flask `/api/messages/conversations` is only a fallback. Flask may
+  return `last_message` as an object while Node returns a string, so message UI
+  must derive a string preview before filtering or rendering.
+- The Node Socket.IO service must allow Capacitor origins
+  `https://localhost`, `capacitor://localhost`, and `ionic://localhost`, plus
+  the production web origins. If these are missing, Android can load REST pages
+  but realtime messages and foreground notifications will fail.
+- Native Android push uses Firebase Cloud Messaging through
+  `@capacitor/push-notifications` and backend `PushSubscription.endpoint`
+  values prefixed with `native:android:`. Browser Web Push/VAPID can be disabled
+  without blocking native FCM.
+- Native app-open welcome notifications use
+  `@capacitor/local-notifications`; install this plugin in both `frontend` for
+  bundling dynamic imports and `mobile_app` for Android Capacitor sync.
+- Foreground direct-message notifications are local notifications scheduled
+  from the Socket.IO `new_message` event. Firebase FCM is still used for
+  background/offline delivery through `backend/app/services/push_service.py`.
+- After frontend/native notification changes, run `npm run build` in
+  `frontend`, then `npx cap sync android` in `mobile_app`, then rebuild the APK
+  in Android Studio. Backend-only deployment is not enough for native plugin
+  changes.
+- External OAuth/payment returns in the Android app use the mobile return
+  bridge. Public web fallback route: `/mobile/return`; native deep link scheme:
+  `bantubuzz://return`. `NativeDeepLinkHandler` listens for Capacitor
+  `appUrlOpen` events and routes back into the packaged React app while
+  preserving query params such as OAuth `code`, `state`, and payment ids.
+  Use `nativeReturnUrl()`, `mobileReturnState()`, and `openExternalUrl()` from
+  `frontend/src/utils/nativeApp.js` when adding new third-party redirects.
+  Desktop web behavior should continue to use the existing normal return URLs
+  and popup/postMessage flows.
+- Deploy the backend/frontend side of mobile messaging/push fixes with
+  `deployment\vps\DEPLOY-NEW-VPS-MOBILE-NOTIFICATIONS.bat`; it should include
+  `messages.py`, `messaging_safety.py`, `push_service.py`,
+  `messaging-service/server.js`, and the compiled frontend dist. It must
+  restart both `bantubuzz-backend.service` and `bantubuzz-messaging.service`.
 ## Current Project Context
 
 - Workspace: `D:\Bantubuzz Platform`
@@ -701,7 +750,10 @@ Read these before touching social platform connection, creator analytics, post m
 
 ### Core ThunziAI Endpoints Used
 
-- Current API docs now say every request must include `x-api-key`. Existing code only sends the key for creator registration, so check this before changing or debugging Thunzi calls.
+- Current API docs say every request must include `x-api-key`. The service uses
+  `_request_with_api_key_fallback()` across platform, sync, post, and audience
+  calls so both documented key variants keep working when Thunzi enforcement
+  changes.
 - `POST /api/creator/register`: API-key creator registration, bypasses normal OTP onboarding.
 - `POST /api/login`: session login.
 - `POST /api/company`: create a company/account container for a BantuBuzz user.
@@ -734,6 +786,14 @@ Creator route: `POST /api/creator/platforms/connect`
 8. Add platform through `thunzi_service.add_platform`.
 9. Save local `ConnectedPlatform`.
 10. Trigger background sync through `app.tasks.platform_sync.sync_platform.delay(...)`.
+
+Manual/worker sync must call `sync_platform_and_poll()` with full context:
+`platform_id`, `account_id`, `company_id`, and `platform`. The service omits
+`accountId` for Facebook/Instagram but sends it for non-Meta platforms when
+available. Creator and brand sync routes refresh the local `ConnectedPlatform`
+from `GET /api/platforms?companyId=...` even when Thunzi reports `pending`,
+`in_progress`, or a local timeout, because metrics can complete asynchronously
+after the trigger returns.
 
 Brand route: `POST /api/brand/platforms/connect` follows a similar pattern but creates a Thunzi company for the brand and does not create a creator entity.
 
@@ -1281,11 +1341,16 @@ Deployment note:
   - Targeted deploy script: `deployment\DEPLOY-NEW-VPS-ADMIN-PAYMENTS-COLLABORATIONS-FIX.bat`. It uploads only the payment/collaboration/billing backend files, the migration, rebuilt frontend dist, runs `flask db upgrade heads`, then restarts backend/Celery and reloads Apache.
 - Brand subscription wallet payments:
   - Brand subscription checkout supports wallet payment through `POST /api/subscriptions/pay-with-wallet`.
+  - Brand plan subscribe/upgrade endpoints must not initiate the legacy Paynow flow. `POST /api/subscriptions/subscribe` creates a pending paid subscription and `PUT /api/subscriptions/upgrade` prepares a pending paid upgrade, then both return `requires_payment`, `amount_due`, `billing_cycle`, `subscription_id`, and `payment_reference` so the unified payment page can handle Wallet, Smile&Pay, or bank-transfer proof.
+  - Agency upgrade is just a paid brand-plan upgrade. After Wallet/Smile&Pay/admin-approved bank transfer calls `apply_paid_subscription`, `apply_brand_subscription_entitlements` converts the brand profile to `account_type='agency'` and unlocks the Agency dashboard/workspaces.
+  - Brand subscription ownership checks must cast `get_jwt_identity()` to `int` before comparing to `Subscription.user_id`; otherwise bank-transfer proof upload and payment-status checks can falsely return 403 `Unauthorized`.
+  - Because `subscriptions` has both `plan_id` and `pending_plan_id` FKs to `subscription_plans`, any direct `Subscription.query.join(SubscriptionPlan)` must specify `Subscription.plan_id == SubscriptionPlan.id`. This affects paid-tier checks used by profile/security metadata.
   - The subscription payment page should show wallet balance available for subscription as `available_balance + pending_clearance`, while still displaying the available and pending portions separately.
   - Wallet subscription deductions use available funds first, then pending clearance if needed, and activate the subscription immediately through `apply_paid_subscription`.
   - Wallet transactions for subscription payments must include `subscription_reference` in metadata and a readable `SUB-<id>` reference in the description so billing/history can identify the payment.
   - Billing subscription invoices should show `paid` for verified/active paid subscriptions and include `payment_reference`.
   - Targeted deploy script: `deployment\DEPLOY-NEW-VPS-BRAND-SUBSCRIPTION-WALLET-PAYMENT.bat`. It deploys only the subscription/wallet/billing routes plus rebuilt frontend and does not run migrations.
+  - Targeted Agency upgrade handoff fix deploy: `deployment\DEPLOY-NEW-VPS-AGENCY-SUBSCRIPTION-PAYMENT-FIX.bat`. It deploys `backend/app/routes/subscriptions.py` plus rebuilt frontend and does not run migrations.
 - Payment service audit notes:
   - The current wallet schema uses `available_balance` and `pending_clearance`; do not use legacy `wallet.balance`.
   - Brand/customer spending transactions should use `transaction_type='payment'` with a negative amount and metadata identifying the source payment.
@@ -1293,6 +1358,19 @@ Deployment note:
   - Campaign cart payments are the primary campaign payment flow. Legacy campaign payment routes must still tolerate `in_progress` collaborations and use `Collaboration.amount/title`, not nonexistent `collab.package` relationships.
   - SmilePay `payment_type='subscription'` activates the main `Subscription` model. Creator add-ons must use `payment_type='creator_subscription'` so `CreatorSubscription` records and badge/feature effects activate correctly.
   - Bank-transfer receiving accounts are centralized in `backend/app/utils/bank_details.py` and `frontend/src/utils/bankDetails.js`. Keep all bank-transfer screens using `BankTransferDetails` and preserve the generated payment/deposit reference beside the account list.
+  - User-facing payment pages should not say "Paynow" as the primary method label. Use "Secure Payment - all Payment Methods Accepted" for online payments while keeping the internal `paynow` payment method value for compatibility with existing backend routes.
+  - Targeted frontend-only deploy for the payment copy change: `deployment\DEPLOY-NEW-VPS-PAYMENT-WORDING.bat`.
+- Signup bot protection:
+  - Google reCAPTCHA Enterprise is intentionally disabled for now because it was blocking legitimate signups. `RECAPTCHA_ENTERPRISE_ENABLED` defaults to `False`, and the frontend signup forms do not call `grecaptcha`.
+  - If reCAPTCHA is re-enabled later, backend verification lives in `backend/app/utils/recaptcha_enterprise.py` and should be tested with `deployment\CHECK-NEW-VPS-RECAPTCHA-STATUS.bat` before exposing signup traffic.
+  - Production reCAPTCHA enforcement requires `RECAPTCHA_ENTERPRISE_API_KEY` in `/etc/bantubuzz/platform.env`; if enabled and missing, the backend fails closed unless `RECAPTCHA_ENTERPRISE_FAIL_OPEN=true` is explicitly set.
+  - Local bot controls live in `backend/app/utils/signup_protection.py`: Redis-backed IP/email signup rate limits plus hidden honeypot fields. Defaults are 5 attempts per IP per 15 minutes and 3 attempts per email per hour.
+  - Hidden honeypot fields are posted by the creator/brand signup forms but are invisible to real users. Any non-empty honeypot value is rejected before account creation.
+  - Google creator signup is also rate-limited by IP and verified Google email so OAuth cannot bypass local signup throttles.
+  - Use `deployment\SET-NEW-VPS-RECAPTCHA-ENV.bat` to set or rotate the API key on the VPS without committing secrets.
+  - Use `deployment\CHECK-NEW-VPS-RECAPTCHA-STATUS.bat` to verify production env vars, frontend script loading, Google assessment API reachability, and backend health.
+  - Use `deployment\DEPLOY-NEW-VPS-RECAPTCHA-SIGNUP.bat` when deploying frontend/backend reCAPTCHA and signup-hardening code changes.
+  - For bot cleanup, use `deployment\DELETE-NEW-VPS-UNVERIFIED-USERS.bat`. It runs a dry run first, opens the report, and deletes only unverified non-admin creator/brand users after typing `DELETE`.
 - Bulk brief sending:
   - Premium/Agency bulk outreach lives on top of the existing brief system, not campaigns. Brands open `Brand Briefs`, choose an open brief, then use `/brand/briefs/<id>/bulk-send`.
   - Access is enforced server-side in `backend/app/services/bulk_brief_service.py`; eligible plans are Premium, Agency, and Enterprise. The frontend can show the screen, but the route must return a clean 403 upgrade gate for lower tiers.
@@ -1301,6 +1379,37 @@ Deployment note:
   - Scheduled sends are processed by Celery Beat through `app.tasks.bulk_brief_tasks.send_due_bulk_briefs` every 10 minutes. Response tracking syncs proposals back into recipient rows hourly.
   - Open tracking is based on creator visits to `/briefs/<id>?bulk_recipient=<recipient_id>`. Response tracking is based on proposals submitted for the same brief by the same creator.
   - Targeted deploy script: `deployment\DEPLOY-NEW-VPS-BULK-BRIEF-SENDING.bat`. It uploads changed brief/backend/Celery files, migration `202606251000_add_bulk_brief_sending.py`, rebuilt frontend dist, runs `flask db upgrade heads`, and restarts backend plus Celery worker/beat.
+- Agency workspace team access:
+  - Agency plans must always allow at least 10 inviteable team seats, even if an older production plan row has `max_team_members=0` or an unexpected Agency slug variant. Use `is_agency_plan(plan)` before falling back to generic plan-seat defaults.
+  - Workspace owner memberships are internal owner access and should not consume an inviteable team seat. `get_workspace_seat_usage()` counts non-owner members plus pending invitations.
+  - If the Invite Member form is greyed out for an Agency account, inspect `/api/workspaces/<id>/members` and its `seat_usage` payload first.
+  - Agency dashboard "Team permissions" must guide the user to add their first workspace when none exists; otherwise it appears to do nothing because there is no workspace-level permission page yet.
+  - Targeted frontend deploy for the team-permissions click/UI fix: `deployment\DEPLOY-NEW-VPS-AGENCY-TEAM-PERMISSIONS-FIX.bat`.
+- Creator team access:
+  - Creator teams are separate from Agency workspaces. Use `creator_team_members`, `creator_team_invitations`, and `creator_team_audit_logs`, not `client_workspaces`.
+  - Creator owner is always the `creator_profiles.user_id` account and does not consume a team seat.
+  - Rising creators get 2 team seats; Creator Pro creators get 5 team seats; free creators get 0. Limits are derived from the active main `subscriptions` row for the creator user, using stable slugs `rising` and `pro-creator`.
+  - Inviteable creator team roles are `manager` and `agent`. Manager can manage profile/packages/collaborations/messages/analytics but not billing. Agent can manage collaborations/messages/analytics only.
+  - Creator team invitation emails are sent synchronously for reliable QA feedback. If SMTP fails, the API returns a visible error rather than a false "sent".
+  - Frontend entry points are `/creator/team` for owners and `/creator/team-invite/<token>` for invite recipients.
+  - Targeted deploy script: `deployment\vps\DEPLOY-NEW-VPS-CREATOR-TEAM-ACCESS.bat`. It uploads creator team backend files, migration `202607151000_add_creator_team_access.py`, rebuilt frontend dist, runs `flask db upgrade heads`, and restarts backend/Celery/Apache.
+- ThunziAI creator setup:
+  - Prefer the documented singular creator-registration endpoint `/api/creator/register`; keep plural `/api/creators/register` only as a fallback.
+  - Thunzi `/api/company` currently rejects minimal company payloads with a blank 400. Send the full documented company payload: `name`, `size`, `contactEmail`, `industry`, `address`, `city`, `country`, and `keywords`. The response may wrap the ID under `newCompany.id`.
+  - If creators see "Failed to create ThunziAI account" while connecting TikTok/other platforms, the failing step is usually company creation before platform connection, not the OAuth provider callback itself.
+  - Targeted deploy for Agency invite and Thunzi company payload fixes: `deployment\DEPLOY-NEW-VPS-AGENCY-INVITES-THUNZI-FIX.bat`.
+- Admin featured creators and browse search:
+  - Admin featured type options are `general`, `facebook`, `tiktok`, `instagram`, `youtube`, and `ugc`.
+  - Platform-specific featured validation must check connected-platform records as well as legacy `creator_profiles.social_links` and `creator_profiles.platforms`; many real creators no longer maintain manual social links.
+  - Browse creator search should treat `@username` and `username` the same and search creator username before pagination.
+  - Targeted deploy script: `deployment\DEPLOY-NEW-VPS-FEATURED-CREATORS-SEARCH-FIX.bat`.
+- Admin account controls:
+  - Public creator profiles must show the Message button to visitors. If the visitor is not logged in, send them to login/signup with a redirect back into messaging.
+  - The creator paid tier should be displayed as `Creator Pro`; keep the existing `pro-creator` slug stable for compatibility.
+  - Admin user profiles now expose creator controls for Top Creator status and granting Rising/Creator Pro account tiers through the main `subscriptions` table with `payment_method='admin_grant'`.
+  - Admin brand wallet funding should use `credit_brand_wallet()` so credits appear as normal wallet transactions and can be spent immediately.
+  - Account fee overrides live in `account_fee_overrides`. Creator commission overrides apply before referral rewards; brand service/platform fee overrides apply before plan defaults.
+  - Targeted deploy script: `deployment\vps\DEPLOY-NEW-VPS-ADMIN-ACCOUNT-CONTROLS.bat`. It uploads changed backend files, migration `202607131500_add_admin_account_controls.py`, rebuilt frontend dist, runs `flask db upgrade heads`, and restarts backend/Celery/Apache.
 - Campaign scenario analysis:
   - First production slice is a live cart-preview estimator, not the future offline ML training pipeline. It uses `backend/app/services/campaign_scenario_service.py` to estimate worst/base/predicted/best outcomes from campaign cart items, creator connected-platform averages, package deliverables, and historical `post_metrics`.
   - API endpoint: `GET /api/campaigns/<campaign_id>/cart/scenarios`. It is brand-owned and lives in `campaign_cart.py` because the first trigger is the cart before payment.

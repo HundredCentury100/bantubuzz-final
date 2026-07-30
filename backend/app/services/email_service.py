@@ -1222,10 +1222,10 @@ def send_campaign_payment_notification_email(payment_id, recipient_email, recipi
         text_body = f"""
         Hello {recipient_name},
 
-        Your payment of R{float(payment.total_amount):.2f} for the campaign "{campaign.title}" has been initiated.
+        Your payment of ${float(payment.total_amount):.2f} USD for the campaign "{campaign.title}" has been initiated.
 
         Payment Details:
-        - Amount: R{float(payment.total_amount):.2f}
+        - Amount: ${float(payment.total_amount):.2f} USD
         - Method: {payment.payment_method}
         - Status: {payment.status}
         - Creators: {payment.items.count() if hasattr(payment, 'items') else 'Multiple'}
@@ -1256,7 +1256,7 @@ def send_campaign_payment_notification_email(payment_id, recipient_email, recipi
                 <div style="background-color: #DBEAFE; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #3B82F6;">
                     <h3 style="color: #1E40AF; margin-top: 0;">Payment Details</h3>
                     <p style="color: #1E3A8A; margin: 10px 0;">
-                        <strong>Amount:</strong> R{float(payment.total_amount):.2f}<br>
+                        <strong>Amount:</strong> ${float(payment.total_amount):.2f} USD<br>
                         <strong>Method:</strong> {payment.payment_method}<br>
                         <strong>Status:</strong> {payment.status}
                     </p>
@@ -1650,7 +1650,7 @@ def send_booking_auto_accepted_email(creator_email, creator_name, brand_name, pa
     Great news! {brand_name} has booked your package and payment has been confirmed.
 
     Package: {package_title}
-    Amount: R {amount:.2f}
+    Amount: ${amount:.2f} USD
     Expected Delivery: {duration_text}
 
     Deliverables:
@@ -1691,7 +1691,7 @@ def send_booking_auto_accepted_email(creator_email, creator_name, brand_name, pa
                 <h3 style="color: #1E40AF; margin-top: 0;">Collaboration Details</h3>
                 <p style="color: #1E3A8A; margin: 10px 0;">
                     <strong>Package:</strong> {package_title}<br>
-                    <strong>Amount:</strong> R {amount:.2f}<br>
+                    <strong>Amount:</strong> ${amount:.2f} USD<br>
                     <strong>Expected Delivery:</strong> {duration_text}
                 </p>
 

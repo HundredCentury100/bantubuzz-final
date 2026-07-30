@@ -2,6 +2,7 @@
 Helper functions for subscription-related operations
 """
 from app.models import Subscription, SubscriptionPlan
+from app.services.account_fee_override_service import get_effective_fee_percentage
 
 
 def get_brand_platform_fee_percentage(brand_user_id):
@@ -30,7 +31,8 @@ def get_brand_platform_fee_percentage(brand_user_id):
     fee_percentage = subscription.plan.platform_fee_percentage
 
     # Return fee percentage, default to 10% if not set
-    return float(fee_percentage) if fee_percentage is not None else 10.0
+    plan_fee = float(fee_percentage) if fee_percentage is not None else 10.0
+    return get_effective_fee_percentage(brand_user_id, 'brand_platform_fee', plan_fee)
 
 
 def get_brand_subscription_plan(brand_user_id):
@@ -62,7 +64,8 @@ def get_brand_service_fee_percentage(brand_user_id):
         return 12.0
 
     fee_percentage = subscription.plan.service_fee_percentage
-    return float(fee_percentage) if fee_percentage is not None else 12.0
+    plan_fee = float(fee_percentage) if fee_percentage is not None else 12.0
+    return get_effective_fee_percentage(brand_user_id, 'brand_service_fee', plan_fee)
 
 
 def get_brand_analytics_entitlements(brand_user_id):

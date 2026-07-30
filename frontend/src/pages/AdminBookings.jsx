@@ -313,7 +313,7 @@ export default function AdminBookings() {
                       </span>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-900">
-                      <span className="capitalize">{booking.payment_method === 'bank_transfer' ? 'Bank Transfer' : 'Paynow'}</span>
+                      <span className="capitalize">{booking.payment_method === 'bank_transfer' ? 'Bank Transfer' : 'Secure Payment'}</span>
                     </td>
                     <td className="px-6 py-4">
                       {getPaymentStatusBadge(booking.payment_status)}
@@ -381,7 +381,7 @@ export default function AdminBookings() {
                       <td className="px-6 py-4 text-sm font-semibold text-gray-900">{formatCurrency(deposit.amount)}</td>
                       <td className="px-6 py-4">
                         <span className="inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                          {deposit.payment_method === 'bank_transfer' ? 'Bank Transfer' : 'Paynow'}
+                          {deposit.payment_method === 'bank_transfer' ? 'Bank Transfer' : 'Secure Payment'}
                         </span>
                       </td>
                       <td className="px-6 py-4">

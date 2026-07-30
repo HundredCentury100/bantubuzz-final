@@ -210,11 +210,12 @@ def get_creators():
         max_followers = request.args.get('max_followers', type=int)
         min_price = request.args.get('min_price', type=float)
         max_price = request.args.get('max_price', type=float)
-        search = request.args.get('search')
+        search = (request.args.get('search') or '').strip()
         platform = request.args.get('platform')
         page = request.args.get('page', 1, type=int)
         per_page = request.args.get('per_page', 12, type=int)
         sort_by = request.args.get('sort_by', '')
+        include_without_packages = request.args.get('include_without_packages', 'false').lower() in ('1', 'true', 'yes')
 
         # New filter parameters
         languages = request.args.getlist('languages[]') or request.args.get('languages', '').split(',') if request.args.get('languages') else []
@@ -282,7 +283,7 @@ def get_creators():
 
         # Apply search filter - check bio, username, email, AND categories
         if search:
-            search_lower = search.lower()
+            search_lower = search.lower().lstrip('@')
             all_creators = [
                 c for c in all_creators
                 if (
@@ -292,8 +293,12 @@ def get_creators():
                     or (c.bio and search_lower in c.bio.lower())
                     # Search in username
                     or (c.username and search_lower in c.username.lower())
+                    # Search in display name fallback
+                    or ((c.username or '').replace('_', ' ') and search_lower in (c.username or '').replace('_', ' ').lower())
+                    # Search in user username if present
+                    or (c.user and getattr(c.user, 'username', None) and search_lower in c.user.username.lower())
                     # Search in email
-                    or (c.user.email and search_lower in c.user.email.lower())
+                    or (c.user and c.user.email and search_lower in c.user.email.lower())
                 )
             ]
 
@@ -342,8 +347,9 @@ def get_creators():
                 if any(category_lower in cat.lower() for cat in (c.categories or []))
             ]
 
-        # Add review stats and cheapest package price
-        # ONLY include creators with at least one active package
+        # Add review stats and cheapest package price. Public marketplace browsing
+        # keeps the historic behavior of only showing creators with active
+        # packages, while campaign invites can opt into all active creators.
         creators_with_stats = []
         private_scores = {
             row.creator_profile_id: float(row.final_score or 0)
@@ -363,8 +369,7 @@ def get_creators():
             # Get active packages for this creator
             packages = Package.query.filter_by(creator_id=creator.id, is_active=True).all()
 
-            # Skip creators without any active packages
-            if not packages:
+            if not packages and not include_without_packages:
                 continue
 
             creator_dict = creator.to_dict(include_user=True, public_view=True)
@@ -375,9 +380,8 @@ def get_creators():
                 'total_reviews': review_stats['total_reviews']
             }
 
-            # Get cheapest package price (we already know packages exist)
             prices = [p.price for p in packages]
-            creator_dict['cheapest_package_price'] = min(prices)
+            creator_dict['cheapest_package_price'] = min(prices) if prices else None
             creator_dict['total_packages'] = len(packages)
             creator_dict['rank'] = (
                 {'position': public_ranks[creator.id], 'type': 'overall'}

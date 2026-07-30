@@ -47,6 +47,7 @@ backend\venv\Scripts\python.exe -m py_compile ^
   "%ROOT%\backend\app\services\thunzi_service.py" ^
   "%ROOT%\backend\app\routes\auth.py" ^
   "%ROOT%\backend\app\routes\platforms.py" ^
+  "%ROOT%\backend\app\tasks\platform_sync.py" ^
   "%ROOT%\backend\app\tasks\analytics_tasks.py"
 if errorlevel 1 goto :failed
 
@@ -59,6 +60,7 @@ tar -czf "%BACKEND_ARCHIVE%" -C "%ROOT%\backend" ^
   app/services/thunzi_service.py ^
   app/routes/auth.py ^
   app/routes/platforms.py ^
+  app/tasks/platform_sync.py ^
   app/tasks/analytics_tasks.py
 if errorlevel 1 goto :failed
 
@@ -76,7 +78,7 @@ echo ============================================================
 echo PASSWORD PROMPT: NEW VPS %NEW_SERVER%
 echo ============================================================
 ssh -o StrictHostKeyChecking=accept-new -o ServerAliveInterval=15 -o ServerAliveCountMax=20 ^
-  %SSH_USER%@%NEW_SERVER% "bash /tmp/deploy-smtp-thunzi-fixes.sh" 2>&1 | powershell.exe -NoProfile -Command ^
+  %SSH_USER%@%NEW_SERVER% "tr -d '\r' < /tmp/deploy-smtp-thunzi-fixes.sh > /tmp/deploy-smtp-thunzi-fixes.lf.sh && bash /tmp/deploy-smtp-thunzi-fixes.lf.sh" 2>&1 | powershell.exe -NoProfile -Command ^
   "$input | Tee-Object -FilePath '%REPORT%'; if (Select-String -Quiet -SimpleMatch 'BANTUBUZZ_SMTP_THUNZI_FIXES_SUCCESS' '%REPORT%') { exit 0 } else { exit 1 }"
 if errorlevel 1 goto :failed
 

@@ -1,0 +1,32 @@
+{
+  "name": "bantubuzz-mobile",
+  "version": "0.1.0",
+  "private": true,
+  "description": "BantuBuzz Capacitor mobile app shell",
+  "type": "module",
+  "scripts": {
+    "build:web": "cd ../frontend && npm run build",
+    "sync": "npm run build:web && npx cap sync",
+    "open:android": "npx cap open android",
+    "run:android": "npm run sync && npx cap run android",
+    "doctor": "npx cap doctor"
+  },
+  "dependencies": {
+    "@capacitor/android": "^6.2.1",
+    "@capacitor/app": "^6.0.2",
+    "@capacitor/browser": "^6.0.5",
+    "@capacitor/core": "^6.2.1",
+    "@capacitor/filesystem": "^6.0.3",
+    "@capacitor/haptics": "^6.0.2",
+    "@capacitor/keyboard": "^6.0.3",
+    "@capacitor/preferences": "^6.0.3",
+    "@capacitor/push-notifications": "^6.0.4",
+    "@capacitor/share": "^6.0.3",
+    "@capacitor/splash-screen": "^6.0.3",
+    "@capacitor/status-bar": "^6.0.2"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "^6.2.1"
+  }
+}

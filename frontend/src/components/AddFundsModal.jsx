@@ -107,14 +107,14 @@ const AddFundsModal = ({ isOpen, onClose, currentBalance, onDepositSuccess }) =>
         });
 
         if (response.data.success && response.data.redirect_url) {
-          toast.success('Redirecting to Paynow...');
+          toast.success('Redirecting to secure payment...');
           // Redirect to Paynow gateway
           window.location.href = response.data.redirect_url;
         } else {
-          toast.error('Failed to initiate Paynow payment');
+          toast.error('Failed to initiate secure payment');
         }
       } catch (error) {
-        console.error('Error initiating Paynow:', error);
+          console.error('Error initiating secure payment:', error);
         toast.error(error.response?.data?.error || 'Failed to initiate payment');
         setIsSubmitting(false);
       }
@@ -206,7 +206,7 @@ const AddFundsModal = ({ isOpen, onClose, currentBalance, onDepositSuccess }) =>
                   Payment Method *
                 </label>
                 <div className="space-y-3">
-                  {/* Paynow Option */}
+                  {/* Secure Payment Option */}
                   <label className="flex items-start p-4 border-2 border-gray-200 rounded-lg cursor-pointer hover:border-primary transition-colors">
                     <input
                       type="radio"
@@ -219,13 +219,13 @@ const AddFundsModal = ({ isOpen, onClose, currentBalance, onDepositSuccess }) =>
                     />
                     <div className="ml-3 flex-1">
                       <div className="flex items-center justify-between">
-                        <span className="font-semibold text-dark">Paynow</span>
+                        <span className="font-semibold text-dark">Secure Payment</span>
                         <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded">
                           Instant
                         </span>
                       </div>
                       <p className="text-sm text-gray-600 mt-1">
-                        Pay instantly via Paynow gateway
+                        Secure Payment - all Payment Methods Accepted
                       </p>
                     </div>
                   </label>
@@ -308,7 +308,7 @@ const AddFundsModal = ({ isOpen, onClose, currentBalance, onDepositSuccess }) =>
                     Processing...
                   </span>
                 ) : (
-                  paymentMethod === 'paynow' ? 'Continue to Paynow' : 'Create Deposit Request'
+                  paymentMethod === 'paynow' ? 'Continue to Secure Payment' : 'Create Deposit Request'
                 )}
               </button>
             </form>

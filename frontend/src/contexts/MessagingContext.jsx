@@ -2,8 +2,17 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef } f
 import { io } from 'socket.io-client';
 import toast from 'react-hot-toast';
 import messagingService from '../services/messagingAPI';
+import { isNativeAppRuntime } from '../utils/nativeApp';
 
-const MESSAGING_SOCKET_URL = import.meta.env.VITE_MESSAGING_SOCKET_URL || window.location.origin;
+const configuredMessagingSocketUrl = import.meta.env.VITE_MESSAGING_SOCKET_URL || window.location.origin;
+const MESSAGING_SOCKET_URL =
+  isNativeAppRuntime() && (
+    !configuredMessagingSocketUrl ||
+    configuredMessagingSocketUrl === window.location.origin ||
+    configuredMessagingSocketUrl.includes('localhost')
+  )
+    ? 'https://bantubuzz.com'
+    : configuredMessagingSocketUrl;
 
 const MessagingContext = createContext(null);
 
@@ -25,6 +34,33 @@ export const MessagingProvider = ({ children }) => {
   const [notifications, setNotifications] = useState([]);
   const socketRef = useRef(null);
 
+  const showNativeLocalNotification = useCallback(async ({ title, body, url = '/messages', tag = 'message' }) => {
+    if (!isNativeAppRuntime()) {
+      return;
+    }
+
+    try {
+      const { LocalNotifications } = await import('@capacitor/local-notifications');
+      const permission = await LocalNotifications.checkPermissions();
+      if (permission.display !== 'granted') {
+        return;
+      }
+
+      await LocalNotifications.schedule({
+        notifications: [{
+          id: Date.now() % 2147483647,
+          title,
+          body,
+          schedule: { at: new Date(Date.now() + 250) },
+          channelId: 'bantubuzz_default',
+          extra: { url, tag },
+        }],
+      });
+    } catch (error) {
+      console.warn('Native local notification skipped:', error);
+    }
+  }, []);
+
   // Initialize Socket.IO connection
   useEffect(() => {
     const token = localStorage.getItem('access_token');
@@ -36,7 +72,8 @@ export const MessagingProvider = ({ children }) => {
 
     if (token && user.id) {
       const socketInstance = io(MESSAGING_SOCKET_URL, {
-        transports: ['websocket', 'polling'],
+        transports: ['polling', 'websocket'],
+        upgrade: true,
         reconnection: true,
         reconnectionAttempts: 10, // Increased from 5 to 10
         reconnectionDelay: 1000,
@@ -141,8 +178,16 @@ export const MessagingProvider = ({ children }) => {
         playNotificationSound();
 
         // Show toast notification
-        toast(`New message from ${message.sender?.name || message.sender?.email || 'Someone'}`, {
+        const senderName = message.sender?.name || message.sender?.email || 'Someone';
+        toast(`New message from ${senderName}`, {
           duration: 3000,
+        });
+
+        showNativeLocalNotification({
+          title: `New message from ${senderName}`,
+          body: message.content || 'Open BantuBuzz to view the message.',
+          url: '/messages',
+          tag: 'message',
         });
       });
 
@@ -235,6 +280,12 @@ export const MessagingProvider = ({ children }) => {
           duration: 4000,
           icon: notification.type === 'success' ? '✅' : notification.type === 'error' ? '❌' : '📢',
         });
+        showNativeLocalNotification({
+          title: notification.title || 'BantuBuzz notification',
+          body: notification.message || 'Open BantuBuzz to view the update.',
+          url: notification.url || notification.action_url || '/notifications',
+          tag: notification.type || 'notification',
+        });
       });
 
       // Cleanup
@@ -242,7 +293,7 @@ export const MessagingProvider = ({ children }) => {
         socketInstance.disconnect();
       };
     }
-  }, []);
+  }, [showNativeLocalNotification]);
 
   // Play notification sound
   const playNotificationSound = useCallback(() => {
@@ -270,9 +321,14 @@ export const MessagingProvider = ({ children }) => {
 
   // Send a message
   const sendMessage = useCallback(async (receiverId, content, bookingId = null, extra = {}) => {
+    const workspaceId = localStorage.getItem('selected_workspace_id');
+    const scopedExtra = workspaceId && workspaceId !== 'all'
+      ? { ...extra, workspace_id: Number(workspaceId) }
+      : extra;
+
     if (!socketRef.current || !isConnected) {
       try {
-        const response = await messagingService.sendMessage(receiverId, content, bookingId, extra);
+        const response = await messagingService.sendMessage(receiverId, content, bookingId, scopedExtra);
         const message = response.data.data;
 
         setMessages(prev => ({
@@ -293,16 +349,17 @@ export const MessagingProvider = ({ children }) => {
       receiverId,
       content,
       bookingId,
-      messageType: extra.message_type,
-      attachmentUrl: extra.attachment_url,
-      attachmentType: extra.attachment_type,
-      attachmentName: extra.attachment_name,
-      attachmentMimeType: extra.attachment_mime_type,
-      attachmentSize: extra.attachment_size,
-      linkUrl: extra.link_url,
-      linkTitle: extra.link_title,
-      linkDescription: extra.link_description,
-      linkImage: extra.link_image
+      workspaceId: scopedExtra.workspace_id,
+      messageType: scopedExtra.message_type,
+      attachmentUrl: scopedExtra.attachment_url,
+      attachmentType: scopedExtra.attachment_type,
+      attachmentName: scopedExtra.attachment_name,
+      attachmentMimeType: scopedExtra.attachment_mime_type,
+      attachmentSize: scopedExtra.attachment_size,
+      linkUrl: scopedExtra.link_url,
+      linkTitle: scopedExtra.link_title,
+      linkDescription: scopedExtra.link_description,
+      linkImage: scopedExtra.link_image
     });
 
     return true;
@@ -316,7 +373,7 @@ export const MessagingProvider = ({ children }) => {
     }
 
     if (!socketRef.current || !isConnected) {
-      messagingService.markAsReadFallback(ids)
+      messagingService.markAsRead(ids)
         .then(() => {
           window.dispatchEvent(new CustomEvent('messages_marked_read', { detail: { messageIds: ids } }));
         })
@@ -326,7 +383,11 @@ export const MessagingProvider = ({ children }) => {
       return;
     }
 
-    socketRef.current.emit('mark_read', { messageIds: ids });
+    const workspaceId = localStorage.getItem('selected_workspace_id');
+    socketRef.current.emit('mark_read', {
+      messageIds: ids,
+      workspaceId: workspaceId && workspaceId !== 'all' ? Number(workspaceId) : null,
+    });
     setMessages(prev => {
       const next = {};
       Object.entries(prev).forEach(([conversationId, conversationMessages]) => {
@@ -349,6 +410,21 @@ export const MessagingProvider = ({ children }) => {
   };
 
   const enablePushNotifications = useCallback(async () => {
+    if (isNativeAppRuntime()) {
+      try {
+        const { PushNotifications } = await import('@capacitor/push-notifications');
+        const permission = await PushNotifications.requestPermissions();
+        if (permission.receive === 'granted') {
+          await PushNotifications.register();
+          return { enabled: true, native: true };
+        }
+        return { enabled: false, native: true, reason: permission.receive };
+      } catch (error) {
+        console.error('Native push permission request failed:', error);
+        return { enabled: false, native: true, reason: 'native_setup_failed' };
+      }
+    }
+
     if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) {
       return { enabled: false, reason: 'unsupported' };
     }

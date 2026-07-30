@@ -149,7 +149,34 @@ const CreatorProfile = () => {
 
   const promptBrandAuth = (action) => {
     toast.error(`Please sign in or sign up as a brand to ${action}.`);
-    navigate('/login');
+    navigate('/login', { state: { redirectTo: location.pathname } });
+  };
+
+  const getMessageTarget = () => ({
+    id: creator.user_id,
+    email: creator.user?.email,
+    display_name: creator.display_name,
+    username: creator.username,
+    profile_picture: creator.profile_picture
+  });
+
+  const handleMessageCreator = () => {
+    if (!user) {
+      toast.error('Please sign in or sign up to message this creator.');
+      navigate('/login', {
+        state: {
+          redirectTo: '/messages',
+          startConversationWith: getMessageTarget(),
+        },
+      });
+      return;
+    }
+
+    navigate('/messages', {
+      state: {
+        startConversationWith: getMessageTarget(),
+      },
+    });
   };
 
   useEffect(() => {
@@ -585,24 +612,18 @@ const CreatorProfile = () => {
                     )}
                   </div>
 
-                  {/* Show message button for brands OR creators viewing other creators (not themselves) */}
-                  {(user?.user_type === 'brand' || (user?.user_type === 'creator' && user?.id !== creator.user_id)) && (
+                  {/* Message is visible publicly; unauthenticated visitors are sent into auth first. */}
+                  {user?.id !== creator.user_id && (
                     <>
-                    <Link
-                      to="/messages"
-                      state={{ startConversationWith: {
-                        id: creator.user_id,
-                        email: creator.user?.email,
-                        display_name: creator.display_name,
-                        username: creator.username,
-                        profile_picture: creator.profile_picture
-                      } }}
+                    <button
+                      type="button"
+                      onClick={handleMessageCreator}
                       className={toolbarPrimaryButton}
                       title="Send message"
                     >
                       <MessageCircle className="h-5 w-5" />
                       <span>Message</span>
-                    </Link>
+                    </button>
                     {/* Invite to Campaign and Save buttons only for brands */}
                     {user?.user_type === 'brand' && (
                       <>

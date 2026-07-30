@@ -45,7 +45,7 @@ const ACCOUNT_TYPES = {
 
 const BrandProfileEdit = () => {
   const navigate = useNavigate();
-  const { updateProfile: updateAuthProfile } = useAuth();
+  const { updateProfile: updateAuthProfile, logout } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
@@ -265,9 +265,22 @@ const BrandProfileEdit = () => {
           </div>
 
           {/* Header */}
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold text-dark mb-2">Edit Brand Profile</h1>
-            <p className="text-gray-600">Update your company information</p>
+          <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-dark mb-2">Edit Brand Profile</h1>
+              <p className="text-gray-600">Update your company information</p>
+            </div>
+            <button
+              type="button"
+              onClick={logout}
+              className="inline-flex items-center justify-center gap-2 rounded-full border border-red-200 bg-white px-5 py-3 font-medium text-red-600 transition-colors hover:bg-red-50 sm:w-auto"
+            >
+              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H9" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 20H6a2 2 0 01-2-2V6a2 2 0 012-2h7" />
+              </svg>
+              Logout
+            </button>
           </div>
 
           {/* Success Message */}

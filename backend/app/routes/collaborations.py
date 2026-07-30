@@ -3,6 +3,7 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 from datetime import datetime, timedelta
 from app import db, socketio
 from app.models import Collaboration, BrandProfile, CreatorProfile, User, CollaborationMilestone, MilestoneDeliverable, PackageDeliverable
+from app.models.review import Review
 from app.models.dispute import Dispute
 from app.utils.notifications import notify_collaboration_status, notify_collaboration_update
 from app.services.product_notifications import (
@@ -152,7 +153,9 @@ def get_collaboration(collab_id):
                 if workspace_error:
                     return jsonify({'error': workspace_error}), workspace_status
 
-        return jsonify(collaboration.to_dict(include_relations=True)), 200
+        collaboration_data = collaboration.to_dict(include_relations=True)
+        collaboration_data['has_review'] = Review.query.filter_by(collaboration_id=collaboration.id).first() is not None
+        return jsonify(collaboration_data), 200
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -1102,13 +1105,6 @@ def mark_collaboration_complete(collab_id):
 
         if collaboration.status != 'in_progress':
             return jsonify({'error': f'Cannot complete collaboration with status: {collaboration.status}'}), 400
-
-        # Verify live post URLs have been submitted
-        if not collaboration.live_urls_submitted_at:
-            return jsonify({
-                'error': 'Cannot complete collaboration',
-                'message': 'Creator has not submitted live post URLs yet'
-            }), 400
 
         print(f"[MARK_COMPLETE] Brand {brand.id} marking collaboration {collab_id} as complete")
 

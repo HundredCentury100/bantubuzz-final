@@ -268,10 +268,10 @@ const PostMetricsDisplay = ({
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm font-medium text-gray-700">Overall Sentiment</span>
               <span className={`text-sm font-semibold ${
-                metrics.sentiment === 'positive' ? 'text-green-600' :
-                metrics.sentiment === 'negative' ? 'text-red-600' : 'text-gray-600'
+                String(metrics.sentiment || '').toLowerCase() === 'positive' ? 'text-green-600' :
+                String(metrics.sentiment || '').toLowerCase() === 'negative' ? 'text-red-600' : 'text-gray-600'
               }`}>
-                {metrics.sentiment?.toUpperCase()}
+                {String(metrics.sentiment || 'neutral').toUpperCase()}
               </span>
             </div>
             {metrics.sentiment_score !== null && (

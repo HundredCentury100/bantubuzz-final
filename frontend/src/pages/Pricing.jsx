@@ -306,7 +306,7 @@ const CREATOR = [
     ]
   },
   {
-    id: "creatorPro", name: "Pro Creator", price: 19,
+    id: "creatorPro", name: "Creator Pro", price: 19,
     fee: "7%", feeNote: "commission",
     tagline: "Maximise your brand deal earnings",
     badge: "Best Value",

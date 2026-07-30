@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate, useLocation, Link } from 'react-router-dom';
 import { toast } from 'react-hot-toast';
 import AdminLayout from '../../components/admin/AdminLayout';
 import StatusBadge from '../../components/admin/StatusBadge';
@@ -8,6 +8,9 @@ import api from '../../services/api';
 export default function AdminUserProfile() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
+  const returnTo = location.state?.returnTo || '/admin/users';
+  const returnLabel = location.state?.returnLabel || 'Users';
 
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -30,7 +33,7 @@ export default function AdminUserProfile() {
       setUser(res.data.data || res.data);
     } catch (err) {
       toast.error('Failed to load user profile');
-      navigate('/admin/users');
+      navigate(returnTo);
     } finally {
       setLoading(false);
     }
@@ -110,6 +113,128 @@ export default function AdminUserProfile() {
     }
   };
 
+  const handleToggleTopCreator = async () => {
+    const isTopCreator = Boolean(user.admin_controls?.creator_badges?.is_top_creator);
+    setActionLoading('creator-controls');
+    try {
+      await api.put(`/admin/users/${id}/creator-controls`, {
+        is_top_creator: !isTopCreator,
+        reason: isTopCreator ? 'Removed Top Creator status by admin' : 'Granted Top Creator status by admin',
+      });
+      toast.success(isTopCreator ? 'Top Creator status removed' : 'Top Creator status granted');
+      fetchUser();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to update creator status');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleGrantCreatorPlan = async (planSlug) => {
+    const planLabel = planSlug === 'pro-creator' ? 'Creator Pro' : 'Rising';
+    const duration = window.prompt(`Grant ${planLabel} for how many days?`, '30');
+    if (!duration) return;
+    const durationDays = Number(duration);
+    if (!Number.isFinite(durationDays) || durationDays <= 0) {
+      toast.error('Please enter a valid number of days');
+      return;
+    }
+
+    const reason = window.prompt('Reason for this admin grant?', `Admin granted ${planLabel}`);
+    setActionLoading(`grant-${planSlug}`);
+    try {
+      await api.put(`/admin/users/${id}/creator-controls`, {
+        plan_slug: planSlug,
+        duration_days: durationDays,
+        reason: reason || `Admin granted ${planLabel}`,
+      });
+      toast.success(`${planLabel} granted`);
+      fetchUser();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to grant creator plan');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleFundWallet = async () => {
+    const amountInput = window.prompt('Amount to add to this brand wallet in USD');
+    if (!amountInput) return;
+    const amount = Number(amountInput);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      toast.error('Please enter a valid amount');
+      return;
+    }
+
+    const reason = window.prompt('Reason or reference for this wallet funding?', 'Admin wallet credit');
+    setActionLoading('fund-wallet');
+    try {
+      await api.post(`/admin/users/${id}/fund-wallet`, {
+        amount,
+        reason: reason || 'Admin wallet credit',
+      });
+      toast.success('Brand wallet funded');
+      fetchUser();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to fund wallet');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleCreateFeeOverride = async (overrideType) => {
+    const label = overrideType === 'creator_commission'
+      ? 'creator commission'
+      : overrideType === 'brand_platform_fee'
+        ? 'brand platform fee'
+        : 'brand service fee';
+    const percentageInput = window.prompt(`Set ${label} percentage. Use 0 for commission-free.`, '0');
+    if (percentageInput === null) return;
+    const percentage = Number(percentageInput);
+    if (!Number.isFinite(percentage) || percentage < 0 || percentage > 100) {
+      toast.error('Please enter a percentage between 0 and 100');
+      return;
+    }
+
+    const durationInput = window.prompt('Duration in days. Leave blank for no expiry.', '');
+    const durationDays = durationInput ? Number(durationInput) : null;
+    if (durationInput && (!Number.isFinite(durationDays) || durationDays <= 0)) {
+      toast.error('Please enter a valid duration');
+      return;
+    }
+
+    const reason = window.prompt('Reason for this fee override?', 'Admin fee override');
+    setActionLoading('fee-override');
+    try {
+      await api.post(`/admin/users/${id}/fee-overrides`, {
+        override_type: overrideType,
+        percentage,
+        duration_days: durationDays,
+        reason: reason || 'Admin fee override',
+      });
+      toast.success('Fee override saved');
+      fetchUser();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to save fee override');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleDeactivateFeeOverride = async (overrideId) => {
+    if (!confirm('Deactivate this fee override?')) return;
+    setActionLoading(`override-${overrideId}`);
+    try {
+      await api.delete(`/admin/users/${id}/fee-overrides/${overrideId}`);
+      toast.success('Fee override deactivated');
+      fetchUser();
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to deactivate fee override');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   const formatDate = (d) => d ? new Date(d).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' }) : 'N/A';
   const formatCurrency = (v) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(v || 0);
 
@@ -127,6 +252,10 @@ export default function AdminUserProfile() {
 
   const profile = user.creator_profile || user.brand_profile;
   const displayName = profile?.username || profile?.company_name || user.email;
+  const adminControls = user.admin_controls || {};
+  const currentPlan = adminControls.active_subscription?.plan;
+  const wallet = adminControls.brand_wallet;
+  const feeOverrides = adminControls.fee_overrides || [];
 
   return (
     <AdminLayout>
@@ -134,11 +263,11 @@ export default function AdminUserProfile() {
 
         {/* Back */}
         <div className="flex items-center gap-3">
-          <button onClick={() => navigate('/admin/users')} className="text-gray-500 hover:text-gray-900 flex items-center gap-1 text-sm">
+          <button onClick={() => navigate(returnTo)} className="text-gray-500 hover:text-gray-900 flex items-center gap-1 text-sm">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
-            Back to Users
+            Back to {returnLabel}
           </button>
         </div>
 
@@ -247,6 +376,12 @@ export default function AdminUserProfile() {
                   <span className="text-gray-500">Role</span>
                   <span className="font-medium capitalize">{user.user_type}</span>
                 </div>
+                {user.user_type === 'creator' && (
+                  <div className="flex justify-between gap-3">
+                    <span className="text-gray-500">Phone</span>
+                    <span className="font-medium text-right">{user.phone_number || 'Not provided'}</span>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -298,6 +433,120 @@ export default function AdminUserProfile() {
 
           {/* Right: Activity Summary */}
           <div className="lg:col-span-2 space-y-6">
+
+            {user.user_type === 'creator' && (
+              <div className="bg-white rounded-lg border border-gray-200 p-5">
+                <div className="flex items-start justify-between gap-4 mb-4">
+                  <div>
+                    <h2 className="font-semibold text-gray-900">Creator Admin Controls</h2>
+                    <p className="text-sm text-gray-500 mt-1">Grant ranking status and creator account tiers.</p>
+                  </div>
+                  {currentPlan && (
+                    <span className="px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold">
+                      {currentPlan.name}
+                    </span>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={handleToggleTopCreator}
+                    disabled={actionLoading === 'creator-controls'}
+                    className="px-4 py-2 bg-gray-900 text-white rounded-lg text-sm font-medium hover:bg-gray-800 disabled:opacity-50"
+                  >
+                    {adminControls.creator_badges?.is_top_creator ? 'Remove Top Creator' : 'Make Top Creator'}
+                  </button>
+                  <button
+                    onClick={() => handleGrantCreatorPlan('rising')}
+                    disabled={actionLoading === 'grant-rising'}
+                    className="px-4 py-2 bg-lime-100 text-lime-800 rounded-lg text-sm font-medium hover:bg-lime-200 disabled:opacity-50"
+                  >
+                    Grant Rising
+                  </button>
+                  <button
+                    onClick={() => handleGrantCreatorPlan('pro-creator')}
+                    disabled={actionLoading === 'grant-pro-creator'}
+                    className="px-4 py-2 bg-blue-100 text-blue-800 rounded-lg text-sm font-medium hover:bg-blue-200 disabled:opacity-50"
+                  >
+                    Grant Creator Pro
+                  </button>
+                  <button
+                    onClick={() => handleCreateFeeOverride('creator_commission')}
+                    disabled={actionLoading === 'fee-override'}
+                    className="px-4 py-2 bg-purple-100 text-purple-800 rounded-lg text-sm font-medium hover:bg-purple-200 disabled:opacity-50"
+                  >
+                    Set Commission
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {user.user_type === 'brand' && (
+              <div className="bg-white rounded-lg border border-gray-200 p-5">
+                <div className="flex items-start justify-between gap-4 mb-4">
+                  <div>
+                    <h2 className="font-semibold text-gray-900">Brand Wallet & Fees</h2>
+                    <p className="text-sm text-gray-500 mt-1">Fund this brand wallet and adjust service fees.</p>
+                  </div>
+                  {wallet && (
+                    <span className="px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold">
+                      {formatCurrency(wallet.available_balance)} available
+                    </span>
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={handleFundWallet}
+                    disabled={actionLoading === 'fund-wallet'}
+                    className="px-4 py-2 bg-primary text-dark rounded-lg text-sm font-semibold hover:bg-primary/90 disabled:opacity-50"
+                  >
+                    Fund Wallet
+                  </button>
+                  <button
+                    onClick={() => handleCreateFeeOverride('brand_service_fee')}
+                    disabled={actionLoading === 'fee-override'}
+                    className="px-4 py-2 bg-blue-100 text-blue-800 rounded-lg text-sm font-medium hover:bg-blue-200 disabled:opacity-50"
+                  >
+                    Set Service Fee
+                  </button>
+                  <button
+                    onClick={() => handleCreateFeeOverride('brand_platform_fee')}
+                    disabled={actionLoading === 'fee-override'}
+                    className="px-4 py-2 bg-purple-100 text-purple-800 rounded-lg text-sm font-medium hover:bg-purple-200 disabled:opacity-50"
+                  >
+                    Set Platform Fee
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {feeOverrides.length > 0 && (
+              <div className="bg-white rounded-lg border border-gray-200 p-5">
+                <h2 className="font-semibold text-gray-900 mb-4">Fee Overrides</h2>
+                <div className="space-y-2">
+                  {feeOverrides.slice(0, 5).map((override) => (
+                    <div key={override.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-gray-50 px-3 py-2 text-sm">
+                      <div>
+                        <p className="font-medium text-gray-900">
+                          {String(override.override_type || '').split('_').join(' ')} · {override.percentage}%
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {override.is_current ? 'Active' : 'Inactive'} · Ends {override.ends_at ? formatDate(override.ends_at) : 'Never'}
+                        </p>
+                      </div>
+                      {override.is_active && (
+                        <button
+                          onClick={() => handleDeactivateFeeOverride(override.id)}
+                          disabled={actionLoading === `override-${override.id}`}
+                          className="px-3 py-1 rounded-md bg-red-100 text-red-700 text-xs font-medium hover:bg-red-200 disabled:opacity-50"
+                        >
+                          Deactivate
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Risk & Flags panel */}
             <div className="bg-white rounded-lg border border-gray-200 p-5">

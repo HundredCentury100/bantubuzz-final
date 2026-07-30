@@ -4,9 +4,56 @@ Admin Featured Creators Management - Set and manage featured creators on homepag
 from flask import jsonify, request
 from datetime import datetime
 from app import db
-from app.models import CreatorProfile, User, Notification
+from app.models import CreatorProfile, User, Notification, ConnectedPlatform
 from app.decorators.admin import admin_required
 from . import bp
+
+
+FEATURED_TYPE_OPTIONS = {
+    'general': {'label': 'General', 'requires_platform': None},
+    'facebook': {'label': 'Facebook', 'requires_platform': 'facebook'},
+    'tiktok': {'label': 'TikTok', 'requires_platform': 'tiktok'},
+    'instagram': {'label': 'Instagram', 'requires_platform': 'instagram'},
+    'youtube': {'label': 'YouTube', 'requires_platform': 'youtube'},
+    'ugc': {'label': 'UGC', 'requires_platform': None},
+}
+
+
+def _platform_keys(creator):
+    keys = set()
+
+    for platform in creator.platforms or []:
+        if platform:
+            keys.add(str(platform).strip().lower())
+
+    for platform in (creator.social_links or {}).keys():
+        if platform:
+            keys.add(str(platform).strip().lower())
+
+    try:
+        for platform in creator.get_platform_stats():
+            platform_name = platform.get('platform')
+            if platform_name:
+                keys.add(str(platform_name).strip().lower())
+    except Exception:
+        pass
+
+    aliases = {
+        'x': 'twitter',
+        'twitter/x': 'twitter',
+        'youtube shorts': 'youtube',
+        'yt': 'youtube',
+        'fb': 'facebook',
+        'meta': 'facebook',
+        'ig': 'instagram',
+    }
+    return {aliases.get(key, key) for key in keys}
+
+
+def _creator_has_platform(creator, platform):
+    if not platform:
+        return True
+    return platform.lower() in _platform_keys(creator)
 
 
 @bp.route('/creators/featured', methods=['GET'])
@@ -14,7 +61,7 @@ from . import bp
 def get_featured_creators():
     """Get list of all featured creators"""
     try:
-        featured_type = request.args.get('featured_type')  # 'general', 'tiktok', 'instagram', or None for all
+        featured_type = request.args.get('featured_type')  # Optional filter by FEATURED_TYPE_OPTIONS key
 
         # Check if featured field exists (may not be migrated yet)
         try:
@@ -75,7 +122,7 @@ def get_eligible_creators():
         page = request.args.get('page', 1, type=int)
         per_page = request.args.get('per_page', 20, type=int)
         search = request.args.get('search', '')
-        platform = request.args.get('platform')  # 'tiktok', 'instagram', or None for all
+        platform = request.args.get('platform')  # Optional platform key
 
         # Base query - verified and active creators
         query = CreatorProfile.query.join(User).filter(
@@ -83,16 +130,23 @@ def get_eligible_creators():
             User.is_active == True
         )
 
-        # Platform filter - check if creator has the platform in their social_links
+        # Platform filter - check if creator has the platform in selected or connected accounts.
         if platform:
-            if platform.lower() == 'tiktok':
-                query = query.filter(
-                    db.cast(CreatorProfile.social_links, db.String).ilike('%tiktok%')
+            platform_name = platform.strip().lower()
+            platform_like = f'%{platform_name}%'
+            query = query.filter(
+                db.or_(
+                    db.func.lower(db.cast(CreatorProfile.social_links, db.String)).ilike(platform_like),
+                    db.func.lower(db.cast(CreatorProfile.platforms, db.String)).ilike(platform_like),
+                    db.exists().where(
+                        db.and_(
+                            ConnectedPlatform.user_id == CreatorProfile.user_id,
+                            ConnectedPlatform.is_connected == True,
+                            db.func.lower(ConnectedPlatform.platform) == platform_name,
+                        )
+                    ),
                 )
-            elif platform.lower() == 'instagram':
-                query = query.filter(
-                    db.cast(CreatorProfile.social_links, db.String).ilike('%instagram%')
-                )
+            )
 
         # Search filter
         if search:
@@ -156,7 +210,7 @@ def feature_creator(creator_id):
     try:
         data = request.get_json() or {}
         featured_order = data.get('featured_order', 0)
-        featured_type = data.get('featured_type', 'general')  # 'general', 'tiktok', 'instagram'
+        featured_type = (data.get('featured_type') or 'general').strip().lower()
 
         creator = CreatorProfile.query.get(creator_id)
         if not creator:
@@ -170,20 +224,20 @@ def feature_creator(creator_id):
             }), 400
 
         # Validate featured_type
-        if featured_type not in ['general', 'tiktok', 'instagram']:
+        if featured_type not in FEATURED_TYPE_OPTIONS:
             return jsonify({
                 'error': 'Invalid featured type',
-                'message': 'featured_type must be one of: general, tiktok, instagram'
+                'message': f"featured_type must be one of: {', '.join(FEATURED_TYPE_OPTIONS.keys())}"
             }), 400
 
         # For platform-specific featuring, verify creator has that platform
-        if featured_type != 'general':
-            social_links = creator.social_links or {}
-            if featured_type not in social_links:
-                return jsonify({
-                    'error': f'Creator does not have {featured_type.title()} account',
-                    'message': f'Cannot feature creator for {featured_type.title()} without a connected account'
-                }), 400
+        required_platform = FEATURED_TYPE_OPTIONS[featured_type]['requires_platform']
+        if required_platform and not _creator_has_platform(creator, required_platform):
+            label = FEATURED_TYPE_OPTIONS[featured_type]['label']
+            return jsonify({
+                'error': f'Creator does not have {label} account',
+                'message': f'Cannot feature creator for {label} without a connected account'
+            }), 400
 
         # Check if featured fields exist
         try:
@@ -202,7 +256,8 @@ def feature_creator(creator_id):
             }), 501
 
         # Send notification to creator
-        featured_text = f'{featured_type.title()} Featured' if featured_type != 'general' else 'Featured'
+        featured_label = FEATURED_TYPE_OPTIONS[featured_type]['label']
+        featured_text = f'{featured_label} Featured' if featured_type != 'general' else 'Featured'
         notification = Notification(
             user_id=creator.user_id,
             title=f'You are now {featured_text}!',

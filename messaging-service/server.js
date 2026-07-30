@@ -13,6 +13,12 @@ const server = http.createServer(app);
 const allowedOrigins = [
   'http://localhost:3000',
   'http://localhost:5000',
+  'http://localhost',
+  'https://localhost',
+  'capacitor://localhost',
+  'ionic://localhost',
+  'https://bantubuzz.com',
+  'https://www.bantubuzz.com',
   process.env.CORS_ORIGIN // Production frontend URL from .env
 ].filter(Boolean); // Remove undefined values
 
@@ -58,6 +64,18 @@ const verifyToken = (token) => {
     return null;
   }
 };
+
+const normalizeWorkspaceId = (value) => {
+  if (value === undefined || value === null || value === '' || value === 'all' || value === 'null' || value === 'undefined') {
+    return null;
+  }
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+};
+
+const getRequestWorkspaceId = (req) => normalizeWorkspaceId(req.headers['x-workspace-id'] || req.query.workspace_id || req.body?.workspace_id);
+
+const workspaceSql = (workspaceId, alias = 'm') => (workspaceId ? ` AND ${alias}.workspace_id = $WORKSPACE_PARAM` : '');
 
 // Store active socket connections
 const activeUsers = new Map(); // userId -> socketId
@@ -111,7 +129,8 @@ io.on('connection', (socket) => {
         linkUrl,
         linkTitle,
         linkDescription,
-        linkImage
+        linkImage,
+        workspaceId
       } = data;
 
       if (!socket.userId) {
@@ -141,20 +160,23 @@ io.on('connection', (socket) => {
         return;
       }
 
+      const selectedWorkspaceId = normalizeWorkspaceId(workspaceId);
+
       // Save message to database (PostgreSQL)
       const insertQuery = `
         INSERT INTO messages (
-          sender_id, receiver_id, booking_id, message_type, content, is_read,
+          sender_id, receiver_id, workspace_id, booking_id, message_type, content, is_read,
           attachment_url, attachment_type, attachment_name, attachment_mime_type, attachment_size,
           link_url, link_title, link_description, link_image, created_at
         )
-        VALUES ($1, $2, $3, $4, $5, false, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW())
+        VALUES ($1, $2, $3, $4, $5, $6, false, $7, $8, $9, $10, $11, $12, $13, $14, $15, NOW())
         RETURNING id
       `;
 
       const insertResult = await pool.query(insertQuery, [
         socket.userId,
         receiverId,
+        selectedWorkspaceId,
         bookingId || null,
         messageType || 'text',
         content || attachmentName || linkUrl || '',
@@ -194,6 +216,7 @@ io.on('connection', (socket) => {
         id: message.id,
         sender_id: message.sender_id,
         receiver_id: message.receiver_id,
+        workspace_id: message.workspace_id,
         booking_id: message.booking_id,
         custom_request_id: message.custom_request_id,
         custom_offer_id: message.custom_offer_id,
@@ -261,20 +284,24 @@ io.on('connection', (socket) => {
   socket.on('mark_read', async (data) => {
     try {
       const { messageIds } = data;
+      const workspaceId = normalizeWorkspaceId(data?.workspaceId || data?.workspace_id);
 
       if (!socket.userId || !messageIds || messageIds.length === 0) {
         return;
       }
 
       const placeholders = messageIds.map((_, i) => `$${i + 1}`).join(',');
+      const workspaceFilter = workspaceId ? ` AND workspace_id = $${messageIds.length + 2}` : '';
       const query = `
         UPDATE messages
         SET is_read = true, read_at = COALESCE(read_at, NOW())
         WHERE id IN (${placeholders}) AND receiver_id = $${messageIds.length + 1}
+        ${workspaceFilter}
         RETURNING id, sender_id, receiver_id, read_at
       `;
 
-      const result = await pool.query(query, [...messageIds, socket.userId]);
+      const params = workspaceId ? [...messageIds, socket.userId, workspaceId] : [...messageIds, socket.userId];
+      const result = await pool.query(query, params);
       const readAt = result.rows[0]?.read_at || new Date();
       socket.emit('messages_marked_read', { messageIds, readAt });
 
@@ -362,6 +389,8 @@ app.get('/api/conversations/:userId', async (req, res) => {
     const otherUserId = req.params.userId;
     const limit = parseInt(req.query.limit) || 50;
     const offset = parseInt(req.query.offset) || 0;
+    const workspaceId = getRequestWorkspaceId(req);
+    const workspaceFilter = workspaceId ? ' AND m.workspace_id = $5' : '';
 
     const query = `
       SELECT m.*,
@@ -386,19 +415,24 @@ app.get('/api/conversations/:userId', async (req, res) => {
       LEFT JOIN creator_profiles sender_cp ON sender_cp.user_id = sender.id AND sender.user_type = 'creator'
       LEFT JOIN brand_profiles receiver_bp ON receiver_bp.user_id = receiver.id AND receiver.user_type = 'brand'
       LEFT JOIN creator_profiles receiver_cp ON receiver_cp.user_id = receiver.id AND receiver.user_type = 'creator'
-      WHERE (m.sender_id = $1 AND m.receiver_id = $2)
-         OR (m.sender_id = $2 AND m.receiver_id = $1)
+      WHERE ((m.sender_id = $1 AND m.receiver_id = $2)
+         OR (m.sender_id = $2 AND m.receiver_id = $1))
+      ${workspaceFilter}
       ORDER BY m.created_at DESC
       LIMIT $3 OFFSET $4
     `;
 
-    const result = await pool.query(query, [currentUserId, otherUserId, limit, offset]);
+    const params = workspaceId
+      ? [currentUserId, otherUserId, limit, offset, workspaceId]
+      : [currentUserId, otherUserId, limit, offset];
+    const result = await pool.query(query, params);
     const messages = result.rows;
 
     const formattedMessages = messages.map(m => ({
       id: m.id,
       sender_id: m.sender_id,
       receiver_id: m.receiver_id,
+      workspace_id: m.workspace_id,
       booking_id: m.booking_id,
       custom_request_id: m.custom_request_id,
       custom_offer_id: m.custom_offer_id,
@@ -446,6 +480,9 @@ app.get('/api/conversations', async (req, res) => {
     }
 
     const userId = decoded.sub;
+    const workspaceId = getRequestWorkspaceId(req);
+    const workspaceFilter = workspaceId ? ' AND workspace_id = $2' : '';
+    const subqueryWorkspaceFilter = workspaceId ? ' AND workspace_id = $2' : '';
 
     // Get all unique conversations with basic info
     const query = `
@@ -456,7 +493,8 @@ app.get('/api/conversations', async (req, res) => {
             ELSE sender_id
           END as other_user_id
         FROM messages
-        WHERE sender_id = $1 OR receiver_id = $1
+        WHERE (sender_id = $1 OR receiver_id = $1)
+        ${workspaceFilter}
       )
       SELECT
         cp.other_user_id as id,
@@ -482,15 +520,18 @@ app.get('/api/conversations', async (req, res) => {
           ELSE NULL
         END as profile_picture,
         (SELECT content FROM messages
-         WHERE (sender_id = $1 AND receiver_id = cp.other_user_id)
-            OR (sender_id = cp.other_user_id AND receiver_id = $1)
+         WHERE ((sender_id = $1 AND receiver_id = cp.other_user_id)
+            OR (sender_id = cp.other_user_id AND receiver_id = $1))
+         ${subqueryWorkspaceFilter}
          ORDER BY created_at DESC LIMIT 1) as last_message,
         (SELECT created_at FROM messages
-         WHERE (sender_id = $1 AND receiver_id = cp.other_user_id)
-            OR (sender_id = cp.other_user_id AND receiver_id = $1)
+         WHERE ((sender_id = $1 AND receiver_id = cp.other_user_id)
+            OR (sender_id = cp.other_user_id AND receiver_id = $1))
+         ${subqueryWorkspaceFilter}
          ORDER BY created_at DESC LIMIT 1) as last_message_time,
         (SELECT COUNT(*) FROM messages
-         WHERE sender_id = cp.other_user_id AND receiver_id = $1 AND is_read = false) as unread_count
+         WHERE sender_id = cp.other_user_id AND receiver_id = $1 AND is_read = false
+         ${subqueryWorkspaceFilter}) as unread_count
       FROM conversation_partners cp
       JOIN users u ON u.id = cp.other_user_id
       LEFT JOIN brand_profiles bp ON bp.user_id = u.id AND u.user_type = 'brand'
@@ -498,7 +539,7 @@ app.get('/api/conversations', async (req, res) => {
       ORDER BY last_message_time DESC
     `;
 
-    const result = await pool.query(query, [userId]);
+    const result = await pool.query(query, workspaceId ? [userId, workspaceId] : [userId]);
     res.json({ conversations: result.rows });
   } catch (error) {
     console.error('Error in get conversations:', error);
@@ -517,19 +558,23 @@ app.post('/api/messages/read', async (req, res) => {
     }
 
     const userId = decoded.sub;
+    const workspaceId = getRequestWorkspaceId(req);
     const messageIds = req.body.messageIds || req.body.message_ids || [];
     if (!Array.isArray(messageIds) || messageIds.length === 0) {
       return res.json({ message: 'No messages to mark as read', updated: 0 });
     }
 
     const placeholders = messageIds.map((_, i) => `$${i + 1}`).join(',');
+    const workspaceFilter = workspaceId ? ` AND workspace_id = $${messageIds.length + 2}` : '';
     const query = `
       UPDATE messages
       SET is_read = true, read_at = COALESCE(read_at, NOW())
       WHERE id IN (${placeholders}) AND receiver_id = $${messageIds.length + 1}
+      ${workspaceFilter}
       RETURNING id, sender_id, receiver_id, read_at
     `;
-    const result = await pool.query(query, [...messageIds, userId]);
+    const params = workspaceId ? [...messageIds, userId, workspaceId] : [...messageIds, userId];
+    const result = await pool.query(query, params);
     const readAt = result.rows[0]?.read_at || new Date();
 
     const readsBySender = result.rows.reduce((acc, row) => {

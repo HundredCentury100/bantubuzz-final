@@ -7,6 +7,7 @@ from flask_jwt_extended import jwt_required, get_jwt_identity
 from werkzeug.utils import secure_filename
 from app import db
 from app.models import Message, PushSubscription, User, UserBlock
+from app.services.workspace_service import get_request_workspace_id, require_workspace_access
 
 bp = Blueprint('messages', __name__)
 
@@ -77,18 +78,40 @@ def _messaging_block_status(user_id, other_user_id):
     return blocked_by_me, blocked_me
 
 
+def _resolve_message_workspace(user_id, data=None):
+    workspace_id = get_request_workspace_id(data)
+    if not workspace_id:
+        return None, None
+
+    _, workspace_error, workspace_status = require_workspace_access(user_id, workspace_id)
+    if workspace_error:
+        return None, (jsonify({'error': workspace_error}), workspace_status)
+
+    return workspace_id, None
+
+
+def _scope_message_query(query, workspace_id):
+    if workspace_id:
+        return query.filter(Message.workspace_id == workspace_id)
+    return query
+
+
 @bp.route('/', methods=['GET'])
 @jwt_required()
 def get_messages():
     """Get messages for current user"""
     try:
-        user_id = get_jwt_identity()
+        user_id = int(get_jwt_identity())
         other_user_id = request.args.get('user_id', type=int)
         booking_id = request.args.get('booking_id', type=int)
+        workspace_id, workspace_response = _resolve_message_workspace(user_id)
+        if workspace_response:
+            return workspace_response
 
         query = Message.query.filter(
             (Message.sender_id == user_id) | (Message.receiver_id == user_id)
         )
+        query = _scope_message_query(query, workspace_id)
 
         if other_user_id:
             query = query.filter(
@@ -111,14 +134,17 @@ def get_messages():
 def send_message():
     """Send a new message"""
     try:
-        user_id = get_jwt_identity()
+        user_id = int(get_jwt_identity())
         data = request.get_json() or {}
+        workspace_id, workspace_response = _resolve_message_workspace(user_id, data)
+        if workspace_response:
+            return workspace_response
 
         if 'receiver_id' not in data:
             return jsonify({'error': 'Missing receiver_id'}), 400
 
         receiver_id = int(data['receiver_id'])
-        blocked_by_me, blocked_me = _messaging_block_status(int(user_id), receiver_id)
+        blocked_by_me, blocked_me = _messaging_block_status(user_id, receiver_id)
         if blocked_by_me:
             return jsonify({'error': 'You have blocked this user. Unblock them before sending messages.'}), 403
         if blocked_me:
@@ -132,6 +158,7 @@ def send_message():
         message = Message(
             sender_id=user_id,
             receiver_id=receiver_id,
+            workspace_id=workspace_id,
             booking_id=data.get('booking_id'),
             **payload
         )
@@ -177,7 +204,11 @@ def send_message():
 def mark_as_read(message_id):
     """Mark message as read"""
     try:
-        user_id = get_jwt_identity()
+        user_id = int(get_jwt_identity())
+        workspace_id, workspace_response = _resolve_message_workspace(user_id)
+        if workspace_response:
+            return workspace_response
+
         message = Message.query.get(message_id)
 
         if not message:
@@ -185,6 +216,8 @@ def mark_as_read(message_id):
 
         if message.receiver_id != user_id:
             return jsonify({'error': 'Unauthorized'}), 403
+        if workspace_id and message.workspace_id != workspace_id:
+            return jsonify({'error': 'Message not found in this workspace'}), 404
 
         message.is_read = True
         message.read_at = message.read_at or datetime.utcnow()
@@ -209,6 +242,9 @@ def mark_many_as_read():
     try:
         user_id = int(get_jwt_identity())
         data = request.get_json() or {}
+        workspace_id, workspace_response = _resolve_message_workspace(user_id, data)
+        if workspace_response:
+            return workspace_response
         message_ids = data.get('messageIds') or data.get('message_ids') or []
         if not isinstance(message_ids, list):
             return jsonify({'error': 'messageIds must be a list'}), 400
@@ -218,13 +254,17 @@ def mark_many_as_read():
             return jsonify({'message': 'No messages to mark as read', 'updated': 0}), 200
 
         read_at = datetime.utcnow()
-        updated = Message.query.filter(
+        update_query = Message.query.filter(
             Message.id.in_(ids),
             Message.receiver_id == user_id,
-        ).update({'is_read': True, 'read_at': read_at}, synchronize_session=False)
+        )
+        update_query = _scope_message_query(update_query, workspace_id)
+        updated = update_query.update({'is_read': True, 'read_at': read_at}, synchronize_session=False)
         db.session.commit()
 
-        read_messages = Message.query.filter(Message.id.in_(ids)).all()
+        read_messages_query = Message.query.filter(Message.id.in_(ids))
+        read_messages_query = _scope_message_query(read_messages_query, workspace_id)
+        read_messages = read_messages_query.all()
         read_by_sender = {}
         for message in read_messages:
             if message.receiver_id == user_id:
@@ -299,10 +339,39 @@ def get_vapid_public_key():
 @bp.route('/push-subscriptions', methods=['POST'])
 @jwt_required()
 def save_push_subscription():
-    """Save or update a browser push subscription for the current user."""
+    """Save or update a browser Web Push subscription or native device token."""
     try:
         user_id = int(get_jwt_identity())
         data = request.get_json() or {}
+        is_native = bool(data.get('native') or data.get('token'))
+
+        if is_native:
+            platform = (data.get('platform') or 'android').lower()
+            token = (data.get('token') or '').strip()
+            device_id = (data.get('device_id') or '').strip()
+
+            if not token:
+                return jsonify({'error': 'Invalid native push token'}), 400
+
+            endpoint = f'native:{platform}:{token}'
+            subscription = PushSubscription.query.filter_by(endpoint=endpoint).first()
+            if not subscription:
+                subscription = PushSubscription(endpoint=endpoint)
+                db.session.add(subscription)
+
+            subscription.user_id = user_id
+            subscription.p256dh = f'native:{platform}'
+            subscription.auth = device_id or 'native'
+            subscription.user_agent = request.headers.get('User-Agent')
+            subscription.is_active = True
+            subscription.updated_at = datetime.utcnow()
+            db.session.commit()
+
+            return jsonify({
+                'message': 'Native push token saved',
+                'subscription': subscription.to_dict()
+            }), 201
+
         endpoint = data.get('endpoint')
         keys = data.get('keys') or {}
         p256dh = keys.get('p256dh')
@@ -363,11 +432,16 @@ def disable_push_subscription():
 def get_conversations():
     """Get all conversations for current user"""
     try:
-        user_id = get_jwt_identity()
+        user_id = int(get_jwt_identity())
+        workspace_id, workspace_response = _resolve_message_workspace(user_id)
+        if workspace_response:
+            return workspace_response
 
         # Get unique users the current user has messaged with
-        sent = db.session.query(Message.receiver_id).filter_by(sender_id=user_id).distinct()
-        received = db.session.query(Message.sender_id).filter_by(receiver_id=user_id).distinct()
+        sent = db.session.query(Message.receiver_id).filter_by(sender_id=user_id)
+        received = db.session.query(Message.sender_id).filter_by(receiver_id=user_id)
+        sent = _scope_message_query(sent, workspace_id).distinct()
+        received = _scope_message_query(received, workspace_id).distinct()
 
         user_ids = set([u[0] for u in sent.all()] + [u[0] for u in received.all()])
         users = User.query.filter(User.id.in_(user_ids)).all()
@@ -377,19 +451,49 @@ def get_conversations():
             last_message = Message.query.filter(
                 ((Message.sender_id == user_id) & (Message.receiver_id == user.id)) |
                 ((Message.sender_id == user.id) & (Message.receiver_id == user_id))
-            ).order_by(Message.created_at.desc()).first()
+            )
+            last_message = _scope_message_query(last_message, workspace_id).order_by(Message.created_at.desc()).first()
 
-            unread_count = Message.query.filter_by(
+            unread_query = Message.query.filter_by(
                 sender_id=user.id,
                 receiver_id=user_id,
                 is_read=False
-            ).count()
+            )
+            unread_count = _scope_message_query(unread_query, workspace_id).count()
 
             conversations.append({
+                'id': user.id,
+                'email': user.email,
+                'user_type': user.user_type,
+                'display_name': (
+                    getattr(user.creator_profile, 'display_name', None)
+                    if user.creator_profile else None
+                ),
+                'username': (
+                    getattr(user.creator_profile, 'username', None)
+                    if user.creator_profile else None
+                ),
+                'company_name': (
+                    getattr(user.brand_profile, 'company_name', None)
+                    if user.brand_profile else None
+                ),
+                'profile_picture': (
+                    getattr(user.creator_profile, 'profile_picture', None)
+                    if user.creator_profile else None
+                ) or (
+                    getattr(user.brand_profile, 'logo', None)
+                    if user.brand_profile else None
+                ),
                 'user': user.to_dict(),
                 'last_message': last_message.to_dict() if last_message else None,
+                'last_message_time': last_message.created_at.isoformat() if last_message else None,
                 'unread_count': unread_count
             })
+
+        conversations.sort(
+            key=lambda conversation: conversation.get('last_message_time') or '',
+            reverse=True,
+        )
 
         return jsonify({'conversations': conversations}), 200
 

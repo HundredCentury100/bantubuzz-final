@@ -11,8 +11,9 @@ const GoogleProfileComplete = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  const googleName = location.state?.googleName || '';
-  const googleEmail = location.state?.googleEmail || '';
+  const searchParams = new URLSearchParams(location.search);
+  const googleName = location.state?.googleName || searchParams.get('google_name') || localStorage.getItem('google_signup_name') || '';
+  const googleEmail = location.state?.googleEmail || searchParams.get('google_email') || localStorage.getItem('google_signup_email') || '';
 
   const {
     register,

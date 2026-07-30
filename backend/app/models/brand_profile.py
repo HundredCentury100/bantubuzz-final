@@ -35,6 +35,17 @@ class BrandProfile(db.Model):
     bookings_as_brand = db.relationship('Booking', foreign_keys='Booking.brand_id', backref='brand', lazy='dynamic')
     saved_creators = db.relationship('SavedCreator', backref='brand', lazy='dynamic', cascade='all, delete-orphan')
 
+    @property
+    def display_name(self):
+        """Compatibility label for older code paths; brands use company names."""
+        if self.company_name:
+            return self.company_name
+        if self.username:
+            return self.username
+        if getattr(self, 'user', None) and self.user.email:
+            return self.user.email.split('@')[0]
+        return 'Brand'
+
     def to_dict(self, include_user=False, public_view=False):
         """
         Convert brand profile to dictionary
@@ -48,7 +59,7 @@ class BrandProfile(db.Model):
             'user_id': self.user_id,
             'username': self.username,
             'company_name': self.company_name,
-            'display_name': self.company_name or 'Brand',  # Brands use company name as display name
+            'display_name': self.display_name,  # Brands use company name as display name
             'account_type': self.account_type or 'brand',
             'expected_workspace_count': self.expected_workspace_count,
             'logo': self.logo,

@@ -104,7 +104,7 @@ with app.app_context():
 
     -- Pro Plan
     ('Pro', 'pro', 'Professional features for serious creators',
-     29.99, 299.00, 50, 100, TRUE, TRUE, TRUE, 2, 'Pro Creator', 1.5, TRUE, TRUE, FALSE, TRUE, FALSE, 2),
+     29.99, 299.00, 50, 100, TRUE, TRUE, TRUE, 2, 'Creator Pro', 1.5, TRUE, TRUE, FALSE, TRUE, FALSE, 2),
 
     -- Agency Plan
     ('Agency', 'agency', 'Full-service solution for agencies and teams',

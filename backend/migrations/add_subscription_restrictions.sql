@@ -231,7 +231,7 @@ INSERT INTO subscription_plans (
     NOW(), NOW()
 );
 
--- Insert Pro Creator plan ($19/mo, $190/yr)
+-- Insert Creator Pro plan ($19/mo, $190/yr)
 INSERT INTO subscription_plans (
     name, slug, description, user_type,
     price_monthly, price_yearly,
@@ -246,7 +246,7 @@ INSERT INTO subscription_plans (
     is_active, is_default, display_order,
     created_at, updated_at
 ) VALUES (
-    'Pro Creator', 'pro-creator', 'Maximum visibility and minimum fees for professional creators',
+    'Creator Pro', 'pro-creator', 'Maximum visibility and minimum fees for professional creators',
     'creator',
     19.00, 190.00,
     999999, 999999,
@@ -256,7 +256,7 @@ INSERT INTO subscription_plans (
     TRUE, TRUE, TRUE,
     TRUE, TRUE, TRUE,
     TRUE, TRUE,
-    3, 'Pro Creator', 1.5,
+    3, 'Creator Pro', 1.5,
     TRUE, FALSE, 3,
     NOW(), NOW()
 );

@@ -8,6 +8,15 @@ import CreatorBadge from '../components/CreatorBadge';
 import toast from 'react-hot-toast';
 import { SparklesIcon, RocketLaunchIcon, BuildingOfficeIcon, ArrowUpIcon } from '@heroicons/react/24/outline';
 
+const withDashboardTimeout = (promise, label, timeoutMs = 10000) => (
+  Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      setTimeout(() => reject(new Error(`${label} request timed out`)), timeoutMs);
+    }),
+  ])
+);
+
 const CreatorDashboard = () => {
   const location = useLocation();
   const authUser = JSON.parse(localStorage.getItem('user') || '{}');
@@ -136,16 +145,32 @@ const CreatorDashboard = () => {
         platformsRes,
         pendingCollabsRes
       ] = await Promise.allSettled([
-        creatorsAPI.getOwnProfile(),
-        packagesAPI.getMyPackages(),
-        bookingsAPI.getMyBookings(),
-        opportunitiesAPI.getMyApplications({ limit: 5 }),
-        api.get('/subscriptions/my-subscription'),
-        api.get('/creator/verification/status'),
-        api.get('/creator/subscriptions/my-subscription'),
-        api.get('/creator/platforms'),
-        collaborationsAPI.getPendingCollaborations()
+        withDashboardTimeout(creatorsAPI.getOwnProfile(), 'creator profile'),
+        withDashboardTimeout(packagesAPI.getMyPackages(), 'creator packages'),
+        withDashboardTimeout(bookingsAPI.getMyBookings(), 'creator bookings'),
+        withDashboardTimeout(opportunitiesAPI.getMyApplications({ limit: 5 }), 'creator applications'),
+        withDashboardTimeout(api.get('/subscriptions/my-subscription'), 'creator subscription'),
+        withDashboardTimeout(api.get('/creator/verification/status'), 'creator verification'),
+        withDashboardTimeout(api.get('/creator/subscriptions/my-subscription'), 'creator verification subscription'),
+        withDashboardTimeout(api.get('/creator/platforms'), 'creator platforms'),
+        withDashboardTimeout(collaborationsAPI.getPendingCollaborations(), 'pending collaborations')
       ]);
+
+      [
+        ['profile', profileRes],
+        ['packages', packagesRes],
+        ['bookings', bookingsRes],
+        ['applications', applicationsRes],
+        ['subscription', subsRes],
+        ['verification', verRes],
+        ['verification subscription', verSubRes],
+        ['platforms', platformsRes],
+        ['pending collaborations', pendingCollabsRes],
+      ].forEach(([label, result]) => {
+        if (result.status === 'rejected') {
+          console.warn(`Creator dashboard ${label} unavailable:`, result.reason);
+        }
+      });
 
       // Handle profile
       if (profileRes.status === 'fulfilled') {
@@ -1117,6 +1142,18 @@ const CreatorDashboard = () => {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
                     </svg>
                     <span className="font-medium text-dark">Manage Subscriptions</span>
+                  </div>
+                </Link>
+
+                <Link
+                  to="/creator/team"
+                  className="block p-3 border border-gray-200 rounded-lg hover:border-primary hover:bg-primary/5 transition-colors"
+                >
+                  <div className="flex items-center">
+                    <svg className="w-5 h-5 text-primary mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a4 4 0 00-4-4h-1M9 20H4v-2a4 4 0 014-4h1m8-6a4 4 0 11-8 0 4 4 0 018 0zm-12 0a4 4 0 108 0 4 4 0 00-8 0z" />
+                    </svg>
+                    <span className="font-medium text-dark">Team Access</span>
                   </div>
                 </Link>
 

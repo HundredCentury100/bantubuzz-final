@@ -268,7 +268,42 @@ This invite expires on {invitation.expires_at.strftime('%Y-%m-%d')}.
   </div>
 </div>
 """
-    send_email(subject, invitation.email, text_body, html_body)
+    return send_email(subject, invitation.email, text_body, html_body, async_send=False)
+
+
+def _workspace_invitation_url(invitation):
+    return _frontend_url(f'/brand/workspace-invite/{invitation.token}')
+
+
+def _send_workspace_member_updated_email(member, workspace, inviter, brand):
+    account_language = _workspace_language(brand)
+    workspace_label = account_language['workspace_singular']
+    invite_url = _frontend_url('/brand/agency')
+    inviter_name = brand.company_name if brand else inviter.email
+    subject = f'Your {workspace.name} workspace access was updated'
+    text_body = f"""
+Your BantuBuzz workspace access has been updated.
+
+{inviter_name} set your role to {member.role} on the {workspace.name} {workspace_label} workspace.
+
+Open your workspace:
+{invite_url}
+"""
+    html_body = f"""
+<div style="font-family: Arial, sans-serif; max-width: 620px; margin: 0 auto; color: #1F2937;">
+  <div style="background: #B5E61D; padding: 20px; border-radius: 8px 8px 0 0;">
+    <h1 style="margin: 0; font-size: 24px;">BantuBuzz</h1>
+  </div>
+  <div style="border: 1px solid #E5E7EB; border-top: 0; padding: 28px; border-radius: 0 0 8px 8px;">
+    <h2 style="margin-top: 0;">Workspace access updated</h2>
+    <p>{inviter_name} set your role to <strong>{member.role}</strong> on the <strong>{workspace.name}</strong> {workspace_label} workspace.</p>
+    <p style="margin: 28px 0;">
+      <a href="{invite_url}" style="background: #B5E61D; color: #1F2937; padding: 12px 18px; border-radius: 8px; text-decoration: none; font-weight: 700;">Open Workspace</a>
+    </p>
+  </div>
+</div>
+"""
+    return send_email(subject, member.user.email, text_body, html_body, async_send=False)
 
 
 def _save_workspace_membership(workspace, user, role, permissions=None):
@@ -840,37 +875,31 @@ def add_member(workspace_id):
             workspace_id=workspace.id,
             user_id=member_user.id,
         ).first()
-        if not existing_membership and get_workspace_seat_usage(workspace)['available'] <= 0:
-            seat_usage = _workspace_seat_payload(workspace)
-            return jsonify({
-                'error': f"Team seat limit reached for your {seat_usage['plan_name']} plan. Upgrade your plan or remove a member before adding another teammate.",
-                'seat_usage': seat_usage,
-            }), 403
+        if existing_membership:
+            membership = _save_workspace_membership(
+                workspace,
+                member_user,
+                role,
+                ROLE_PERMISSIONS[role],
+            )
+            _log_workspace_audit(
+                workspace,
+                'member_role_updated',
+                email,
+                role,
+                target_user_id=member_user.id,
+            )
+            db.session.commit()
 
-        membership = _save_workspace_membership(
-            workspace,
-            member_user,
-            role,
-            ROLE_PERMISSIONS[role],
-        )
-        WorkspaceInvitation.query.filter_by(
-            workspace_id=workspace.id,
-            email=email,
-            status='pending',
-        ).update({'status': 'accepted', 'accepted_at': datetime.utcnow()})
-        _log_workspace_audit(
-            workspace,
-            'member_role_updated' if existing_membership else 'member_added',
-            email,
-            role,
-            target_user_id=member_user.id,
-        )
-        db.session.commit()
-        return jsonify({
-            'message': 'Workspace member saved',
-            'member': membership.to_dict(),
-            'seat_usage': _workspace_seat_payload(workspace),
-        }), 200
+            inviter = User.query.get(int(get_jwt_identity()))
+            brand = BrandProfile.query.get(workspace.agency_brand_id)
+            _send_workspace_member_updated_email(membership, workspace, inviter, brand)
+
+            return jsonify({
+                'message': 'Workspace member saved',
+                'member': membership.to_dict(),
+                'seat_usage': _workspace_seat_payload(workspace),
+            }), 200
 
     invitation = WorkspaceInvitation.query.filter_by(
         workspace_id=workspace.id,
@@ -913,11 +942,19 @@ def add_member(workspace_id):
 
     inviter = User.query.get(int(get_jwt_identity()))
     brand = BrandProfile.query.get(workspace.agency_brand_id)
-    _send_workspace_invitation_email(invitation, workspace, inviter, brand)
+    email_sent = _send_workspace_invitation_email(invitation, workspace, inviter, brand)
+    if not email_sent:
+        current_app.logger.warning(
+            'Workspace invitation email could not be sent for invitation_id=%s email=%s',
+            invitation.id,
+            invitation.email,
+        )
 
     return jsonify({
-        'message': 'Workspace invitation sent',
+        'message': 'Workspace invitation sent' if email_sent else 'Workspace invitation created, but email delivery could not be confirmed',
         'invitation': invitation.to_dict(),
+        'invitation_url': _workspace_invitation_url(invitation),
+        'email_sent': email_sent,
         'seat_usage': _workspace_seat_payload(workspace),
     }), 202
 

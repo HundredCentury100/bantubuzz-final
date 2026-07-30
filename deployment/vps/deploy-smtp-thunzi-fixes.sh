@@ -44,6 +44,7 @@ tar --ignore-failed-read -czf "$BACKUP/backend-targeted.tar.gz" -C backend \
   app/services/thunzi_service.py \
   app/routes/auth.py \
   app/routes/platforms.py \
+  app/tasks/platform_sync.py \
   app/tasks/analytics_tasks.py
 
 echo "Installing targeted backend files"
@@ -54,6 +55,7 @@ chown -R bantubuzz:www-data \
   backend/app/services/thunzi_service.py \
   backend/app/routes/auth.py \
   backend/app/routes/platforms.py \
+  backend/app/tasks/platform_sync.py \
   backend/app/tasks/analytics_tasks.py
 
 echo "Compiling targeted backend files"
@@ -67,6 +69,7 @@ for path in [
     'app/services/thunzi_service.py',
     'app/routes/auth.py',
     'app/routes/platforms.py',
+    'app/tasks/platform_sync.py',
     'app/tasks/analytics_tasks.py',
 ]:
     py_compile.compile(path, cfile=f"/tmp/{path.replace('/', '_')}.pyc", doraise=True)
@@ -167,6 +170,6 @@ for path in paths[:12]:
         print(line[:700])
 PY
 
-rm -f /tmp/bantubuzz-smtp-thunzi-fixes-backend.tar.gz /tmp/deploy-smtp-thunzi-fixes.sh
+rm -f /tmp/bantubuzz-smtp-thunzi-fixes-backend.tar.gz /tmp/deploy-smtp-thunzi-fixes.sh /tmp/deploy-smtp-thunzi-fixes.lf.sh
 
 echo BANTUBUZZ_SMTP_THUNZI_FIXES_SUCCESS

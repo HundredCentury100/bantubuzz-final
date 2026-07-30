@@ -5,6 +5,7 @@
 import { useState, useEffect } from 'react';
 import { toast } from 'react-hot-toast';
 import api from '../services/api';
+import { isNativeAppRuntime, mobileReturnState, nativeReturnUrl, openExternalUrl } from '../utils/nativeApp';
 
 const FACEBOOK_APP_ID = '1863571634283956';
 const FACEBOOK_BUSINESS_CONFIG_ID = '1404830888084532'; // For creators WITH business portfolio
@@ -49,7 +50,7 @@ export const useFacebookOAuth = () => {
         const stateData = JSON.parse(decodeURIComponent(state));
         if (stateData.action === 'facebook_connect') {
           // Handle the authorization code
-          handleFacebookRedirect(code);
+          handleFacebookRedirect(code, stateData);
 
           // Clean up URL
           window.history.replaceState({}, document.title, window.location.pathname);
@@ -61,20 +62,20 @@ export const useFacebookOAuth = () => {
   }, []);
 
   // Handle Facebook OAuth redirect with authorization code
-  const handleFacebookRedirect = async (code) => {
+  const handleFacebookRedirect = async (code, stateData = {}) => {
     setIsConnecting(true);
 
     try {
       console.log('Exchanging authorization code for access token');
 
       // Get account type from session storage
-      const accountType = sessionStorage.getItem('facebook_account_type') || 'business';
+      const accountType = stateData.accountType || sessionStorage.getItem('facebook_account_type') || 'business';
 
       // Use the SAME redirect URI for both flows
       const redirectPath = '/creator/platforms';
 
       // Exchange code for access token via backend
-      const redirect_uri = window.location.origin + redirectPath;
+      const redirect_uri = stateData.redirectUri || `${window.location.origin}${redirectPath}`;
       const tokenResponse = await api.post('/creator/platforms/facebook/exchange-code', {
         code: code,
         redirect_uri: redirect_uri,
@@ -151,7 +152,7 @@ export const useFacebookOAuth = () => {
   };
 
   const connectFacebookPage = async (onSuccess, accountType = 'business') => {
-    if (!isSDKLoaded) {
+    if (!isNativeAppRuntime() && !isSDKLoaded) {
       toast.error('Facebook SDK is still loading...');
       return;
     }
@@ -169,12 +170,17 @@ export const useFacebookOAuth = () => {
       const redirectPath = '/creator/platforms';
 
       // Build the OAuth dialog URL manually
-      const redirectUri = encodeURIComponent(window.location.origin + redirectPath);
-      const state = encodeURIComponent(JSON.stringify({
+      const redirectUriValue = isNativeAppRuntime()
+        ? nativeReturnUrl(redirectPath)
+        : window.location.origin + redirectPath;
+      const redirectUri = encodeURIComponent(redirectUriValue);
+      const state = encodeURIComponent(JSON.stringify(mobileReturnState({
         action: 'facebook_connect',
         accountType: accountType,
+        redirectUri: redirectUriValue,
+        returnTarget: redirectPath,
         timestamp: Date.now()
-      }));
+      })));
 
       // Required scopes - MUST match ALL permissions in the Facebook configuration
       const scope = 'business_management,email,instagram_basic,instagram_manage_insights,pages_manage_ads,pages_manage_metadata,pages_messaging,pages_read_engagement,pages_read_user_content,pages_show_list,read_insights';
@@ -196,7 +202,7 @@ export const useFacebookOAuth = () => {
       }
 
       // Redirect to Facebook OAuth
-      window.location.href = oauthUrl;
+      await openExternalUrl(oauthUrl);
 
     } catch (error) {
       console.error('Facebook OAuth error:', error);

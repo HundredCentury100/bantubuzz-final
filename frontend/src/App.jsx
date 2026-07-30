@@ -1,10 +1,13 @@
-import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { useEffect } from 'react';
+import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from './hooks/useAuth';
 import ScrollToTop from './components/ScrollToTop';
 import { SubscriptionProvider } from './contexts/SubscriptionContext';
 import { WorkspaceProvider } from './contexts/WorkspaceContext';
 import SubscriptionWrapper from './components/SubscriptionWrapper';
 import Footer from './components/Footer';
+import { isNativeAppRuntime } from './utils/nativeApp';
+import NativeDeepLinkHandler from './components/NativeDeepLinkHandler';
 
 // Pages
 import Home from './pages/Home';
@@ -12,6 +15,7 @@ import Login from './pages/Login';
 import RegisterCreator from './pages/RegisterCreator';
 import RegisterBrand from './pages/RegisterBrand';
 import VerifyOTP from './pages/VerifyOTP';
+import MobileOnboarding from './pages/MobileOnboarding';
 import CreatorDashboard from './pages/CreatorDashboard';
 import CreatorProfileEdit from './pages/CreatorProfileEdit';
 import PackageManagement from './pages/PackageManagement';
@@ -20,6 +24,8 @@ import BrandDashboard from './pages/BrandDashboard';
 import AgencyDashboard from './pages/AgencyDashboard';
 import WorkspaceManage from './pages/WorkspaceManage';
 import WorkspaceInvite from './pages/WorkspaceInvite';
+import CreatorTeamManage from './pages/CreatorTeamManage';
+import CreatorTeamInvite from './pages/CreatorTeamInvite';
 import BrandProfileEdit from './pages/BrandProfileEdit';
 import BrandAnalytics from './pages/BrandAnalytics';
 import BrandAnalyticsOverview from './pages/BrandAnalyticsOverview';
@@ -123,6 +129,7 @@ import PublicCampaignReport from './pages/PublicCampaignReport';
 import ReferralLanding from './pages/ReferralLanding';
 import Referrals from './pages/Referrals';
 import Leaderboard from './pages/Leaderboard';
+import MobileReturn from './pages/MobileReturn';
 
 // Support Pages
 import HelpCenter from './pages/HelpCenter';
@@ -192,7 +199,7 @@ const PublicRoute = ({ children }) => {
 const AdminRoute = ({ children }) => {
   const { location } = window;
   const user = JSON.parse(localStorage.getItem('user') || '{}');
-  const token = localStorage.getItem('token');
+  const token = localStorage.getItem('access_token') || localStorage.getItem('token');
 
   if (!token || !user.is_admin) {
     // Save the intended URL for redirect after login
@@ -207,6 +214,7 @@ const AdminRoute = ({ children }) => {
 function App() {
   const { isAuthenticated } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
   const routesWithLocalFooter = [
     '/',
     '/about',
@@ -236,10 +244,21 @@ function App() {
     path.startsWith('/tickets/');
   const showAuthenticatedFooter = isAuthenticated && !path.startsWith('/admin') && !hasLocalFooter;
 
+  useEffect(() => {
+    if (
+      isNativeAppRuntime() &&
+      path === '/' &&
+      localStorage.getItem('bantubuzz_mobile_onboarding_seen') !== 'true'
+    ) {
+      navigate('/mobile/onboarding', { replace: true });
+    }
+  }, [navigate, path]);
+
   return (
     <SubscriptionProvider>
       <WorkspaceProvider>
         <SubscriptionWrapper>
+        <NativeDeepLinkHandler />
         <ScrollToTop />
         <Routes>
       {/* Public Routes */}
@@ -279,10 +298,13 @@ function App() {
         }
       />
       <Route path="/verify-otp" element={<VerifyOTP />} />
+      <Route path="/mobile/onboarding" element={<MobileOnboarding />} />
+      <Route path="/mobile/return" element={<MobileReturn />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password/:token" element={<ResetPassword />} />
       <Route path="/register/creator/complete-profile" element={<GoogleProfileComplete />} />
       <Route path="/youtube/callback" element={<YouTubeCallback />} />
+      <Route path="/creator/team-invite/:token" element={<CreatorTeamInvite />} />
 
       {/* Creator Protected Routes */}
       <Route
@@ -442,6 +464,14 @@ function App() {
         element={
           <ProtectedRoute requiredType="creator">
             <CreatorSubscriptions />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/creator/team"
+        element={
+          <ProtectedRoute requiredType="creator">
+            <CreatorTeamManage />
           </ProtectedRoute>
         }
       />

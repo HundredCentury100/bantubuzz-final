@@ -11,6 +11,15 @@ const PLATFORM_OPTIONS = [
   { value: 'twitter', label: 'Twitter/X', mode: 'url' }
 ];
 
+const normalizePlatformValue = (platform) => {
+  if (!platform) return '';
+  if (typeof platform === 'string') return platform;
+  if (typeof platform === 'object') {
+    return String(platform.value || platform.platform || platform.name || platform.label || '');
+  }
+  return String(platform);
+};
+
 /**
  * DeliverableURLInput Component
  *
@@ -34,7 +43,7 @@ const DeliverableURLInput = ({
   onSuccess
 }) => {
   const [postUrl, setPostUrl] = useState(deliverable?.post_url || '');
-  const [selectedPlatform, setSelectedPlatform] = useState(deliverable?.post_platform || '');
+  const [selectedPlatform, setSelectedPlatform] = useState(normalizePlatformValue(deliverable?.post_platform));
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [showInput, setShowInput] = useState(!deliverable?.post_url_validated);
@@ -56,7 +65,7 @@ const DeliverableURLInput = ({
       twitter: Twitter,
       tiktok: Link2 // Using generic link icon for TikTok since lucide doesn't have TikTok
     };
-    const IconComponent = icons[platform?.toLowerCase()] || Link2;
+    const IconComponent = icons[normalizePlatformValue(platform).toLowerCase()] || Link2;
     return <IconComponent size={20} className="text-primary" />;
   };
 
@@ -154,7 +163,7 @@ const DeliverableURLInput = ({
         <div className="flex items-center gap-2 text-sm text-green-800">
           {getPlatformIcon(deliverable.post_platform)}
           <span className="font-mono text-xs bg-green-100 px-2 py-1 rounded">
-            {deliverable.post_platform?.toUpperCase()} - {deliverable.post_id}
+            {normalizePlatformValue(deliverable.post_platform).toUpperCase() || 'POST'} - {deliverable.post_id}
           </span>
         </div>
         {deliverable.url?.startsWith('http') && (

@@ -35,6 +35,22 @@ const getDeliveryTiming = (dateValue) => {
   };
 };
 
+const getDeliverableLabel = (deliverable, fallback = 'Deliverable') => {
+  if (typeof deliverable === 'string') return deliverable;
+  if (!deliverable || typeof deliverable !== 'object') return fallback;
+
+  const platform = deliverable.platform || deliverable.post_platform || deliverable.channel;
+  const contentType = deliverable.content_type || deliverable.type || deliverable.deliverable_type || deliverable.title || deliverable.name;
+  const quantity = deliverable.quantity || deliverable.count;
+
+  const parts = [];
+  if (platform) parts.push(String(platform));
+  if (quantity) parts.push(String(quantity));
+  if (contentType) parts.push(String(contentType));
+
+  return parts.length ? parts.join(' ') : fallback;
+};
+
 const CollaborationDetails = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -445,19 +461,27 @@ const CollaborationDetails = () => {
     );
   }
 
-  const totalExpected = collaboration.deliverables?.length || 0;
-  const totalApproved = collaboration.submitted_deliverables?.length || 0;
-  const totalDrafts = collaboration.draft_deliverables?.length || 0;
+  const expectedDeliverables = Array.isArray(collaboration.deliverables)
+    ? collaboration.deliverables.map((deliverable, index) => getDeliverableLabel(deliverable, `Deliverable ${index + 1}`))
+    : [];
+  const submittedDeliverables = Array.isArray(collaboration.submitted_deliverables) ? collaboration.submitted_deliverables : [];
+  const draftDeliverables = Array.isArray(collaboration.draft_deliverables) ? collaboration.draft_deliverables : [];
+  const packageDeliverables = Array.isArray(collaboration.package_deliverables) ? collaboration.package_deliverables : [];
+  const revisionRequests = Array.isArray(collaboration.revision_requests) ? collaboration.revision_requests : [];
+  const totalExpected = expectedDeliverables.length;
+  const totalApproved = submittedDeliverables.length;
+  const totalDrafts = draftDeliverables.length;
   const totalRevisions = collaboration.total_revisions_used || 0;
   const paidRevisions = collaboration.paid_revisions || 0;
   const freeRevisions = collaboration.creator?.free_revisions || 2;
   const revisionFee = collaboration.creator?.revision_fee || 0;
 
   // Check if user can submit new deliverables based on expected deliverables count
-  const expectedDeliverablesCount = collaboration.deliverables?.length || 0;
-  const draftsWithoutRevisions = collaboration.draft_deliverables?.filter(d => d.status !== 'revision_requested').length || 0;
+  const expectedDeliverablesCount = expectedDeliverables.length;
+  const draftsWithoutRevisions = draftDeliverables.filter(d => d.status !== 'revision_requested').length || 0;
   const totalUniqueDeliverables = draftsWithoutRevisions + totalApproved;
   const canSubmitNewDeliverable = totalUniqueDeliverables < expectedDeliverablesCount;
+  const missingExpectedDeliverables = totalExpected === 0;
 
   return (
     <div className="min-h-screen bg-light">
@@ -630,6 +654,19 @@ const CollaborationDetails = () => {
               )}
             </div>
 
+            {missingExpectedDeliverables && (
+              <div className="rounded-lg border-2 border-amber-200 bg-amber-50 p-5">
+                <h2 className="text-lg font-bold text-amber-950">Deliverables missing</h2>
+                <p className="mt-2 text-sm text-amber-900">
+                  This collaboration was created without expected deliverables, so delivery actions are disabled for safety.
+                  Future package and campaign-cart collaborations are blocked from activating without at least one deliverable.
+                </p>
+                <p className="mt-2 text-xs text-amber-800">
+                  Collaboration ID: {collaboration.id}. An admin can complete, cancel, or recreate it with deliverables from the admin collaboration tools.
+                </p>
+              </div>
+            )}
+
             {/* Revision Policy (Brand View) */}
             {isBrand && (
               <div className="bg-primary/5 border border-primary/20 rounded-lg p-4">
@@ -643,13 +680,13 @@ const CollaborationDetails = () => {
             )}
 
             {/* CONTENT REVIEW = YES: Two-Stage Workflow */}
-            {collaboration.requires_content_review && (
+            {collaboration.requires_content_review && !missingExpectedDeliverables && (
               <div className="space-y-6">
                 {/* Expected Content Section */}
                 <div className="bg-white rounded-lg shadow p-6">
                   <h2 className="text-xl font-bold text-gray-900 mb-4">Expected Content</h2>
                   <ul className="space-y-2">
-                    {collaboration.deliverables?.map((deliverable, idx) => (
+                    {expectedDeliverables.map((deliverable, idx) => (
                       <li key={idx} className="flex items-start gap-2 text-gray-700">
                         <svg className="w-5 h-5 text-gray-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -705,7 +742,7 @@ const CollaborationDetails = () => {
                         Content Pending Review ({totalDrafts})
                       </h2>
                       {/* Approve All Button - Only show for brands when there are multiple pending items */}
-                      {isBrand && collaboration.status === 'in_progress' && collaboration.draft_deliverables.filter(d => d.status === 'pending_review').length > 1 && (
+                      {isBrand && collaboration.status === 'in_progress' && draftDeliverables.filter(d => d.status === 'pending_review').length > 1 && (
                         <button
                           onClick={handleApproveAll}
                           disabled={approvingAll || approvingDeliverable !== null}
@@ -728,7 +765,7 @@ const CollaborationDetails = () => {
                       )}
                     </div>
                     <div className="space-y-4">
-                      {collaboration.draft_deliverables.map((deliverable) => (
+                      {draftDeliverables.map((deliverable) => (
                         <div key={deliverable.id} className="border-2 border-yellow-200 rounded-lg p-4 bg-yellow-50">
                           <div className="flex items-start justify-between mb-2">
                             <div className="flex-1">
@@ -815,13 +852,13 @@ const CollaborationDetails = () => {
                         Your Content Items
                       </h2>
                       {/* Submit All Button - Show when multiple items can be submitted */}
-                      {canSubmitNewDeliverable && collaboration.deliverables && collaboration.deliverables.length > 1 && (
+                      {canSubmitNewDeliverable && expectedDeliverables.length > 1 && (
                         <button
                           onClick={() => {
-                            const pendingTitles = collaboration.deliverables.filter(delivName => {
+                            const pendingTitles = expectedDeliverables.filter(delivName => {
                               // Check if this deliverable hasn't been submitted yet
-                              const alreadySubmitted = collaboration.draft_deliverables?.some(d => d.title === delivName && d.status !== 'revision_requested') ||
-                                                      collaboration.submitted_deliverables?.some(d => d.title === delivName);
+                              const alreadySubmitted = draftDeliverables.some(d => d.title === delivName && d.status !== 'revision_requested') ||
+                                                      submittedDeliverables.some(d => d.title === delivName);
                               return !alreadySubmitted;
                             });
                             setBulkDraftTitles(pendingTitles);
@@ -844,10 +881,10 @@ const CollaborationDetails = () => {
                     </div>
 
                     <div className="space-y-4">
-                      {collaboration.deliverables?.map((deliverableName, idx) => {
+                      {expectedDeliverables.map((deliverableName, idx) => {
                         // Check if this deliverable has been submitted (as draft or approved)
-                        const draftVersion = collaboration.draft_deliverables?.find(d => d.title === deliverableName);
-                        const approvedVersion = collaboration.submitted_deliverables?.find(d => d.title === deliverableName);
+                        const draftVersion = draftDeliverables.find(d => d.title === deliverableName);
+                        const approvedVersion = submittedDeliverables.find(d => d.title === deliverableName);
                         const isSubmitted = (draftVersion && draftVersion.status !== 'revision_requested') || approvedVersion;
 
                         return (
@@ -941,14 +978,14 @@ const CollaborationDetails = () => {
                 )}
 
                 {/* STAGE 2: Live Posts (Only appears when content is approved) */}
-                {collaboration.submitted_deliverables && collaboration.submitted_deliverables.length > 0 && (
+                {submittedDeliverables.length > 0 && (
                   <div className="bg-white rounded-lg shadow p-6">
                     <h2 className="text-xl font-bold text-gray-900 mb-4">
                       Live Posts ({totalApproved}/{totalExpected})
                     </h2>
 
                     {/* Notification for Creator after approval */}
-                    {!isBrand && collaboration.submitted_deliverables.some(d => !d.post_url) && (
+                    {!isBrand && submittedDeliverables.some(d => !d.post_url) && (
                       <div className="mb-6 bg-green-50 border-2 border-green-300 rounded-lg p-4">
                         <div className="flex items-start gap-3">
                           <svg className="w-6 h-6 text-green-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -957,7 +994,7 @@ const CollaborationDetails = () => {
                           <div>
                             <p className="font-semibold text-green-900 mb-1">Your content has been approved!</p>
                             <p className="text-sm text-green-800">
-                              You can now post it live on your social media platforms and submit your post URL{collaboration.submitted_deliverables.filter(d => !d.post_url).length > 1 ? 's' : ''} here.
+                              You can now post it live on your social media platforms and submit your post URL{submittedDeliverables.filter(d => !d.post_url).length > 1 ? 's' : ''} here.
                             </p>
                           </div>
                         </div>
@@ -965,7 +1002,7 @@ const CollaborationDetails = () => {
                     )}
 
                     {/* Waiting state for Brand after approval */}
-                    {isBrand && collaboration.submitted_deliverables.some(d => !d.post_url) && (
+                    {isBrand && submittedDeliverables.some(d => !d.post_url) && (
                       <div className="mb-6 bg-blue-50 border-2 border-blue-200 rounded-lg p-4">
                         <div className="flex items-start gap-3">
                           <svg className="w-6 h-6 text-blue-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -974,7 +1011,7 @@ const CollaborationDetails = () => {
                           <div>
                             <p className="font-semibold text-blue-900 mb-1">Content approved. Waiting for creator to post live.</p>
                             <p className="text-sm text-blue-800">
-                              The creator will post the approved content to their social media and submit their URL{collaboration.submitted_deliverables.filter(d => !d.post_url).length > 1 ? 's' : ''} here.
+                              The creator will post the approved content to their social media and submit their URL{submittedDeliverables.filter(d => !d.post_url).length > 1 ? 's' : ''} here.
                             </p>
                           </div>
                         </div>
@@ -982,7 +1019,7 @@ const CollaborationDetails = () => {
                     )}
 
                     <div className="space-y-3">
-                      {collaboration.submitted_deliverables.map((deliverable, idx) => (
+                      {submittedDeliverables.map((deliverable, idx) => (
                         <div key={idx} className="border-2 border-green-200 rounded-lg p-4 bg-green-50">
                           <div className="flex items-start justify-between mb-2">
                             <div>
@@ -1044,7 +1081,7 @@ const CollaborationDetails = () => {
             )}
 
             {/* CONTENT REVIEW = NO: Direct Post Workflow - No Draft Review */}
-            {!collaboration.requires_content_review && (
+            {!collaboration.requires_content_review && !missingExpectedDeliverables && (
               <div className="bg-white rounded-lg shadow p-6">
                 <h2 className="text-xl font-bold text-gray-900 mb-4">
                   Live Posts
@@ -1100,10 +1137,10 @@ const CollaborationDetails = () => {
 
                 {/* Expected Posts with Direct URL Submission */}
                 <div className="space-y-4">
-                  {collaboration.deliverables?.map((deliverableName, idx) => {
+                  {expectedDeliverables.map((deliverableName, idx) => {
                     // For NO track, find matching record from submitted_deliverables or package_deliverables
-                    const submittedPost = collaboration.submitted_deliverables?.find(d => d.title === deliverableName) ||
-                                         collaboration.package_deliverables?.find(d => d.title === deliverableName);
+                    const submittedPost = submittedDeliverables.find(d => d.title === deliverableName) ||
+                                         packageDeliverables.find(d => d.title === deliverableName);
 
                     return (
                       <div key={idx} className={`rounded-lg p-4 border-2 ${submittedPost?.post_url ? 'border-green-200 bg-green-50' : 'border-gray-200 bg-gray-50'}`}>
@@ -1183,11 +1220,11 @@ const CollaborationDetails = () => {
             )}
 
             {/* Revision History */}
-            {collaboration.revision_requests && collaboration.revision_requests.length > 0 && (
+            {revisionRequests.length > 0 && (
               <div className="bg-white rounded-lg shadow p-6">
                 <h2 className="text-xl font-bold text-gray-900 mb-4">Revision History</h2>
                 <div className="space-y-3">
-                  {collaboration.revision_requests.map((revision, idx) => (
+                  {revisionRequests.map((revision, idx) => (
                     <div key={idx} className="border border-gray-200 rounded-lg p-4">
                       <div className="flex items-start justify-between mb-2">
                         <div>
@@ -1307,8 +1344,8 @@ const CollaborationDetails = () => {
                     Send Message
                   </Link>
 
-                  {/* Mark as Completed Button - Only for brands after live URLs submitted */}
-                  {isBrand && collaboration.live_urls_submitted_at && (
+                  {/* Mark as Completed Button - Available to brands for active collaborations */}
+                  {isBrand && (
                     <MarkCompleteButton
                       collaborationId={parseInt(id)}
                       collaborationTitle={collaboration.title}
@@ -1326,7 +1363,7 @@ const CollaborationDetails = () => {
             )}
 
             {/* Review Button - Brand */}
-            {collaboration.status === 'completed' && isBrand && (
+            {collaboration.status === 'completed' && isBrand && !collaboration.has_review && (
               <div className="bg-white rounded-lg shadow p-6">
                 <h3 className="text-lg font-bold text-gray-900 mb-4">Feedback</h3>
                 <Link
@@ -1335,6 +1372,13 @@ const CollaborationDetails = () => {
                 >
                   Leave a Review
                 </Link>
+              </div>
+            )}
+
+            {collaboration.status === 'completed' && isBrand && collaboration.has_review && (
+              <div className="bg-white rounded-lg shadow p-6">
+                <h3 className="text-lg font-bold text-gray-900 mb-2">Feedback</h3>
+                <p className="text-sm text-gray-600">Review submitted for this collaboration.</p>
               </div>
             )}
 

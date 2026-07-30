@@ -9,11 +9,10 @@ import os
 from werkzeug.utils import secure_filename
 from app import db
 from app.models import BrandProfile, User, Subscription, SubscriptionPlan
-from app.services.payment_service import initiate_subscription_payment, check_subscription_payment_status
+from app.services.payment_service import check_subscription_payment_status
 from app.services.agency_subscription_service import apply_brand_subscription_entitlements
 from app.services.subscription_lifecycle_service import (
     apply_paid_subscription,
-    clear_pending_change,
     is_downgrade,
     plan_price,
     prepare_paid_upgrade,
@@ -132,7 +131,7 @@ def get_my_subscription():
 @jwt_required()
 def subscribe():
     """
-    Subscribe user to a plan with Paynow payment
+    Subscribe user to a plan and hand off paid plans to the unified payment page.
     Body: { plan_id: int, billing_cycle: 'monthly'|'yearly' }
     """
     try:
@@ -183,7 +182,8 @@ def subscribe():
                 'data': subscription.to_dict()
             }), 201
 
-        # For paid plans, create subscription with pending status and initiate payment
+        # For paid plans, create a pending subscription. The frontend payment page
+        # handles wallet, Smile&Pay, and bank-transfer proof upload.
         subscription = Subscription(
             user_id=user_id,
             plan_id=plan_id,
@@ -198,34 +198,20 @@ def subscribe():
         # Calculate amount based on billing cycle
         amount = plan_price(plan, billing_cycle)
 
-        # Initiate Paynow payment
-        payment_result = initiate_subscription_payment(
-            subscription=subscription,
-            user_email=user.email,
-            plan_name=plan.name,
-            amount=amount,
-            billing_cycle=billing_cycle
-        )
-
-        if payment_result['success']:
-            db.session.commit()
-            return jsonify({
-                'success': True,
-                'message': 'Payment initiated successfully',
-                'data': {
-                    'subscription_id': subscription.id,
-                    'redirect_url': payment_result['redirect_url'],
-                    'poll_url': payment_result['poll_url'],
-                    'payment_reference': payment_result['payment_reference']
-                }
-            }), 201
-        else:
-            db.session.rollback()
-            return jsonify({
-                'success': False,
-                'error': payment_result.get('error', 'Payment initialization failed'),
-                'message': payment_result.get('message', 'Unknown error')
-            }), 400
+        subscription.payment_status = 'pending_payment'
+        subscription.payment_reference = f'SUB-{subscription.id}'
+        db.session.commit()
+        return jsonify({
+            'success': True,
+            'message': 'Subscription created. Choose a payment method to activate it.',
+            'data': {
+                'subscription_id': subscription.id,
+                'payment_reference': subscription.payment_reference,
+                'amount_due': float(amount),
+                'billing_cycle': billing_cycle,
+                'requires_payment': True
+            }
+        }), 201
 
     except Exception as e:
         db.session.rollback()
@@ -240,9 +226,9 @@ def subscribe():
 @jwt_required()
 def upgrade_subscription():
     """
-    Upgrade to a different plan (requires payment like subscription)
+    Upgrade to a different plan. Paid upgrades are prepared, then completed by
+    wallet, Smile&Pay, or bank-transfer verification.
     Body: { plan_id: int, billing_cycle: 'monthly'|'yearly' }
-    Returns payment initiation data for Paynow (frontend handles wallet/bank transfer separately)
     """
     try:
         user_id = get_jwt_identity()
@@ -314,38 +300,20 @@ def upgrade_subscription():
                 }
             }), 200
 
-        # Initiate Paynow payment
-        payment_result = initiate_subscription_payment(
-            subscription=current_sub,
-            user_email=user.email,
-            plan_name=new_plan.name,
-            amount=amount,
-            billing_cycle=billing_cycle
-        )
-
-        if payment_result['success']:
-            db.session.commit()
-            return jsonify({
-                'success': True,
-                'message': 'Upgrade payment initiated successfully',
-                'data': {
-                    'subscription_id': current_sub.id,
-                    'redirect_url': payment_result['redirect_url'],
-                    'poll_url': payment_result['poll_url'],
-                    'payment_reference': payment_result['payment_reference'],
-                    'amount_due': float(amount),
-                    'is_upgrade': True
-                }
-            }), 200
-        else:
-            clear_pending_change(current_sub)
-            current_sub.payment_status = None
-            db.session.rollback()
-            return jsonify({
-                'success': False,
-                'error': payment_result.get('error', 'Payment initialization failed'),
-                'message': payment_result.get('message', 'Unknown error')
-            }), 400
+        current_sub.payment_reference = f'SUB-{current_sub.id}-UPGRADE'
+        db.session.commit()
+        return jsonify({
+            'success': True,
+            'message': 'Upgrade prepared. Choose a payment method to activate it.',
+            'data': {
+                'subscription_id': current_sub.id,
+                'payment_reference': current_sub.payment_reference,
+                'amount_due': float(amount),
+                'billing_cycle': billing_cycle,
+                'is_upgrade': True,
+                'requires_payment': True
+            }
+        }), 200
 
     except Exception as e:
         db.session.rollback()
@@ -550,7 +518,7 @@ def check_payment_status_endpoint(subscription_id):
     Check payment status for a subscription
     """
     try:
-        user_id = get_jwt_identity()
+        user_id = int(get_jwt_identity())
 
         subscription = Subscription.query.get_or_404(subscription_id)
 
@@ -588,7 +556,7 @@ def upload_payment_proof():
     Requires admin verification before subscription activates
     """
     try:
-        user_id = get_jwt_identity()
+        user_id = int(get_jwt_identity())
         user = User.query.get(user_id)
 
         if 'file' not in request.files:

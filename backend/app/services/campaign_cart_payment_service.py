@@ -195,9 +195,15 @@ def complete_campaign_cart_payment(payment, payment_reference=None, payment_meth
     service_fee_percentage = Decimal(str(metadata.get("service_fee_percentage") or get_brand_service_fee_percentage(payment.brand_user_id)))
 
     for cart_item in cart_items:
+        deliverables = _deliverables_for_item(cart_item, campaign)
+        if not deliverables:
+            raise ValueError("Cannot activate a campaign collaboration without at least one deliverable")
+
         start_date = datetime.utcnow()
+        collaboration_type = "package" if cart_item.item_type == "package" and cart_item.package_id else "campaign"
+
         collaboration = Collaboration(
-            collaboration_type="campaign" if cart_item.item_type == "application" else "package",
+            collaboration_type=collaboration_type,
             campaign_application_id=cart_item.proposal_id if cart_item.item_type == "application" else None,
             brand_id=cart_item.brand_id,
             creator_id=cart_item.creator_id,
@@ -208,7 +214,7 @@ def complete_campaign_cart_payment(payment, payment_reference=None, payment_meth
             status="in_progress",
             progress_percentage=0,
             escrow_status="escrowed",
-            deliverables=_deliverables_for_item(cart_item, campaign),
+            deliverables=deliverables,
             start_date=start_date,
             expected_completion_date=_expected_completion_for_item(cart_item, campaign),
             requires_content_review=bool(requires_content_review),

@@ -106,7 +106,8 @@ export default function SubscriptionManage() {
               payment_reference: res.data.data.payment_reference
             },
             plan: plan,
-            billingCycle: billingCycle
+            billingCycle: res.data.data.billing_cycle || billingCycle,
+            amountDue: res.data.data.amount_due
           }
         });
       }
@@ -129,19 +130,20 @@ export default function SubscriptionManage() {
       });
 
       if (res.data.success && res.data.data) {
-        if (res.data.data.redirect_url) {
-          localStorage.setItem('lastSubscriptionId', actualSubscription?.id || currentSubscription?.subscription?.id);
+        const subscriptionId = res.data.data.subscription_id || actualSubscription?.id || currentSubscription?.subscription?.id;
+        if (res.data.data.requires_payment || res.data.data.redirect_url || res.data.data.amount_due > 0) {
+          localStorage.setItem('lastSubscriptionId', subscriptionId);
 
           navigate('/subscription/payment', {
             state: {
               paymentData: {
-                subscription_id: actualSubscription?.id || currentSubscription?.subscription?.id,
+                subscription_id: subscriptionId,
                 redirect_url: res.data.data.redirect_url,
                 poll_url: res.data.data.poll_url,
                 payment_reference: res.data.data.payment_reference
             },
             plan: plan,
-            billingCycle: billingCycle,
+            billingCycle: res.data.data.billing_cycle || billingCycle,
             amountDue: res.data.data.amount_due
           }
         });

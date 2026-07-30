@@ -20,6 +20,12 @@ from app.services.email_service import (
 )
 from app.services.referral_service import attach_referral, mark_referral_activated
 from app.services.creator_score_service import CreatorScoreService, queue_creator_score_recalculation
+from app.utils.recaptcha_enterprise import RecaptchaVerificationError, verify_recaptcha_token
+from app.utils.signup_protection import (
+    SignupProtectionError,
+    check_signup_honeypot,
+    enforce_signup_rate_limit,
+)
 
 bp = Blueprint('auth', __name__)
 MAX_FAILED_LOGIN_ATTEMPTS = 5
@@ -55,7 +61,10 @@ def _issue_auth_response(user):
 def _has_active_paid_subscription(user):
     now = datetime.utcnow()
     if user.user_type == 'brand':
-        subscription = Subscription.query.join(SubscriptionPlan).filter(
+        subscription = Subscription.query.join(
+            SubscriptionPlan,
+            Subscription.plan_id == SubscriptionPlan.id
+        ).filter(
             Subscription.user_id == user.id,
             Subscription.status == 'active',
             SubscriptionPlan.price_monthly > 0,
@@ -73,7 +82,10 @@ def _has_active_paid_subscription(user):
         if creator_subscription:
             return True
 
-        subscription = Subscription.query.join(SubscriptionPlan).filter(
+        subscription = Subscription.query.join(
+            SubscriptionPlan,
+            Subscription.plan_id == SubscriptionPlan.id
+        ).filter(
             Subscription.user_id == user.id,
             Subscription.status == 'active',
             SubscriptionPlan.price_monthly > 0,
@@ -141,7 +153,16 @@ def _parse_optional_int(value):
 def register_creator():
     """Register a new creator account"""
     try:
-        data = request.get_json()
+        data = request.get_json() or {}
+
+        try:
+            check_signup_honeypot(data)
+            enforce_signup_rate_limit(data.get('email'), 'register_creator')
+            verify_recaptcha_token(data.get('recaptcha_token'), 'REGISTER_CREATOR')
+        except SignupProtectionError as exc:
+            return jsonify({'error': str(exc)}), exc.status_code
+        except RecaptchaVerificationError as exc:
+            return jsonify({'error': str(exc)}), 400
 
         # Validate required fields
         required_fields = ['email', 'password', 'username']
@@ -234,7 +255,16 @@ def register_creator():
 def register_brand():
     """Register a new brand account"""
     try:
-        data = request.get_json()
+        data = request.get_json() or {}
+
+        try:
+            check_signup_honeypot(data)
+            enforce_signup_rate_limit(data.get('email'), 'register_brand')
+            verify_recaptcha_token(data.get('recaptcha_token'), 'REGISTER_BRAND')
+        except SignupProtectionError as exc:
+            return jsonify({'error': str(exc)}), exc.status_code
+        except RecaptchaVerificationError as exc:
+            return jsonify({'error': str(exc)}), 400
 
         # Validate required fields
         required_fields = ['email', 'password', 'company_name']
@@ -699,7 +729,12 @@ def google_creator_auth():
         from google.auth.transport import requests as google_requests
         import os
 
-        data = request.get_json()
+        data = request.get_json() or {}
+        try:
+            check_signup_honeypot(data)
+        except SignupProtectionError as exc:
+            return jsonify({'error': str(exc)}), exc.status_code
+
         credential = data.get('credential')  # Google ID token
         referral_code = data.get('referral_code')
 
@@ -774,6 +809,12 @@ def google_creator_auth():
             }), 200
 
         else:
+            try:
+                enforce_signup_rate_limit(None, 'google_creator')
+                enforce_signup_rate_limit(email, 'google_creator_email')
+            except SignupProtectionError as exc:
+                return jsonify({'error': str(exc)}), exc.status_code
+
             # New user - create account but needs profile completion
             # Create a temporary token for the profile completion step
             import secrets as secrets_module
