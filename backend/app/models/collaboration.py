@@ -136,10 +136,8 @@ class Collaboration(db.Model):
                 # Content still being approved (0-80% range)
                 return int((total_approved / total_expected) * 80)
         else:
-            # NO track: creator posts live first, then submits URLs. Placeholder
-            # records are pre-approved only to skip draft review, so progress is
-            # based on live URL submission rather than approval count.
-            return int((deliverables_with_urls / total_expected) * 100)
+            # NO track: Standard calculation
+            return int((total_approved / total_expected) * 100)
 
     def to_dict(self, include_relations=False):
         """Convert collaboration to dictionary"""
@@ -188,20 +186,18 @@ class Collaboration(db.Model):
 
         if include_relations:
             if self.brand:
-                from app.utils.brand_identity import public_brand_for_collaboration
-                data['brand'] = public_brand_for_collaboration(self, include_user=True)
+                brand_data = self.brand.to_dict(include_user=True)
+                if self.workspace:
+                    brand_data['company_name'] = self.workspace.name or brand_data.get('company_name')
+                    brand_data['display_name'] = self.workspace.name or brand_data.get('display_name')
+                    brand_data['business_name'] = self.workspace.name or brand_data.get('business_name')
+                    brand_data['logo'] = self.workspace.logo or brand_data.get('logo')
+                    brand_data['workspace_id'] = self.workspace.id
+                data['brand'] = brand_data
             if self.creator:
                 data['creator'] = self.creator.to_dict(include_user=True)
             if self.campaign_application:
                 data['campaign_application'] = self.campaign_application.to_dict(include_relations=True)
-                data['campaign_id'] = self.campaign_application.campaign_id
-            elif self.collaboration_type == 'campaign':
-                from app.models.campaign_chat import CampaignChatParticipant
-                chat_participation = CampaignChatParticipant.query.filter_by(
-                    collaboration_id=self.id
-                ).first()
-                if chat_participation and chat_participation.chat:
-                    data['campaign_id'] = chat_participation.chat.campaign_id
             if self.booking:
                 data['booking'] = self.booking.to_dict(include_relations=True)
 
@@ -211,17 +207,17 @@ class Collaboration(db.Model):
                 milestones = CollaborationMilestone.query.filter_by(collaboration_id=self.id).order_by(CollaborationMilestone.milestone_number).all()
                 data['milestones'] = [milestone.to_dict(include_deliverables=True) for milestone in milestones]
 
-            # Include package-style deliverables for package collaborations and
-            # direct campaign collaborations that skip draft review.
-            from app.models.package_deliverable import PackageDeliverable
-            package_deliverables = PackageDeliverable.query.filter_by(
-                collaboration_id=self.id
-            ).order_by(PackageDeliverable.submitted_at).all()
-            data['package_deliverables'] = [d.to_dict() for d in package_deliverables]
+            # Include package deliverables from database for package-type collaborations
+            if self.collaboration_type == 'package':
+                from app.models.package_deliverable import PackageDeliverable
+                package_deliverables = PackageDeliverable.query.filter_by(
+                    collaboration_id=self.id
+                ).order_by(PackageDeliverable.submitted_at).all()
+                data['package_deliverables'] = [d.to_dict() for d in package_deliverables]
 
-            # Separate by status for frontend convenience.
-            data['draft_deliverables'] = [d.to_dict() for d in package_deliverables if d.status in ['pending_review', 'revision_requested']]
-            data['submitted_deliverables'] = [d.to_dict() for d in package_deliverables if d.status == 'approved']
+                # Separate by status for frontend convenience
+                data['draft_deliverables'] = [d.to_dict() for d in package_deliverables if d.status in ['pending_review', 'revision_requested']]
+                data['submitted_deliverables'] = [d.to_dict() for d in package_deliverables if d.status == 'approved']
 
         return data
 

@@ -72,7 +72,6 @@ class CampaignInvitation(db.Model):
     def to_dict(self):
         """Convert invitation to dictionary"""
         from app.models import CreatorProfile, BrandProfile
-        from app.utils.brand_identity import public_brand_for_campaign
 
         # Get creator profile
         creator_profile = CreatorProfile.query.filter_by(user_id=self.creator_user_id).first()
@@ -80,13 +79,11 @@ class CampaignInvitation(db.Model):
         # Show the client workspace brand on agency campaigns. The agency parent
         # owns the record, but creators should see the brand they will work with.
         brand_profile = BrandProfile.query.filter_by(user_id=self.invited_by_user_id).first()
-        display_brand = public_brand_for_campaign(self.campaign) if self.campaign else {}
-        display_brand_name = (
-            display_brand.get('company_name')
-            or display_brand.get('display_name')
-            or (brand_profile.company_name if brand_profile else self.invited_by.email)
-        )
-        display_brand_logo = display_brand.get('logo') or (brand_profile.logo if brand_profile else None)
+        display_brand_name = brand_profile.company_name if brand_profile else self.invited_by.email
+        display_brand_logo = brand_profile.logo if brand_profile else None
+        if self.campaign and self.campaign.workspace:
+            display_brand_name = self.campaign.workspace.name or display_brand_name
+            display_brand_logo = self.campaign.workspace.logo or display_brand_logo
 
         return {
             'id': self.id,
