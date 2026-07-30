@@ -212,7 +212,7 @@ const InvitationCard = ({ invitation, onUpdate }) => {
           className="flex-1 px-4 py-3 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 transition-colors font-medium disabled:opacity-50 flex items-center justify-center gap-2"
         >
           <FaTimes size={14} />
-          Decline
+          {(invitation.invitation_type === 'join' || invitation.invitation_type === 'invite_to_join') ? 'Decline Campaign' : 'Decline'}
         </button>
         <button
           onClick={() => openResponseModal('accept')}
@@ -220,7 +220,7 @@ const InvitationCard = ({ invitation, onUpdate }) => {
           className="flex-1 px-4 py-3 bg-primary text-white rounded-xl hover:bg-primary-dark transition-colors font-medium disabled:opacity-50 flex items-center justify-center gap-2"
         >
           <FaCheckCircle size={14} />
-          Accept & {(invitation.invitation_type === 'join' || invitation.invitation_type === 'invite_to_join') ? 'Join' : 'Apply'}
+          {(invitation.invitation_type === 'join' || invitation.invitation_type === 'invite_to_join') ? 'Join Campaign' : 'Apply'}
         </button>
       </div>
 

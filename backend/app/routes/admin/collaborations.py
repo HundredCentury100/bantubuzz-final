@@ -141,7 +141,7 @@ def get_collaboration_details(collaboration_id):
 
 
 @bp.route('/collaborations/<int:collaboration_id>/payment', methods=['PUT'])
-@role_required('super_admin', 'finance')
+@role_required('super_admin', 'finance', 'admin')
 def update_collaboration_payment(collaboration_id):
     """
     Update payment information for a collaboration and credit wallet
@@ -254,8 +254,101 @@ def update_collaboration_payment(collaboration_id):
         }), 500
 
 
+@bp.route('/collaborations/<int:collaboration_id>/status', methods=['PUT'])
+@admin_required
+def update_collaboration_status(collaboration_id):
+    """
+    Admin override for collaboration status.
+    Used by support/admins to complete stuck collaborations from the admin panel.
+    """
+    try:
+        data = request.get_json() or {}
+        new_status = data.get('status')
+        notes = (data.get('notes') or '').strip()
+        allowed_statuses = {'pending', 'in_progress', 'completed', 'cancelled'}
+
+        if new_status not in allowed_statuses:
+            return jsonify({'error': 'Invalid collaboration status'}), 400
+
+        collab = Collaboration.query.get(collaboration_id)
+        if not collab:
+            return jsonify({'error': 'Collaboration not found'}), 404
+
+        previous_status = collab.status
+        collab.status = new_status
+        collab.updated_at = datetime.utcnow()
+        if notes:
+            note = f"\n\n[ADMIN STATUS UPDATE - {datetime.utcnow().isoformat()}]\n{notes}"
+            collab.notes = (collab.notes or '') + note
+
+        if new_status == 'completed':
+            collab.actual_completion_date = collab.actual_completion_date or datetime.utcnow()
+            collab.progress_percentage = 100
+            collab.last_update = 'Your collaboration is complete'
+            collab.last_update_date = datetime.utcnow()
+            if collab.escrow_status not in ['released', 'failed']:
+                collab.escrow_status = 'escrowed'
+
+            if collab.booking_id:
+                from app.models import Booking
+                booking = Booking.query.get(collab.booking_id)
+                if booking and booking.status != 'completed':
+                    booking.status = 'completed'
+                    booking.completion_date = datetime.utcnow()
+                    booking.escrow_status = booking.escrow_status or 'escrowed'
+                    booking.escrowed_at = booking.escrowed_at or datetime.utcnow()
+
+            try:
+                from app.services.campaign_completion_service import update_campaign_completion_for_collaboration
+                update_campaign_completion_for_collaboration(collab)
+            except Exception as campaign_error:
+                print(f"[ADMIN_COLLAB_STATUS] Campaign completion update failed: {campaign_error}")
+
+        db.session.commit()
+        escrow_release_result = None
+        escrow_release_warning = None
+
+        if new_status == 'completed' and previous_status != 'completed':
+            try:
+                from app.services.payment_service import release_collaboration_escrow
+                escrow_release_result = release_collaboration_escrow(
+                    collaboration_id,
+                    payout_percentage=100,
+                    reason='admin_completed',
+                    clearance_days=1
+                )
+            except Exception as escrow_error:
+                escrow_release_warning = str(escrow_error)
+                if escrow_release_warning != 'Funds already released to wallet':
+                    print(f"[ADMIN_COLLAB_STATUS] Escrow release failed: {escrow_release_warning}")
+
+            try:
+                from app.services.product_notifications import notify_collaboration_completed
+                notify_collaboration_completed(collab, auto_completed=False)
+            except Exception as notification_error:
+                print(f"[ADMIN_COLLAB_STATUS] Completion notification failed: {notification_error}")
+
+        return jsonify({
+            'success': True,
+            'message': f'Collaboration status updated to {new_status}',
+            'data': collab.to_dict(),
+            'escrow_release': {
+                'released': bool(escrow_release_result),
+                'warning': escrow_release_warning,
+            } if new_status == 'completed' else None
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            'success': False,
+            'error': 'Failed to update collaboration status',
+            'message': str(e)
+        }), 500
+
+
 @bp.route('/collaborations/<int:collaboration_id>/escrow/release', methods=['POST'])
-@role_required('super_admin', 'finance')
+@role_required('super_admin', 'finance', 'admin')
 def release_escrow(collaboration_id):
     """
     Release escrow funds to creator's wallet
@@ -272,9 +365,15 @@ def release_escrow(collaboration_id):
                 'message': 'Collaboration must be completed first'
             }), 400
 
-        from app.services.payment_service import release_escrow_to_wallet
+        from app.services.payment_service import release_collaboration_escrow
 
-        transaction = release_escrow_to_wallet(collaboration_id)
+        result = release_collaboration_escrow(
+            collaboration_id,
+            payout_percentage=100,
+            reason='admin_release',
+            clearance_days=1
+        )
+        transaction = result.get('creator_transaction')
 
         # Send notification to creator
         notification = Notification(
@@ -292,7 +391,7 @@ def release_escrow(collaboration_id):
             'data': {
                 'collaboration_id': collaboration_id,
                 'amount': float(collab.amount),
-                'creator_pending_clearance': float(transaction.wallet.pending_clearance or 0)
+                'creator_pending_clearance': float(transaction.wallet.pending_clearance or 0) if transaction else 0
             }
         }), 200
 
