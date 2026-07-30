@@ -59,6 +59,27 @@ def _load_brand_campaign(campaign_id, permission='can_manage_campaigns'):
     return user, brand, campaign, None
 
 
+def _campaign_display_brand(campaign, fallback_brand=None):
+    """Show creators the client brand for agency workspace campaigns, not the agency parent."""
+    workspace = getattr(campaign, 'workspace', None)
+    if workspace:
+        return {
+            'name': workspace.name or 'A brand',
+            'logo': workspace.logo,
+        }
+
+    brand = fallback_brand or getattr(campaign, 'brand', None)
+    return {
+        'name': (
+            getattr(brand, 'company_name', None)
+            or getattr(brand, 'business_name', None)
+            or getattr(brand, 'display_name', None)
+            or 'A brand'
+        ),
+        'logo': getattr(brand, 'logo', None),
+    }
+
+
 @bp.route('/<int:campaign_id>/cart', methods=['GET'])
 @jwt_required()
 def get_campaign_cart(campaign_id):
@@ -242,12 +263,14 @@ def add_invitation_to_cart(campaign_id):
                 db.session.add(cart_item)
 
         db.session.commit()
+        display_brand = _campaign_display_brand(campaign, brand)
+        stored_invitation_type = 'invite_to_join' if invitation_type == 'invite_with_package' else 'invite_to_apply'
 
         create_notification(
             creator.user_id,
             'campaign',
             'Campaign Invitation',
-            f'{brand.company_name or brand.display_name or "A brand"} invited you to '
+            f'{display_brand["name"]} invited you to '
             f'{"join" if invitation_type == "invite_with_package" else "apply to"} "{campaign.title}".',
             f'/creator/campaigns/{campaign_id}'
         )
@@ -261,10 +284,10 @@ def add_invitation_to_cart(campaign_id):
                     EmailService.send_campaign_invitation_email(
                         creator_email=creator_user.email,
                         creator_name=creator.display_name or creator.username,
-                        brand_name=brand.company_name or brand.display_name,
+                        brand_name=display_brand["name"],
                         campaign_title=campaign.title,
                         campaign_url=f"https://bantubuzz.com/creator/campaigns/{campaign_id}",
-                        invitation_type='join directly',
+                        invitation_type=stored_invitation_type,
                         message=message
                     )
                 else:
@@ -272,10 +295,10 @@ def add_invitation_to_cart(campaign_id):
                     EmailService.send_campaign_invitation_email(
                         creator_email=creator_user.email,
                         creator_name=creator.display_name or creator.username,
-                        brand_name=brand.company_name or brand.display_name,
+                        brand_name=display_brand["name"],
                         campaign_title=campaign.title,
                         campaign_url=f"https://bantubuzz.com/creator/campaigns/{campaign_id}",
-                        invitation_type='apply to',
+                        invitation_type=stored_invitation_type,
                         message=message
                     )
             except Exception as email_error:

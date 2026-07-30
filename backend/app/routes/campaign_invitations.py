@@ -15,6 +15,15 @@ from datetime import datetime, timedelta
 bp = Blueprint('campaign_invitations', __name__, url_prefix='/api/campaign-invitations')
 
 
+def _campaign_display_brand_name(campaign, user):
+    if campaign and campaign.workspace:
+        return campaign.workspace.name or 'A brand'
+    brand_profile = getattr(user, 'brand_profile', None)
+    if brand_profile:
+        return brand_profile.company_name or brand_profile.display_name or user.email
+    return user.email
+
+
 @bp.route('/invite', methods=['POST'])
 @jwt_required()
 def send_invitation():
@@ -174,15 +183,14 @@ def send_invitation():
                 try:
                     from app.services.email_service import send_campaign_invitation_email
                     creator_name = creator_profile.display_name if creator_profile else creator.email
-                    brand_profile = getattr(user, 'brand_profile', None)
-                    brand_name = brand_profile.company_name if brand_profile else user.email
+                    brand_name = _campaign_display_brand_name(campaign, user)
 
                     send_campaign_invitation_email(
                         creator_email=creator.email,
                         creator_name=creator_name,
                         campaign_title=campaign.title,
                         brand_name=brand_name,
-                        invitation_type=invitation_type,
+                        invitation_type=stored_invitation_type,
                         message=message,
                         campaign_url=f'{request.host_url}campaigns/{campaign_id}'
                     )

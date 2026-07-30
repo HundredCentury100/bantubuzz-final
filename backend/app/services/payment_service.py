@@ -4,7 +4,7 @@ Payment Service - Handles payment verification and management
 from datetime import datetime, timedelta
 from decimal import Decimal, ROUND_HALF_UP
 from app import db
-from app.models import Payment, PaymentVerification, Booking, WalletTransaction, Collaboration, User, BrandProfile, Subscription
+from app.models import Payment, PaymentVerification, Booking, WalletTransaction, Collaboration, User, BrandProfile, Subscription, CampaignPaymentItem
 from app.services.wallet_service import get_or_create_wallet
 from app.utils.email_service import send_payment_verified_notification
 from app.utils.bank_details import get_bank_transfer_details
@@ -486,6 +486,27 @@ def _find_payment_for_collaboration(collaboration):
     payment = Payment.query.filter_by(collaboration_id=collaboration.id).first()
     if not payment and collaboration.booking_id:
         payment = Payment.query.filter_by(booking_id=collaboration.booking_id).first()
+    if not payment:
+        campaign_item = CampaignPaymentItem.query.filter_by(
+            collaboration_id=collaboration.id,
+            status='paid'
+        ).order_by(CampaignPaymentItem.paid_at.desc()).first()
+        campaign_payment = campaign_item.payment if campaign_item else None
+        if campaign_item and campaign_payment and campaign_payment.status == 'completed':
+            payment = Payment(
+                collaboration_id=collaboration.id,
+                user_id=campaign_payment.brand_user_id,
+                amount=campaign_item.amount,
+                payment_method=campaign_payment.payment_method,
+                payment_type='campaign_cart',
+                status='completed',
+                payment_reference=campaign_payment.payment_reference,
+                escrow_status='escrowed',
+                held_amount=campaign_item.amount,
+                completed_at=campaign_payment.completed_at or campaign_item.paid_at or datetime.utcnow(),
+            )
+            db.session.add(payment)
+            db.session.flush()
     return payment
 
 
