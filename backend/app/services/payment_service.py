@@ -383,10 +383,12 @@ def release_escrow_to_wallet(collaboration_id, platform_fee_percentage=None):
     completed_at = datetime.utcnow()
     available_at = completed_at + timedelta(days=1)  # 24 hours for testing
 
-    # Build description and metadata
-    description = f"Earnings from collaboration with {collaboration.brand.company_name if collaboration.brand else 'brand'}"
+    # Build description and metadata. Agency-owned collaborations should show
+    # the client workspace brand to creators, not the agency parent account.
+    display_brand_name = _display_brand_name_for_collaboration(collaboration)
+    description = f"Earnings from collaboration with {display_brand_name}"
     metadata = {
-        'brand_name': collaboration.brand.company_name if collaboration.brand else 'Unknown',
+        'brand_name': display_brand_name,
         'collaboration_id': collaboration.id,
         'collaboration_title': collaboration.title if hasattr(collaboration, 'title') else 'Collaboration'
     }
@@ -510,6 +512,14 @@ def _find_payment_for_collaboration(collaboration):
     return payment
 
 
+def _display_brand_name_for_collaboration(collaboration):
+    if getattr(collaboration, 'workspace', None):
+        return collaboration.workspace.name or 'brand'
+    if getattr(collaboration, 'brand', None):
+        return collaboration.brand.company_name or collaboration.brand.display_name or 'brand'
+    return 'brand'
+
+
 def _has_open_dispute(collaboration_id):
     from app.models.dispute import Dispute
 
@@ -575,7 +585,8 @@ def release_collaboration_escrow(collaboration_id, payout_percentage=100, reason
         available_at = completed_at + timedelta(days=clearance_days)
 
         booking = collaboration.booking if hasattr(collaboration, 'booking') and collaboration.booking else None
-        description = f"Earnings from collaboration with {collaboration.brand.company_name if collaboration.brand else 'brand'}"
+        display_brand_name = _display_brand_name_for_collaboration(collaboration)
+        description = f"Earnings from collaboration with {display_brand_name}"
         transaction = WalletTransaction(
             wallet_id=wallet.id,
             user_id=creator.user_id,
@@ -594,7 +605,7 @@ def release_collaboration_escrow(collaboration_id, payout_percentage=100, reason
             net_amount=creator_amount,
             description=description,
             transaction_metadata={
-                'brand_name': collaboration.brand.company_name if collaboration.brand else 'Unknown',
+                'brand_name': display_brand_name,
                 'collaboration_id': collaboration.id,
                 'collaboration_title': collaboration.title,
                 'creator_commission_pct': commission_percentage,
@@ -1087,7 +1098,7 @@ def release_milestone_escrow(milestone_id, platform_fee_percentage=15):
             'milestone_title': milestone.title,
             'milestone_number': milestone.milestone_number,
             'collaboration_title': collaboration.title,
-            'brand_name': collaboration.brand.company_name if collaboration.brand else 'Unknown'
+            'brand_name': _display_brand_name_for_collaboration(collaboration)
         }
     )
     db.session.add(transaction)

@@ -74,7 +74,9 @@ set "PYTHON_EXE=python"
 if exist "%BACKEND_DIR%\venv\Scripts\python.exe" set "PYTHON_EXE=%BACKEND_DIR%\venv\Scripts\python.exe"
 "%PYTHON_EXE%" -m py_compile ^
   backend\app\models\campaign_invitation.py ^
+  backend\app\models\collaboration.py ^
   backend\app\models\message.py ^
+  backend\app\routes\admin\collaborations.py ^
   backend\app\routes\campaign_cart.py ^
   backend\app\routes\campaign_invitations.py ^
   backend\app\routes\messages.py ^
@@ -106,7 +108,9 @@ if not "%TAR_FRONTEND_STATUS%"=="0" goto :failed
 
 tar -czf "%BACKEND_ARCHIVE%" -C "%BACKEND_DIR%" ^
   app/models/campaign_invitation.py ^
+  app/models/collaboration.py ^
   app/models/message.py ^
+  app/routes/admin/collaborations.py ^
   app/routes/campaign_cart.py ^
   app/routes/campaign_invitations.py ^
   app/routes/messages.py ^

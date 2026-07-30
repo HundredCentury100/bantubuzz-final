@@ -64,7 +64,9 @@ echo "Creating targeted backup at $BACKUP_DIR"
 mkdir -p "$BACKUP_DIR"
 tar --ignore-failed-read -czf "$BACKUP_DIR/backend-files.tar.gz" -C "$BACKEND_ROOT" \
   app/models/campaign_invitation.py \
+  app/models/collaboration.py \
   app/models/message.py \
+  app/routes/admin/collaborations.py \
   app/routes/campaign_cart.py \
   app/routes/campaign_invitations.py \
   app/routes/messages.py \
@@ -89,7 +91,9 @@ echo "Compiling backend files"
 cd "$BACKEND_ROOT"
 venv/bin/python -m py_compile \
   app/models/campaign_invitation.py \
+  app/models/collaboration.py \
   app/models/message.py \
+  app/routes/admin/collaborations.py \
   app/routes/campaign_cart.py \
   app/routes/campaign_invitations.py \
   app/routes/messages.py \

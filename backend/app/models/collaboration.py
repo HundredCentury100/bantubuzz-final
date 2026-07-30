@@ -186,7 +186,14 @@ class Collaboration(db.Model):
 
         if include_relations:
             if self.brand:
-                data['brand'] = self.brand.to_dict(include_user=True)
+                brand_data = self.brand.to_dict(include_user=True)
+                if self.workspace:
+                    brand_data['company_name'] = self.workspace.name or brand_data.get('company_name')
+                    brand_data['display_name'] = self.workspace.name or brand_data.get('display_name')
+                    brand_data['business_name'] = self.workspace.name or brand_data.get('business_name')
+                    brand_data['logo'] = self.workspace.logo or brand_data.get('logo')
+                    brand_data['workspace_id'] = self.workspace.id
+                data['brand'] = brand_data
             if self.creator:
                 data['creator'] = self.creator.to_dict(include_user=True)
             if self.campaign_application:
