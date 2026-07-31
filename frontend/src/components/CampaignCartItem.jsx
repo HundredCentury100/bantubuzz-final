@@ -62,6 +62,9 @@ const CampaignCartItem = ({
   };
 
   const { creator, package: pkg, proposal, invitation } = cartItem;
+  const isDirectInvitation = ['join', 'invite_to_join', 'invite_with_package'].includes(
+    invitation?.invitation_type
+  );
 
   return (
     <div className={`bg-white rounded-lg border-2 ${
@@ -194,10 +197,15 @@ const CampaignCartItem = ({
             {cartItem.item_type === 'invitation' && invitation && (
               <div>
                 <h4 className="font-medium text-gray-900 mb-1">
-                  {invitation.invitation_type === 'invite_with_package'
-                    ? 'Invited with Package'
+                  {isDirectInvitation
+                    ? 'Invited to Join'
                     : 'Invited to Apply'}
                 </h4>
+                {isDirectInvitation && (
+                  <p className="text-sm text-gray-600 mb-2">
+                    Creator can accept or decline this direct campaign invitation. No application is required.
+                  </p>
+                )}
                 {invitation.message && (
                   <p className="text-sm text-gray-600 italic">"{invitation.message}"</p>
                 )}

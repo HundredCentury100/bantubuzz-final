@@ -28,6 +28,9 @@ const InvitationCard = ({ invitation, onUpdate }) => {
         navigate(response.data.redirect_url || `/bookings/${response.data.collaboration_id}`);
       } else if (response.data.next_step === 'submit_proposal') {
         navigate(response.data.redirect_url);
+      } else if (response.data.next_step === 'awaiting_brand_payment') {
+        toast.success('You joined the campaign. The brand will activate the collaboration after payment.');
+        navigate('/creator/applications');
       }
 
       if (onUpdate) onUpdate();
@@ -226,7 +229,7 @@ const InvitationCard = ({ invitation, onUpdate }) => {
 
       {/* View Campaign Link */}
       <button
-        onClick={() => navigate(`/campaigns/${invitation.campaign_id}`)}
+        onClick={() => navigate(`/creator/opportunities/${invitation.campaign_id}`)}
         className="w-full mt-3 text-sm text-primary hover:text-primary-dark font-medium"
       >
         View Campaign Details →

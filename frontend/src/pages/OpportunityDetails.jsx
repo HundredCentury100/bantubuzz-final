@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { opportunitiesAPI } from '../services/api';
+import { campaignInvitationsAPI } from '../services/campaignInvitationsAPI';
 import Navbar from '../components/Navbar';
 import toast from 'react-hot-toast';
 
@@ -9,6 +10,7 @@ const OpportunityDetails = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [opportunity, setOpportunity] = useState(null);
+  const [pendingInvitation, setPendingInvitation] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showApplicationModal, setShowApplicationModal] = useState(false);
   const [pricingMode, setPricingMode] = useState('total'); // 'total' or 'per_milestone'
@@ -25,16 +27,24 @@ const OpportunityDetails = () => {
   }, [id]);
 
   useEffect(() => {
-    if (opportunity && searchParams.get('apply') === '1' && !opportunity.has_applied) {
+    if (opportunity && searchParams.get('apply') === '1' && !opportunity.has_applied && !isDirectJoinInvitation) {
       openApplicationModal();
     }
-  }, [opportunity, searchParams]);
+  }, [opportunity, searchParams, pendingInvitation]);
 
   const fetchOpportunityDetails = async () => {
     try {
       setLoading(true);
-      const response = await opportunitiesAPI.getOpportunity(id);
+      const [response, invitationResponse] = await Promise.all([
+        opportunitiesAPI.getOpportunity(id),
+        campaignInvitationsAPI.getCreatorInvitations().catch(() => null)
+      ]);
       setOpportunity(response.data);
+
+      const matchingInvitation = invitationResponse?.data?.invitations?.find((invitation) => {
+        return String(invitation.campaign_id) === String(id) && invitation.status === 'pending';
+      });
+      setPendingInvitation(matchingInvitation || null);
     } catch (error) {
       console.error('Error fetching opportunity:', error);
       toast.error('Failed to load opportunity details');
@@ -193,6 +203,107 @@ const OpportunityDetails = () => {
     }
   };
 
+  const isDirectJoinInvitation = ['join', 'invite_to_join', 'invite_with_package'].includes(
+    pendingInvitation?.invitation_type
+  );
+
+  const isApplyInvitation = ['apply', 'invite_to_apply'].includes(pendingInvitation?.invitation_type);
+
+  const handleAcceptDirectInvite = async () => {
+    if (!pendingInvitation) return;
+
+    try {
+      setSubmitting(true);
+      const response = await campaignInvitationsAPI.acceptInvitation(pendingInvitation.id);
+      toast.success('Campaign invitation accepted');
+
+      if (response.data?.redirect_url) {
+        navigate(response.data.redirect_url);
+      } else {
+        navigate('/creator/applications');
+      }
+    } catch (error) {
+      console.error('Error accepting campaign invitation:', error);
+      toast.error(error.response?.data?.error || 'Failed to join campaign');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleDeclineDirectInvite = async () => {
+    if (!pendingInvitation) return;
+
+    try {
+      setSubmitting(true);
+      await campaignInvitationsAPI.declineInvitation(pendingInvitation.id);
+      toast.success('Campaign invitation declined');
+      navigate('/creator/opportunities');
+    } catch (error) {
+      console.error('Error declining campaign invitation:', error);
+      toast.error(error.response?.data?.error || 'Failed to decline invitation');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const renderPrimaryAction = (fullWidth = false) => {
+    if (isDirectJoinInvitation) {
+      return (
+        <div className={fullWidth ? 'w-full space-y-3' : 'flex items-center gap-3'}>
+          <button
+            onClick={handleAcceptDirectInvite}
+            disabled={submitting}
+            className={`${fullWidth ? 'w-full' : ''} px-6 py-3 bg-primary text-white rounded-xl hover:bg-primary-dark transition-colors font-medium disabled:cursor-not-allowed disabled:opacity-60`}
+          >
+            {submitting ? 'Joining...' : 'Join Campaign'}
+          </button>
+          <button
+            onClick={handleDeclineDirectInvite}
+            disabled={submitting}
+            className={`${fullWidth ? 'w-full' : ''} px-6 py-3 border border-gray-300 text-gray-700 rounded-xl hover:bg-gray-50 transition-colors font-medium disabled:cursor-not-allowed disabled:opacity-60`}
+          >
+            Decline Campaign
+          </button>
+        </div>
+      );
+    }
+
+    return (
+      <button
+        onClick={openApplicationModal}
+        disabled={opportunity.has_applied}
+        className={`${fullWidth ? 'w-full' : ''} px-6 py-3 bg-primary text-white rounded-xl hover:bg-primary-dark transition-colors font-medium disabled:cursor-not-allowed disabled:opacity-60`}
+      >
+        {opportunity.has_applied ? 'Application Submitted' : isApplyInvitation ? 'Apply to Invitation' : (fullWidth ? 'Apply to This Opportunity' : 'Apply Now')}
+      </button>
+    );
+  };
+
+  const getDisplayBrand = () => {
+    const workspace = opportunity?.workspace || opportunity?.client_workspace;
+    if (workspace) {
+      return {
+        name: workspace.name,
+        logo: workspace.logo,
+        industry: workspace.industry || opportunity.brand?.industry,
+        location: opportunity.brand?.location,
+        description: workspace.description || opportunity.brand?.description
+      };
+    }
+
+    if (opportunity?.brand) {
+      return {
+        name: opportunity.brand.company_name,
+        logo: opportunity.brand.logo,
+        industry: opportunity.brand.industry,
+        location: opportunity.brand.location,
+        description: opportunity.brand.description
+      };
+    }
+
+    return null;
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-blue-50">
@@ -220,6 +331,8 @@ const OpportunityDetails = () => {
     );
   }
 
+  const displayBrand = getDisplayBrand();
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-blue-50">
       <Navbar />
@@ -245,13 +358,7 @@ const OpportunityDetails = () => {
               </div>
               <p className="text-gray-600">{opportunity.description}</p>
             </div>
-            <button
-              onClick={openApplicationModal}
-              disabled={opportunity.has_applied}
-              className="px-6 py-3 bg-primary text-white rounded-xl hover:bg-primary-dark transition-colors font-medium"
-            >
-              {opportunity.has_applied ? 'Application Submitted' : 'Apply Now'}
-            </button>
+            {renderPrimaryAction()}
           </div>
         </div>
 
@@ -377,26 +484,26 @@ const OpportunityDetails = () => {
             </div>
 
             {/* Brand Card */}
-            {opportunity.brand && (
+            {displayBrand && (
               <div className="bg-white rounded-3xl shadow-lg p-6">
                 <h3 className="text-lg font-bold text-gray-900 mb-4">About the Brand</h3>
                 <div className="flex items-center gap-3 mb-3">
-                  {opportunity.brand.logo && (
+                  {displayBrand.logo && (
                     <img
-                      src={opportunity.brand.logo}
-                      alt={opportunity.brand.company_name}
+                      src={displayBrand.logo}
+                      alt={displayBrand.name}
                       className="w-12 h-12 rounded-full object-cover"
                     />
                   )}
                   <div>
-                    <p className="text-gray-900 font-semibold">{opportunity.brand.company_name}</p>
-                    {opportunity.brand.industry && (
-                      <p className="text-xs text-gray-600">{opportunity.brand.industry}</p>
+                    <p className="text-gray-900 font-semibold">{displayBrand.name}</p>
+                    {displayBrand.industry && (
+                      <p className="text-xs text-gray-600">{displayBrand.industry}</p>
                     )}
                   </div>
                 </div>
-                {opportunity.brand.location && (
-                  <p className="text-sm text-gray-600">{opportunity.brand.location}</p>
+                {displayBrand.location && (
+                  <p className="text-sm text-gray-600">{displayBrand.location}</p>
                 )}
               </div>
             )}
@@ -448,13 +555,7 @@ const OpportunityDetails = () => {
             )}
 
             {/* Apply Button */}
-            <button
-              onClick={openApplicationModal}
-              disabled={opportunity.has_applied}
-              className="w-full px-6 py-3 bg-primary text-white rounded-xl hover:bg-primary-dark transition-colors font-medium disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {opportunity.has_applied ? 'Application Submitted' : 'Apply to This Opportunity'}
-            </button>
+            {renderPrimaryAction(true)}
           </div>
         </div>
       </div>
