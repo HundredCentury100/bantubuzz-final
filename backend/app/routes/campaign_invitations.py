@@ -175,8 +175,7 @@ def send_invitation():
                     type='campaign_invitation',
                     title=f'Campaign Invitation: {campaign.title}',
                     message=f'{display_brand_name} invited you to {"apply for" if invitation_type == "apply" else "join"} the campaign "{campaign.title}"',
-                    related_id=invitation.id,
-                    link=f'/campaigns/{campaign_id}'
+                    action_url=f'/creator/opportunities/{campaign_id}'
                 )
                 db.session.add(notification)
 
@@ -192,7 +191,7 @@ def send_invitation():
                         brand_name=display_brand_name,
                         invitation_type=stored_invitation_type,
                         message=message,
-                        campaign_url=f'{request.host_url}campaigns/{campaign_id}'
+                        campaign_url=f'{request.host_url.rstrip("/")}/creator/opportunities/{campaign_id}'
                     )
                 except Exception as email_error:
                     print(f"Failed to send invitation email: {email_error}")
@@ -347,8 +346,7 @@ def accept_invitation(invitation_id):
             type='invitation_accepted',
             title='Invitation Accepted',
             message=f'{creator_name} accepted your invitation for "{campaign.title}"',
-            related_id=invitation_id,
-            link=f'/campaigns/{campaign.id}'
+            action_url=f'/brand/campaigns/{campaign.id}?tab=cart'
         )
         db.session.add(notification)
 
@@ -447,8 +445,7 @@ def decline_invitation(invitation_id):
             type='invitation_declined',
             title='Invitation Declined',
             message=f'{creator_name} declined your invitation for "{campaign.title}"',
-            related_id=invitation_id,
-            link=f'/campaigns/{campaign.id}'
+            action_url=f'/brand/campaigns/{campaign.id}?tab=cart'
         )
         db.session.add(notification)
         db.session.commit()
