@@ -24,6 +24,14 @@ def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
 
+def package_missing_deliverables_response(package):
+    if package and not package.has_deliverables():
+        return jsonify({
+            'error': 'This package cannot be booked because it has no deliverables. Please ask the creator to update the package first.'
+        }), 400
+    return None
+
+
 def create_multiplatform_deliverables(collaboration, package):
     """
     DISABLED - This function was causing deliverable multiplication bug.
@@ -62,9 +70,27 @@ def create_no_track_deliverables(collaboration):
     from app.models.package_deliverable import PackageDeliverable
     from datetime import datetime
 
+    def _deliverable_title(value, fallback):
+        if isinstance(value, str):
+            return value
+        if isinstance(value, dict):
+            platform = value.get('platform') or value.get('post_platform') or value.get('channel')
+            quantity = value.get('quantity') or value.get('count')
+            content_type = value.get('content_type') or value.get('type') or value.get('deliverable_type') or value.get('title') or value.get('name')
+            parts = [str(part) for part in [platform, quantity, content_type] if part]
+            return ' '.join(parts) or fallback
+        return fallback
+
+    def _deliverable_platform(value):
+        if isinstance(value, dict):
+            return value.get('platform') or value.get('post_platform') or value.get('channel')
+        return None
+
     print(f"[NO_TRACK] Creating {len(collaboration.deliverables)} deliverable records for collaboration {collaboration.id}")
 
-    for deliverable_title in collaboration.deliverables:
+    for index, deliverable_item in enumerate(collaboration.deliverables, start=1):
+        deliverable_title = _deliverable_title(deliverable_item, f"Deliverable {index}")
+        deliverable_platform = _deliverable_platform(deliverable_item)
         # Check if record already exists
         existing = PackageDeliverable.query.filter_by(
             collaboration_id=collaboration.id,
@@ -76,6 +102,7 @@ def create_no_track_deliverables(collaboration):
             deliverable = PackageDeliverable(
                 collaboration_id=collaboration.id,
                 title=deliverable_title,
+                platform=deliverable_platform,
                 deliverable_type='live_post',  # NO track = direct live post
                 status='approved',  # No review needed, ready for URL submission
                 submitted_at=datetime.utcnow(),  # Mark as "submitted" since no draft stage
@@ -211,6 +238,9 @@ def create_booking():
         package = Package.query.get(data['package_id'])
         if not package:
             return jsonify({'error': 'Package not found'}), 404
+        missing_deliverables = package_missing_deliverables_response(package)
+        if missing_deliverables:
+            return missing_deliverables
 
         booking = Booking(
             package_id=package.id,
@@ -284,6 +314,9 @@ def update_booking_status(booking_id):
             if not existing_collaboration:
                 # Load package if not already loaded
                 package = Package.query.get(booking.package_id)
+                missing_deliverables = package_missing_deliverables_response(package)
+                if missing_deliverables:
+                    return missing_deliverables
 
                 # Calculate expected completion date based on package duration
                 from datetime import timedelta
@@ -559,6 +592,9 @@ def cart_checkout():
             package = Package.query.get(pkg_id)
             if not package:
                 return jsonify({'error': f'Package {pkg_id} not found'}), 404
+            missing_deliverables = package_missing_deliverables_response(package)
+            if missing_deliverables:
+                return missing_deliverables
 
             booking = Booking(
                 package_id=package.id,
@@ -732,6 +768,10 @@ def cart_payment_status():
                 existing_collab = Collaboration.query.filter_by(booking_id=booking.id).first()
                 if not existing_collab:
                     package = Package.query.get(booking.package_id)
+                    missing_deliverables = package_missing_deliverables_response(package)
+                    if missing_deliverables:
+                        return missing_deliverables
+
                     start_date = datetime.utcnow()
                     expected_completion = None
                     if package and package.duration_days:
@@ -913,6 +953,9 @@ def cart_bank_transfer():
             package = Package.query.get(pkg_id)
             if not package:
                 return jsonify({'error': f'Package {pkg_id} not found'}), 404
+            missing_deliverables = package_missing_deliverables_response(package)
+            if missing_deliverables:
+                return missing_deliverables
 
             booking = Booking(
                 package_id=package.id,
@@ -994,6 +1037,9 @@ def cart_pay_with_wallet():
             package = Package.query.get(pkg_id)
             if not package:
                 return jsonify({'error': f'Package {pkg_id} not found'}), 404
+            missing_deliverables = package_missing_deliverables_response(package)
+            if missing_deliverables:
+                return missing_deliverables
             packages.append(package)
             total += float(package.price)
 
@@ -1044,6 +1090,10 @@ def cart_pay_with_wallet():
         # Create collaborations for each booking
         activated_collaboration_ids = []
         for booking, package in bookings:
+            missing_deliverables = package_missing_deliverables_response(package)
+            if missing_deliverables:
+                return missing_deliverables
+
             start_date = datetime.utcnow()
             expected_completion = None
             if package.duration_days:
@@ -1585,6 +1635,10 @@ def verify_bank_transfer_payment(booking_id):
             ).first()
 
             if not existing_collab and booking.package:
+                missing_deliverables = package_missing_deliverables_response(booking.package)
+                if missing_deliverables:
+                    return missing_deliverables
+
                 # Create collaboration for package in campaign
                 # Campaign already imported at top
                 campaign = Campaign.query.get(booking.campaign_id)
@@ -1621,6 +1675,9 @@ def verify_bank_transfer_payment(booking_id):
                 # Load package
                 # Package already imported at top
                 package = Package.query.get(booking.package_id)
+                missing_deliverables = package_missing_deliverables_response(package)
+                if missing_deliverables:
+                    return missing_deliverables
 
                 # Calculate expected completion date based on package duration
                 from datetime import timedelta

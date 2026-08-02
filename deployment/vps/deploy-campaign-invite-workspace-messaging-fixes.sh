@@ -67,6 +67,7 @@ tar --ignore-failed-read -czf "$BACKUP_DIR/backend-files.tar.gz" -C "$BACKEND_RO
   app/models/collaboration.py \
   app/models/message.py \
   app/routes/admin/collaborations.py \
+  app/routes/bookings.py \
   app/routes/campaign_cart.py \
   app/routes/campaign_invitations.py \
   app/routes/messages.py \
@@ -95,6 +96,7 @@ venv/bin/python -m py_compile \
   app/models/collaboration.py \
   app/models/message.py \
   app/routes/admin/collaborations.py \
+  app/routes/bookings.py \
   app/routes/campaign_cart.py \
   app/routes/campaign_invitations.py \
   app/routes/messages.py \

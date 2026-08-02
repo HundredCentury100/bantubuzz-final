@@ -77,6 +77,7 @@ if exist "%BACKEND_DIR%\venv\Scripts\python.exe" set "PYTHON_EXE=%BACKEND_DIR%\v
   backend\app\models\collaboration.py ^
   backend\app\models\message.py ^
   backend\app\routes\admin\collaborations.py ^
+  backend\app\routes\bookings.py ^
   backend\app\routes\campaign_cart.py ^
   backend\app\routes\campaign_invitations.py ^
   backend\app\routes\messages.py ^
@@ -112,6 +113,7 @@ tar -czf "%BACKEND_ARCHIVE%" -C "%BACKEND_DIR%" ^
   app/models/collaboration.py ^
   app/models/message.py ^
   app/routes/admin/collaborations.py ^
+  app/routes/bookings.py ^
   app/routes/campaign_cart.py ^
   app/routes/campaign_invitations.py ^
   app/routes/messages.py ^
