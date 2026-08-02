@@ -24,6 +24,22 @@ def money(value):
     return Decimal(str(value or 0)).quantize(Decimal("0.01"))
 
 
+def coerce_bool(value, default=False):
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return value != 0
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {"false", "0", "no", "n", "off"}:
+            return False
+        if normalized in {"true", "1", "yes", "y", "on"}:
+            return True
+    return bool(value)
+
+
 def get_bank_details(reference):
     return get_bank_transfer_details(reference)
 
@@ -79,7 +95,7 @@ def create_campaign_cart_payment(
             "source": "campaign_cart",
             "cart_item_ids": [item.id for item in cart_items],
             "collaboration_details": collaboration_details or {},
-            "requires_content_review": bool(requires_content_review),
+            "requires_content_review": coerce_bool(requires_content_review, True),
             "service_fee_percentage": float(service_fee_percentage),
             "subtotal": float(subtotal),
         },
@@ -177,7 +193,7 @@ def complete_campaign_cart_payment(payment, payment_reference=None, payment_meth
     metadata = payment.payment_metadata or {}
     cart_item_ids = metadata.get("cart_item_ids") or []
     collaboration_details = metadata.get("collaboration_details") or {}
-    requires_content_review = metadata.get("requires_content_review", True)
+    requires_content_review = coerce_bool(metadata.get("requires_content_review"), True)
     cart_items = CampaignCartItem.query.filter(
         CampaignCartItem.id.in_(cart_item_ids),
         CampaignCartItem.payment_status == "pending",
@@ -217,7 +233,7 @@ def complete_campaign_cart_payment(payment, payment_reference=None, payment_meth
             deliverables=deliverables,
             start_date=start_date,
             expected_completion_date=_expected_completion_for_item(cart_item, campaign),
-            requires_content_review=bool(requires_content_review),
+            requires_content_review=requires_content_review,
             brief=collaboration_details.get("brief"),
             guidelines=collaboration_details.get("guidelines"),
             rules=collaboration_details.get("rules"),

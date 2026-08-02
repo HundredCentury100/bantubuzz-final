@@ -80,6 +80,7 @@ if exist "%BACKEND_DIR%\venv\Scripts\python.exe" set "PYTHON_EXE=%BACKEND_DIR%\v
   backend\app\routes\campaign_cart.py ^
   backend\app\routes\campaign_invitations.py ^
   backend\app\routes\messages.py ^
+  backend\app\services\campaign_cart_payment_service.py ^
   backend\app\services\payment_service.py ^
   backend\migrations\versions\202607291000_add_workspace_id_to_messages.py >> "%REPORT%" 2>&1
 if errorlevel 1 (
@@ -114,6 +115,7 @@ tar -czf "%BACKEND_ARCHIVE%" -C "%BACKEND_DIR%" ^
   app/routes/campaign_cart.py ^
   app/routes/campaign_invitations.py ^
   app/routes/messages.py ^
+  app/services/campaign_cart_payment_service.py ^
   app/services/payment_service.py ^
   migrations/versions/202607291000_add_workspace_id_to_messages.py >> "%REPORT%" 2>&1
 if errorlevel 1 goto :failed

@@ -136,8 +136,10 @@ class Collaboration(db.Model):
                 # Content still being approved (0-80% range)
                 return int((total_approved / total_expected) * 80)
         else:
-            # NO track: Standard calculation
-            return int((total_approved / total_expected) * 100)
+            # NO track: creator posts live first, then submits URLs. Placeholder
+            # records are pre-approved only to skip draft review, so progress is
+            # based on live URL submission rather than approval count.
+            return int((deliverables_with_urls / total_expected) * 100)
 
     def to_dict(self, include_relations=False):
         """Convert collaboration to dictionary"""

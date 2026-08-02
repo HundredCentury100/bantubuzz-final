@@ -70,6 +70,7 @@ tar --ignore-failed-read -czf "$BACKUP_DIR/backend-files.tar.gz" -C "$BACKEND_RO
   app/routes/campaign_cart.py \
   app/routes/campaign_invitations.py \
   app/routes/messages.py \
+  app/services/campaign_cart_payment_service.py \
   app/services/payment_service.py \
   migrations/versions/202607291000_add_workspace_id_to_messages.py \
   2>/dev/null || true
@@ -97,6 +98,7 @@ venv/bin/python -m py_compile \
   app/routes/campaign_cart.py \
   app/routes/campaign_invitations.py \
   app/routes/messages.py \
+  app/services/campaign_cart_payment_service.py \
   app/services/payment_service.py \
   migrations/versions/202607291000_add_workspace_id_to_messages.py
 
@@ -118,6 +120,70 @@ if [ -s /etc/bantubuzz/platform.env ]; then
   set +a
 fi
 venv/bin/flask db upgrade heads
+
+echo "Repairing existing no-review campaign collaborations"
+venv/bin/python - <<'PY'
+from app import create_app, db
+from app.models import CampaignPayment, Collaboration
+from app.models.campaign_payment import CampaignPaymentItem
+from app.models.package_deliverable import PackageDeliverable
+from app.routes.bookings import create_no_track_deliverables
+
+
+def coerce_bool(value, default=True):
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, (int, float)):
+        return value != 0
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {"false", "0", "no", "n", "off"}:
+            return False
+        if normalized in {"true", "1", "yes", "y", "on"}:
+            return True
+    return bool(value)
+
+
+app = create_app()
+with app.app_context():
+    repaired = 0
+    placeholders = 0
+
+    payments = CampaignPayment.query.filter(
+        CampaignPayment.status == "completed",
+        CampaignPayment.payment_metadata.isnot(None),
+    ).all()
+
+    for payment in payments:
+        metadata = payment.payment_metadata or {}
+        if metadata.get("source") != "campaign_cart":
+            continue
+        if coerce_bool(metadata.get("requires_content_review"), True):
+            continue
+
+        items = CampaignPaymentItem.query.filter_by(campaign_payment_id=payment.id).all()
+        for item in items:
+            collaboration = Collaboration.query.get(item.collaboration_id)
+            if not collaboration:
+                continue
+
+            if collaboration.requires_content_review:
+                collaboration.requires_content_review = False
+                repaired += 1
+
+            before = PackageDeliverable.query.filter_by(collaboration_id=collaboration.id).count()
+            create_no_track_deliverables(collaboration)
+            db.session.flush()
+            after = PackageDeliverable.query.filter_by(collaboration_id=collaboration.id).count()
+            placeholders += max(0, after - before)
+            collaboration.progress_percentage = collaboration.calculate_progress()
+
+    db.session.commit()
+    print(f"no_review_collaborations_repaired={repaired}")
+    print(f"no_review_url_placeholders_created={placeholders}")
+PY
 
 echo "Installing frontend build at Apache document root"
 rm -rf "$FRONTEND_ROOT"
