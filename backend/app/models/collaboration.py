@@ -209,17 +209,17 @@ class Collaboration(db.Model):
                 milestones = CollaborationMilestone.query.filter_by(collaboration_id=self.id).order_by(CollaborationMilestone.milestone_number).all()
                 data['milestones'] = [milestone.to_dict(include_deliverables=True) for milestone in milestones]
 
-            # Include package deliverables from database for package-type collaborations
-            if self.collaboration_type == 'package':
-                from app.models.package_deliverable import PackageDeliverable
-                package_deliverables = PackageDeliverable.query.filter_by(
-                    collaboration_id=self.id
-                ).order_by(PackageDeliverable.submitted_at).all()
-                data['package_deliverables'] = [d.to_dict() for d in package_deliverables]
+            # Include package-style deliverables for package collaborations and
+            # direct campaign collaborations that skip draft review.
+            from app.models.package_deliverable import PackageDeliverable
+            package_deliverables = PackageDeliverable.query.filter_by(
+                collaboration_id=self.id
+            ).order_by(PackageDeliverable.submitted_at).all()
+            data['package_deliverables'] = [d.to_dict() for d in package_deliverables]
 
-                # Separate by status for frontend convenience
-                data['draft_deliverables'] = [d.to_dict() for d in package_deliverables if d.status in ['pending_review', 'revision_requested']]
-                data['submitted_deliverables'] = [d.to_dict() for d in package_deliverables if d.status == 'approved']
+            # Separate by status for frontend convenience.
+            data['draft_deliverables'] = [d.to_dict() for d in package_deliverables if d.status in ['pending_review', 'revision_requested']]
+            data['submitted_deliverables'] = [d.to_dict() for d in package_deliverables if d.status == 'approved']
 
         return data
 

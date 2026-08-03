@@ -487,6 +487,28 @@ const CollaborationDetails = () => {
   const totalUniqueDeliverables = draftsWithoutRevisions + totalApproved;
   const canSubmitNewDeliverable = totalUniqueDeliverables < expectedDeliverablesCount;
   const missingExpectedDeliverables = totalExpected === 0;
+  const normalizeDeliverableKey = (value) =>
+    String(value || '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, ' ')
+      .trim();
+  const getDeliverablePlatform = (value) => {
+    const text = normalizeDeliverableKey(value);
+    return ['instagram', 'tiktok', 'youtube', 'facebook', 'twitter', 'x', 'linkedin', 'ugc']
+      .find((platform) => text.includes(platform));
+  };
+  const findLivePostDeliverable = (deliverableName, index) => {
+    const expectedKey = normalizeDeliverableKey(deliverableName);
+    const expectedPlatform = getDeliverablePlatform(deliverableName);
+    const allLiveDeliverables = [...submittedDeliverables, ...packageDeliverables];
+
+    return allLiveDeliverables.find((deliverable) => normalizeDeliverableKey(deliverable.title) === expectedKey) ||
+      allLiveDeliverables.find((deliverable) => {
+        const platform = getDeliverablePlatform(deliverable.title || deliverable.post_platform || deliverable.platform);
+        return expectedPlatform && platform === expectedPlatform;
+      }) ||
+      allLiveDeliverables[index];
+  };
 
   return (
     <div className="min-h-screen bg-light">
@@ -1144,8 +1166,7 @@ const CollaborationDetails = () => {
                 <div className="space-y-4">
                   {expectedDeliverables.map((deliverableName, idx) => {
                     // For NO track, find matching record from submitted_deliverables or package_deliverables
-                    const submittedPost = submittedDeliverables.find(d => d.title === deliverableName) ||
-                                         packageDeliverables.find(d => d.title === deliverableName);
+                    const submittedPost = findLivePostDeliverable(deliverableName, idx);
 
                     return (
                       <div key={idx} className={`rounded-lg p-4 border-2 ${submittedPost?.post_url ? 'border-green-200 bg-green-50' : 'border-gray-200 bg-gray-50'}`}>
