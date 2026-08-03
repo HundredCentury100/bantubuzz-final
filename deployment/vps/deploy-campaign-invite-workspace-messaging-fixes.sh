@@ -150,8 +150,41 @@ def coerce_bool(value, default=True):
 
 app = create_app()
 with app.app_context():
-    repaired = 0
-    placeholders = 0
+    stats = {"repaired": 0, "placeholders": 0}
+    seen_collaboration_ids = set()
+
+    def parse_ids(values):
+        ids = set()
+        if not values:
+            return ids
+        if isinstance(values, (str, int)):
+            values = [values]
+        for value in values:
+            try:
+                ids.add(int(value))
+            except (TypeError, ValueError):
+                continue
+        return ids
+
+    def repair_no_review_collaboration(collaboration_id):
+        if not collaboration_id or collaboration_id in seen_collaboration_ids:
+            return
+        seen_collaboration_ids.add(collaboration_id)
+
+        collaboration = Collaboration.query.get(collaboration_id)
+        if not collaboration:
+            return
+
+        if collaboration.requires_content_review:
+            collaboration.requires_content_review = False
+            stats["repaired"] += 1
+
+        before = PackageDeliverable.query.filter_by(collaboration_id=collaboration.id).count()
+        create_no_track_deliverables(collaboration)
+        db.session.flush()
+        after = PackageDeliverable.query.filter_by(collaboration_id=collaboration.id).count()
+        stats["placeholders"] += max(0, after - before)
+        collaboration.progress_percentage = collaboration.calculate_progress()
 
     payments = CampaignPayment.query.filter(
         CampaignPayment.status == "completed",
@@ -165,26 +198,22 @@ with app.app_context():
         if coerce_bool(metadata.get("requires_content_review"), True):
             continue
 
+        collaboration_ids = parse_ids(metadata.get("collaboration_ids"))
         items = CampaignPaymentItem.query.filter_by(campaign_payment_id=payment.id).all()
         for item in items:
-            collaboration = Collaboration.query.get(item.collaboration_id)
-            if not collaboration:
-                continue
+            collaboration_ids.update(parse_ids(item.collaboration_id))
 
-            if collaboration.requires_content_review:
-                collaboration.requires_content_review = False
-                repaired += 1
+        for collaboration_id in collaboration_ids:
+            repair_no_review_collaboration(collaboration_id)
 
-            before = PackageDeliverable.query.filter_by(collaboration_id=collaboration.id).count()
-            create_no_track_deliverables(collaboration)
-            db.session.flush()
-            after = PackageDeliverable.query.filter_by(collaboration_id=collaboration.id).count()
-            placeholders += max(0, after - before)
-            collaboration.progress_percentage = collaboration.calculate_progress()
+    # Legacy repair for the known no-review campaign collaboration created before
+    # payment metadata and item rows were consistently linked.
+    for collaboration_id in {122}:
+        repair_no_review_collaboration(collaboration_id)
 
     db.session.commit()
-    print(f"no_review_collaborations_repaired={repaired}")
-    print(f"no_review_url_placeholders_created={placeholders}")
+    print(f"no_review_collaborations_repaired={stats['repaired']}")
+    print(f"no_review_url_placeholders_created={stats['placeholders']}")
 PY
 
 echo "Installing frontend build at Apache document root"

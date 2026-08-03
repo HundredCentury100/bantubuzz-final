@@ -88,6 +88,11 @@ const CollaborationDetails = () => {
   const [editingDeliverable, setEditingDeliverable] = useState(null);
 
   const isBrand = user?.user_type === 'brand';
+  const requiresContentReview =
+    collaboration?.requires_content_review !== false &&
+    collaboration?.requires_content_review !== 'false' &&
+    collaboration?.requires_content_review !== 0 &&
+    collaboration?.requires_content_review !== '0';
   const deliveryTiming = getDeliveryTiming(collaboration?.expected_completion_date);
   const isEditingUserInput =
     showDeliverableModal ||
@@ -680,7 +685,7 @@ const CollaborationDetails = () => {
             )}
 
             {/* CONTENT REVIEW = YES: Two-Stage Workflow */}
-            {collaboration.requires_content_review && !missingExpectedDeliverables && (
+            {requiresContentReview && !missingExpectedDeliverables && (
               <div className="space-y-6">
                 {/* Expected Content Section */}
                 <div className="bg-white rounded-lg shadow p-6">
@@ -1081,7 +1086,7 @@ const CollaborationDetails = () => {
             )}
 
             {/* CONTENT REVIEW = NO: Direct Post Workflow - No Draft Review */}
-            {!collaboration.requires_content_review && !missingExpectedDeliverables && (
+            {!requiresContentReview && !missingExpectedDeliverables && (
               <div className="bg-white rounded-lg shadow p-6">
                 <h2 className="text-xl font-bold text-gray-900 mb-4">
                   Live Posts
@@ -1425,15 +1430,23 @@ const CollaborationDetails = () => {
           <div className="bg-white rounded-lg max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6">
             <h2 className="text-2xl font-bold text-gray-900 mb-4">
               {bulkDraftTitles.length > 0
-                ? 'Submit Draft Content for Review'
-                : editingDeliverable ? 'Edit & Resubmit Deliverable' : 'Submit Deliverable for Review'}
+                ? (requiresContentReview ? 'Submit Draft Content for Review' : 'Submit Live Post URLs')
+                : editingDeliverable
+                ? (requiresContentReview ? 'Edit & Resubmit Deliverable' : 'Edit Delivery')
+                : (requiresContentReview ? 'Submit Deliverable for Review' : 'Submit Live Post URL')}
             </h2>
             <p className="text-sm text-gray-600 mb-4">
               {bulkDraftTitles.length > 0
-                ? 'Upload your draft content to Google Drive, set sharing to Anyone with the link, then submit the matching link below.'
+                ? (requiresContentReview
+                  ? 'Upload your draft content to Google Drive, set sharing to Anyone with the link, then submit the matching link below.'
+                  : 'Paste the live post URL or post ID for each content item once it has been published.')
                 : editingDeliverable
-                ? 'Update your deliverable based on the revision feedback and resubmit for review.'
-                : 'Your deliverable will be submitted for brand review before being marked as approved.'
+                ? (requiresContentReview
+                  ? 'Update your deliverable based on the revision feedback and resubmit for review.'
+                  : 'Update the live post URL or post ID for this delivery.')
+                : (requiresContentReview
+                  ? 'Your deliverable will be submitted for brand review before being marked as approved.'
+                  : 'Submit the live post URL or platform post ID for this deliverable.')
               }
             </p>
 
@@ -1455,14 +1468,16 @@ const CollaborationDetails = () => {
                     Are you posting the same content across all platforms?
                   </label>
                   <p className="text-xs text-gray-700 mb-3">
-                    Upload to Google Drive, set sharing to Anyone with the link, and paste the link here.
+                    {requiresContentReview
+                      ? 'Upload to Google Drive, set sharing to Anyone with the link, and paste the link here.'
+                      : 'If the same live post is used for all items, paste the public URL or post ID here.'}
                   </p>
                   <input
                     type="url"
                     value={sharedDraftUrl}
                     onChange={(e) => setSharedDraftUrl(e.target.value)}
                     className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent"
-                    placeholder="https://drive.google.com/..."
+                    placeholder={requiresContentReview ? 'https://drive.google.com/...' : 'https://www.tiktok.com/@creator/video/...'}
                     disabled={submitting}
                   />
                 </div>
@@ -1470,7 +1485,9 @@ const CollaborationDetails = () => {
                 <div>
                   <p className="text-sm font-semibold text-gray-900 mb-2">Different content per platform</p>
                   <p className="text-xs text-gray-600 mb-3">
-                    Leave the shared link empty and paste a separate Google Drive link for each item. Make sure each file is shared with Anyone with the link.
+                    {requiresContentReview
+                      ? 'Leave the shared link empty and paste a separate Google Drive link for each item. Make sure each file is shared with Anyone with the link.'
+                      : 'Leave the shared field empty and paste a separate live URL or post ID for each platform.'}
                   </p>
                   <div className="space-y-3">
                     {bulkDraftTitles.map((title) => (
@@ -1481,7 +1498,7 @@ const CollaborationDetails = () => {
                           value={draftLinksByTitle[title] || ''}
                           onChange={(e) => setDraftLinksByTitle((current) => ({ ...current, [title]: e.target.value }))}
                           className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-primary focus:border-transparent"
-                          placeholder="https://drive.google.com/..."
+                          placeholder={requiresContentReview ? 'https://drive.google.com/...' : 'https://www.tiktok.com/@creator/video/...'}
                           disabled={submitting || !!sharedDraftUrl.trim()}
                         />
                       </div>
@@ -1506,17 +1523,19 @@ const CollaborationDetails = () => {
 
             <div className="mb-4">
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Google Drive Link <span className="text-red-500">*</span>
+                {requiresContentReview ? 'Google Drive Link' : 'Live Post URL or Post ID'} <span className="text-red-500">*</span>
               </label>
               <input
                 type="url"
                 value={deliverableUrl}
                 onChange={(e) => setDeliverableUrl(e.target.value)}
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                placeholder="https://drive.google.com/..."
+                placeholder={requiresContentReview ? 'https://drive.google.com/...' : 'https://www.tiktok.com/@creator/video/...'}
               />
               <p className="mt-2 text-xs text-gray-500">
-                Upload your draft to Google Drive and set sharing to Anyone with the link before submitting.
+                {requiresContentReview
+                  ? 'Upload your draft to Google Drive and set sharing to Anyone with the link before submitting.'
+                  : 'Paste the public live post URL or the platform post ID after publishing.'}
               </p>
             </div>
 
@@ -1541,7 +1560,11 @@ const CollaborationDetails = () => {
                 disabled={submitting}
                 className="flex-1 px-6 py-3 bg-primary hover:bg-primary-dark text-white font-medium rounded-lg transition-colors disabled:opacity-50"
               >
-                {submitting ? (editingDeliverable ? 'Updating...' : 'Submitting...') : (editingDeliverable ? 'Update & Resubmit' : 'Submit for Review')}
+                {submitting
+                  ? (editingDeliverable ? 'Updating...' : 'Submitting...')
+                  : (editingDeliverable
+                    ? (requiresContentReview ? 'Update & Resubmit' : 'Update Delivery')
+                    : (requiresContentReview ? 'Submit for Review' : 'Submit Delivery'))}
               </button>
               <button
                 onClick={() => {
