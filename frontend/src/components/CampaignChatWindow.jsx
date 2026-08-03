@@ -5,9 +5,6 @@ import toast from 'react-hot-toast';
 import { format } from 'date-fns';
 import { useCampaignChat } from '../hooks/useCampaignChat';
 import { useAuth } from '../hooks/useAuth';
-import axios from 'axios';
-
-const MESSAGING_SERVICE_URL = import.meta.env.VITE_MESSAGING_SERVICE_URL || 'http://localhost:3002';
 
 const CampaignChatWindow = ({ chat, onChatUpdate, onClose }) => {
   const { user } = useAuth();
@@ -32,6 +29,16 @@ const CampaignChatWindow = ({ chat, onChatUpdate, onClose }) => {
     markAsRead,
     sendTypingIndicator
   } = useCampaignChat(chat?.id);
+
+  const normalizeMessage = (message) => {
+    if (!message) return message;
+    const sender = message.sender || {};
+    return {
+      ...message,
+      sender_name: message.sender_name || sender.display_name || sender.company_name || sender.email || 'Unknown User',
+      sender_picture: message.sender_picture || sender.profile_picture || sender.logo || null,
+    };
+  };
 
   useEffect(() => {
     if (chat?.id) {
@@ -60,16 +67,7 @@ const CampaignChatWindow = ({ chat, onChatUpdate, onClose }) => {
 
   const fetchChatDetails = async () => {
     try {
-      // Fetch participants from messaging service
-      const token = localStorage.getItem('token');
-      const response = await axios.get(
-        `${MESSAGING_SERVICE_URL}/api/campaign-chats/${chat.id}/participants`,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        }
-      );
+      const response = await campaignChatsAPI.getChatDetails(chat.id);
       setParticipants(response.data.participants || []);
     } catch (error) {
       console.error('Failed to fetch chat details:', error);
@@ -79,16 +77,8 @@ const CampaignChatWindow = ({ chat, onChatUpdate, onClose }) => {
   const fetchInitialMessages = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('token');
-      const response = await axios.get(
-        `${MESSAGING_SERVICE_URL}/api/campaign-chats/${chat.id}/messages`,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        }
-      );
-      setMessages(response.data.messages || []);
+      const response = await campaignChatsAPI.getMessages(chat.id);
+      setMessages((response.data.messages || []).slice().reverse().map(normalizeMessage));
     } catch (error) {
       console.error('Failed to fetch messages:', error);
       toast.error('Failed to load messages');
@@ -101,17 +91,28 @@ const CampaignChatWindow = ({ chat, onChatUpdate, onClose }) => {
     e.preventDefault();
 
     const text = messageText.trim();
-    if (!text || sending || !connected) return;
+    if (!text || sending) return;
 
     try {
       setSending(true);
 
-      // Send via WebSocket
-      await sendWebSocketMessage(text);
+      if (connected) {
+        await sendWebSocketMessage(text);
+      } else {
+        const response = await campaignChatsAPI.sendMessage(chat.id, {
+          content: text,
+          message_type: 'text',
+          attachments: []
+        });
+        const message = normalizeMessage(response.data.data);
+        setMessages((current) => [...current, message]);
+      }
 
       setMessageText('');
       textareaRef.current?.focus();
-      sendTypingIndicator(false);
+      if (connected) {
+        sendTypingIndicator(false);
+      }
 
       if (onChatUpdate) {
         onChatUpdate();
@@ -425,7 +426,7 @@ const CampaignChatWindow = ({ chat, onChatUpdate, onClose }) => {
       <div className="p-4 border-t border-gray-200 bg-white">
         {!connected && (
           <div className="mb-2 px-3 py-2 bg-yellow-50 border border-yellow-200 rounded-lg text-sm text-yellow-800">
-            Connecting to chat service...
+            Realtime chat is connecting. You can still send messages.
           </div>
         )}
         <form onSubmit={handleSendMessage} className="flex gap-2">
@@ -445,11 +446,11 @@ const CampaignChatWindow = ({ chat, onChatUpdate, onClose }) => {
             placeholder="Type your message... (Shift+Enter for new line)"
             className="flex-1 px-4 py-2 border border-gray-300 rounded-xl resize-none focus:outline-none focus:ring-2 focus:ring-primary/50"
             rows="2"
-            disabled={sending || !connected}
+            disabled={sending}
           />
           <button
             type="submit"
-            disabled={!messageText.trim() || sending || !connected}
+            disabled={!messageText.trim() || sending}
             className="px-4 py-2 bg-primary text-white rounded-xl hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
           >
             <FaPaperPlane size={16} />
