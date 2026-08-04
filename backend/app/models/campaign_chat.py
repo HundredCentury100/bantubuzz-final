@@ -175,8 +175,12 @@ class CampaignChatParticipant(db.Model):
             user_data['display_name'] = self.user.creator_profile.display_name
             user_data['profile_picture'] = self.user.creator_profile.profile_picture
         elif self.user.user_type == 'brand' and hasattr(self.user, 'brand_profile') and self.user.brand_profile:
-            user_data['company_name'] = self.user.brand_profile.company_name
-            user_data['logo'] = self.user.brand_profile.logo
+            from app.utils.brand_identity import public_brand_for_campaign
+            brand_data = public_brand_for_campaign(self.chat.campaign if self.chat else None)
+            user_data['company_name'] = brand_data.get('company_name') or self.user.brand_profile.company_name
+            user_data['display_name'] = user_data['company_name']
+            user_data['logo'] = brand_data.get('logo') or self.user.brand_profile.logo
+            user_data['is_workspace_brand'] = bool(brand_data.get('is_workspace_brand'))
 
         return {
             'id': self.id,

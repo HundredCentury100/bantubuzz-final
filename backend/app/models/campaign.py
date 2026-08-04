@@ -88,7 +88,7 @@ class Campaign(db.Model):
     proposals = db.relationship('CampaignProposal', backref='campaign', lazy='dynamic', cascade='all, delete-orphan')
     packages = db.relationship('Package', secondary=campaign_packages, backref='campaigns')
 
-    def to_dict(self, include_milestones=True, include_brand=False):
+    def to_dict(self, include_milestones=True, include_brand=False, prefer_workspace_brand=False):
         """
         CRITICAL: Return money as strings to avoid rounding
         Never use float() or .toFixed() anywhere
@@ -133,8 +133,31 @@ class Campaign(db.Model):
             result['proposals_count'] = self.proposals.count()
             result['packages_count'] = len(self.packages)
 
+        if self.workspace:
+            workspace = self.workspace.to_dict()
+            result['workspace'] = workspace
+            result['client_workspace'] = workspace
+            result['display_brand'] = {
+                'id': workspace.get('id'),
+                'company_name': workspace.get('name'),
+                'display_name': workspace.get('name'),
+                'logo': workspace.get('logo'),
+                'industry': workspace.get('industry'),
+                'description': workspace.get('description'),
+                'is_workspace_brand': True,
+            }
+            if not prefer_workspace_brand:
+                result['display_brand']['agency_brand_id'] = self.brand_id
+
         if include_brand and self.brand:
-            result['brand'] = self.brand.to_dict()
+            brand = self.brand.to_dict()
+            if prefer_workspace_brand and self.workspace:
+                result['brand'] = result['display_brand']
+            else:
+                result['brand'] = brand
+
+        if 'display_brand' not in result and include_brand and self.brand:
+            result['display_brand'] = result['brand']
 
         return result
 
@@ -252,7 +275,11 @@ class CampaignProposal(db.Model):
             result['creator'] = self.creator.to_dict()
 
         if include_campaign and self.campaign:
-            result['campaign'] = self.campaign.to_dict(include_milestones=True, include_brand=False)
+            result['campaign'] = self.campaign.to_dict(
+                include_milestones=True,
+                include_brand=True,
+                prefer_workspace_brand=True,
+            )
 
         return result
 

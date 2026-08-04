@@ -73,18 +73,29 @@ pushd "%ROOT%" >nul
 set "PYTHON_EXE=python"
 if exist "%BACKEND_DIR%\venv\Scripts\python.exe" set "PYTHON_EXE=%BACKEND_DIR%\venv\Scripts\python.exe"
 "%PYTHON_EXE%" -m py_compile ^
+  backend\app\utils\brand_identity.py ^
+  backend\app\models\booking.py ^
+  backend\app\models\brief.py ^
+  backend\app\models\campaign.py ^
   backend\app\models\campaign_chat.py ^
   backend\app\models\campaign_invitation.py ^
   backend\app\models\collaboration.py ^
   backend\app\models\message.py ^
+  backend\app\models\review.py ^
   backend\app\routes\admin\collaborations.py ^
   backend\app\routes\bookings.py ^
   backend\app\routes\campaign_cart.py ^
   backend\app\routes\campaign_chats.py ^
   backend\app\routes\campaign_invitations.py ^
+  backend\app\routes\custom_packages.py ^
+  backend\app\routes\milestones.py ^
   backend\app\routes\messages.py ^
+  backend\app\routes\portfolio.py ^
+  backend\app\routes\reviews.py ^
   backend\app\services\campaign_cart_payment_service.py ^
   backend\app\services\payment_service.py ^
+  backend\app\services\product_notifications.py ^
+  backend\app\services\wallet_service.py ^
   backend\app\utils\campaign_helpers.py ^
   backend\migrations\versions\202607291000_add_workspace_id_to_messages.py >> "%REPORT%" 2>&1
 if errorlevel 1 (
@@ -112,18 +123,29 @@ popd >nul
 if not "%TAR_FRONTEND_STATUS%"=="0" goto :failed
 
 tar -czf "%BACKEND_ARCHIVE%" -C "%BACKEND_DIR%" ^
+  app/utils/brand_identity.py ^
+  app/models/booking.py ^
+  app/models/brief.py ^
+  app/models/campaign.py ^
   app/models/campaign_chat.py ^
   app/models/campaign_invitation.py ^
   app/models/collaboration.py ^
   app/models/message.py ^
+  app/models/review.py ^
   app/routes/admin/collaborations.py ^
   app/routes/bookings.py ^
   app/routes/campaign_cart.py ^
   app/routes/campaign_chats.py ^
   app/routes/campaign_invitations.py ^
+  app/routes/custom_packages.py ^
+  app/routes/milestones.py ^
   app/routes/messages.py ^
+  app/routes/portfolio.py ^
+  app/routes/reviews.py ^
   app/services/campaign_cart_payment_service.py ^
   app/services/payment_service.py ^
+  app/services/product_notifications.py ^
+  app/services/wallet_service.py ^
   app/utils/campaign_helpers.py ^
   migrations/versions/202607291000_add_workspace_id_to_messages.py >> "%REPORT%" 2>&1
 if errorlevel 1 goto :failed

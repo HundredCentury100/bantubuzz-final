@@ -4,6 +4,7 @@ from datetime import datetime
 from app import db
 from app.models import PortfolioItem, CreatorProfile, User, ThunziAccount
 from app.services.thunzi_service import thunzi_service
+from app.utils.brand_identity import public_brand_for_collaboration
 from app.utils.file_upload import save_and_compress_image
 
 bp = Blueprint('portfolio', __name__)
@@ -395,8 +396,6 @@ def create_portfolio_from_collaboration(collaboration_id):
     """
     try:
         from app.models.collaboration import Collaboration
-        from app.models.brand_profile import BrandProfile
-
         user_id = int(get_jwt_identity())
         creator = CreatorProfile.query.filter_by(user_id=user_id).first()
 
@@ -416,9 +415,14 @@ def create_portfolio_from_collaboration(collaboration_id):
         if collaboration.status != 'completed':
             return jsonify({'error': 'Only completed collaborations can be added to portfolio'}), 400
 
-        # Get brand info
-        brand = BrandProfile.query.get(collaboration.brand_id)
-        brand_name = getattr(brand, 'company_name', None) or 'Unknown Brand'
+        # Get creator-safe brand info. Agency-owned collaborations should still
+        # store the client workspace brand on creator portfolio items.
+        display_brand = public_brand_for_collaboration(collaboration)
+        brand_name = (
+            display_brand.get('company_name')
+            or display_brand.get('display_name')
+            or 'Unknown Brand'
+        )
 
         # Get platform info from booking if available
         platform = None

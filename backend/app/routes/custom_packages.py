@@ -2,6 +2,8 @@ from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from app import db
 from app.models import CustomPackageRequest, CustomPackageOffer, BrandProfile, CreatorProfile, User, Booking, Notification, Message
+from app.services.workspace_service import get_request_workspace_id, require_workspace_access
+from app.utils.brand_identity import public_brand_payload
 from app.utils.websocket_helper import emit_message_to_websocket
 from app.services.email_service import EmailService
 from datetime import datetime, timezone
@@ -28,6 +30,14 @@ def create_custom_request():
         expected_deliverables = data.get('expected_deliverables')
         budget = data.get('budget')
         additional_notes = data.get('additional_notes', '')
+        workspace_id = get_request_workspace_id(data)
+        workspace = None
+        if workspace_id:
+            workspace, workspace_error, workspace_status = require_workspace_access(user_id, workspace_id)
+            if workspace_error:
+                return jsonify({'error': workspace_error}), workspace_status
+        display_brand = public_brand_payload(brand, workspace)
+        display_brand_name = display_brand.get('company_name') or display_brand.get('display_name') or 'A brand'
 
         # Validation
         if not creator_id or not expected_deliverables or not budget:
@@ -66,7 +76,7 @@ def create_custom_request():
             user_id=creator.user_id,
             type='custom_package_request',
             title='New Custom Package Request',
-            message=f'{brand.company_name} has requested a custom package from you. Budget: ${budget}',
+            message=f'{display_brand_name} has requested a custom package from you. Budget: ${budget}',
             action_url=f'/messages'
         )
         db.session.add(notification)
@@ -77,7 +87,7 @@ def create_custom_request():
             EmailService.send_custom_package_request_email(
                 creator_email=creator_user.email,
                 creator_name=creator.username,
-                brand_name=brand.company_name,
+                brand_name=display_brand_name,
                 budget=budget,
                 deliverables=expected_deliverables,
                 notes=additional_notes
@@ -87,7 +97,7 @@ def create_custom_request():
             # Continue - email failure doesn't fail the main operation
 
         # Create ONE unified message with greeting + request
-        unified_content = f"Hi {creator.username}, this is {brand.company_name}. Kindly browse through my custom package request below."
+        unified_content = f"Hi {creator.username}, this is {display_brand_name}. Kindly browse through my custom package request below."
 
         request_message = Message(
             sender_id=brand.user_id,
@@ -95,6 +105,7 @@ def create_custom_request():
             custom_request_id=custom_request.id,
             message_type='custom_request',
             content=unified_content,
+            workspace_id=workspace.id if workspace else None,
             is_read=False
         )
         db.session.add(request_message)

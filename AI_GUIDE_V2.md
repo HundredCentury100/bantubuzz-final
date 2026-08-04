@@ -1380,6 +1380,8 @@ Deployment note:
   - Open tracking is based on creator visits to `/briefs/<id>?bulk_recipient=<recipient_id>`. Response tracking is based on proposals submitted for the same brief by the same creator.
   - Targeted deploy script: `deployment\DEPLOY-NEW-VPS-BULK-BRIEF-SENDING.bat`. It uploads changed brief/backend/Celery files, migration `202606251000_add_bulk_brief_sending.py`, rebuilt frontend dist, runs `flask db upgrade heads`, and restarts backend plus Celery worker/beat.
 - Agency workspace team access:
+  - Agency parent identity is internal. Creator-facing pages, emails, notifications, chat participants, invitations, reviews, wallet/collaboration labels, custom-package outreach, and public campaign payloads must show the selected client workspace brand, never the agency name/logo. Use `backend/app/utils/brand_identity.py` helpers instead of reading `brand.company_name` or `brand.logo` directly when a record can have `workspace_id`.
+  - Campaign serializers should pass `prefer_workspace_brand=True` for creator-facing opportunities, applications, invitations, and embedded campaign payloads.
   - Agency plans must always allow at least 10 inviteable team seats, even if an older production plan row has `max_team_members=0` or an unexpected Agency slug variant. Use `is_agency_plan(plan)` before falling back to generic plan-seat defaults.
   - Workspace owner memberships are internal owner access and should not consume an inviteable team seat. `get_workspace_seat_usage()` counts non-owner members plus pending invitations.
   - If the Invite Member form is greyed out for an Agency account, inspect `/api/workspaces/<id>/members` and its `seat_usage` payload first.

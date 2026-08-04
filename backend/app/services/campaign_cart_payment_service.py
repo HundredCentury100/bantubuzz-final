@@ -18,6 +18,7 @@ from app.models import (
 )
 from app.services.email_service import EmailService, send_email
 from app.utils.notifications import create_notification
+from app.utils.brand_identity import public_brand_for_campaign, public_brand_name
 from app.utils.subscription_helper import get_brand_service_fee_percentage
 from app.utils.bank_details import get_bank_transfer_details
 from sqlalchemy import distinct, func
@@ -152,9 +153,10 @@ def _expected_completion_for_item(cart_item, campaign):
 
 
 def _brand_name(campaign):
-    if campaign.brand:
-        return campaign.brand.company_name or campaign.brand.display_name or "A brand"
-    return "A brand"
+    return public_brand_name(
+        brand=getattr(campaign, "brand", None),
+        workspace=getattr(campaign, "workspace", None),
+    )
 
 
 def _notify_creator(collaboration, campaign):

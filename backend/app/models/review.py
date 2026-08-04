@@ -84,7 +84,11 @@ class Review(db.Model):
 
         if include_relations:
             if self.brand:
-                data['brand'] = self.brand.to_dict(include_user=True)
+                from app.utils.brand_identity import public_brand_for_collaboration, public_brand_payload
+                if self.collaboration:
+                    data['brand'] = public_brand_for_collaboration(self.collaboration, include_user=True)
+                else:
+                    data['brand'] = public_brand_payload(self.brand, include_user=True)
             if self.creator:
                 data['creator'] = self.creator.to_dict(include_user=True)
             if self.collaboration:

@@ -20,6 +20,7 @@ from app.services.campaign_cart_payment_service import (
 from app.services.campaign_scenario_service import CampaignScenarioService
 from app.services.workspace_service import require_workspace_access
 from app.utils.notifications import create_notification
+from app.utils.brand_identity import public_brand_for_campaign
 from datetime import datetime, timedelta
 from decimal import Decimal
 from io import BytesIO
@@ -61,22 +62,15 @@ def _load_brand_campaign(campaign_id, permission='can_manage_campaigns'):
 
 def _campaign_display_brand(campaign, fallback_brand=None):
     """Show creators the client brand for agency workspace campaigns, not the agency parent."""
-    workspace = getattr(campaign, 'workspace', None)
-    if workspace:
-        return {
-            'name': workspace.name or 'A brand',
-            'logo': workspace.logo,
-        }
-
-    brand = fallback_brand or getattr(campaign, 'brand', None)
+    display_brand = public_brand_for_campaign(campaign)
     return {
         'name': (
-            getattr(brand, 'company_name', None)
-            or getattr(brand, 'business_name', None)
-            or getattr(brand, 'display_name', None)
+            display_brand.get('company_name')
+            or display_brand.get('business_name')
+            or display_brand.get('display_name')
             or 'A brand'
         ),
-        'logo': getattr(brand, 'logo', None),
+        'logo': display_brand.get('logo'),
     }
 
 
@@ -375,7 +369,7 @@ def add_application_to_cart(campaign_id):
             proposal.creator.user_id,
             'campaign',
             'Application Added to Cart',
-            f'{brand.company_name or "A brand"} added your proposal for "{campaign.title}" to their campaign cart. Payment is pending.',
+            f'{_campaign_display_brand(campaign, brand)["name"]} added your proposal for "{campaign.title}" to their campaign cart. Payment is pending.',
             '/creator/applications'
         )
 

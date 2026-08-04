@@ -63,18 +63,29 @@ wait_for_url() {
 echo "Creating targeted backup at $BACKUP_DIR"
 mkdir -p "$BACKUP_DIR"
 tar --ignore-failed-read -czf "$BACKUP_DIR/backend-files.tar.gz" -C "$BACKEND_ROOT" \
+  app/utils/brand_identity.py \
+  app/models/booking.py \
+  app/models/brief.py \
+  app/models/campaign.py \
   app/models/campaign_chat.py \
   app/models/campaign_invitation.py \
   app/models/collaboration.py \
   app/models/message.py \
+  app/models/review.py \
   app/routes/admin/collaborations.py \
   app/routes/bookings.py \
   app/routes/campaign_cart.py \
   app/routes/campaign_chats.py \
   app/routes/campaign_invitations.py \
+  app/routes/custom_packages.py \
+  app/routes/milestones.py \
   app/routes/messages.py \
+  app/routes/portfolio.py \
+  app/routes/reviews.py \
   app/services/campaign_cart_payment_service.py \
   app/services/payment_service.py \
+  app/services/product_notifications.py \
+  app/services/wallet_service.py \
   app/utils/campaign_helpers.py \
   migrations/versions/202607291000_add_workspace_id_to_messages.py \
   2>/dev/null || true
@@ -95,18 +106,29 @@ tar -xzf "$NODE_ARCHIVE" -C "$MESSAGING_ROOT"
 echo "Compiling backend files"
 cd "$BACKEND_ROOT"
 venv/bin/python -m py_compile \
+  app/utils/brand_identity.py \
+  app/models/booking.py \
+  app/models/brief.py \
+  app/models/campaign.py \
   app/models/campaign_chat.py \
   app/models/campaign_invitation.py \
   app/models/collaboration.py \
   app/models/message.py \
+  app/models/review.py \
   app/routes/admin/collaborations.py \
   app/routes/bookings.py \
   app/routes/campaign_cart.py \
   app/routes/campaign_chats.py \
   app/routes/campaign_invitations.py \
+  app/routes/custom_packages.py \
+  app/routes/milestones.py \
   app/routes/messages.py \
+  app/routes/portfolio.py \
+  app/routes/reviews.py \
   app/services/campaign_cart_payment_service.py \
   app/services/payment_service.py \
+  app/services/product_notifications.py \
+  app/services/wallet_service.py \
   app/utils/campaign_helpers.py \
   migrations/versions/202607291000_add_workspace_id_to_messages.py
 

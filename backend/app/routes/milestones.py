@@ -7,6 +7,7 @@ from app.models import (
     User, CreatorProfile, WalletTransaction, Wallet
 )
 from app.utils.notifications import create_notification
+from app.utils.brand_identity import public_brand_for_collaboration
 
 bp = Blueprint('milestones', __name__)
 
@@ -306,7 +307,7 @@ def approve_milestone(collaboration_id, milestone_number):
             transaction_metadata={
                 'collaboration_id': collaboration.id,
                 'milestone_number': milestone_number,
-                'brand_name': collaboration.brand.company_name
+                'brand_name': public_brand_for_collaboration(collaboration).get('company_name')
             }
         )
         db.session.add(transaction)

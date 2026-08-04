@@ -74,7 +74,8 @@ class Booking(db.Model):
             if self.creator:
                 data['creator'] = self.creator.to_dict(include_user=True)
             if self.brand:
-                data['brand'] = self.brand.to_dict(include_user=True)
+                from app.utils.brand_identity import public_brand_for_booking
+                data['brand'] = public_brand_for_booking(self, include_user=True)
 
         return data
 

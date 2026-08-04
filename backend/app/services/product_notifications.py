@@ -1,6 +1,7 @@
 from flask import current_app
 
 from app.services.email_service import send_email
+from app.utils.brand_identity import public_brand_for_booking, public_brand_for_collaboration
 from app.utils.notifications import create_notification
 
 
@@ -98,7 +99,8 @@ def notify_creator_new_booking(booking):
     brand = getattr(booking, 'brand', None)
     package = getattr(booking, 'package', None)
     creator_user = getattr(creator, 'user', None)
-    brand_name = _profile_name(brand, 'A brand')
+    public_brand = public_brand_for_booking(booking)
+    brand_name = public_brand.get('company_name') or public_brand.get('display_name') or _profile_name(brand, 'A brand')
     package_title = getattr(package, 'title', 'your package')
     message = f'{brand_name} has booked your package "{package_title}".'
     _notify_user(
@@ -116,7 +118,8 @@ def notify_collaboration_active(collaboration):
     brand = getattr(collaboration, 'brand', None)
     creator_user = getattr(creator, 'user', None)
     brand_user = getattr(brand, 'user', None)
-    brand_name = _profile_name(brand, 'The brand')
+    public_brand = public_brand_for_collaboration(collaboration)
+    brand_name = public_brand.get('company_name') or public_brand.get('display_name') or _profile_name(brand, 'The brand')
     creator_name = _profile_name(creator, 'the creator')
 
     _notify_user(

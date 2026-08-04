@@ -6,7 +6,7 @@ from flask import Blueprint, current_app, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from werkzeug.utils import secure_filename
 from app import db
-from app.models import Message, PushSubscription, User, UserBlock
+from app.models import ClientWorkspace, Message, PushSubscription, User, UserBlock
 from app.services.workspace_service import get_request_workspace_id, require_workspace_access
 
 bp = Blueprint('messages', __name__)
@@ -460,6 +460,26 @@ def get_conversations():
                 is_read=False
             )
             unread_count = _scope_message_query(unread_query, workspace_id).count()
+            workspace_brand = None
+            if user.user_type == 'brand' and last_message and last_message.workspace_id:
+                workspace_brand = ClientWorkspace.query.get(last_message.workspace_id)
+            company_name = (
+                getattr(workspace_brand, 'name', None)
+                if workspace_brand else (
+                    getattr(user.brand_profile, 'company_name', None)
+                    if user.brand_profile else None
+                )
+            )
+            profile_picture = (
+                getattr(user.creator_profile, 'profile_picture', None)
+                if user.creator_profile else None
+            ) or (
+                getattr(workspace_brand, 'logo', None)
+                if workspace_brand else (
+                    getattr(user.brand_profile, 'logo', None)
+                    if user.brand_profile else None
+                )
+            )
 
             conversations.append({
                 'id': user.id,
@@ -473,17 +493,9 @@ def get_conversations():
                     getattr(user.creator_profile, 'username', None)
                     if user.creator_profile else None
                 ),
-                'company_name': (
-                    getattr(user.brand_profile, 'company_name', None)
-                    if user.brand_profile else None
-                ),
-                'profile_picture': (
-                    getattr(user.creator_profile, 'profile_picture', None)
-                    if user.creator_profile else None
-                ) or (
-                    getattr(user.brand_profile, 'logo', None)
-                    if user.brand_profile else None
-                ),
+                'company_name': company_name,
+                'profile_picture': profile_picture,
+                'is_workspace_brand': bool(workspace_brand),
                 'user': user.to_dict(),
                 'last_message': last_message.to_dict() if last_message else None,
                 'last_message_time': last_message.created_at.isoformat() if last_message else None,

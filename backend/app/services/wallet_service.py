@@ -8,6 +8,7 @@ from app.models import (
     Wallet, WalletTransaction, CreatorProfile,
     Collaboration, CashoutRequest
 )
+from app.utils.brand_identity import public_brand_for_collaboration
 
 
 def get_or_create_wallet(user_id):
@@ -99,7 +100,7 @@ def get_pending_clearance_transactions(user_id):
             if collab:
                 txn_dict['collaboration'] = {
                     'id': collab.id,
-                    'brand_name': collab.brand.company_name if collab.brand else 'Unknown'
+                    'brand_name': public_brand_for_collaboration(collab).get('company_name') or 'Unknown'
                 }
 
         result.append(txn_dict)

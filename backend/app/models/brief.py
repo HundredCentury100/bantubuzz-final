@@ -61,12 +61,11 @@ class Brief(db.Model):
         }
 
         if include_relations:
-            data['brand'] = {
-                'id': self.brand.id,
-                'company_name': self.brand.company_name,
-                'logo': self.brand.logo,
-                'industry': self.brand.industry
-            } if self.brand else None
+            if self.brand:
+                from app.utils.brand_identity import public_brand_payload
+                data['brand'] = public_brand_payload(self.brand, self.workspace)
+            else:
+                data['brand'] = None
 
             data['milestones'] = [m.to_dict() for m in self.milestones.all()]
             data['proposal_count'] = self.proposals.count()

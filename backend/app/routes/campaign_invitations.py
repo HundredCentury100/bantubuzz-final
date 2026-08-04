@@ -10,14 +10,18 @@ from app.models import (
     Notification
 )
 from app.services.workspace_service import require_workspace_access
+from app.utils.brand_identity import public_brand_for_campaign, public_brand_name
 from datetime import datetime, timedelta
 
 bp = Blueprint('campaign_invitations', __name__, url_prefix='/api/campaign-invitations')
 
 
 def _campaign_display_brand_name(campaign, user):
-    if campaign and campaign.workspace:
-        return campaign.workspace.name or 'A brand'
+    if campaign:
+        return public_brand_name(
+            brand=getattr(campaign, 'brand', None),
+            workspace=getattr(campaign, 'workspace', None),
+        )
     brand_profile = getattr(user, 'brand_profile', None)
     if brand_profile:
         return brand_profile.company_name or brand_profile.display_name or user.email
