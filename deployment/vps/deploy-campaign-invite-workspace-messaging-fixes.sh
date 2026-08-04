@@ -225,7 +225,6 @@ venv/bin/python - <<'PY'
 from app import create_app, db
 from app.models import Campaign, CampaignChat, CampaignChatParticipant, Collaboration, CreatorProfile
 from app.models.campaign_cart import CampaignCartItem
-from app.models.campaign_invitation import CampaignInvitation
 from sqlalchemy import distinct, func
 
 
@@ -299,17 +298,6 @@ with app.app_context():
         creator_user_id = item.creator.user_id if item.creator else None
         if ensure_chat(campaign, collaboration, brand_user_id, creator_user_id):
             repaired += 1
-
-    invitations = CampaignInvitation.query.filter(
-        CampaignInvitation.collaboration_id.isnot(None)
-    ).all()
-    for invitation in invitations:
-        collaboration = Collaboration.query.get(invitation.collaboration_id)
-        campaign = Campaign.query.get(invitation.campaign_id)
-        creator = CreatorProfile.query.get(invitation.creator_id)
-        creator_user_id = creator.user_id if creator else None
-        if ensure_chat(campaign, collaboration, invitation.invited_by_user_id, creator_user_id):
-            linked += 1
 
     db.session.commit()
     print(f"campaign_cart_chats_repaired={repaired}")
