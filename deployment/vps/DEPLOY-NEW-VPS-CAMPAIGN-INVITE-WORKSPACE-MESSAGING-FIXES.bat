@@ -73,6 +73,7 @@ pushd "%ROOT%" >nul
 set "PYTHON_EXE=python"
 if exist "%BACKEND_DIR%\venv\Scripts\python.exe" set "PYTHON_EXE=%BACKEND_DIR%\venv\Scripts\python.exe"
 "%PYTHON_EXE%" -m py_compile ^
+  backend\app\models\campaign_chat.py ^
   backend\app\models\campaign_invitation.py ^
   backend\app\models\collaboration.py ^
   backend\app\models\message.py ^
@@ -111,6 +112,7 @@ popd >nul
 if not "%TAR_FRONTEND_STATUS%"=="0" goto :failed
 
 tar -czf "%BACKEND_ARCHIVE%" -C "%BACKEND_DIR%" ^
+  app/models/campaign_chat.py ^
   app/models/campaign_invitation.py ^
   app/models/collaboration.py ^
   app/models/message.py ^

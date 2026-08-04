@@ -256,8 +256,25 @@ class CampaignChatMessage(db.Model):
             sender_data['display_name'] = self.sender.creator_profile.display_name
             sender_data['profile_picture'] = self.sender.creator_profile.profile_picture
         elif self.sender.user_type == 'brand' and hasattr(self.sender, 'brand_profile') and self.sender.brand_profile:
-            sender_data['company_name'] = self.sender.brand_profile.company_name
-            sender_data['logo'] = self.sender.brand_profile.logo
+            company_name = self.sender.brand_profile.company_name
+            logo = self.sender.brand_profile.logo
+
+            # Agency campaign chats must present the client workspace brand to
+            # creators. The parent agency name should remain internal.
+            try:
+                campaign = self.chat.campaign if self.chat else None
+                if campaign and campaign.workspace:
+                    company_name = campaign.workspace.name or company_name
+                    logo = campaign.workspace.logo or logo
+                elif campaign and campaign.brand:
+                    company_name = campaign.brand.company_name or company_name
+                    logo = campaign.brand.logo or logo
+            except Exception:
+                pass
+
+            sender_data['company_name'] = company_name
+            sender_data['display_name'] = company_name
+            sender_data['logo'] = logo
 
         return {
             'id': self.id,

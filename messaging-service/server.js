@@ -377,6 +377,7 @@ io.on('connection', (socket) => {
   });
 
   socket.on('send_campaign_message', async (data) => {
+    let sentToClient = false;
     try {
       const { chatId, content, messageType = 'text', attachments = [] } = data || {};
 
@@ -439,7 +440,7 @@ io.on('connection', (socket) => {
         SELECT u.email, u.user_type,
                CASE
                  WHEN u.user_type = 'brand' THEN bp.company_name
-                 WHEN u.user_type = 'creator' THEN cp.display_name
+                 WHEN u.user_type = 'creator' THEN COALESCE(cp.username, u.email)
                  ELSE NULL
                END as sender_name,
                CASE
@@ -453,14 +454,34 @@ io.on('connection', (socket) => {
         WHERE u.id = $1
       `, [socket.userId]);
 
+      const campaignBrandResult = await pool.query(`
+        SELECT
+          cw.name AS workspace_name,
+          cw.logo AS workspace_logo,
+          bp.company_name AS campaign_brand_name,
+          bp.logo AS campaign_brand_logo
+        FROM campaign_chats cc
+        JOIN campaigns c ON c.id = cc.campaign_id
+        LEFT JOIN client_workspaces cw ON cw.id = c.workspace_id
+        LEFT JOIN brand_profiles bp ON bp.id = c.brand_id
+        WHERE cc.id = $1
+      `, [chatId]);
+
       const sender = senderResult.rows[0] || {};
+      const campaignBrand = campaignBrandResult.rows[0] || {};
+      const displaySenderName = senderType === 'brand'
+        ? (campaignBrand.workspace_name || campaignBrand.campaign_brand_name || sender.sender_name || sender.email)
+        : (sender.sender_name || sender.email);
+      const displaySenderPicture = senderType === 'brand'
+        ? (campaignBrand.workspace_logo || campaignBrand.campaign_brand_logo || sender.sender_picture)
+        : sender.sender_picture;
       const messageData = {
         id: messageId,
         chat_id: chatId,
         sender_id: socket.userId,
         sender_type: senderType,
-        sender_name: sender.sender_name || sender.email,
-        sender_picture: sender.sender_picture,
+        sender_name: displaySenderName,
+        sender_picture: displaySenderPicture,
         message_type: messageType,
         content: content.trim(),
         attachments: attachments || [],
@@ -472,32 +493,39 @@ io.on('connection', (socket) => {
       const roomName = `campaign_chat_${chatId}`;
       io.to(roomName).emit('campaign_message', messageData);
       socket.emit('campaign_message_sent', messageData);
+      sentToClient = true;
 
-      const campaignId = chatResult.rows[0]?.campaign_id;
-      const recipients = await pool.query(`
-        SELECT user_id
-        FROM campaign_chat_participants
-        WHERE chat_id = $1
-          AND user_id <> $2
-          AND left_at IS NULL
-          AND COALESCE(is_muted, false) = false
-      `, [chatId, socket.userId]);
+      try {
+        const campaignId = chatResult.rows[0]?.campaign_id;
+        const recipients = await pool.query(`
+          SELECT user_id
+          FROM campaign_chat_participants
+          WHERE chat_id = $1
+            AND user_id <> $2
+            AND left_at IS NULL
+            AND COALESCE(is_muted, false) = false
+        `, [chatId, socket.userId]);
 
-      recipients.rows.forEach((row) => {
-        const targetSocketId = activeUsers.get(row.user_id.toString());
-        if (targetSocketId) {
-          io.to(targetSocketId).emit('new_notification', {
-            title: `New campaign message from ${messageData.sender_name}`,
-            message: messageData.content.substring(0, 100),
-            type: 'campaign_message',
-            link: campaignId ? `/campaigns/${campaignId}?tab=chat` : undefined,
-            timestamp: new Date().toISOString()
-          });
-        }
-      });
+        recipients.rows.forEach((row) => {
+          const targetSocketId = activeUsers.get(row.user_id.toString());
+          if (targetSocketId) {
+            io.to(targetSocketId).emit('new_notification', {
+              title: `New campaign message from ${messageData.sender_name}`,
+              message: messageData.content.substring(0, 100),
+              type: 'campaign_message',
+              link: campaignId ? `/campaigns/${campaignId}?tab=chat` : undefined,
+              timestamp: new Date().toISOString()
+            });
+          }
+        });
+      } catch (notificationError) {
+        console.error('Error sending campaign message realtime notification:', notificationError);
+      }
     } catch (error) {
       console.error('Error sending campaign message:', error);
-      socket.emit('error', { message: 'Failed to send campaign message' });
+      if (!sentToClient) {
+        socket.emit('error', { message: 'Failed to send campaign message' });
+      }
     }
   });
 

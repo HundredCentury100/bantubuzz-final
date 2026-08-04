@@ -536,6 +536,13 @@ def send_message_notifications(chat, message, sender):
             sender_name = sender.creator_profile.display_name
         elif sender.user_type == 'brand' and hasattr(sender, 'brand_profile') and sender.brand_profile:
             sender_name = sender.brand_profile.company_name
+            try:
+                if chat.campaign and chat.campaign.workspace:
+                    sender_name = chat.campaign.workspace.name or sender_name
+                elif chat.campaign and chat.campaign.brand:
+                    sender_name = chat.campaign.brand.company_name or sender_name
+            except Exception:
+                pass
 
         # Create notifications
         for participant in participants:

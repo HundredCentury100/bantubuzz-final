@@ -63,6 +63,7 @@ wait_for_url() {
 echo "Creating targeted backup at $BACKUP_DIR"
 mkdir -p "$BACKUP_DIR"
 tar --ignore-failed-read -czf "$BACKUP_DIR/backend-files.tar.gz" -C "$BACKEND_ROOT" \
+  app/models/campaign_chat.py \
   app/models/campaign_invitation.py \
   app/models/collaboration.py \
   app/models/message.py \
@@ -94,6 +95,7 @@ tar -xzf "$NODE_ARCHIVE" -C "$MESSAGING_ROOT"
 echo "Compiling backend files"
 cd "$BACKEND_ROOT"
 venv/bin/python -m py_compile \
+  app/models/campaign_chat.py \
   app/models/campaign_invitation.py \
   app/models/collaboration.py \
   app/models/message.py \
