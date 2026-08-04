@@ -116,14 +116,14 @@ def create_one_to_one_chat():
             # Verify collaboration exists using helper function
             collaboration = get_user_collaboration_for_campaign(campaign_id, creator_user_id)
 
-            if not collaboration or collaboration.status != 'active':
+            if not collaboration or collaboration.status in ('cancelled', 'rejected'):
                 return jsonify({'error': 'No active collaboration with this creator'}), 404
 
         elif user.user_type == 'creator':
             # Creator creating chat with brand - verify collaboration using helper function
             collaboration = get_user_collaboration_for_campaign(campaign_id, user_id)
 
-            if not collaboration or collaboration.status != 'active':
+            if not collaboration or collaboration.status in ('cancelled', 'rejected'):
                 return jsonify({'error': 'You are not a collaborator in this campaign'}), 403
 
             brand_user_id = campaign.brand.user_id if campaign.brand else None
@@ -544,13 +544,7 @@ def send_message_notifications(chat, message, sender):
                 type='campaign_message',
                 title=f'New message from {sender_name}',
                 message=f'{sender_name}: {message.content[:50]}{"..." if len(message.content) > 50 else ""}',
-                related_id=chat.id,
-                metadata={
-                    'chat_id': chat.id,
-                    'message_id': message.id,
-                    'campaign_id': chat.campaign_id,
-                    'sender_id': sender.id
-                }
+                action_url=f'/campaigns/{chat.campaign_id}?tab=chat'
             )
             db.session.add(notification)
 

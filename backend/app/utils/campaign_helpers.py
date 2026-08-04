@@ -9,6 +9,7 @@ Data Model Relationships:
 """
 
 from app.models.campaign import Campaign, CampaignProposal
+from app.models.campaign_chat import CampaignChat, CampaignChatParticipant
 from app.models.collaboration import Collaboration
 from app.models.brand_profile import BrandProfile
 from app.models.creator_profile import CreatorProfile
@@ -69,10 +70,28 @@ def get_campaign_collaborations(campaign_id, status=None):
         CampaignProposal.campaign_id == campaign_id
     )
 
+    direct_query = db.session.query(Collaboration).join(
+        CampaignChatParticipant,
+        CampaignChatParticipant.collaboration_id == Collaboration.id
+    ).join(
+        CampaignChat,
+        CampaignChatParticipant.chat_id == CampaignChat.id
+    ).filter(
+        CampaignChat.campaign_id == campaign_id,
+        Collaboration.campaign_application_id.is_(None),
+    )
+
     if status:
         query = query.filter(Collaboration.status == status)
+        direct_query = direct_query.filter(Collaboration.status == status)
 
-    return query.all()
+    collaborations = query.all()
+    seen_ids = {collaboration.id for collaboration in collaborations}
+    for collaboration in direct_query.all():
+        if collaboration.id not in seen_ids:
+            collaborations.append(collaboration)
+            seen_ids.add(collaboration.id)
+    return collaborations
 
 
 def is_user_campaign_collaborator(campaign_id, user_id):
@@ -100,7 +119,26 @@ def is_user_campaign_collaborator(campaign_id, user_id):
         CreatorProfile.user_id == user_id
     ).first()
 
-    return collaboration is not None
+    if collaboration is not None:
+        return True
+
+    direct_collaboration = db.session.query(Collaboration).join(
+        CreatorProfile,
+        Collaboration.creator_id == CreatorProfile.id
+    ).join(
+        CampaignChatParticipant,
+        CampaignChatParticipant.collaboration_id == Collaboration.id
+    ).join(
+        CampaignChat,
+        CampaignChatParticipant.chat_id == CampaignChat.id
+    ).filter(
+        CampaignChat.campaign_id == campaign_id,
+        CreatorProfile.user_id == user_id,
+        CampaignChatParticipant.user_id == user_id,
+        CampaignChatParticipant.left_at.is_(None),
+    ).first()
+
+    return direct_collaboration is not None
 
 
 def get_collaboration_campaign_id(collaboration):
@@ -118,6 +156,12 @@ def get_collaboration_campaign_id(collaboration):
 
     if collaboration.campaign_application:
         return collaboration.campaign_application.campaign_id
+
+    chat_participation = CampaignChatParticipant.query.filter_by(
+        collaboration_id=collaboration.id
+    ).first()
+    if chat_participation and chat_participation.chat:
+        return chat_participation.chat.campaign_id
 
     return None
 
@@ -166,7 +210,24 @@ def get_user_collaboration_for_campaign(campaign_id, user_id):
         CreatorProfile.user_id == user_id
     ).first()
 
-    return collaboration
+    if collaboration:
+        return collaboration
+
+    return db.session.query(Collaboration).join(
+        CreatorProfile,
+        Collaboration.creator_id == CreatorProfile.id
+    ).join(
+        CampaignChatParticipant,
+        CampaignChatParticipant.collaboration_id == Collaboration.id
+    ).join(
+        CampaignChat,
+        CampaignChatParticipant.chat_id == CampaignChat.id
+    ).filter(
+        CampaignChat.campaign_id == campaign_id,
+        CreatorProfile.user_id == user_id,
+        CampaignChatParticipant.user_id == user_id,
+        CampaignChatParticipant.left_at.is_(None),
+    ).first()
 
 
 def get_campaign_collaborator_user_ids(campaign_id, status=None):
@@ -193,7 +254,28 @@ def get_campaign_collaborator_user_ids(campaign_id, status=None):
     if status:
         query = query.filter(Collaboration.status == status)
 
-    return [user_id for (user_id,) in query.all()]
+    user_ids = {user_id for (user_id,) in query.all()}
+
+    direct_query = db.session.query(CreatorProfile.user_id).join(
+        Collaboration,
+        CreatorProfile.id == Collaboration.creator_id
+    ).join(
+        CampaignChatParticipant,
+        CampaignChatParticipant.collaboration_id == Collaboration.id
+    ).join(
+        CampaignChat,
+        CampaignChatParticipant.chat_id == CampaignChat.id
+    ).filter(
+        CampaignChat.campaign_id == campaign_id,
+        CampaignChatParticipant.role == "creator",
+        CampaignChatParticipant.left_at.is_(None),
+    )
+
+    if status:
+        direct_query = direct_query.filter(Collaboration.status == status)
+
+    user_ids.update(user_id for (user_id,) in direct_query.all())
+    return list(user_ids)
 
 
 def get_brand_user_campaigns(user_id):

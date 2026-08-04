@@ -69,10 +69,12 @@ tar --ignore-failed-read -czf "$BACKUP_DIR/backend-files.tar.gz" -C "$BACKEND_RO
   app/routes/admin/collaborations.py \
   app/routes/bookings.py \
   app/routes/campaign_cart.py \
+  app/routes/campaign_chats.py \
   app/routes/campaign_invitations.py \
   app/routes/messages.py \
   app/services/campaign_cart_payment_service.py \
   app/services/payment_service.py \
+  app/utils/campaign_helpers.py \
   migrations/versions/202607291000_add_workspace_id_to_messages.py \
   2>/dev/null || true
 if [ -d "$MESSAGING_ROOT" ]; then
@@ -98,10 +100,12 @@ venv/bin/python -m py_compile \
   app/routes/admin/collaborations.py \
   app/routes/bookings.py \
   app/routes/campaign_cart.py \
+  app/routes/campaign_chats.py \
   app/routes/campaign_invitations.py \
   app/routes/messages.py \
   app/services/campaign_cart_payment_service.py \
   app/services/payment_service.py \
+  app/utils/campaign_helpers.py \
   migrations/versions/202607291000_add_workspace_id_to_messages.py
 
 echo "Checking messaging service"
@@ -214,6 +218,102 @@ with app.app_context():
     db.session.commit()
     print(f"no_review_collaborations_repaired={stats['repaired']}")
     print(f"no_review_url_placeholders_created={stats['placeholders']}")
+PY
+
+echo "Repairing campaign chat participants for existing campaign collaborations"
+venv/bin/python - <<'PY'
+from app import create_app, db
+from app.models import Campaign, CampaignChat, CampaignChatParticipant, Collaboration, CreatorProfile
+from app.models.campaign_cart import CampaignCartItem
+from app.models.campaign_invitation import CampaignInvitation
+from sqlalchemy import distinct, func
+
+
+def ensure_chat(campaign, collaboration, brand_user_id, creator_user_id):
+    if not campaign or not collaboration or not brand_user_id or not creator_user_id:
+        return False
+
+    existing_chat_id = (
+        db.session.query(CampaignChatParticipant.chat_id)
+        .join(CampaignChat, CampaignChatParticipant.chat_id == CampaignChat.id)
+        .filter(
+            CampaignChat.campaign_id == campaign.id,
+            CampaignChat.chat_type == "one_to_one",
+            CampaignChat.is_active == True,
+            CampaignChatParticipant.user_id.in_([brand_user_id, creator_user_id]),
+            CampaignChatParticipant.left_at.is_(None),
+        )
+        .group_by(CampaignChatParticipant.chat_id)
+        .having(func.count(distinct(CampaignChatParticipant.user_id)) == 2)
+        .first()
+    )
+
+    if existing_chat_id:
+        participant = CampaignChatParticipant.query.filter_by(
+            chat_id=existing_chat_id[0],
+            user_id=creator_user_id,
+        ).first()
+        if participant and not participant.collaboration_id:
+            participant.collaboration_id = collaboration.id
+            return True
+        return False
+
+    title = collaboration.creator.display_name or collaboration.creator.username or "Creator Chat"
+    chat = CampaignChat(
+        campaign_id=campaign.id,
+        chat_type="one_to_one",
+        title=title,
+        is_active=True,
+        chat_metadata={
+            "brand_user_id": brand_user_id,
+            "creator_user_id": creator_user_id,
+            "collaboration_id": collaboration.id,
+            "created_from": "deployment_repair",
+        },
+    )
+    db.session.add(chat)
+    db.session.flush()
+    db.session.add(CampaignChatParticipant(chat_id=chat.id, user_id=brand_user_id, role="brand"))
+    db.session.add(CampaignChatParticipant(
+        chat_id=chat.id,
+        user_id=creator_user_id,
+        role="creator",
+        collaboration_id=collaboration.id,
+    ))
+    return True
+
+
+app = create_app()
+with app.app_context():
+    repaired = 0
+    linked = 0
+    items = (
+        db.session.query(CampaignCartItem)
+        .filter(CampaignCartItem.collaboration_id.isnot(None))
+        .all()
+    )
+    for item in items:
+        collaboration = Collaboration.query.get(item.collaboration_id)
+        campaign = Campaign.query.get(item.campaign_id)
+        brand_user_id = item.brand.user_id if item.brand else None
+        creator_user_id = item.creator.user_id if item.creator else None
+        if ensure_chat(campaign, collaboration, brand_user_id, creator_user_id):
+            repaired += 1
+
+    invitations = CampaignInvitation.query.filter(
+        CampaignInvitation.collaboration_id.isnot(None)
+    ).all()
+    for invitation in invitations:
+        collaboration = Collaboration.query.get(invitation.collaboration_id)
+        campaign = Campaign.query.get(invitation.campaign_id)
+        creator = CreatorProfile.query.get(invitation.creator_id)
+        creator_user_id = creator.user_id if creator else None
+        if ensure_chat(campaign, collaboration, invitation.invited_by_user_id, creator_user_id):
+            linked += 1
+
+    db.session.commit()
+    print(f"campaign_cart_chats_repaired={repaired}")
+    print(f"campaign_invitation_chats_repaired={linked}")
 PY
 
 echo "Installing frontend build at Apache document root"

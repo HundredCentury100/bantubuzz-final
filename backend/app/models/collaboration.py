@@ -200,6 +200,14 @@ class Collaboration(db.Model):
                 data['creator'] = self.creator.to_dict(include_user=True)
             if self.campaign_application:
                 data['campaign_application'] = self.campaign_application.to_dict(include_relations=True)
+                data['campaign_id'] = self.campaign_application.campaign_id
+            elif self.collaboration_type == 'campaign':
+                from app.models.campaign_chat import CampaignChatParticipant
+                chat_participation = CampaignChatParticipant.query.filter_by(
+                    collaboration_id=self.id
+                ).first()
+                if chat_participation and chat_participation.chat:
+                    data['campaign_id'] = chat_participation.chat.campaign_id
             if self.booking:
                 data['booking'] = self.booking.to_dict(include_relations=True)
 

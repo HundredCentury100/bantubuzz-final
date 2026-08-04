@@ -340,6 +340,195 @@ io.on('connection', (socket) => {
     }
   });
 
+  socket.on('join_campaign_chat', async (data) => {
+    try {
+      const { chatId } = data;
+
+      if (!socket.userId || !chatId) {
+        socket.emit('error', { message: 'Not authenticated or missing chat' });
+        return;
+      }
+
+      const participant = await pool.query(
+        'SELECT id FROM campaign_chat_participants WHERE chat_id = $1 AND user_id = $2 AND left_at IS NULL',
+        [chatId, socket.userId]
+      );
+
+      if (participant.rows.length === 0) {
+        socket.emit('error', { message: 'Not authorized to join this campaign chat' });
+        return;
+      }
+
+      const roomName = `campaign_chat_${chatId}`;
+      socket.join(roomName);
+      socket.emit('joined_campaign_chat', { chatId, roomName });
+    } catch (error) {
+      console.error('Error joining campaign chat:', error);
+      socket.emit('error', { message: 'Failed to join campaign chat' });
+    }
+  });
+
+  socket.on('leave_campaign_chat', (data) => {
+    const { chatId } = data || {};
+    if (chatId) {
+      socket.leave(`campaign_chat_${chatId}`);
+      socket.emit('left_campaign_chat', { chatId });
+    }
+  });
+
+  socket.on('send_campaign_message', async (data) => {
+    try {
+      const { chatId, content, messageType = 'text', attachments = [] } = data || {};
+
+      if (!socket.userId) {
+        socket.emit('error', { message: 'Not authenticated' });
+        return;
+      }
+
+      if (!chatId || !content || !content.trim()) {
+        socket.emit('error', { message: 'Message content is required' });
+        return;
+      }
+
+      const participantResult = await pool.query(`
+        SELECT ccp.*, u.user_type
+        FROM campaign_chat_participants ccp
+        JOIN users u ON u.id = ccp.user_id
+        WHERE ccp.chat_id = $1 AND ccp.user_id = $2 AND ccp.left_at IS NULL
+      `, [chatId, socket.userId]);
+
+      if (participantResult.rows.length === 0) {
+        socket.emit('error', { message: 'Not authorized to send messages in this campaign chat' });
+        return;
+      }
+
+      const senderType = participantResult.rows[0].user_type;
+      const insertResult = await pool.query(`
+        INSERT INTO campaign_chat_messages
+          (chat_id, sender_id, sender_type, message_type, content, attachments, created_at)
+        VALUES ($1, $2, $3, $4, $5, $6::jsonb, NOW())
+        RETURNING id, created_at
+      `, [
+        chatId,
+        socket.userId,
+        senderType,
+        messageType,
+        content.trim(),
+        JSON.stringify(attachments || [])
+      ]);
+
+      const messageId = insertResult.rows[0].id;
+      const createdAt = insertResult.rows[0].created_at;
+
+      const chatResult = await pool.query(`
+        UPDATE campaign_chats
+        SET last_message_at = NOW(),
+            last_message_preview = $1,
+            updated_at = NOW()
+        WHERE id = $2
+        RETURNING campaign_id
+      `, [content.trim().substring(0, 100), chatId]);
+
+      await pool.query(`
+        UPDATE campaign_chat_participants
+        SET unread_count = COALESCE(unread_count, 0) + 1
+        WHERE chat_id = $1 AND user_id <> $2 AND left_at IS NULL AND COALESCE(is_muted, false) = false
+      `, [chatId, socket.userId]);
+
+      const senderResult = await pool.query(`
+        SELECT u.email, u.user_type,
+               CASE
+                 WHEN u.user_type = 'brand' THEN bp.company_name
+                 WHEN u.user_type = 'creator' THEN cp.display_name
+                 ELSE NULL
+               END as sender_name,
+               CASE
+                 WHEN u.user_type = 'brand' THEN bp.logo
+                 WHEN u.user_type = 'creator' THEN cp.profile_picture
+                 ELSE NULL
+               END as sender_picture
+        FROM users u
+        LEFT JOIN brand_profiles bp ON bp.user_id = u.id AND u.user_type = 'brand'
+        LEFT JOIN creator_profiles cp ON cp.user_id = u.id AND u.user_type = 'creator'
+        WHERE u.id = $1
+      `, [socket.userId]);
+
+      const sender = senderResult.rows[0] || {};
+      const messageData = {
+        id: messageId,
+        chat_id: chatId,
+        sender_id: socket.userId,
+        sender_type: senderType,
+        sender_name: sender.sender_name || sender.email,
+        sender_picture: sender.sender_picture,
+        message_type: messageType,
+        content: content.trim(),
+        attachments: attachments || [],
+        created_at: createdAt,
+        is_edited: false,
+        is_deleted: false
+      };
+
+      const roomName = `campaign_chat_${chatId}`;
+      io.to(roomName).emit('campaign_message', messageData);
+      socket.emit('campaign_message_sent', messageData);
+
+      const campaignId = chatResult.rows[0]?.campaign_id;
+      const recipients = await pool.query(`
+        SELECT user_id
+        FROM campaign_chat_participants
+        WHERE chat_id = $1
+          AND user_id <> $2
+          AND left_at IS NULL
+          AND COALESCE(is_muted, false) = false
+      `, [chatId, socket.userId]);
+
+      recipients.rows.forEach((row) => {
+        const targetSocketId = activeUsers.get(row.user_id.toString());
+        if (targetSocketId) {
+          io.to(targetSocketId).emit('new_notification', {
+            title: `New campaign message from ${messageData.sender_name}`,
+            message: messageData.content.substring(0, 100),
+            type: 'campaign_message',
+            link: campaignId ? `/campaigns/${campaignId}?tab=chat` : undefined,
+            timestamp: new Date().toISOString()
+          });
+        }
+      });
+    } catch (error) {
+      console.error('Error sending campaign message:', error);
+      socket.emit('error', { message: 'Failed to send campaign message' });
+    }
+  });
+
+  socket.on('mark_campaign_chat_read', async (data) => {
+    try {
+      const { chatId } = data || {};
+      if (!socket.userId || !chatId) return;
+
+      await pool.query(`
+        UPDATE campaign_chat_participants
+        SET last_read_at = NOW(), unread_count = 0
+        WHERE chat_id = $1 AND user_id = $2
+      `, [chatId, socket.userId]);
+
+      socket.emit('campaign_chat_marked_read', { chatId });
+    } catch (error) {
+      console.error('Error marking campaign chat as read:', error);
+    }
+  });
+
+  socket.on('campaign_chat_typing', (data) => {
+    const { chatId, isTyping } = data || {};
+    if (!socket.userId || !chatId) return;
+
+    socket.to(`campaign_chat_${chatId}`).emit('campaign_chat_user_typing', {
+      chatId,
+      userId: socket.userId,
+      isTyping
+    });
+  });
+
   // Handle real-time notifications
   socket.on('send_notification', (notification) => {
     const { userId, title, message, type, link } = notification;

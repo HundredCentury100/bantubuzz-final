@@ -7,6 +7,8 @@ from app.models import (
     CampaignCartItem,
     CampaignPayment,
     CampaignPaymentItem,
+    CampaignChat,
+    CampaignChatParticipant,
     Collaboration,
     CreatorProfile,
     Payment,
@@ -18,6 +20,7 @@ from app.services.email_service import EmailService, send_email
 from app.utils.notifications import create_notification
 from app.utils.subscription_helper import get_brand_service_fee_percentage
 from app.utils.bank_details import get_bank_transfer_details
+from sqlalchemy import distinct, func
 
 
 def money(value):
@@ -182,6 +185,71 @@ Open it here: https://bantubuzz.com/creator/collaborations/{collaboration.id}
         print(f"Failed to send campaign collaboration activation email: {error}")
 
 
+def _ensure_campaign_chat(campaign, collaboration, brand_user_id, creator_user_id):
+    if not campaign or not collaboration or not brand_user_id or not creator_user_id:
+        return None
+
+    existing_chat_id = (
+        db.session.query(CampaignChatParticipant.chat_id)
+        .join(CampaignChat, CampaignChatParticipant.chat_id == CampaignChat.id)
+        .filter(
+            CampaignChat.campaign_id == campaign.id,
+            CampaignChat.chat_type == "one_to_one",
+            CampaignChat.is_active == True,
+            CampaignChatParticipant.user_id.in_([brand_user_id, creator_user_id]),
+            CampaignChatParticipant.left_at.is_(None),
+        )
+        .group_by(CampaignChatParticipant.chat_id)
+        .having(func.count(distinct(CampaignChatParticipant.user_id)) == 2)
+        .first()
+    )
+
+    if existing_chat_id:
+        chat = CampaignChat.query.get(existing_chat_id[0])
+        creator_participant = CampaignChatParticipant.query.filter_by(
+            chat_id=chat.id,
+            user_id=creator_user_id,
+        ).first()
+        if creator_participant and not creator_participant.collaboration_id:
+            creator_participant.collaboration_id = collaboration.id
+        return chat
+
+    creator_name = None
+    if collaboration.creator:
+        creator_name = (
+            getattr(collaboration.creator, "display_name", None)
+            or getattr(collaboration.creator, "username", None)
+        )
+
+    chat = CampaignChat(
+        campaign_id=campaign.id,
+        chat_type="one_to_one",
+        title=creator_name or "Creator Chat",
+        is_active=True,
+        chat_metadata={
+            "brand_user_id": brand_user_id,
+            "creator_user_id": creator_user_id,
+            "collaboration_id": collaboration.id,
+            "created_from": "campaign_cart_payment",
+        },
+    )
+    db.session.add(chat)
+    db.session.flush()
+
+    db.session.add(CampaignChatParticipant(
+        chat_id=chat.id,
+        user_id=brand_user_id,
+        role="brand",
+    ))
+    db.session.add(CampaignChatParticipant(
+        chat_id=chat.id,
+        user_id=creator_user_id,
+        role="creator",
+        collaboration_id=collaboration.id,
+    ))
+    return chat
+
+
 def complete_campaign_cart_payment(payment, payment_reference=None, payment_method=None):
     if payment.status == "completed":
         return []
@@ -285,6 +353,8 @@ def complete_campaign_cart_payment(payment, payment_reference=None, payment_meth
         ))
 
         created_collaborations.append(collaboration)
+        if creator_user_id:
+            _ensure_campaign_chat(campaign, collaboration, payment.brand_user_id, creator_user_id)
         _notify_creator(collaboration, campaign)
 
     payment.status = "completed"

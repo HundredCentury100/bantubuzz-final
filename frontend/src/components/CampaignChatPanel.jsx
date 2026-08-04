@@ -20,7 +20,11 @@ const CampaignChatPanel = ({ campaign, userType, onChatSelect, selectedChatId })
     try {
       setLoading(true);
       const response = await campaignChatsAPI.getCampaignChats(campaign.id);
-      setChats(response.data.chats || []);
+      const fetchedChats = response.data.chats || [];
+      setChats(fetchedChats);
+      if (!selectedChatId && fetchedChats.length === 1) {
+        onChatSelect(fetchedChats[0]);
+      }
     } catch (error) {
       console.error('Failed to fetch chats:', error);
       toast.error('Failed to load chats');

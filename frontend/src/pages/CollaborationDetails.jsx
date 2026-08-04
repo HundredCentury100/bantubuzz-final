@@ -11,6 +11,8 @@ import PostMetricsDisplay from '../components/PostMetricsDisplay';
 import CollaborationAnalytics from '../components/CollaborationAnalytics';
 import MarkCompleteButton from '../components/MarkCompleteButton';
 import PortfolioFormModal from '../components/PortfolioFormModal';
+import CampaignChatPanel from '../components/CampaignChatPanel';
+import CampaignChatWindow from '../components/CampaignChatWindow';
 import toast from 'react-hot-toast';
 
 const getDeliveryTiming = (dateValue) => {
@@ -83,6 +85,7 @@ const CollaborationDetails = () => {
 
   // Success Story modal state
   const [showSuccessStoryModal, setShowSuccessStoryModal] = useState(false);
+  const [selectedCampaignChat, setSelectedCampaignChat] = useState(null);
 
   const { socket } = useMessaging();
   const [editingDeliverable, setEditingDeliverable] = useState(null);
@@ -487,6 +490,9 @@ const CollaborationDetails = () => {
   const totalUniqueDeliverables = draftsWithoutRevisions + totalApproved;
   const canSubmitNewDeliverable = totalUniqueDeliverables < expectedDeliverablesCount;
   const missingExpectedDeliverables = totalExpected === 0;
+  const campaignChatContext = collaboration.campaign_id
+    ? { id: collaboration.campaign_id, title: collaboration.title, collaborations: [] }
+    : null;
   const normalizeDeliverableKey = (value) =>
     String(value || '')
       .toLowerCase()
@@ -1241,6 +1247,39 @@ const CollaborationDetails = () => {
                       </div>
                     );
                   })}
+                </div>
+              </div>
+            )}
+
+            {/* Campaign Chat */}
+            {campaignChatContext && (
+              <div className="bg-white rounded-lg shadow p-6">
+                <div className="mb-4">
+                  <h2 className="text-xl font-bold text-gray-900">Campaign Messages</h2>
+                  <p className="text-sm text-gray-600">
+                    Keep campaign-specific communication with this brand and creator team in one place.
+                  </p>
+                </div>
+                <div className="grid lg:grid-cols-3 gap-4 h-[520px]">
+                  <div className="lg:col-span-1 min-h-0">
+                    <CampaignChatPanel
+                      campaign={campaignChatContext}
+                      userType={isBrand ? 'brand' : 'creator'}
+                      onChatSelect={setSelectedCampaignChat}
+                      selectedChatId={selectedCampaignChat?.id}
+                    />
+                  </div>
+                  <div className="lg:col-span-2 min-h-0">
+                    <CampaignChatWindow
+                      chat={selectedCampaignChat}
+                      onChatUpdate={() => {
+                        if (selectedCampaignChat) {
+                          setSelectedCampaignChat({ ...selectedCampaignChat });
+                        }
+                      }}
+                      onClose={() => setSelectedCampaignChat(null)}
+                    />
+                  </div>
                 </div>
               </div>
             )}
