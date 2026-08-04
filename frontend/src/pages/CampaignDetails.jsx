@@ -874,9 +874,9 @@ const CampaignDetails = () => {
 
         {/* Chat Tab */}
         {activeTab === 'chat' && (
-          <div className="grid lg:grid-cols-3 gap-6 h-[700px]">
+          <div className="grid lg:grid-cols-3 gap-6 min-h-[620px] h-[calc(100vh-220px)] max-h-[780px] mb-12">
             {/* Chat List Panel */}
-            <div className="lg:col-span-1">
+            <div className="lg:col-span-1 min-h-0">
               <CampaignChatPanel
                 campaign={campaign}
                 userType={currentUser?.user_type}
@@ -886,7 +886,7 @@ const CampaignDetails = () => {
             </div>
 
             {/* Chat Window */}
-            <div className="lg:col-span-2">
+            <div className="lg:col-span-2 min-h-0">
               <CampaignChatWindow
                 chat={selectedChat}
                 currentUserId={currentUser?.id}

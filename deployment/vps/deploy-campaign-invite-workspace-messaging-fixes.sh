@@ -117,6 +117,25 @@ else
 fi
 node --check server.js
 
+echo "Ensuring messaging service listens on the Apache-proxied port"
+mkdir -p /etc/bantubuzz
+python3 - <<'PY'
+from pathlib import Path
+
+path = Path("/etc/bantubuzz/messaging.env")
+text = path.read_text() if path.exists() else ""
+lines = text.splitlines()
+updated = False
+for index, line in enumerate(lines):
+    if line.startswith("PORT="):
+        lines[index] = "PORT=3002"
+        updated = True
+        break
+if not updated:
+    lines.append("PORT=3002")
+path.write_text("\n".join(lines).rstrip() + "\n")
+PY
+
 echo "Running database migration without data loss"
 cd "$BACKEND_ROOT"
 if [ -s /etc/bantubuzz/platform.env ]; then
@@ -323,6 +342,7 @@ fi
 
 if systemctl list-unit-files | grep -q '^bantubuzz-messaging\.service'; then
   pkill -f '/var/www/bantubuzz/messaging-service/server.js|messaging-service/server.js|node server.js' || true
+  systemctl daemon-reload
   systemctl restart bantubuzz-messaging.service
 else
   pkill -f '/var/www/bantubuzz/messaging-service/server.js|messaging-service/server.js|node server.js' || true
@@ -330,7 +350,57 @@ else
   nohup node server.js >/var/log/bantubuzz-messaging.log 2>&1 &
 fi
 
-systemctl reload apache2
+echo "Ensuring Apache Socket.IO proxy is aligned with messaging service"
+a2enmod proxy proxy_http proxy_wstunnel rewrite headers >/dev/null
+python3 - <<'PY'
+from pathlib import Path
+
+rewrite_block = """    # Socket.IO websocket upgrades must use ws://; polling remains on the normal ProxyPass.
+    RewriteEngine On
+    RewriteCond %{HTTP:Upgrade} =websocket [NC]
+    RewriteRule ^/socket\\.io/?(.*) ws://127.0.0.1:3002/socket.io/$1 [P,L]
+
+"""
+
+socket_proxy = """    ProxyPass /socket.io http://127.0.0.1:3002/socket.io
+    ProxyPassReverse /socket.io http://127.0.0.1:3002/socket.io
+    ProxyPass /messaging/api http://127.0.0.1:3002/api
+    ProxyPassReverse /messaging/api http://127.0.0.1:3002/api
+"""
+
+for path in [
+    Path("/etc/apache2/sites-available/bantubuzz-platform.conf"),
+    Path("/etc/apache2/sites-enabled/bantubuzz-platform.conf"),
+]:
+    if not path.exists():
+        continue
+
+    text = path.read_text()
+    if "ws://127.0.0.1:3002/socket.io" not in text:
+        marker = "    ProxyTimeout 120\n\n"
+        if marker in text:
+            text = text.replace(marker, marker + rewrite_block, 1)
+        else:
+            text = text.replace("    ProxyPreserveHost On\n", "    ProxyPreserveHost On\n" + rewrite_block, 1)
+
+    lines = []
+    skipping_socket_block = False
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith("ProxyPass /socket.io") or stripped.startswith("ProxyPassReverse /socket.io"):
+            continue
+        if stripped.startswith("ProxyPass /messaging/api") or stripped.startswith("ProxyPassReverse /messaging/api"):
+            continue
+        lines.append(line)
+    text = "\n".join(lines) + "\n"
+
+    api_marker = "    ProxyPassReverse /api http://127.0.0.1:8002/api\n"
+    if socket_proxy not in text:
+        text = text.replace(api_marker, api_marker + socket_proxy, 1)
+    path.write_text(text)
+PY
+apache2ctl configtest
+systemctl restart apache2
 sleep 3
 
 if systemctl list-unit-files | grep -q '^bantubuzz-backend\.service'; then
@@ -350,16 +420,10 @@ if systemctl list-unit-files | grep -q '^bantubuzz-messaging\.service'; then
     MESSAGING_PORT="$service_port"
   fi
 fi
-if ! wait_for_url "http://127.0.0.1:${MESSAGING_PORT}/health" "Messaging health"; then
-  if [ "$MESSAGING_PORT" != "3002" ]; then
-    wait_for_url http://127.0.0.1:3002/health "Messaging health on legacy port"
-  else
-    wait_for_url http://127.0.0.1:3001/health "Messaging health on default port"
-  fi
-fi
+wait_for_url http://127.0.0.1:3002/health "Messaging health"
 
 echo "Socket.IO public polling smoke test:"
-curl -L -sS --max-time 20 'https://bantubuzz.com/socket.io/?EIO=4&transport=polling' | head -c 160
+curl -fsSL --max-time 20 'https://bantubuzz.com/socket.io/?EIO=4&transport=polling' | head -c 160
 echo
 
 echo "Campaign invite endpoint files installed and messages workspace migration applied."
