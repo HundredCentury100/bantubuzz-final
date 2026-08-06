@@ -1088,6 +1088,7 @@ const CollaborationDetails = () => {
                               collaborationId={parseInt(id)}
                               deliverableId={deliverable.id}
                               deliverable={deliverable}
+                              defaultPlatform={getDeliverablePlatform(deliverable.title || deliverable.platform || deliverable.post_platform)}
                               onSuccess={(updatedDeliverable) => {
                                 fetchCollaboration();
                               }}
@@ -1231,6 +1232,7 @@ const CollaborationDetails = () => {
                                 collaborationId={parseInt(id)}
                                 deliverableId={submittedPost.id}
                                 deliverable={submittedPost}
+                                defaultPlatform={getDeliverablePlatform(deliverableName || submittedPost.title || submittedPost.platform || submittedPost.post_platform)}
                                 onSuccess={() => fetchCollaboration()}
                               />
                             ) : (

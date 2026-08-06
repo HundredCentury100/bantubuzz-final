@@ -87,6 +87,7 @@ tar --ignore-failed-read -czf "$BACKUP_DIR/backend-files.tar.gz" -C "$BACKEND_RO
   app/services/product_notifications.py \
   app/services/wallet_service.py \
   app/utils/campaign_helpers.py \
+  app/utils/post_url_parser.py \
   migrations/versions/202607291000_add_workspace_id_to_messages.py \
   2>/dev/null || true
 if [ -d "$MESSAGING_ROOT" ]; then
@@ -130,6 +131,7 @@ venv/bin/python -m py_compile \
   app/services/product_notifications.py \
   app/services/wallet_service.py \
   app/utils/campaign_helpers.py \
+  app/utils/post_url_parser.py \
   migrations/versions/202607291000_add_workspace_id_to_messages.py
 
 echo "Checking messaging service"

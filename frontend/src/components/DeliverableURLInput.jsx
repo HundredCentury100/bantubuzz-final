@@ -20,6 +20,17 @@ const normalizePlatformValue = (platform) => {
   return String(platform);
 };
 
+const normalizePlatformKey = (platform) => {
+  const value = normalizePlatformValue(platform).trim().toLowerCase();
+  if (['x', 'twitter/x'].includes(value)) return 'twitter';
+  if (value.includes('instagram')) return 'instagram';
+  if (value.includes('tiktok') || value.includes('tik tok')) return 'tiktok';
+  if (value.includes('youtube') || value.includes('you tube')) return 'youtube';
+  if (value.includes('facebook')) return 'facebook';
+  if (value.includes('twitter')) return 'twitter';
+  return value;
+};
+
 /**
  * DeliverableURLInput Component
  *
@@ -40,10 +51,13 @@ const DeliverableURLInput = ({
   milestoneId, // Optional - only for milestone-based collaborations (briefs/campaigns)
   deliverableId,
   deliverable,
+  defaultPlatform,
   onSuccess
 }) => {
   const [postUrl, setPostUrl] = useState(deliverable?.post_url || '');
-  const [selectedPlatform, setSelectedPlatform] = useState(normalizePlatformValue(deliverable?.post_platform));
+  const [selectedPlatform, setSelectedPlatform] = useState(
+    normalizePlatformKey(deliverable?.post_platform || deliverable?.platform || defaultPlatform)
+  );
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [showInput, setShowInput] = useState(!deliverable?.post_url_validated);
@@ -78,10 +92,10 @@ const DeliverableURLInput = ({
     }
 
     const patterns = [
-      { platform: 'instagram', pattern: /instagram\.com\/(p|reel|tv)\//i },
-      { platform: 'facebook', pattern: /(facebook\.com\/(.*\/)?(posts|photo\.php|permalink\.php|watch)|fb\.watch\/)/i },
-      { platform: 'youtube', pattern: /(youtube\.com\/watch|youtu\.be\/|youtube\.com\/shorts)/i },
-      { platform: 'tiktok', pattern: /(tiktok\.com\/@.*\/video\/|vm\.tiktok\.com\/)/i },
+      { platform: 'instagram', pattern: /(?:www\.)?instagram\.com\/(p|reel|tv)\//i },
+      { platform: 'facebook', pattern: /((?:www\.|m\.)?facebook\.com\/(.*\/)?(posts|photo\.php|permalink\.php|watch|reel)|fb\.watch\/)/i },
+      { platform: 'youtube', pattern: /((?:www\.|m\.)?youtube\.com\/watch|youtu\.be\/|(?:www\.|m\.)?youtube\.com\/shorts)/i },
+      { platform: 'tiktok', pattern: /((?:www\.|m\.)?tiktok\.com\/@.*\/video\/|(?:vm|vt)\.tiktok\.com\/|(?:www\.)?tiktok\.com\/t\/)/i },
       { platform: 'twitter', pattern: /(twitter\.com|x\.com)\/.*\/status\//i }
     ];
 

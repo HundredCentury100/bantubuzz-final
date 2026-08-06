@@ -97,6 +97,7 @@ if exist "%BACKEND_DIR%\venv\Scripts\python.exe" set "PYTHON_EXE=%BACKEND_DIR%\v
   backend\app\services\product_notifications.py ^
   backend\app\services\wallet_service.py ^
   backend\app\utils\campaign_helpers.py ^
+  backend\app\utils\post_url_parser.py ^
   backend\migrations\versions\202607291000_add_workspace_id_to_messages.py >> "%REPORT%" 2>&1
 if errorlevel 1 (
   popd >nul
@@ -147,6 +148,7 @@ tar -czf "%BACKEND_ARCHIVE%" -C "%BACKEND_DIR%" ^
   app/services/product_notifications.py ^
   app/services/wallet_service.py ^
   app/utils/campaign_helpers.py ^
+  app/utils/post_url_parser.py ^
   migrations/versions/202607291000_add_workspace_id_to_messages.py >> "%REPORT%" 2>&1
 if errorlevel 1 goto :failed
 

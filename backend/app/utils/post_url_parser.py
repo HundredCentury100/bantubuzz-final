@@ -37,7 +37,8 @@ class PostURLParser:
         ],
         'tiktok': [
             r'tiktok\.com/@[^/]+/video/([0-9]+)',           # Video
-            r'vm\.tiktok\.com/([A-Za-z0-9_-]+)',            # Shortened URL (includes hyphens and underscores)
+            r'(?:vm|vt)\.tiktok\.com/([A-Za-z0-9_-]+)',     # Shortened URL (includes hyphens and underscores)
+            r'tiktok\.com/t/([A-Za-z0-9_-]+)',              # Web short URL
         ],
         'twitter': [
             r'twitter\.com/[^/]+/status/([0-9]+)',          # Tweet (twitter.com)
@@ -48,10 +49,11 @@ class PostURLParser:
     @staticmethod
     def _resolve_tiktok_short_url(url: str) -> Optional[str]:
         """
-        Resolve TikTok shortened URL (vm.tiktok.com) to get the actual numeric video ID
+        Resolve TikTok shortened URL (vm.tiktok.com, vt.tiktok.com, or
+        tiktok.com/t/...) to get the actual numeric video ID
 
         Args:
-            url: TikTok shortened URL (e.g., https://vm.tiktok.com/ZS9LeUqy1MUgm-ihnDJ/)
+            url: TikTok shortened URL (e.g., https://vt.tiktok.com/ZS45ExBr/)
 
         Returns:
             Numeric video ID (e.g., '7493878653856533790') or None if resolution fails
@@ -224,7 +226,9 @@ class PostURLParser:
         url = url.strip()
 
         # Special handling for TikTok shortened URLs - resolve to get numeric ID
-        if 'vm.tiktok.com' in url.lower():
+        normalized_url = url.lower()
+
+        if any(host in normalized_url for host in ('vm.tiktok.com', 'vt.tiktok.com', 'tiktok.com/t/')):
             numeric_id = PostURLParser._resolve_tiktok_short_url(url)
             if numeric_id:
                 return {
