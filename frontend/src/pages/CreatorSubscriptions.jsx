@@ -48,10 +48,15 @@ export default function CreatorSubscriptions() {
         api.get('/wallet/balance'),
       ]);
       if (profileRes.status === 'fulfilled') {
-        setCreatorProfile(profileRes.value.data.creator || profileRes.value.data);
+        setCreatorProfile(
+          profileRes.value.data.creator
+          || profileRes.value.data.creator_profile
+          || profileRes.value.data.profile
+          || profileRes.value.data
+        );
       }
       if (walletRes.status === 'fulfilled') {
-        setWalletBalance(walletRes.value.data.wallet);
+        setWalletBalance(walletRes.value.data.wallet || walletRes.value.data);
       }
     } catch (error) {
       console.error('Error fetching subscription data:', error);
@@ -126,10 +131,12 @@ export default function CreatorSubscriptions() {
               subscription_id: res.data.data.subscription_id,
               redirect_url: res.data.data.redirect_url,
               poll_url: res.data.data.poll_url,
-              payment_reference: res.data.data.payment_reference
+              payment_reference: res.data.data.payment_reference,
+              amount_due: res.data.data.amount_due,
             },
             plan: plan,
-            billingCycle: billingCycle
+            billingCycle: billingCycle,
+            amountDue: res.data.data.amount_due,
           }
         });
       }
@@ -152,20 +159,23 @@ export default function CreatorSubscriptions() {
       });
 
       if (res.data.success && res.data.data) {
-        if (res.data.data.redirect_url) {
+        if (res.data.data.requires_payment || res.data.data.amount_due > 0 || res.data.data.redirect_url) {
           const actualSubscription = currentSubscription?.subscription || currentSubscription;
-          localStorage.setItem('lastSubscriptionId', actualSubscription?.id);
+          const subscriptionId = res.data.data.subscription_id || actualSubscription?.id;
+          localStorage.setItem('lastSubscriptionId', subscriptionId);
 
           navigate('/subscription/payment', {
             state: {
               paymentData: {
-                subscription_id: actualSubscription?.id,
+                subscription_id: subscriptionId,
                 redirect_url: res.data.data.redirect_url,
                 poll_url: res.data.data.poll_url,
-                payment_reference: res.data.data.payment_reference
+                payment_reference: res.data.data.payment_reference,
+                amount_due: res.data.data.amount_due,
               },
               plan: plan,
-              billingCycle: billingCycle
+              billingCycle: billingCycle,
+              amountDue: res.data.data.amount_due,
             }
           });
         } else {
@@ -549,7 +559,7 @@ export default function CreatorSubscriptions() {
                 <div className="text-sm text-gray-600 mb-6">{boost.note}</div>
                 <button
                   onClick={() => handleBoostPurchase(boost.days === '3 Days' ? 3 : boost.days === '7 Days' ? 7 : 30)}
-                  disabled={boostLoading === (boost.days === '3 Days' ? 3 : boost.days === '7 Days' ? 7 : 30) || (walletBalance && Number(walletBalance.available_balance || 0) < boost.price)}
+                  disabled={boostLoading === (boost.days === '3 Days' ? 3 : boost.days === '7 Days' ? 7 : 30)}
                   className={`w-full py-2.5 rounded-full text-sm font-semibold transition-all ${
                     boost.best
                       ? 'bg-primary hover:bg-primary-dark text-dark'

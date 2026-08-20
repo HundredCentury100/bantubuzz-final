@@ -57,6 +57,8 @@ const BrandProfileEdit = () => {
   const [reportLogo, setReportLogo] = useState(null);
   const [security, setSecurity] = useState({ can_enable_2fa: false, two_factor_enabled: false });
   const [reportEntitlements, setReportEntitlements] = useState({ white_label: false });
+  const [deleteConfirmation, setDeleteConfirmation] = useState('');
+  const [deletingAccount, setDeletingAccount] = useState(false);
 
   const {
     register,
@@ -231,6 +233,28 @@ const BrandProfileEdit = () => {
       setError(err.response?.data?.error || 'Failed to update profile');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    if (deleteConfirmation !== 'DELETE') {
+      toast.error('Type DELETE to confirm account deletion');
+      return;
+    }
+
+    try {
+      setDeletingAccount(true);
+      await authAPI.deleteAccount({ confirmation: deleteConfirmation });
+      toast.success('Your account has been deleted');
+      logout();
+    } catch (err) {
+      const blockers = err.response?.data?.blockers;
+      const blockerText = Array.isArray(blockers) && blockers.length
+        ? ` Resolve: ${blockers.join(', ')}.`
+        : '';
+      toast.error(`${err.response?.data?.error || 'Unable to delete account'}${blockerText}`);
+    } finally {
+      setDeletingAccount(false);
     }
   };
 
@@ -662,6 +686,34 @@ const BrandProfileEdit = () => {
                   </span>
                 </span>
               </label>
+            </div>
+
+            <div className="card border border-red-200 bg-red-50">
+              <h2 className="text-xl font-bold text-red-900 mb-3">Delete Account</h2>
+              <p className="text-sm text-red-800 leading-relaxed">
+                This removes your brand profile from public discovery and deactivates your login.
+                Campaigns, collaborations, billing history, wallet records, and audit records may be retained where required for platform records.
+              </p>
+              <p className="mt-3 text-sm text-red-800">
+                Deletion is blocked while you have active collaborations, active bookings, or wallet funds still available or pending clearance.
+              </p>
+              <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto]">
+                <input
+                  type="text"
+                  value={deleteConfirmation}
+                  onChange={(event) => setDeleteConfirmation(event.target.value)}
+                  className="input border-red-200 bg-white"
+                  placeholder="Type DELETE to confirm"
+                />
+                <button
+                  type="button"
+                  onClick={handleDeleteAccount}
+                  disabled={deletingAccount || deleteConfirmation !== 'DELETE'}
+                  className="rounded-lg bg-red-600 px-5 py-3 font-semibold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {deletingAccount ? 'Deleting...' : 'Delete Account'}
+                </button>
+              </div>
             </div>
 
             {/* Social Media */}

@@ -93,6 +93,7 @@ export const authAPI = {
   verifyOTP: (data) => api.post('/auth/verify-otp', data),
   verifyLogin2FA: (data) => api.post('/auth/login/verify-2fa', data),
   updateSecurity: (data) => api.put('/auth/security', data),
+  deleteAccount: (data) => api.post('/auth/delete-account', data),
   resendOTP: (data) => api.post('/auth/resend-otp', data),
   forgotPassword: (email) => api.post('/auth/forgot-password', { email }),
   resetPassword: (token, password) => api.post(`/auth/reset-password/${token}`, { password }),
@@ -211,6 +212,7 @@ export const campaignsAPI = {
 
   // Analytics
   getPerformance: (campaignId, params) => api.get(`/campaigns/${campaignId}/performance`, { params }),
+  getCommentInsights: (campaignId) => api.get(`/campaigns/${campaignId}/comments-ai-overviews`),
   downloadSentimentReport: (campaignId, params) => api.get(
     `/campaigns/${campaignId}/performance/sentiment-report`,
     { params, responseType: 'blob' },
@@ -374,6 +376,9 @@ export const collaborationsAPI = {
   // Get cached metrics for a deliverable
   getDeliverableMetrics: (collabId, deliverableId) =>
     api.get(`/collaborations/${collabId}/deliverables/${deliverableId}/metrics`),
+  // Get ThunziAI comment AI Overview for a synced post
+  getDeliverableCommentsAIOverview: (collabId, deliverableId) =>
+    api.get(`/collaborations/${collabId}/deliverables/${deliverableId}/comments-ai-overview`),
   // Sync metrics for all deliverables in a collaboration
   syncAllCollaborationMetrics: (collabId) =>
     api.post(`/collaborations/${collabId}/sync-all-metrics`),

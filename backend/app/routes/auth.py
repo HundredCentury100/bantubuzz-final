@@ -12,6 +12,7 @@ from app import db
 from app.models import User, CreatorProfile, BrandProfile, OTP, Subscription, SubscriptionPlan
 from app.models import CreatorSubscription, CreatorSubscriptionPlan
 from app.services.email_service import (
+    send_email,
     send_otp_email,
     send_verification_email,
     send_password_reset_email,
@@ -30,6 +31,22 @@ from app.utils.signup_protection import (
 bp = Blueprint('auth', __name__)
 MAX_FAILED_LOGIN_ATTEMPTS = 5
 LOGIN_LOCKOUT_MINUTES = 15
+CREATOR_INTRO_EMAIL_DELAY_SECONDS = 2 * 60 * 60
+
+
+def _schedule_creator_intro_email(user):
+    if not user or user.user_type != 'creator':
+        return
+    try:
+        from app.tasks.email_tasks import send_creator_intro_email_task
+
+        send_creator_intro_email_task.apply_async(
+            args=[user.id],
+            countdown=CREATOR_INTRO_EMAIL_DELAY_SECONDS
+        )
+        current_app.logger.info('Queued creator intro email for user_id=%s', user.id)
+    except Exception:
+        current_app.logger.exception('Failed to queue creator intro email for user_id=%s', getattr(user, 'id', None))
 
 
 def _issue_auth_response(user):
@@ -511,7 +528,10 @@ def verify_otp():
         otp.mark_as_used()
 
         db.session.commit()
-        send_welcome_email(user)
+        if user.user_type == 'creator':
+            _schedule_creator_intro_email(user)
+        else:
+            send_welcome_email(user)
 
         return jsonify({
             'message': 'Email verified successfully',
@@ -702,6 +722,126 @@ def update_security_settings():
 
     except Exception as e:
         db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+
+@bp.route('/delete-account', methods=['POST'])
+@jwt_required()
+def delete_account():
+    """Soft-delete the current account after checking active obligations."""
+    try:
+        user_id = int(get_jwt_identity())
+        user = User.query.get(user_id)
+        if not user:
+            return jsonify({'error': 'User not found'}), 404
+
+        data = request.get_json() or {}
+        if data.get('confirmation') != 'DELETE':
+            return jsonify({'error': 'Type DELETE to confirm account deletion'}), 400
+
+        from app.models.booking import Booking
+        from app.models.collaboration import Collaboration
+        from app.models.wallet import Wallet
+
+        blockers = []
+        creator_profile = user.creator_profile if user.user_type == 'creator' else None
+        brand_profile = user.brand_profile if user.user_type == 'brand' else None
+
+        if creator_profile:
+            active_collaborations = Collaboration.query.filter(
+                Collaboration.creator_id == creator_profile.id,
+                Collaboration.status.in_([
+                    'pending_creator_acceptance',
+                    'in_progress',
+                    'pending_review',
+                    'revision_requested',
+                    'content_approved',
+                    'active',
+                ])
+            ).count()
+            active_bookings = Booking.query.filter(
+                Booking.creator_id == creator_profile.id,
+                Booking.status.in_(['pending', 'accepted', 'in_progress'])
+            ).count()
+            if active_collaborations:
+                blockers.append(f'{active_collaborations} active collaboration(s)')
+            if active_bookings:
+                blockers.append(f'{active_bookings} active booking(s)')
+
+        if brand_profile:
+            active_collaborations = Collaboration.query.filter(
+                Collaboration.brand_id == brand_profile.id,
+                Collaboration.status.in_([
+                    'pending_creator_acceptance',
+                    'in_progress',
+                    'pending_review',
+                    'revision_requested',
+                    'content_approved',
+                    'active',
+                ])
+            ).count()
+            active_bookings = Booking.query.filter(
+                Booking.brand_id == brand_profile.id,
+                Booking.status.in_(['pending', 'accepted', 'in_progress'])
+            ).count()
+            if active_collaborations:
+                blockers.append(f'{active_collaborations} active collaboration(s)')
+            if active_bookings:
+                blockers.append(f'{active_bookings} active booking(s)')
+
+        wallet = Wallet.query.filter_by(user_id=user.id).first()
+        if wallet and ((wallet.available_balance or 0) > 0 or (wallet.pending_clearance or 0) > 0):
+            blockers.append('wallet balance or pending clearance funds')
+
+        if blockers:
+            return jsonify({
+                'error': 'Account deletion is blocked until outstanding obligations are resolved.',
+                'blockers': blockers,
+            }), 409
+
+        timestamp = int(datetime.utcnow().timestamp())
+        original_email = user.email
+        user.email = f'deleted-user-{user.id}-{timestamp}@deleted.bantubuzz.local'
+        user.password_hash = None
+        user.google_oauth_id = None
+        user.google_profile_picture = None
+        user.phone_number = None
+        user.reset_token = None
+        user.reset_token_expires = None
+        user.verification_token = None
+        user.is_active = False
+        user.is_verified = False
+        user.two_factor_enabled = False
+        user.updated_at = datetime.utcnow()
+
+        if creator_profile:
+            creator_profile.username = f'deleted_creator_{creator_profile.id}_{timestamp}'
+            creator_profile.bio = None
+            creator_profile.profile_picture = None
+            creator_profile.availability_status = 'unavailable'
+
+        if brand_profile:
+            brand_profile.company_name = 'Deleted brand account'
+            brand_profile.logo = None
+            brand_profile.description = None
+
+        db.session.commit()
+
+        try:
+            send_email(
+                'Your BantuBuzz account deletion has been processed',
+                original_email,
+                'Your BantuBuzz account has been deactivated and removed from public discovery.',
+                async_send=False,
+            )
+        except Exception:
+            current_app.logger.exception('Failed to send account deletion confirmation for user_id=%s', user.id)
+
+        return jsonify({'message': 'Account deletion processed successfully'}), 200
+
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.exception('Account deletion failed')
         return jsonify({'error': str(e)}), 500
 
 
@@ -943,6 +1083,7 @@ def google_complete_profile():
 
         db.session.commit()
         queue_creator_score_recalculation(user.creator_profile.id)
+        _schedule_creator_intro_email(user)
 
         # Issue full auth tokens
         claims = {

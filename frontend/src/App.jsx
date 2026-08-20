@@ -109,7 +109,6 @@ import BriefDetails from './pages/BriefDetails';
 import CreateBrief from './pages/CreateBrief';
 import ManageBriefs from './pages/ManageBriefs';
 import BulkBriefSend from './pages/BulkBriefSend';
-import MyProposals from './pages/MyProposals';
 
 // Public Pages
 import About from './pages/About';
@@ -399,7 +398,7 @@ function App() {
         path="/creator/proposals"
         element={
           <ProtectedRoute requiredType="creator">
-            <MyProposals />
+            <Navigate to="/creator/applications" replace />
           </ProtectedRoute>
         }
       />
@@ -423,7 +422,7 @@ function App() {
         path="/creator/bookings"
         element={
           <ProtectedRoute requiredType="creator">
-            <Bookings />
+            <Navigate to="/creator/collaborations" replace />
           </ProtectedRoute>
         }
       />

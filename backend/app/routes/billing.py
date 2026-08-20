@@ -268,8 +268,8 @@ def get_invoices():
     if not user:
         return jsonify({'error': 'User not found'}), 404
 
-    workspace_id = get_request_workspace_id()
-    if workspace_id:
+    workspace_id = get_request_workspace_id() if user.user_type == 'brand' else None
+    if user.user_type == 'brand' and workspace_id:
         workspace, workspace_error, workspace_status = require_workspace_access(user.id, workspace_id, 'can_manage_billing')
         if workspace_error:
             return jsonify({'error': workspace_error}), workspace_status
