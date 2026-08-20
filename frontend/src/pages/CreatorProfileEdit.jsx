@@ -17,7 +17,7 @@ import { portfolioAPI } from '../services/portfolioAPI';
 
 const CreatorProfileEdit = () => {
   const navigate = useNavigate();
-  const { updateProfile: updateAuthProfile } = useAuth();
+  const { updateProfile: updateAuthProfile, logout } = useAuth();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
@@ -38,6 +38,8 @@ const CreatorProfileEdit = () => {
   const [editingPortfolioItem, setEditingPortfolioItem] = useState(null);
   const [portfolioRefreshKey, setPortfolioRefreshKey] = useState(0);
   const [security, setSecurity] = useState({ can_enable_2fa: false, two_factor_enabled: false });
+  const [deleteConfirmation, setDeleteConfirmation] = useState('');
+  const [deletingAccount, setDeletingAccount] = useState(false);
 
   const {
     register,
@@ -407,6 +409,28 @@ const CreatorProfileEdit = () => {
     }
   };
 
+  const handleDeleteAccount = async () => {
+    if (deleteConfirmation !== 'DELETE') {
+      toast.error('Type DELETE to confirm account deletion');
+      return;
+    }
+
+    try {
+      setDeletingAccount(true);
+      await authAPI.deleteAccount({ confirmation: deleteConfirmation });
+      toast.success('Your account has been deleted');
+      logout();
+    } catch (err) {
+      const blockers = err.response?.data?.blockers;
+      const blockerText = Array.isArray(blockers) && blockers.length
+        ? ` Resolve: ${blockers.join(', ')}.`
+        : '';
+      toast.error(`${err.response?.data?.error || 'Unable to delete account'}${blockerText}`);
+    } finally {
+      setDeletingAccount(false);
+    }
+  };
+
   if (loadingProfile) {
     return (
       <div className="min-h-screen bg-light">
@@ -438,22 +462,35 @@ const CreatorProfileEdit = () => {
           </div>
 
           {/* Header */}
-          <div className="mb-8 flex items-start justify-between gap-4">
+          <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <h1 className="text-3xl font-bold text-dark mb-2">Edit Your Profile</h1>
               <p className="text-gray-600">Update your creator profile to attract more brands</p>
             </div>
-            <button
-              type="button"
-              onClick={() => setShowPreviewModal(true)}
-              className="px-6 py-3 bg-white border-2 border-primary text-primary hover:bg-primary hover:text-dark font-medium rounded-full transition-colors flex items-center gap-2 whitespace-nowrap"
-            >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-              </svg>
-              Preview Profile
-            </button>
+            <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row">
+              <button
+                type="button"
+                onClick={logout}
+                className="inline-flex items-center justify-center gap-2 rounded-full border border-red-200 bg-white px-5 py-3 font-medium text-red-600 transition-colors hover:bg-red-50 sm:order-2"
+              >
+                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H9" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 20H6a2 2 0 01-2-2V6a2 2 0 012-2h7" />
+                </svg>
+                Logout
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowPreviewModal(true)}
+                className="inline-flex items-center justify-center gap-2 rounded-full border-2 border-primary bg-white px-6 py-3 font-medium text-primary transition-colors hover:bg-primary hover:text-dark sm:order-1"
+              >
+                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                </svg>
+                Preview Profile
+              </button>
+            </div>
           </div>
 
           {/* Success Message */}
@@ -1041,6 +1078,34 @@ const CreatorProfileEdit = () => {
                   </span>
                 </span>
               </label>
+            </div>
+
+            <div className="card border border-red-200 bg-red-50">
+              <h2 className="text-xl font-bold text-red-900 mb-3">Delete Account</h2>
+              <p className="text-sm text-red-800 leading-relaxed">
+                This removes your creator profile from public discovery and deactivates your login.
+                Packages, messages, collaborations, earnings history, and audit records may be retained where required for platform records.
+              </p>
+              <p className="mt-3 text-sm text-red-800">
+                Deletion is blocked while you have active collaborations, active bookings, or wallet funds still available or pending clearance.
+              </p>
+              <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto]">
+                <input
+                  type="text"
+                  value={deleteConfirmation}
+                  onChange={(event) => setDeleteConfirmation(event.target.value)}
+                  className="input border-red-200 bg-white"
+                  placeholder="Type DELETE to confirm"
+                />
+                <button
+                  type="button"
+                  onClick={handleDeleteAccount}
+                  disabled={deletingAccount || deleteConfirmation !== 'DELETE'}
+                  className="rounded-lg bg-red-600 px-5 py-3 font-semibold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {deletingAccount ? 'Deleting...' : 'Delete Account'}
+                </button>
+              </div>
             </div>
 
             {/* Actions */}

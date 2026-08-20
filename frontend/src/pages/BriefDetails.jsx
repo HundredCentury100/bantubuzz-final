@@ -205,7 +205,7 @@ const BriefDetails = () => {
       await proposalsAPI.createProposal(payload);
       toast.success('Proposal submitted successfully!');
       setShowProposalModal(false);
-      navigate('/creator/proposals');
+      navigate('/creator/applications');
     } catch (err) {
       console.error('Error submitting proposal:', err);
 
@@ -541,10 +541,10 @@ const BriefDetails = () => {
                     Status: <span className="font-semibold">{existingProposal.status}</span>
                   </p>
                   <button
-                    onClick={() => navigate('/creator/proposals')}
+                    onClick={() => navigate('/creator/applications')}
                     className="w-full py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                   >
-                    View Proposal
+                    View Application
                   </button>
                 </div>
               )}

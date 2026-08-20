@@ -92,7 +92,7 @@ export async function generateCreatorCardBlob({
   context.font = '700 58px Poppins, Arial, sans-serif';
   context.fillText(fitText(creator.display_name || creator.username || 'Creator', 27), 540, 740);
 
-  const rank = creator.overall_rank?.position || creator.rank;
+  const rank = creator.rank || creator.overall_rank?.position;
   if (rank) {
     context.fillStyle = '#ccdb53';
     roundRect(context, 330, 785, 420, 90, 14);

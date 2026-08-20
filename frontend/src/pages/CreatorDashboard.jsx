@@ -8,7 +8,7 @@ import CreatorBadge from '../components/CreatorBadge';
 import toast from 'react-hot-toast';
 import { SparklesIcon, RocketLaunchIcon, BuildingOfficeIcon, ArrowUpIcon } from '@heroicons/react/24/outline';
 
-const withDashboardTimeout = (promise, label, timeoutMs = 10000) => (
+const withDashboardTimeout = (promise, label, timeoutMs = 4500) => (
   Promise.race([
     promise,
     new Promise((_, reject) => {
@@ -16,6 +16,14 @@ const withDashboardTimeout = (promise, label, timeoutMs = 10000) => (
     }),
   ])
 );
+
+const logDashboardFailures = (scope, results) => {
+  results.forEach(([label, result]) => {
+    if (result.status === 'rejected') {
+      console.warn(`${scope} dashboard ${label} unavailable:`, result.reason);
+    }
+  });
+};
 
 const CreatorDashboard = () => {
   const location = useLocation();
@@ -107,6 +115,11 @@ const CreatorDashboard = () => {
     });
   };
 
+  const getCampaignDisplayBrandName = (campaign) => {
+    const workspace = campaign?.workspace || campaign?.client_workspace;
+    return workspace?.name || campaign?.brand?.company_name || campaign?.brand?.display_name || 'Brand';
+  };
+
   const saveLeaderboardPreferences = async () => {
     try {
       setSavingLeaderboardPrefs(true);
@@ -133,46 +146,25 @@ const CreatorDashboard = () => {
 
   const fetchDashboardData = async () => {
     try {
-      // Fetch all data in parallel for faster loading
       const [
         profileRes,
-        packagesRes,
-        bookingsRes,
-        applicationsRes,
         subsRes,
         verRes,
         verSubRes,
-        platformsRes,
-        pendingCollabsRes
       ] = await Promise.allSettled([
         withDashboardTimeout(creatorsAPI.getOwnProfile(), 'creator profile'),
-        withDashboardTimeout(packagesAPI.getMyPackages(), 'creator packages'),
-        withDashboardTimeout(bookingsAPI.getMyBookings(), 'creator bookings'),
-        withDashboardTimeout(opportunitiesAPI.getMyApplications({ limit: 5 }), 'creator applications'),
         withDashboardTimeout(api.get('/subscriptions/my-subscription'), 'creator subscription'),
         withDashboardTimeout(api.get('/creator/verification/status'), 'creator verification'),
         withDashboardTimeout(api.get('/creator/subscriptions/my-subscription'), 'creator verification subscription'),
-        withDashboardTimeout(api.get('/creator/platforms'), 'creator platforms'),
-        withDashboardTimeout(collaborationsAPI.getPendingCollaborations(), 'pending collaborations')
       ]);
 
-      [
+      logDashboardFailures('Creator', [
         ['profile', profileRes],
-        ['packages', packagesRes],
-        ['bookings', bookingsRes],
-        ['applications', applicationsRes],
         ['subscription', subsRes],
         ['verification', verRes],
         ['verification subscription', verSubRes],
-        ['platforms', platformsRes],
-        ['pending collaborations', pendingCollabsRes],
-      ].forEach(([label, result]) => {
-        if (result.status === 'rejected') {
-          console.warn(`Creator dashboard ${label} unavailable:`, result.reason);
-        }
-      });
+      ]);
 
-      // Handle profile
       if (profileRes.status === 'fulfilled') {
         const nextProfile = profileRes.value.data;
         setProfile(nextProfile);
@@ -182,44 +174,58 @@ const CreatorDashboard = () => {
         });
       }
 
-      // Handle packages - Keep FULL array for stats, slice for display
-      const pkgs = packagesRes.status === 'fulfilled' ? (packagesRes.value.data.packages || []) : [];
-      setPackages(pkgs.slice(0, 3)); // Show only 3 recent in UI
-
-      // Handle bookings - Keep FULL array for stats, slice for display
-      const bks = bookingsRes.status === 'fulfilled' ? (bookingsRes.value.data.bookings || []) : [];
-      setBookings(bks.slice(0, 5)); // Show only 5 recent in UI
-
-      // Handle applications
-      const apps = applicationsRes.status === 'fulfilled' ? (applicationsRes.value.data.applications || []) : [];
-      setApplications(apps);
-
-      // Handle subscription
       if (subsRes.status === 'fulfilled') {
         setSubscription(subsRes.value.data.data);
       }
 
-      // Handle verification status
       if (verRes.status === 'fulfilled') {
         setVerificationStatus(verRes.value.data);
       }
 
-      // Handle verification subscription
       if (verSubRes.status === 'fulfilled' && verSubRes.value.data.success && verSubRes.value.data.data.has_subscription) {
         setVerificationSubscription(verSubRes.value.data.data.subscription);
       }
 
-      // Handle connected platforms
+      setLoading(false);
+
+      const [
+        packagesRes,
+        bookingsRes,
+        applicationsRes,
+        platformsRes,
+        pendingCollabsRes
+      ] = await Promise.allSettled([
+        withDashboardTimeout(packagesAPI.getMyPackages(), 'creator packages', 6500),
+        withDashboardTimeout(bookingsAPI.getMyBookings(), 'creator bookings', 6500),
+        withDashboardTimeout(opportunitiesAPI.getMyApplications({ limit: 5 }), 'creator applications', 6500),
+        withDashboardTimeout(api.get('/creator/platforms'), 'creator platforms', 6500),
+        withDashboardTimeout(collaborationsAPI.getPendingCollaborations(), 'pending collaborations', 6500)
+      ]);
+
+      logDashboardFailures('Creator', [
+        ['packages', packagesRes],
+        ['bookings', bookingsRes],
+        ['applications', applicationsRes],
+        ['platforms', platformsRes],
+        ['pending collaborations', pendingCollabsRes],
+      ]);
+
+      const pkgs = packagesRes.status === 'fulfilled' ? (packagesRes.value.data.packages || []) : [];
+      const bks = bookingsRes.status === 'fulfilled' ? (bookingsRes.value.data.bookings || []) : [];
+      const apps = applicationsRes.status === 'fulfilled' ? (applicationsRes.value.data.applications || []) : [];
+
+      setPackages(pkgs.slice(0, 3));
+      setBookings(bks.slice(0, 5));
+      setApplications(apps);
+
       if (platformsRes.status === 'fulfilled' && platformsRes.value.data.success) {
         setConnectedPlatforms(platformsRes.value.data.platforms || []);
       }
 
-      // Handle pending collaborations
       if (pendingCollabsRes.status === 'fulfilled' && pendingCollabsRes.value.data.success) {
         setPendingCollaborations(pendingCollabsRes.value.data.collaborations || []);
       }
 
-      // Calculate stats from FULL arrays (before slicing)
       const activePackages = pkgs.filter(p => p.is_active).length;
       const pendingBookings = bks.filter(b => b.status === 'pending').length;
       const totalEarnings = bks
@@ -227,9 +233,9 @@ const CreatorDashboard = () => {
         .reduce((sum, b) => sum + (b.amount || 0), 0);
 
       setStats({
-        totalPackages: pkgs.length,  // Use full array length
+        totalPackages: pkgs.length,
         activePackages,
-        totalBookings: bks.length,  // Use full array length
+        totalBookings: bks.length,
         pendingBookings,
         totalEarnings
       });
@@ -345,13 +351,13 @@ const CreatorDashboard = () => {
                   <span className="text-xs px-2 sm:px-3 py-1 bg-white/50 text-primary-dark rounded-full font-medium">✓ Verified Badge</span>
                   <span className="text-xs px-2 sm:px-3 py-1 bg-white/50 text-primary-dark rounded-full font-medium">✓ Increased Trust</span>
                   <span className="text-xs px-2 sm:px-3 py-1 bg-white/50 text-primary-dark rounded-full font-medium">✓ Priority in Search</span>
-                  <span className="text-xs px-2 sm:px-3 py-1 bg-white/50 text-primary-dark rounded-full font-medium">$5/month</span>
+                  <span className="text-xs px-2 sm:px-3 py-1 bg-white/50 text-primary-dark rounded-full font-medium">Included in Rising and Creator Pro</span>
                 </div>
                 <Link
                   to="/creator/subscriptions"
                   className="inline-block px-4 sm:px-6 py-2 bg-dark text-white rounded-full hover:bg-gray-800 transition-colors text-xs sm:text-sm font-semibold"
                 >
-                  Subscribe to Verification →
+                  View Creator Plans →
                 </Link>
               </div>
             </div>
@@ -1072,7 +1078,7 @@ const CreatorDashboard = () => {
                         <div className="flex-1">
                           <h3 className="font-bold text-dark mb-1">{app.campaign?.title || 'Campaign'}</h3>
                           <p className="text-sm text-gray-600 mb-2">
-                            {app.campaign?.brand?.company_name || app.campaign?.brand?.display_name || 'Brand'}
+                            {getCampaignDisplayBrandName(app.campaign)}
                           </p>
                         </div>
                         <span className={`px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap ml-2 ${
@@ -1182,14 +1188,14 @@ const CreatorDashboard = () => {
                 </Link>
 
                 <Link
-                  to="/creator/proposals"
+                  to="/creator/applications"
                   className="block p-3 border border-gray-200 rounded-lg hover:border-primary hover:bg-primary/5 transition-colors"
                 >
                   <div className="flex items-center">
                     <svg className="w-5 h-5 text-primary mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
                     </svg>
-                    <span className="font-medium text-dark">My Proposals</span>
+                    <span className="font-medium text-dark">My Applications</span>
                   </div>
                 </Link>
 
@@ -1207,14 +1213,14 @@ const CreatorDashboard = () => {
                 </Link>
 
                 <Link
-                  to="/creator/bookings"
+                  to="/creator/collaborations"
                   className="block p-3 border border-gray-200 rounded-lg hover:border-primary hover:bg-primary/5 transition-colors"
                 >
                   <div className="flex items-center">
                     <svg className="w-5 h-5 text-primary mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
                     </svg>
-                    <span className="font-medium text-dark">View Bookings</span>
+                    <span className="font-medium text-dark">My Collaborations</span>
                   </div>
                 </Link>
 
