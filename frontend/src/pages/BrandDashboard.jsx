@@ -6,8 +6,9 @@ import Navbar from '../components/Navbar';
 import toast from 'react-hot-toast';
 import Avatar from '../components/Avatar';
 import { SparklesIcon, RocketLaunchIcon, BuildingOfficeIcon, ArrowUpIcon } from '@heroicons/react/24/outline';
+import { useAuth } from '../hooks/useAuth';
 
-const withDashboardTimeout = (promise, label, timeoutMs = 10000) => (
+const withDashboardTimeout = (promise, label, timeoutMs = 4500) => (
   Promise.race([
     promise,
     new Promise((_, reject) => {
@@ -16,9 +17,17 @@ const withDashboardTimeout = (promise, label, timeoutMs = 10000) => (
   ])
 );
 
+const logDashboardFailures = (scope, results) => {
+  results.forEach(([label, result]) => {
+    if (result.status === 'rejected') {
+      console.warn(`${scope} dashboard ${label} unavailable:`, result.reason);
+    }
+  });
+};
+
 const BrandDashboard = () => {
   const location = useLocation();
-  const authUser = JSON.parse(localStorage.getItem('user') || '{}');
+  const { user: authUser } = useAuth();
   const [profile, setProfile] = useState(null);
   const [savedCreators, setSavedCreators] = useState([]);
   const [bookings, setBookings] = useState([]);
@@ -57,28 +66,15 @@ const BrandDashboard = () => {
       const [
         profileRes,
         subsRes,
-        platformsRes,
-        savedRes,
-        bookingsRes,
       ] = await Promise.allSettled([
         withDashboardTimeout(brandsAPI.getOwnProfile(), 'brand profile'),
         withDashboardTimeout(api.get('/subscriptions/my-subscription'), 'brand subscription'),
-        withDashboardTimeout(api.get('/brand/platforms'), 'brand platforms'),
-        withDashboardTimeout(brandsAPI.getSavedCreators(), 'saved creators'),
-        withDashboardTimeout(bookingsAPI.getMyBookings(), 'brand bookings'),
       ]);
 
-      [
+      logDashboardFailures('Brand', [
         ['profile', profileRes],
         ['subscription', subsRes],
-        ['platforms', platformsRes],
-        ['saved creators', savedRes],
-        ['bookings', bookingsRes],
-      ].forEach(([label, result]) => {
-        if (result.status === 'rejected') {
-          console.warn(`Brand dashboard ${label} unavailable:`, result.reason);
-        }
-      });
+      ]);
 
       if (profileRes.status === 'fulfilled') {
         setProfile(profileRes.value.data);
@@ -87,6 +83,24 @@ const BrandDashboard = () => {
       if (subsRes.status === 'fulfilled') {
         setSubscription(subsRes.value.data.data);
       }
+
+      setLoading(false);
+
+      const [
+        platformsRes,
+        savedRes,
+        bookingsRes,
+      ] = await Promise.allSettled([
+        withDashboardTimeout(api.get('/brand/platforms'), 'brand platforms', 6500),
+        withDashboardTimeout(brandsAPI.getSavedCreators(), 'saved creators', 6500),
+        withDashboardTimeout(bookingsAPI.getMyBookings(), 'brand bookings', 6500),
+      ]);
+
+      logDashboardFailures('Brand', [
+        ['platforms', platformsRes],
+        ['saved creators', savedRes],
+        ['bookings', bookingsRes],
+      ]);
 
       if (platformsRes.status === 'fulfilled' && platformsRes.value.data.success) {
         setConnectedPlatforms(platformsRes.value.data.platforms || []);
@@ -208,7 +222,7 @@ const BrandDashboard = () => {
         </div>
 
         {/* Suspension Banner */}
-        {authUser.is_active === false && (
+        {authUser?.is_active === false && (
           <div className="mb-6 p-4 bg-red-50 border border-red-400 rounded-lg">
             <div className="flex items-start gap-3">
               <svg className="w-5 h-5 text-red-600 mt-0.5 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">

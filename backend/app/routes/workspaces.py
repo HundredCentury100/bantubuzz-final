@@ -6,7 +6,7 @@ import os
 import re
 
 from flask import Blueprint, current_app, jsonify, make_response, request
-from flask_jwt_extended import get_jwt_identity, jwt_required
+from flask_jwt_extended import create_access_token, get_jwt_identity, jwt_required
 from werkzeug.utils import secure_filename
 
 from app import db
@@ -22,6 +22,7 @@ from app.models import (
     WalletTransaction,
     WorkspaceAddon,
     WorkspaceAuditLog,
+    WorkspaceConnectionRequest,
     WorkspaceInvitation,
     WorkspaceMemberPermission,
 )
@@ -34,6 +35,7 @@ from app.services.workspace_service import (
     get_active_subscription,
     get_workspace_seat_usage,
     get_workspace_limit,
+    ensure_workspace_client_brand,
     is_agency_user,
     require_workspace_access,
     slugify,
@@ -170,11 +172,14 @@ def _workspace_summary(workspace, start_date=None, end_date=None):
     }
 
 
-def _master_dashboard_payload(brand, start_date=None, end_date=None):
-    workspaces = ClientWorkspace.query.filter_by(
+def _master_dashboard_payload(brand, start_date=None, end_date=None, workspace_id=None):
+    query = ClientWorkspace.query.filter_by(
         agency_brand_id=brand.id,
         is_active=True,
-    ).order_by(ClientWorkspace.name.asc()).all()
+    )
+    if workspace_id:
+        query = query.filter(ClientWorkspace.id == workspace_id)
+    workspaces = query.order_by(ClientWorkspace.name.asc()).all()
     summaries = [_workspace_summary(workspace, start_date, end_date) for workspace in workspaces]
     return {
         'clients': summaries,
@@ -214,7 +219,6 @@ Report period: {date_label}
 
 {signature}
 
-Powered by BantuBuzz
 """
     escaped_message = escape(message or 'Please find the latest performance report attached.')
     signature_html = ''.join(f"<p style='margin:0 0 6px'>{escape(line)}</p>" for line in signature.splitlines() if line.strip())
@@ -231,7 +235,6 @@ Powered by BantuBuzz
   <div style="border-top: 1px solid #E5E7EB; padding-top: 16px;">
     {signature_html}
   </div>
-  <p style="margin-top: 28px; color: #9CA3AF; font-size: 12px;">Powered by BantuBuzz</p>
 </div>
 """
     return text_body, html_body
@@ -269,6 +272,35 @@ This invite expires on {invitation.expires_at.strftime('%Y-%m-%d')}.
 </div>
 """
     return send_email(subject, invitation.email, text_body, html_body, async_send=False)
+
+
+def _send_workspace_connection_request_email(connection_request, agency_brand):
+    workspace = connection_request.workspace
+    connection_url = _frontend_url(f'/brand/agency-connection/{connection_request.token}')
+    subject = f'{agency_brand.company_name} requested access to manage {connection_request.client_brand.company_name}'
+    text_body = f"""
+{agency_brand.company_name} wants to manage your BantuBuzz brand account, {connection_request.client_brand.company_name}, as an agency client workspace.
+
+Accept or decline this request while signed into your brand account:
+{connection_url}
+
+If accepted, the agency can work with your brand through its client workspace. Your brand account, login, and public identity remain yours.
+
+This request expires on {connection_request.expires_at.strftime('%Y-%m-%d')}.
+"""
+    html_body = f"""
+<div style="font-family: Arial, sans-serif; max-width: 620px; margin: 0 auto; color: #1F2937;">
+  <div style="background: #B5E61D; padding: 20px; border-radius: 8px 8px 0 0;"><h1 style="margin: 0; font-size: 24px;">BantuBuzz</h1></div>
+  <div style="border: 1px solid #E5E7EB; border-top: 0; padding: 28px; border-radius: 0 0 8px 8px;">
+    <h2 style="margin-top: 0;">Agency management request</h2>
+    <p><strong>{escape(agency_brand.company_name)}</strong> requested access to manage <strong>{escape(connection_request.client_brand.company_name)}</strong> as an agency client workspace.</p>
+    <p>Your brand account, login, and public identity remain yours. You can accept or decline this request from your brand account.</p>
+    <p style="margin: 28px 0;"><a href="{connection_url}" style="background: #B5E61D; color: #1F2937; padding: 12px 18px; border-radius: 8px; text-decoration: none; font-weight: 700;">Review request</a></p>
+    <p style="color: #6B7280; font-size: 14px;">This request expires on {connection_request.expires_at.strftime('%Y-%m-%d')}.</p>
+  </div>
+</div>
+"""
+    return send_email(subject, connection_request.client_brand.user.email, text_body, html_body, async_send=False)
 
 
 def _workspace_invitation_url(invitation):
@@ -465,6 +497,12 @@ def create_workspace():
     included_limit = included_limit or DEFAULT_INCLUDED_WORKSPACES
     billing_cycle = data.get('billing_cycle') or (subscription.billing_cycle if subscription else 'monthly')
 
+    existing_brand_user = User.query.filter_by(email=(data.get('billing_email') or '').strip().lower()).first()
+    if existing_brand_user and existing_brand_user.user_type == 'brand' and existing_brand_user.brand_profile:
+        return jsonify({
+            'error': 'This email already belongs to a BantuBuzz brand. Use Connect Existing Brand so the owner can approve agency access.'
+        }), 409
+
     workspace = ClientWorkspace(
         agency_brand_id=brand.id,
         name=name,
@@ -477,6 +515,7 @@ def create_workspace():
     )
     db.session.add(workspace)
     db.session.flush()
+    client_brand = ensure_workspace_client_brand(workspace)
 
     owner_membership = WorkspaceMemberPermission(
         workspace_id=workspace.id,
@@ -492,9 +531,196 @@ def create_workspace():
     return jsonify({
         'message': 'Client workspace created successfully',
         'workspace': workspace.to_dict(include_counts=True),
+        'client_brand': client_brand.to_dict(include_user=True) if client_brand else None,
         'addon_required': addon is not None,
         'addon': addon.to_dict() if addon else None,
     }), 201
+
+
+@bp.route('/connect-existing-brand', methods=['POST'])
+@jwt_required()
+def connect_existing_brand():
+    """Request consent to manage an existing, independently-owned brand account."""
+    user, agency_brand, error = _current_brand()
+    if error:
+        message, status = error
+        return jsonify({'error': message}), status
+    if not is_agency_user(user):
+        return jsonify({'error': 'Agency plan required to connect an existing brand'}), 403
+
+    data = request.get_json() or {}
+    email = (data.get('email') or '').strip().lower()
+    if not email:
+        return jsonify({'error': 'Brand account email is required'}), 400
+
+    client_user = User.query.filter_by(email=email, user_type='brand').first()
+    client_brand = client_user.brand_profile if client_user else None
+    if not client_brand:
+        return jsonify({'error': 'No verified BantuBuzz brand account was found for that email'}), 404
+    if client_brand.id == agency_brand.id:
+        return jsonify({'error': 'You cannot connect your own agency account as a client'}), 400
+
+    linked_workspace = ClientWorkspace.query.filter_by(
+        agency_brand_id=agency_brand.id,
+        client_brand_id=client_brand.id,
+    ).first()
+    if linked_workspace and linked_workspace.is_active:
+        return jsonify({'error': 'This brand is already connected to your agency'}), 409
+
+    workspace = linked_workspace or ClientWorkspace(
+        agency_brand_id=agency_brand.id,
+        client_brand_id=client_brand.id,
+        name=client_brand.company_name,
+        slug=_unique_slug(agency_brand.id, client_brand.company_name),
+        logo=client_brand.logo,
+        industry=client_brand.industry,
+        website=client_brand.website,
+        description=client_brand.description,
+        billing_email=client_user.email,
+        is_active=False,
+    )
+    if not linked_workspace:
+        db.session.add(workspace)
+        db.session.flush()
+
+    connection_request = WorkspaceConnectionRequest.query.filter_by(workspace_id=workspace.id).first()
+    if connection_request and connection_request.status == 'pending' and not connection_request.is_expired():
+        return jsonify({'error': 'A connection request is already awaiting this brand owner\'s response'}), 409
+    if not connection_request:
+        connection_request = WorkspaceConnectionRequest(
+            workspace_id=workspace.id,
+            client_brand_id=client_brand.id,
+            requested_by_user_id=user.id,
+            token=WorkspaceConnectionRequest.generate_token(),
+            status='pending',
+            expires_at=WorkspaceConnectionRequest.default_expiry(),
+        )
+        db.session.add(connection_request)
+    else:
+        connection_request.requested_by_user_id = user.id
+        connection_request.token = WorkspaceConnectionRequest.generate_token()
+        connection_request.status = 'pending'
+        connection_request.expires_at = WorkspaceConnectionRequest.default_expiry()
+        connection_request.responded_at = None
+    db.session.flush()
+
+    _log_workspace_audit(workspace, 'requested_existing_brand_connection', email, details={'client_brand_id': client_brand.id})
+    db.session.commit()
+    email_result = _send_workspace_connection_request_email(connection_request, agency_brand)
+
+    return jsonify({
+        'message': 'Connection request created. The brand owner must approve it before the client workspace is active.',
+        'request': connection_request.to_dict(),
+        'email_sent': bool(email_result),
+    }), 202
+
+
+@bp.route('/connection-requests/<token>', methods=['GET'])
+@jwt_required()
+def get_connection_request(token):
+    connection_request = WorkspaceConnectionRequest.query.filter_by(token=token).first()
+    if not connection_request:
+        return jsonify({'error': 'Connection request not found'}), 404
+    user = User.query.get(int(get_jwt_identity()))
+    if not user or not connection_request.client_brand or connection_request.client_brand.user_id != user.id:
+        return jsonify({'error': 'Connection request not found or unauthorized'}), 403
+    if connection_request.status == 'pending' and connection_request.is_expired():
+        connection_request.status = 'expired'
+        db.session.commit()
+    return jsonify({'request': connection_request.to_dict()}), 200
+
+
+@bp.route('/connection-requests/<token>/respond', methods=['POST'])
+@jwt_required()
+def respond_to_connection_request(token):
+    connection_request = WorkspaceConnectionRequest.query.filter_by(token=token).first()
+    if not connection_request:
+        return jsonify({'error': 'Connection request not found'}), 404
+    user = User.query.get(int(get_jwt_identity()))
+    if not user or not connection_request.client_brand or connection_request.client_brand.user_id != user.id:
+        return jsonify({'error': 'Connection request not found or unauthorized'}), 403
+    if connection_request.status != 'pending' or connection_request.is_expired():
+        if connection_request.is_expired() and connection_request.status == 'pending':
+            connection_request.status = 'expired'
+            db.session.commit()
+        return jsonify({'error': 'This connection request is no longer available'}), 400
+
+    approved = bool((request.get_json() or {}).get('approved'))
+    connection_request.status = 'accepted' if approved else 'declined'
+    connection_request.responded_at = datetime.utcnow()
+    workspace = connection_request.workspace
+
+    if approved:
+        agency_user = workspace.agency_brand.user
+        subscription = get_active_subscription(agency_user.id)
+        included_limit, _ = get_workspace_limit(agency_user.id)
+        included_limit = included_limit or DEFAULT_INCLUDED_WORKSPACES
+        addon = create_workspace_addon_if_needed(
+            workspace,
+            subscription,
+            included_limit,
+            subscription.billing_cycle if subscription else 'monthly',
+        )
+        if not addon:
+            workspace.is_active = True
+        _save_workspace_membership(workspace, agency_user, 'owner', ROLE_PERMISSIONS['owner'])
+        _log_workspace_audit(workspace, 'accepted_existing_brand_connection', user.email, target_user_id=user.id)
+    else:
+        _log_workspace_audit(workspace, 'declined_existing_brand_connection', user.email, target_user_id=user.id)
+
+    db.session.commit()
+    return jsonify({
+        'message': 'Agency connection accepted' if approved else 'Agency connection declined',
+        'request': connection_request.to_dict(),
+        'workspace': workspace.to_dict(include_counts=True) if approved else None,
+        'addon_required': bool(approved and not workspace.is_active),
+    }), 200
+
+
+@bp.route('/<int:workspace_id>/enter-brand-session', methods=['POST'])
+@jwt_required()
+def enter_workspace_brand_session(workspace_id):
+    """Issue a tab-scoped delegated token for the client brand account."""
+    actor_user_id = int(get_jwt_identity())
+    actor = User.query.get(actor_user_id)
+    if not actor:
+        return jsonify({'error': 'User not found'}), 404
+
+    workspace, error, status = require_workspace_access(actor_user_id, workspace_id)
+    if error:
+        return jsonify({'error': error}), status
+
+    if not is_agency_user(actor) and not user_has_workspace_permission(actor, workspace, 'can_manage_campaigns'):
+        return jsonify({'error': 'Agency or workspace access required'}), 403
+
+    client_brand = ensure_workspace_client_brand(workspace)
+    if not client_brand or not client_brand.user:
+        return jsonify({'error': 'Client brand account could not be prepared'}), 500
+
+    client_user = client_brand.user
+    claims = {
+        'user_type': 'brand',
+        'is_admin': False,
+        'admin_role': None,
+        'managed_by_agency': True,
+        'agency_actor_user_id': actor_user_id,
+        'agency_brand_id': workspace.agency_brand_id,
+        'workspace_id': workspace.id,
+        'client_brand_id': client_brand.id,
+    }
+    # The client tab is a genuine brand session. The agency actor remains in
+    # claims for delegated workspace authority and agency entitlements, while
+    # standard brand endpoints resolve the real client brand from JWT identity.
+    access_token = create_access_token(identity=str(client_user.id), additional_claims=claims)
+    db.session.commit()
+
+    return jsonify({
+        'access_token': access_token,
+        'user': client_user.to_dict(),
+        'profile': client_brand.to_dict(include_user=True),
+        'workspace': workspace.to_dict(include_counts=True),
+        'redirect_path': '/brand/dashboard',
+    }), 200
 
 
 @bp.route('/addons/<int:addon_id>/pay-with-wallet', methods=['POST'])
@@ -603,8 +829,9 @@ def master_dashboard():
     start_date, end_date, date_error = _parse_date_range()
     if date_error:
         return jsonify({'error': date_error}), 400
+    workspace_id = request.args.get('workspace_id', type=int)
     return jsonify({
-        **_master_dashboard_payload(brand, start_date, end_date),
+        **_master_dashboard_payload(brand, start_date, end_date, workspace_id),
         **_agency_meta(user, brand),
     }), 200
 
@@ -621,7 +848,8 @@ def export_master_dashboard():
     if date_error:
         return jsonify({'error': date_error}), 400
 
-    payload = _master_dashboard_payload(brand, start_date, end_date)
+    workspace_id = request.args.get('workspace_id', type=int)
+    payload = _master_dashboard_payload(brand, start_date, end_date, workspace_id)
     language = payload['language']
     export_format = (request.args.get('format') or 'csv').lower()
     filename_base = f"bantubuzz-{language['workspace_plural']}-report"
@@ -699,7 +927,6 @@ def export_master_dashboard():
             </thead>
             <tbody>{rows}</tbody>
           </table>
-          <footer>Powered by BantuBuzz</footer>
         </body>
         </html>
         """
@@ -761,7 +988,8 @@ def email_master_dashboard_report():
     if invalid_email:
         return jsonify({'error': f'Invalid recipient email: {invalid_email}'}), 400
 
-    payload = _master_dashboard_payload(brand, start_date, end_date)
+    workspace_id = request.args.get('workspace_id', type=int)
+    payload = _master_dashboard_payload(brand, start_date, end_date, workspace_id)
     language = payload['language']
     date_label = 'All time'
     if payload['date_range']['start_date'] or payload['date_range']['end_date']:
@@ -812,6 +1040,15 @@ def update_workspace(workspace_id):
     for field in ['logo', 'industry', 'website', 'description', 'billing_email']:
         if field in data:
             setattr(workspace, field, data.get(field))
+    # A client workspace is backed by a real BrandProfile. Keep the agency
+    # management form and the brand account presentation in sync.
+    client_brand = ensure_workspace_client_brand(workspace)
+    if client_brand:
+        if 'name' in data and data['name']:
+            client_brand.company_name = workspace.name
+        for field in ['logo', 'industry', 'website', 'description']:
+            if field in data:
+                setattr(client_brand, field, data.get(field))
     workspace.updated_at = datetime.utcnow()
     db.session.commit()
 

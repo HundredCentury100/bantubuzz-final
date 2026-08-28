@@ -22,14 +22,15 @@ const api = axios.create({
 // Request interceptor to add auth token
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('access_token') || localStorage.getItem('token');
+    const managedToken = sessionStorage.getItem('managed_access_token');
+    const token = managedToken || localStorage.getItem('access_token') || localStorage.getItem('token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
     if (config.data instanceof FormData) {
       delete config.headers['Content-Type'];
     }
-    const workspaceId = localStorage.getItem('selected_workspace_id');
+    const workspaceId = sessionStorage.getItem('managed_workspace_id') || localStorage.getItem('selected_workspace_id');
     if (workspaceId && workspaceId !== 'all') {
       config.headers['X-Workspace-Id'] = workspaceId;
     }
@@ -51,7 +52,8 @@ api.interceptors.response.use(
       originalRequest._retry = true;
 
       try {
-        const refreshToken = localStorage.getItem('refresh_token');
+        const isManagedSession = Boolean(sessionStorage.getItem('managed_access_token'));
+        const refreshToken = isManagedSession ? null : localStorage.getItem('refresh_token');
         if (refreshToken) {
           const response = await axios.post(`${API_BASE_URL}/auth/refresh`, {}, {
             headers: {
@@ -69,10 +71,10 @@ api.interceptors.response.use(
         }
       } catch (refreshError) {
         // Refresh failed, logout user
-        localStorage.removeItem('access_token');
-        localStorage.removeItem('refresh_token');
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
+          localStorage.removeItem('access_token');
+          localStorage.removeItem('refresh_token');
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
         window.location.href = '/login';
         return Promise.reject(refreshError);
       }
@@ -467,7 +469,9 @@ export const referralsAPI = {
 export const workspacesAPI = {
   getWorkspaces: () => api.get('/workspaces'),
   createWorkspace: (data) => api.post('/workspaces', data),
+  connectExistingBrand: (data) => api.post('/workspaces/connect-existing-brand', data),
   getWorkspace: (id) => api.get(`/workspaces/${id}`),
+  enterBrandSession: (id) => api.post(`/workspaces/${id}/enter-brand-session`),
   updateWorkspace: (id, data) => api.put(`/workspaces/${id}`, data),
   deleteWorkspace: (id) => api.delete(`/workspaces/${id}`),
   getMasterDashboard: (params) => api.get('/workspaces/master-dashboard', { params }),
@@ -484,6 +488,8 @@ export const workspacesAPI = {
     headers: { 'Content-Type': 'multipart/form-data' },
   }),
   getInvitation: (token) => api.get(`/workspaces/invitations/${token}`),
+  getConnectionRequest: (token) => api.get(`/workspaces/connection-requests/${token}`),
+  respondToConnectionRequest: (token, approved) => api.post(`/workspaces/connection-requests/${token}/respond`, { approved }),
   acceptInvitation: (token) => api.post(`/workspaces/invitations/${token}/accept`),
   cancelInvitation: (invitationId) => api.delete(`/workspaces/invitations/${invitationId}`),
 };

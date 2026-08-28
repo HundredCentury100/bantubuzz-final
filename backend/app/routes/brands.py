@@ -7,7 +7,7 @@ from app.models import BrandProfile, SavedCreator, CreatorProfile, User
 from app.utils import save_profile_picture, delete_profile_picture
 from app.utils.file_upload import save_and_compress_image
 from app.utils.image_compression import delete_image_variants
-from app.services.workspace_service import get_request_workspace_id, require_workspace_access
+from app.services.workspace_service import get_context_brand_profile, get_request_workspace_id, require_workspace_access
 
 bp = Blueprint('brands', __name__)
 
@@ -37,7 +37,7 @@ def get_own_profile():
         if not user or user.user_type != 'brand':
             return jsonify({'error': 'Brand profile not found'}), 404
 
-        brand = user.brand_profile
+        brand = get_context_brand_profile(user)
         if not brand:
             return jsonify({'error': 'Brand profile not found'}), 404
 
@@ -61,7 +61,7 @@ def update_profile():
         if not user or user.user_type != 'brand':
             return jsonify({'error': 'Not authorized'}), 403
 
-        brand = user.brand_profile
+        brand = get_context_brand_profile(user)
         if not brand:
             return jsonify({'error': 'Brand profile not found'}), 404
 
@@ -154,7 +154,7 @@ def upload_report_logo():
         if not user or user.user_type != 'brand':
             return jsonify({'error': 'Not authorized'}), 403
 
-        brand = user.brand_profile
+        brand = get_context_brand_profile(user)
         if not brand:
             return jsonify({'error': 'Brand profile not found'}), 404
 
@@ -210,7 +210,7 @@ def upload_logo():
         if not user or user.user_type != 'brand':
             return jsonify({'error': 'Not authorized'}), 403
 
-        brand = user.brand_profile
+        brand = get_context_brand_profile(user)
         if not brand:
             return jsonify({'error': 'Brand profile not found'}), 404
 
@@ -265,7 +265,8 @@ def get_saved_creators():
     """Get saved creators for current brand"""
     try:
         user_id = int(get_jwt_identity())
-        brand = BrandProfile.query.filter_by(user_id=user_id).first()
+        user = User.query.get(user_id)
+        brand = get_context_brand_profile(user)
 
         if not brand:
             return jsonify({'error': 'Brand profile not found'}), 404
@@ -301,7 +302,8 @@ def save_creator(creator_id):
     """Save a creator"""
     try:
         user_id = int(get_jwt_identity())
-        brand = BrandProfile.query.filter_by(user_id=user_id).first()
+        user = User.query.get(user_id)
+        brand = get_context_brand_profile(user)
 
         if not brand:
             return jsonify({'error': 'Brand profile not found'}), 404
@@ -339,7 +341,8 @@ def unsave_creator(creator_id):
     """Unsave a creator"""
     try:
         user_id = int(get_jwt_identity())
-        brand = BrandProfile.query.filter_by(user_id=user_id).first()
+        user = User.query.get(user_id)
+        brand = get_context_brand_profile(user)
 
         if not brand:
             return jsonify({'error': 'Brand profile not found'}), 404
@@ -384,7 +387,8 @@ def get_brand_audience():
     """
     try:
         user_id = int(get_jwt_identity())
-        brand = BrandProfile.query.filter_by(user_id=user_id).first()
+        user = User.query.get(user_id)
+        brand = get_context_brand_profile(user)
 
         if not brand:
             return jsonify({'error': 'Brand profile not found'}), 404

@@ -1,8 +1,10 @@
 import re
+import secrets
 from decimal import Decimal
 from datetime import datetime
 
 from flask import request
+from flask_jwt_extended import get_jwt
 
 from app import db
 from app.models import (
@@ -73,6 +75,73 @@ ROLE_PERMISSIONS = {
 def slugify(value):
     slug = re.sub(r'[^a-z0-9]+', '-', (value or '').strip().lower()).strip('-')
     return slug or 'client'
+
+
+def _unique_brand_username(base_name):
+    base = slugify(base_name).replace('-', '_')[:40] or 'client_brand'
+    username = base
+    suffix = 2
+    while BrandProfile.query.filter_by(username=username).first():
+        username = f'{base[:36]}_{suffix}'
+        suffix += 1
+    return username
+
+
+def _unique_managed_brand_email(workspace):
+    base = slugify(workspace.slug or workspace.name or f'workspace-{workspace.id}')
+    email = f'client+workspace-{workspace.id}-{base}@agency-managed.bantubuzz.local'
+    suffix = 2
+    while User.query.filter_by(email=email).first():
+        email = f'client+workspace-{workspace.id}-{base}-{suffix}@agency-managed.bantubuzz.local'
+        suffix += 1
+    return email
+
+
+def ensure_workspace_client_brand(workspace):
+    """Ensure a client workspace has a real brand user/profile behind it."""
+    if not workspace:
+        return None
+
+    if workspace.client_brand_id:
+        existing = BrandProfile.query.get(workspace.client_brand_id)
+        if existing:
+            return existing
+
+    email = (workspace.billing_email or '').strip().lower()
+    user = User.query.filter_by(email=email).first() if email else None
+    if user and user.user_type == 'brand' and user.brand_profile:
+        client_brand = user.brand_profile
+    else:
+        if not email or user:
+            email = _unique_managed_brand_email(workspace)
+        user = User(email=email, user_type='brand', password=secrets.token_urlsafe(24))
+        user.is_verified = True
+        db.session.add(user)
+        db.session.flush()
+        client_brand = BrandProfile(
+            user_id=user.id,
+            username=_unique_brand_username(workspace.name),
+            company_name=workspace.name,
+            account_type='brand',
+            logo=workspace.logo,
+            industry=workspace.industry,
+            website=workspace.website,
+            description=workspace.description,
+        )
+        db.session.add(client_brand)
+        db.session.flush()
+
+    workspace.client_brand_id = client_brand.id
+    workspace.name = client_brand.company_name or workspace.name
+    if not workspace.logo and client_brand.logo:
+        workspace.logo = client_brand.logo
+    if not workspace.industry and client_brand.industry:
+        workspace.industry = client_brand.industry
+    if not workspace.website and client_brand.website:
+        workspace.website = client_brand.website
+    if not workspace.description and client_brand.description:
+        workspace.description = client_brand.description
+    return client_brand
 
 
 def get_active_subscription(user_id):
@@ -176,7 +245,24 @@ def get_accessible_workspace(user, workspace_id):
     if not workspace:
         return None
 
+    # A delegated client tab authenticates as the real client brand. Its JWT
+    # also carries the agency actor that opened the tab, so workspace authority
+    # remains available without pretending the agency profile is the client.
+    try:
+        claims = get_jwt()
+    except RuntimeError:
+        claims = {}
+    delegated_actor_id = claims.get('agency_actor_user_id') if claims.get('managed_by_agency') else None
+    delegated_actor = User.query.get(int(delegated_actor_id)) if delegated_actor_id else None
+    delegated_brand = get_agency_brand(delegated_actor.id) if delegated_actor else None
+
+    if brand and workspace.client_brand_id == brand.id:
+        return workspace
+
     if brand and workspace.agency_brand_id == brand.id:
+        return workspace
+
+    if delegated_brand and workspace.agency_brand_id == delegated_brand.id:
         return workspace
 
     membership = WorkspaceMemberPermission.query.filter_by(
@@ -207,9 +293,50 @@ def require_workspace_access(user_id, workspace_id, permission=None):
     return workspace, None, None
 
 
+def get_context_brand_profile(user):
+    """Resolve the brand represented by this request, including agency-managed clients."""
+    if not user or user.user_type != 'brand':
+        return None
+
+    try:
+        claims = get_jwt()
+    except RuntimeError:
+        claims = {}
+
+    # In a managed tab the JWT identity is the actual client-brand user. Never
+    # fall back to the parent agency profile for this request.
+    managed_brand_id = claims.get('client_brand_id') if claims.get('managed_by_agency') else None
+    if managed_brand_id:
+        managed_brand = BrandProfile.query.get(managed_brand_id)
+        if managed_brand and managed_brand.user_id == user.id:
+            return managed_brand
+
+    workspace_id = get_request_workspace_id()
+    if workspace_id:
+        workspace = get_accessible_workspace(user, workspace_id)
+        if workspace:
+            return ensure_workspace_client_brand(workspace)
+
+    return get_agency_brand(user.id)
+
+
 def user_has_workspace_permission(user, workspace, permission):
     brand = get_agency_brand(user.id) if user.user_type == 'brand' else None
+    if brand and workspace.client_brand_id == brand.id:
+        # The represented client brand has normal brand capabilities within its
+        # own workspace. Agency limits remain enforced by the calling route.
+        return True
     if brand and workspace.agency_brand_id == brand.id:
+        return True
+
+    try:
+        claims = get_jwt()
+    except RuntimeError:
+        claims = {}
+    delegated_actor_id = claims.get('agency_actor_user_id') if claims.get('managed_by_agency') else None
+    delegated_actor = User.query.get(int(delegated_actor_id)) if delegated_actor_id else None
+    delegated_brand = get_agency_brand(delegated_actor.id) if delegated_actor else None
+    if delegated_brand and workspace.agency_brand_id == delegated_brand.id:
         return True
 
     membership = WorkspaceMemberPermission.query.filter_by(
@@ -235,7 +362,11 @@ def create_workspace_addon_if_needed(workspace, subscription, included_limit, bi
         is_active=True,
     ).count()
 
-    if active_count <= included_limit:
+    # New workspaces are normally active before this helper is called, while an
+    # approved existing-brand connection starts inactive. Count the candidate
+    # once in both flows so approval cannot bypass the agency workspace limit.
+    projected_count = active_count if workspace.is_active else active_count + 1
+    if projected_count <= included_limit:
         return None
 
     amount = EXTRA_WORKSPACE_YEARLY_PRICE if billing_cycle == 'yearly' else EXTRA_WORKSPACE_MONTHLY_PRICE

@@ -4,6 +4,7 @@ import { campaignsAPI } from '../services/api';
 import Navbar from '../components/Navbar';
 import toast from 'react-hot-toast';
 import { Bolt } from 'lucide-react';
+import { useWorkspace } from '../contexts/WorkspaceContext';
 
 const Campaigns = () => {
   const navigate = useNavigate();
@@ -11,15 +12,20 @@ const Campaigns = () => {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState('all'); // all, draft, active, paused, completed
   const [deleteConfirm, setDeleteConfirm] = useState(null);
+  const [clientFilter, setClientFilter] = useState('');
+  const [clientSearch, setClientSearch] = useState('');
+  const { workspaceMeta } = useWorkspace() || {};
+  const isAgencyView = Boolean(workspaceMeta?.is_agency) && !sessionStorage.getItem('managed_workspace_id');
 
   useEffect(() => {
     fetchCampaigns();
-  }, [filter]);
+  }, [filter, clientFilter]);
 
   const fetchCampaigns = async () => {
     try {
       setLoading(true);
       const params = filter !== 'all' ? { status: filter } : {};
+      if (isAgencyView && clientFilter) params.client_workspace_id = clientFilter;
       const response = await campaignsAPI.getCampaigns(params);
       setCampaigns(response.data.campaigns);
     } catch (error) {
@@ -68,7 +74,10 @@ const Campaigns = () => {
     }
   };
 
-  const filteredCampaigns = campaigns;
+  const filteredCampaigns = campaigns.filter((campaign) => {
+    if (!clientSearch.trim()) return true;
+    return (campaign.client_name || '').toLowerCase().includes(clientSearch.trim().toLowerCase());
+  });
 
   if (loading) {
     return (
@@ -101,7 +110,8 @@ const Campaigns = () => {
         </div>
 
         {/* Filters */}
-        <div className="flex gap-2 mb-6 overflow-x-auto">
+        <div className="mb-6 flex flex-col gap-3">
+        <div className="flex gap-2 overflow-x-auto">
           {[
             { value: 'all', label: 'All Campaigns' },
             { value: 'draft', label: 'Draft' },
@@ -121,6 +131,16 @@ const Campaigns = () => {
               {tab.label}
             </button>
           ))}
+        </div>
+        {isAgencyView && (
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            <select value={clientFilter} onChange={(event) => setClientFilter(event.target.value)} className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm text-gray-700">
+              <option value="">All client brands</option>
+              {(workspaceMeta?.workspaces || []).map((workspace) => <option key={workspace.id} value={workspace.id}>{workspace.name}</option>)}
+            </select>
+            <input value={clientSearch} onChange={(event) => setClientSearch(event.target.value)} placeholder="Search campaigns by client brand" className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm text-gray-700" />
+          </div>
+        )}
         </div>
 
         {/* Campaigns List */}
@@ -177,6 +197,7 @@ const Campaigns = () => {
                   <p className="text-gray-600 text-sm line-clamp-2 mb-4">
                     {campaign.description}
                   </p>
+                  {isAgencyView && campaign.client_name && <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-500">Client brand: {campaign.client_name}</p>}
 
                   {/* Campaign Stats */}
                   <div className="grid grid-cols-2 gap-4 mb-4">

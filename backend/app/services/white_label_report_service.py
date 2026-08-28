@@ -94,9 +94,8 @@ def _new_page(brand, title, date_label, white_label=True):
     draw.text((title_x, 108), date_label, font=_font(19), fill=(99, 102, 111))
     draw.line((MARGIN, 170, PAGE_SIZE[0] - MARGIN, 170), fill=primary, width=4)
 
-    footer = 'Powered by BantuBuzz'
-    footer_width = draw.textlength(footer, font=_font(16))
-    draw.text(((PAGE_SIZE[0] - footer_width) / 2, PAGE_SIZE[1] - 58), footer, font=_font(16), fill=(120, 120, 120))
+    # Agency and client reports are white-label outputs. The report identity is
+    # controlled by the configured logo, colours, sender, and signature above.
     return page, draw, primary, secondary
 
 
@@ -308,81 +307,306 @@ def generate_campaign_report_pdf(brand, payload, white_label=False):
     )
     pages.append(page)
     y = 220
-
     overview = payload.get('overview') or {}
-    draw.text((MARGIN, y), 'Executive summary', font=_font(25, True), fill=secondary)
-    y += 48
-    summary = [
-        ('Reach', f"{int(overview.get('total_reach') or 0):,}"),
-        ('Impressions', f"{int(overview.get('total_impressions') or 0):,}"),
-        ('Engagement', f"{int(overview.get('total_engagements') or 0):,}"),
-        ('ROI', f"{float(overview.get('estimated_roi') or 0):.1f}%"),
-        ('Creators', f"{int(overview.get('total_creators') or 0):,}"),
-        ('Posts', f"{int(overview.get('total_posts') or 0):,}"),
-        ('Spend', f"${float(overview.get('total_spend') or 0):,.2f}"),
-        ('Engagement rate', f"{float(overview.get('engagement_rate') or 0):.2f}%"),
-    ]
-    card_width = 250
-    for index, (label, value) in enumerate(summary):
-        row, column = divmod(index, 4)
-        x = MARGIN + column * (card_width + 24)
-        card_y = y + row * 144
-        draw.rounded_rectangle(
-            (x, card_y, x + card_width, card_y + 120),
-            radius=14,
-            outline=(229, 231, 235),
-            width=2,
-            fill=(249, 250, 251),
-        )
-        draw.text((x + 18, card_y + 18), label, font=_font(15), fill=(99, 102, 111))
-        draw.text((x + 18, card_y + 56), value, font=_font(24, True), fill=secondary)
-    y += 320
+    creators = payload.get('by_creator') or []
+    platforms = payload.get('by_platform') or []
+    sentiment = payload.get('sentiment') or {}
+    methodology = payload.get('methodology') or {}
 
-    def draw_breakdown(section_title, rows, label_key):
+    def fmt_num(value):
+        return f"{int(float(value or 0)):,}"
+
+    def fmt_money(value):
+        return f"${float(value or 0):,.2f}"
+
+    def fmt_percent(value):
+        return f"{float(value or 0):.2f}%"
+
+    def add_page(section_label=None):
         nonlocal page, draw, primary, secondary, y
-        if y > PAGE_SIZE[1] - 420:
-            page, draw, primary, secondary = _new_page(
-                brand, title, date_label, white_label=white_label
-            )
-            pages.append(page)
-            y = 220
-        draw.text((MARGIN, y), section_title, font=_font(24, True), fill=secondary)
-        y += 42
-        headers = ['Name', 'Posts', 'Reach', 'Engagement', 'Rate']
-        columns = [MARGIN, 570, 710, 900, 1080]
-        for index, header in enumerate(headers):
-            draw.text((columns[index], y), header, font=_font(15, True), fill=(99, 102, 111))
-        y += 30
-        draw.line((MARGIN, y, PAGE_SIZE[0] - MARGIN, y), fill=(229, 231, 235), width=2)
-        y += 16
-        for row in rows[:12]:
-            if y > PAGE_SIZE[1] - 130:
-                page, draw, primary, secondary = _new_page(
-                    brand, title, date_label, white_label=white_label
-                )
-                pages.append(page)
-                y = 220
-            label = str(row.get(label_key) or 'Unknown')[:38]
-            draw.text((columns[0], y), label, font=_font(16, True), fill=secondary)
-            draw.text((columns[1], y), str(row.get('posts_count') or 0), font=_font(16), fill=secondary)
-            draw.text((columns[2], y), f"{int(row.get('reach') or 0):,}", font=_font(16), fill=secondary)
-            draw.text((columns[3], y), f"{int(row.get('engagements') or 0):,}", font=_font(16), fill=secondary)
-            draw.text((columns[4], y), f"{float(row.get('engagement_rate') or 0):.2f}%", font=_font(16), fill=secondary)
-            y += 42
-        y += 28
+        page, draw, primary, secondary = _new_page(
+            brand,
+            title,
+            section_label or date_label,
+            white_label=white_label,
+        )
+        pages.append(page)
+        y = 220
 
-    draw_breakdown('Creator performance', payload.get('by_creator') or [], 'creator_name')
-    draw_breakdown('Platform performance', payload.get('by_platform') or [], 'platform')
+    def ensure_space(height, section_label=None):
+        if y + height > PAGE_SIZE[1] - 140:
+            add_page(section_label)
+
+    def stat_grid(stats, columns=3):
+        nonlocal y
+        card_gap = 24
+        card_width = int((PAGE_SIZE[0] - (MARGIN * 2) - card_gap * (columns - 1)) / columns)
+        card_height = 124
+        for index, (label, value) in enumerate(stats):
+            row, column = divmod(index, columns)
+            x = MARGIN + column * (card_width + card_gap)
+            card_y = y + row * (card_height + 22)
+            draw.rounded_rectangle(
+                (x, card_y, x + card_width, card_y + card_height),
+                radius=14,
+                outline=(229, 231, 235),
+                width=2,
+                fill=(249, 250, 251),
+            )
+            draw.text((x + 18, card_y + 18), label, font=_font(15), fill=(99, 102, 111))
+            draw.text((x + 18, card_y + 58), str(value), font=_font(25, True), fill=secondary)
+        y += ((len(stats) + columns - 1) // columns) * (card_height + 22) + 10
+
+    def section_heading(text, subtitle=None):
+        nonlocal y
+        ensure_space(120, text)
+        draw.text((MARGIN, y), text, font=_font(25, True), fill=secondary)
+        y += 40
+        if subtitle:
+            y = _draw_wrapped(draw, subtitle, (MARGIN, y), _font(16), (75, 85, 99), PAGE_SIZE[0] - (MARGIN * 2))
+            y += 18
+
+    def draw_table(headers, rows, widths, section_label=None):
+        nonlocal y
+        ensure_space(90, section_label)
+        x = MARGIN
+        for header, width in zip(headers, widths):
+            draw.text((x, y), header, font=_font(14, True), fill=(75, 85, 99))
+            x += width
+        y += 28
+        draw.line((MARGIN, y, PAGE_SIZE[0] - MARGIN, y), fill=(229, 231, 235), width=2)
+        y += 14
+        for row in rows:
+            ensure_space(72, section_label)
+            x = MARGIN
+            max_lines = 1
+            wrapped_cells = []
+            for cell, width in zip(row, widths):
+                avg = max(draw.textlength('ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz', font=_font(15)) / 52, 6)
+                lines = textwrap.wrap(str(cell or ''), width=max(8, int((width - 12) / avg))) or ['']
+                lines = lines[:3]
+                max_lines = max(max_lines, len(lines))
+                wrapped_cells.append(lines)
+            for lines, width in zip(wrapped_cells, widths):
+                cell_y = y
+                for line in lines:
+                    draw.text((x, cell_y), line, font=_font(15), fill=secondary)
+                    cell_y += 22
+                x += width
+            y += max_lines * 22 + 18
+            draw.line((MARGIN, y - 8, PAGE_SIZE[0] - MARGIN, y - 8), fill=(243, 244, 246), width=1)
+        y += 16
+
+    section_heading(
+        'Executive scorecard',
+        'A campaign-level view of exposure, engagement, media-equivalent value, and creator activation.',
+    )
+    stat_grid([
+        ('Campaign Spend', fmt_money(overview.get('total_spend'))),
+        ('Views / Impressions', fmt_num(overview.get('views_impressions'))),
+        ('Engagements', fmt_num(overview.get('total_engagements'))),
+        ('Engagement Rate', fmt_percent(overview.get('engagement_rate'))),
+        ('Earned Media Value', fmt_money(overview.get('earned_media_value'))),
+        ('EMV Multiple', f"{float(overview.get('emv_multiple') or 0):.2f}x"),
+        ('Cost Per Engagement', fmt_money(overview.get('cost_per_engagement'))),
+        ('Cost / 1K Views', fmt_money(overview.get('cost_per_1000_views'))),
+        ('Creators Activated', fmt_num(overview.get('total_creators'))),
+        ('Published Posts', fmt_num(overview.get('total_posts'))),
+        ('Views Per Post', fmt_num(overview.get('views_per_post'))),
+        ('Reporting Period', date_label),
+    ])
+
+    section_heading('Key insights')
+    top_creator = creators[0] if creators else None
+    insights = [
+        f"The campaign generated {fmt_num(overview.get('views_impressions'))} Views / Impressions and {fmt_num(overview.get('total_engagements'))} total engagements.",
+        f"Estimated media-equivalent value is {fmt_money(overview.get('earned_media_value'))}, based on {overview.get('benchmark_version') or methodology.get('benchmark_version') or 'the current BantuBuzz benchmark'}.",
+    ]
+    if top_creator:
+        insights.append(
+            f"{top_creator.get('creator_name')} is currently the highest contributing creator by engagement with {fmt_num(top_creator.get('engagements'))} engagements."
+        )
+    for insight in insights:
+        y = _draw_wrapped(draw, f"- {insight}", (MARGIN + 8, y), _font(17), secondary, PAGE_SIZE[0] - (MARGIN * 2) - 8)
+        y += 8
+
+    add_page('Campaign performance')
+    section_heading('Campaign performance')
+    draw_table(
+        ['Platform', 'Posts', 'Views / Impressions', 'Engagements', 'Rate', 'EMV'],
+        [
+            [
+                str(row.get('platform') or 'Unknown').title(),
+                row.get('posts_count'),
+                fmt_num(row.get('views_impressions')),
+                fmt_num(row.get('engagements')),
+                fmt_percent(row.get('engagement_rate')),
+                fmt_money(row.get('earned_media_value')),
+            ]
+            for row in platforms
+        ] or [['No platform data synced yet', '', '', '', '', '']],
+        [210, 100, 240, 180, 150, 180],
+        'Campaign performance',
+    )
+
+    section_heading('Engagement breakdown')
+    draw_table(
+        ['Interaction', 'Volume', 'Share of Engagement'],
+        [
+            [item.get('label'), fmt_num(item.get('value')), f"{float(item.get('percentage') or 0):.1f}%"]
+            for item in (overview.get('engagement_breakdown') or [])
+        ],
+        [420, 260, 300],
+        'Engagement breakdown',
+    )
+
+    add_page('Audience intelligence')
+    section_heading('Sentiment analysis')
+    sentiment_rows = []
+    for label in ('positive', 'neutral', 'negative', 'critical'):
+        sentiment_rows.append([
+            label.title(),
+            fmt_num((sentiment.get('counts') or {}).get(label)),
+            f"{float((sentiment.get('percentages') or {}).get(label) or 0):.1f}%",
+        ])
+    draw_table(['Sentiment', 'Comments', 'Share'], sentiment_rows, [360, 260, 260], 'Sentiment analysis')
+
+    section_heading('Know What People Are Saying')
+    comments = sentiment.get('top_comments') or []
+    if comments:
+        for item in comments[:5]:
+            content = item.get('content') or item.get('comment') or ''
+            y = _draw_wrapped(draw, f"- {content}", (MARGIN + 8, y), _font(16), (75, 85, 99), PAGE_SIZE[0] - (MARGIN * 2) - 8)
+            y += 10
+    else:
+        y = _draw_wrapped(
+            draw,
+            'Comment-level insight will appear here once synced posts have enough comments for analysis.',
+            (MARGIN, y),
+            _font(16),
+            (75, 85, 99),
+            PAGE_SIZE[0] - (MARGIN * 2),
+        )
+        y += 18
+
+    section_heading('Emerging narratives')
+    drivers = sentiment.get('drivers') or {}
+    narrative_rows = []
+    for group in ('positive', 'negative'):
+        for item in (drivers.get(group) or [])[:5]:
+            narrative_rows.append([group.title(), str(item.get('theme') or '').replace('_', ' ').title(), item.get('count')])
+    draw_table(['Signal', 'Theme', 'Mentions'], narrative_rows or [['No recurring themes detected yet', '', '']], [220, 560, 180], 'Emerging narratives')
+
+    add_page('Top collaborations')
+    section_heading('Top collaborations and contribution')
+    draw_table(
+        ['Rank', 'Creator', 'Views / Impressions', '% Views', 'Engagements', '% Engagement'],
+        [
+            [
+                row.get('rank'),
+                row.get('creator_name'),
+                fmt_num(row.get('views_impressions')),
+                f"{float(row.get('view_contribution') or 0):.1f}%",
+                fmt_num(row.get('engagements')),
+                f"{float(row.get('engagement_contribution') or 0):.1f}%",
+            ]
+            for row in creators[:15]
+        ] or [['-', 'No creators found', '', '', '', '']],
+        [90, 300, 220, 140, 170, 160],
+        'Top collaborations',
+    )
+
+    add_page('EMV and efficiency')
+    section_heading(
+        'Earned Media Value and efficiency',
+        'EMV is an advertising-equivalent estimate of attention generated. It is not revenue and should not be read as ROI.',
+    )
+    draw_table(
+        ['Component', 'Volume', 'Benchmark Value', 'EMV'],
+        [
+            [item.get('label'), fmt_num(item.get('volume')), item.get('rate_label'), fmt_money(item.get('value'))]
+            for item in (overview.get('emv_components') or [])
+        ],
+        [360, 220, 260, 200],
+        'EMV and efficiency',
+    )
+    section_heading('Creator EMV summary')
+    draw_table(
+        ['Creator', 'Spend', 'EMV', 'EMV Multiple', 'CPE'],
+        [
+            [
+                row.get('creator_name'),
+                fmt_money(row.get('spend')),
+                fmt_money(row.get('earned_media_value')),
+                f"{float(row.get('emv_multiple') or 0):.2f}x",
+                fmt_money(row.get('cost_per_engagement')),
+            ]
+            for row in creators[:12]
+        ] or [['No creator EMV data available', '', '', '', '']],
+        [360, 170, 190, 170, 150],
+        'Creator EMV summary',
+    )
+
+    for creator in creators:
+        add_page(str(creator.get('creator_name') or 'Creator')[:42])
+        section_heading(f"Creator deep dive: {creator.get('creator_name') or 'Creator'}")
+        stat_grid([
+            ('Views / Impressions', fmt_num(creator.get('views_impressions'))),
+            ('Engagements', fmt_num(creator.get('engagements'))),
+            ('Engagement Rate', fmt_percent(creator.get('engagement_rate'))),
+            ('% Views', f"{float(creator.get('view_contribution') or 0):.1f}%"),
+            ('% Engagement', f"{float(creator.get('engagement_contribution') or 0):.1f}%"),
+            ('EMV', fmt_money(creator.get('earned_media_value'))),
+        ])
+        section_heading('Performance details')
+        draw_table(
+            ['Metric', 'Value'],
+            [
+                ['Published posts', fmt_num(creator.get('posts_count'))],
+                ['Likes', fmt_num(creator.get('likes'))],
+                ['Comments', fmt_num(creator.get('comments'))],
+                ['Shares / Reposts', fmt_num(creator.get('shares'))],
+                ['Saves / Favourites', fmt_num(creator.get('saves'))],
+                ['Clicks', fmt_num(creator.get('clicks'))],
+            ],
+            [520, 300],
+            'Performance details',
+        )
+        section_heading('BantuBuzz verdict')
+        y = _draw_wrapped(
+            draw,
+            creator.get('campaign_verdict') or 'Creator performance should be assessed alongside the campaign objective and content quality.',
+            (MARGIN, y),
+            _font(17),
+            (75, 85, 99),
+            PAGE_SIZE[0] - (MARGIN * 2),
+        )
+
+    add_page('Methodology')
+    section_heading('Methodology and data integrity')
+    for note in (methodology.get('notes') or []):
+        y = _draw_wrapped(draw, f"- {note}", (MARGIN + 8, y), _font(17), secondary, PAGE_SIZE[0] - (MARGIN * 2) - 8)
+        y += 8
+    y += 18
+    section_heading('EMV benchmark')
+    rates = methodology.get('emv_rates') or {}
+    draw_table(
+        ['Component', 'Benchmark'],
+        [
+            ['Views / Impressions', f"${float(rates.get('impressions_cpm') or 0):.2f} CPM"],
+            ['Like', f"${float(rates.get('like') or 0):.2f} each"],
+            ['Comment', f"${float(rates.get('comment') or 0):.2f} each"],
+            ['Share / Repost', f"${float(rates.get('share') or 0):.2f} each"],
+            ['Click', f"${float(rates.get('click') or 0):.2f} each"],
+        ],
+        [520, 300],
+        'EMV benchmark',
+    )
 
     if white_label:
         signature = getattr(brand, 'report_email_signature', None)
         if signature:
-            if y > PAGE_SIZE[1] - 260:
-                page, draw, primary, secondary = _new_page(
-                    brand, title, date_label, white_label=True
-                )
-                pages.append(page)
-                y = 220
+            ensure_space(240, 'Prepared by')
             draw.line((MARGIN, y, PAGE_SIZE[0] - MARGIN, y), fill=primary, width=3)
             draw.text((MARGIN, y + 24), 'Prepared by', font=_font(18, True), fill=secondary)
             _draw_wrapped(

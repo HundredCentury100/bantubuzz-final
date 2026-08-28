@@ -22,6 +22,8 @@ import PackageManagement from './pages/PackageManagement';
 import PackageForm from './pages/PackageForm';
 import BrandDashboard from './pages/BrandDashboard';
 import AgencyDashboard from './pages/AgencyDashboard';
+import AgencyAnalytics from './pages/AgencyAnalytics';
+import AgencyConnectionRequest from './pages/AgencyConnectionRequest';
 import WorkspaceManage from './pages/WorkspaceManage';
 import WorkspaceInvite from './pages/WorkspaceInvite';
 import CreatorTeamManage from './pages/CreatorTeamManage';
@@ -77,6 +79,7 @@ import YouTubeCallback from './pages/YouTubeCallback';
 import AdminLogin from './pages/AdminLogin';
 import AdminDashboard from './pages/admin/Dashboard';
 import AdminUsers from './pages/admin/Users';
+import AdminBrandProfiles from './pages/admin/BrandProfiles';
 import AdminUserProfile from './pages/admin/UserProfile';
 import VerificationQueue from './pages/admin/VerificationQueue';
 import CreatorVerifications from './pages/admin/CreatorVerifications';
@@ -846,6 +849,22 @@ function App() {
         }
       />
       <Route
+        path="/brand/agency/analytics"
+        element={
+          <ProtectedRoute requiredType="brand">
+            <AgencyAnalytics />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/admin/brand-profiles"
+        element={
+          <AdminRoute>
+            <AdminBrandProfiles />
+          </AdminRoute>
+        }
+      />
+      <Route
         path="/admin/users/:id"
         element={
           <AdminRoute>
@@ -1014,6 +1033,7 @@ function App() {
       <Route path="/contact" element={<Contact />} />
       <Route path="/pricing" element={<Pricing />} />
       <Route path="/brand/workspace-invite/:token" element={<WorkspaceInvite />} />
+      <Route path="/brand/agency-connection/:token" element={<AgencyConnectionRequest />} />
       <Route path="/privacy" element={<PrivacyPolicy />} />
       <Route path="/terms" element={<TermsOfService />} />
       <Route path="/policies/harassment-abuse" element={<HarassmentPolicy />} />

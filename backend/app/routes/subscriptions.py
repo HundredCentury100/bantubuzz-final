@@ -2,7 +2,7 @@
 User-facing Subscription routes - Subscribe, manage, and view plans
 """
 from flask import Blueprint, jsonify, request
-from flask_jwt_extended import jwt_required, get_jwt_identity
+from flask_jwt_extended import jwt_required, get_jwt_identity, get_jwt
 from datetime import datetime
 from decimal import Decimal
 import os
@@ -78,9 +78,16 @@ def get_my_subscription():
         user_id = int(get_jwt_identity())
         user = User.query.get(user_id)
 
+        # Managed client workspaces inherit the parent agency's paid plan. The
+        # request identity remains the client brand for normal account data.
+        claims = get_jwt()
+        billing_user_id = user_id
+        if claims.get('managed_by_agency') and claims.get('agency_actor_user_id'):
+            billing_user_id = int(claims['agency_actor_user_id'])
+
         # Get active subscription
         subscription = Subscription.query.filter(
-            Subscription.user_id == user_id,
+            Subscription.user_id == billing_user_id,
             Subscription.status.in_(['active', 'past_due'])
         ).order_by(Subscription.updated_at.desc()).first()
 

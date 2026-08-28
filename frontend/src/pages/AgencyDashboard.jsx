@@ -3,11 +3,13 @@ import { Link, useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import { workspacesAPI } from '../services/api';
 import { useWorkspace } from '../contexts/WorkspaceContext';
+import { useAuth } from '../hooks/useAuth';
 import toast from 'react-hot-toast';
 import SmilePayPaymentModal from '../components/SmilePayPaymentModal';
 import BankTransferDetails from '../components/BankTransferDetails';
 import {
   ArrowDownTrayIcon,
+  ArrowRightOnRectangleIcon,
   BuildingOffice2Icon,
   ChartBarIcon,
   CheckCircleIcon,
@@ -69,7 +71,8 @@ const SetupStep = ({ done, title, description, action }) => (
 
 const AgencyDashboard = () => {
   const navigate = useNavigate();
-  const { selectWorkspace, refreshWorkspaces, workspaceMeta } = useWorkspace() || {};
+  const { logout } = useAuth();
+  const { refreshWorkspaces, workspaceMeta } = useWorkspace() || {};
   const createWorkspaceRef = useRef(null);
   const [clients, setClients] = useState([]);
   const [totals, setTotals] = useState(null);
@@ -77,6 +80,9 @@ const AgencyDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [showCreateForm, setShowCreateForm] = useState(false);
+  const [showConnectForm, setShowConnectForm] = useState(false);
+  const [connecting, setConnecting] = useState(false);
+  const [connectionEmail, setConnectionEmail] = useState('');
   const [creating, setCreating] = useState(false);
   const [exporting, setExporting] = useState('');
   const [pendingAddon, setPendingAddon] = useState(null);
@@ -168,9 +174,34 @@ const AgencyDashboard = () => {
 
   const handleClientSelect = async (workspaceId) => {
     const selectedClient = clients.find((client) => String(client.id) === String(workspaceId));
-    selectWorkspace?.(workspaceId);
-    await refreshWorkspaces?.();
-    toast.success(`Switched to ${selectedClient?.name || 'selected'} ${workspaceLabel} workspace`);
+    const brandWindow = window.open('', '_blank');
+
+    if (!brandWindow) {
+      toast.error('Allow pop-ups for BantuBuzz to open the client brand account');
+      return;
+    }
+
+    brandWindow.document.title = 'Opening client brand account...';
+    brandWindow.document.body.textContent = 'Opening client brand account...';
+
+    try {
+      const response = await workspacesAPI.enterBrandSession(workspaceId);
+      const { access_token: accessToken, user, profile, redirect_path: redirectPath } = response.data || {};
+      if (!accessToken || !user || !profile) {
+        throw new Error('The client brand session could not be prepared');
+      }
+
+      brandWindow.sessionStorage.setItem('managed_access_token', accessToken);
+      brandWindow.sessionStorage.setItem('managed_workspace_id', String(workspaceId));
+      brandWindow.sessionStorage.setItem('managed_user', JSON.stringify(user));
+      brandWindow.sessionStorage.setItem('managed_profile', JSON.stringify(profile));
+      brandWindow.opener = null;
+      brandWindow.location.replace(`${window.location.origin}${redirectPath || '/brand/dashboard'}`);
+      toast.success(`Opened ${selectedClient?.name || 'selected'} as a brand account in a new tab`);
+    } catch (err) {
+      brandWindow.close();
+      toast.error(err.response?.data?.error || `Failed to open ${workspaceLabel} brand account`);
+    }
   };
 
   const handleCreateWorkspace = async (event) => {
@@ -200,6 +231,25 @@ const AgencyDashboard = () => {
       toast.error(err.response?.data?.error || 'Failed to create workspace');
     } finally {
       setCreating(false);
+    }
+  };
+
+  const handleConnectExistingBrand = async (event) => {
+    event.preventDefault();
+    if (!connectionEmail.trim()) {
+      toast.error('Enter the existing brand owner email');
+      return;
+    }
+    try {
+      setConnecting(true);
+      const response = await workspacesAPI.connectExistingBrand({ email: connectionEmail.trim() });
+      toast.success(response.data.email_sent ? 'Connection request emailed to the brand owner' : 'Connection request created; email delivery needs attention');
+      setConnectionEmail('');
+      setShowConnectForm(false);
+    } catch (err) {
+      toast.error(err.response?.data?.error || 'Failed to request brand connection');
+    } finally {
+      setConnecting(false);
     }
   };
 
@@ -387,14 +437,24 @@ const AgencyDashboard = () => {
                     Your account is ready for {workspacePlural} workspaces. Complete the Agency subscription first, then add your branding and first {workspaceLabel}.
                   </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => navigate('/subscription/manage', { state: { selectedPlanId: 'agency', billingCycle: meta.billing_cycle || 'monthly' } })}
-                  className="inline-flex items-center justify-center gap-2 rounded-full bg-dark px-6 py-3 text-sm font-semibold text-white"
-                >
-                  <CurrencyDollarIcon className="h-5 w-5" />
-                  Pay Agency Subscription
-                </button>
+                <div className="flex flex-wrap items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => navigate('/subscription/manage', { state: { selectedPlanId: 'agency', billingCycle: meta.billing_cycle || 'monthly' } })}
+                    className="inline-flex items-center justify-center gap-2 rounded-full bg-dark px-6 py-3 text-sm font-semibold text-white"
+                  >
+                    <CurrencyDollarIcon className="h-5 w-5" />
+                    Pay Agency Subscription
+                  </button>
+                  <button
+                    type="button"
+                    onClick={logout}
+                    className="inline-flex items-center justify-center gap-2 rounded-full border border-red-200 bg-white px-5 py-3 text-sm font-semibold text-red-600 transition-colors hover:bg-red-50"
+                  >
+                    <ArrowRightOnRectangleIcon className="h-5 w-5" />
+                    Logout
+                  </button>
+                </div>
               </div>
             </section>
 
@@ -418,132 +478,12 @@ const AgencyDashboard = () => {
           <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
             <div>
               <h1 className="text-3xl font-bold text-dark">{language.dashboard_title}</h1>
-              <p className="mt-2 text-gray-600">{language.dashboard_subtitle}, campaigns, approvals, and spend in one view.</p>
+              <p className="mt-2 text-gray-600">{language.dashboard_subtitle}, with each client operating as its own brand account.</p>
             </div>
-
-            <div className="rounded-3xl bg-white p-4 shadow-sm">
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_1fr_auto_auto_auto_auto_auto]">
-                <label className="block">
-                  <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">From</span>
-                  <input
-                    type="date"
-                    value={filters.start_date}
-                    onChange={(event) => setFilters((current) => ({ ...current, start_date: event.target.value }))}
-                    className="rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-                  />
-                </label>
-                <label className="block">
-                  <span className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">To</span>
-                  <input
-                    type="date"
-                    value={filters.end_date}
-                    onChange={(event) => setFilters((current) => ({ ...current, end_date: event.target.value }))}
-                    className="rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-                  />
-                </label>
-                <button
-                  type="button"
-                  onClick={fetchDashboard}
-                  className="self-end rounded-xl bg-dark px-4 py-2 text-sm font-semibold text-white"
-                >
-                  Apply
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleExport('csv')}
-                  disabled={exporting === 'csv'}
-                  className="self-end inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-dark hover:border-primary disabled:opacity-60"
-                  title="Download CSV"
-                >
-                  <ArrowDownTrayIcon className="h-4 w-4" />
-                  CSV
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleExport('html')}
-                  disabled={exporting === 'html'}
-                  className="self-end inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-dark hover:border-primary disabled:opacity-60"
-                  title="Open printable report"
-                >
-                  <PrinterIcon className="h-4 w-4" />
-                  Report
-                </button>
-                <button
-                  type="button"
-                  onClick={() => handleExport('pdf')}
-                  disabled={exporting === 'pdf'}
-                  className="self-end inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 px-4 py-2 text-sm font-semibold text-dark hover:border-primary disabled:opacity-60"
-                  title="Download branded PDF"
-                >
-                  <ArrowDownTrayIcon className="h-4 w-4" />
-                  PDF
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowEmailReport((value) => !value)}
-                  className="self-end inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2 text-sm font-semibold text-dark hover:bg-primary/90"
-                  title="Email branded PDF"
-                >
-                  Email
-                </button>
-              </div>
-            </div>
+            <Link to="/brand/agency/analytics" className="inline-flex items-center justify-center gap-2 rounded-xl bg-dark px-5 py-3 text-sm font-semibold text-white">
+              <ChartBarIcon className="h-5 w-5" /> Analytics & Reports
+            </Link>
           </div>
-
-          {showEmailReport && (
-            <form onSubmit={handleEmailReport} className="rounded-3xl bg-white p-5 shadow-sm">
-              <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.4fr_1fr]">
-                <div>
-                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">
-                    Recipient emails
-                  </label>
-                  <input
-                    type="text"
-                    value={emailReportForm.recipients}
-                    onChange={(event) => setEmailReportForm((current) => ({ ...current, recipients: event.target.value }))}
-                    className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-                    placeholder="client@example.com, finance@example.com"
-                  />
-                </div>
-                <div>
-                  <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">
-                    Subject
-                  </label>
-                  <input
-                    type="text"
-                    value={emailReportForm.subject}
-                    onChange={(event) => setEmailReportForm((current) => ({ ...current, subject: event.target.value }))}
-                    className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-                    placeholder={`${language.dashboard_title} Report`}
-                  />
-                </div>
-              </div>
-              <div className="mt-4">
-                <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">
-                  Message
-                </label>
-                <textarea
-                  rows={3}
-                  value={emailReportForm.message}
-                  onChange={(event) => setEmailReportForm((current) => ({ ...current, message: event.target.value }))}
-                  className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-                  placeholder="Please find this month's client performance report attached."
-                />
-              </div>
-              <div className="mt-4 flex flex-wrap items-center gap-3">
-                <button
-                  type="submit"
-                  disabled={sendingReport}
-                  className="rounded-full bg-dark px-5 py-2 text-sm font-semibold text-white disabled:opacity-60"
-                >
-                  {sendingReport ? 'Sending...' : 'Send PDF Report'}
-                </button>
-                <p className="text-sm text-gray-500">
-                  Sent through BantuBuzz email for now, with your sender name, reply-to, logo, colors, and signature.
-                </p>
-              </div>
-            </form>
-          )}
 
           {loading && (
             <div className="rounded-3xl bg-white p-10 text-center text-gray-600 shadow-sm">
@@ -656,7 +596,7 @@ const AgencyDashboard = () => {
                       Set up once, manage every {workspaceLabel} separately
                     </h2>
                     <p className="mt-2 max-w-3xl text-sm leading-relaxed text-gray-600">
-                      Use this dashboard for cross-{workspaceLabel} visibility, white-label reporting, billing breakdowns, and team access. Select a specific {workspaceLabel} in the navbar to use normal brand tools inside that workspace.
+                      Use this dashboard for cross-{workspaceLabel} visibility, billing oversight, and team access. Open a client in a new tab to work in its normal brand account.
                     </p>
                   </div>
                   <button
@@ -667,57 +607,13 @@ const AgencyDashboard = () => {
                     <PlusIcon className="h-5 w-5" />
                     {language.add_label}
                   </button>
-                </div>
-              </section>
-
-              <section className="grid grid-cols-1 gap-4 lg:grid-cols-2">
-                <div className="space-y-3">
-                  <h2 className="text-xl font-bold text-dark">Agency Setup</h2>
-                  {setupSteps.map((step) => (
-                    <SetupStep key={step.title} {...step} />
-                  ))}
-                </div>
-                <div className="space-y-3">
-                  <h2 className="text-xl font-bold text-dark">Quick Links</h2>
-                  <div className="grid grid-cols-1 gap-3">
-                    <FeatureLink
-                      to="/brand/profile/edit"
-                      icon={SwatchIcon}
-                      title="White-label settings"
-                      description="Set logo, report colors, sender details, and email signature."
-                    />
-                    <FeatureLink
-                      to="/brand/billing"
-                      icon={CurrencyDollarIcon}
-                      title="Central billing"
-                      description={`Review invoices and spend across all ${workspacePlural}.`}
-                    />
-                    <FeatureLink
-                      to="/brand/analytics"
-                      icon={ChartBarIcon}
-                      title={`All-${workspaceLabel} analytics`}
-                      description="See cross-workspace performance before drilling into one client."
-                    />
-                    <FeatureLink
-                      to={clients[0] ? `/brand/workspaces/${clients[0].id}` : '/brand/agency'}
-                      onClick={(event) => {
-                        if (!clients[0]) {
-                          event.preventDefault();
-                          openCreateWorkspaceForm();
-                          toast('Add your first workspace before inviting team members.');
-                        }
-                      }}
-                      icon={UserGroupIcon}
-                      title="Team permissions"
-                      description={`Invite teammates and assign access per ${workspaceLabel}.`}
-                    />
-                    <FeatureLink
-                      to="/messages"
-                      icon={EnvelopeIcon}
-                      title="Messages"
-                      description={`Keep communication organized while working across ${workspacePlural}.`}
-                    />
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowConnectForm((value) => !value)}
+                    className="inline-flex items-center justify-center rounded-full border border-dark px-5 py-3 text-sm font-semibold text-dark hover:bg-dark hover:text-white"
+                  >
+                    Connect Existing Brand
+                  </button>
                 </div>
               </section>
 
@@ -792,6 +688,17 @@ const AgencyDashboard = () => {
                   </form>
                 )}
 
+                {showConnectForm && (
+                  <form onSubmit={handleConnectExistingBrand} className="mb-6 flex flex-col gap-3 rounded-2xl border border-blue-100 bg-blue-50 p-4 md:flex-row md:items-center">
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold text-dark">Connect an existing BantuBuzz brand</p>
+                      <p className="mt-1 text-xs text-gray-600">The brand owner must approve access from their own login before it appears as an active client.</p>
+                    </div>
+                    <input value={connectionEmail} onChange={(event) => setConnectionEmail(event.target.value)} type="email" placeholder="brand-owner@example.com" className="rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm focus:border-primary focus:outline-none" />
+                    <button type="submit" disabled={connecting} className="rounded-xl bg-dark px-4 py-2 text-sm font-semibold text-white disabled:opacity-60">{connecting ? 'Sending...' : 'Request access'}</button>
+                  </form>
+                )}
+
                 {clients.length === 0 ? (
                   <div className="rounded-2xl border border-dashed border-gray-200 py-10 text-center">
                     <BuildingOffice2Icon className="mx-auto mb-3 h-10 w-10 text-gray-300" />
@@ -849,6 +756,16 @@ const AgencyDashboard = () => {
                     </table>
                   </div>
                 )}
+              </section>
+
+              <section className="border-t border-gray-200 pt-6">
+                <h2 className="mb-3 text-xl font-bold text-dark">Quick Links</h2>
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+                  <FeatureLink to="/brand/profile/edit" icon={SwatchIcon} title="Agency branding" description="Manage your agency identity and white-label report settings." />
+                  <FeatureLink to="/brand/billing" icon={CurrencyDollarIcon} title="Central billing" description={`Review invoices and spend across all ${workspacePlural}.`} />
+                  <FeatureLink to="/brand/agency/analytics" icon={ChartBarIcon} title="Analytics & reports" description="Filter by client and period, then export or email reports." />
+                  <FeatureLink to={clients[0] ? `/brand/workspaces/${clients[0].id}` : '/brand/agency'} onClick={(event) => { if (!clients[0]) { event.preventDefault(); openCreateWorkspaceForm(); toast('Add your first workspace before inviting team members.'); } }} icon={UserGroupIcon} title="Team permissions" description={`Invite teammates and assign access per ${workspaceLabel}.`} />
+                </div>
               </section>
             </>
           )}

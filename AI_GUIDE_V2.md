@@ -1215,9 +1215,13 @@ Deployment note:
   - Premium PDF endpoint: `GET /api/campaigns/<campaign_id>/performance/sentiment-report`.
   - Four-hour platform and submitted-post sync schedules remain in `backend/app/celery_app.py`.
 - Exportable campaign reports:
-  - Deploy script: `deployment/DEPLOY-CAMPAIGN-REPORTS.bat`.
+  - New VPS spec-driven deploy script: `deployment/vps/DEPLOY-NEW-VPS-CAMPAIGN-REPORTS-V2.bat`.
+  - Legacy deploy script: `deployment/DEPLOY-CAMPAIGN-REPORTS.bat`.
   - Migration: `backend/migrations/versions/202606101000_add_campaign_report_exports.py`.
   - Shared report data is built by `backend/app/services/campaign_report_service.py`; PDF, CSV, scheduled email, and public links must use this payload so metrics remain consistent.
+  - Campaign reports follow `BantuBuzz_Campaign_Report_Specification_v1.pdf`: do not show Reach as a headline metric, use `Views / Impressions`, include Engagement Breakdown, Sentiment Analysis, "Know What People Are Saying", Emerging Narratives, creator contribution percentages, EMV and efficiency, creator deep dives, and final methodology.
+  - Do not display ROI unless there is attributable monetary return. EMV is an advertising-equivalent estimate only; label it as Earned Media Value and include the benchmark version/methodology.
+  - Creator deep dives must include every activated creator, even when no post data is synced, so reporting gaps are explicit rather than silently removed.
   - Pro+ campaign reports:
     - PDF: `GET /api/campaign-reports/campaigns/<campaign_id>/export.pdf`
     - CSV: `GET /api/campaign-reports/campaigns/<campaign_id>/export.csv`
@@ -1434,3 +1438,32 @@ Deployment note:
 7. For small backend changes, upload changed files directly with `scp`.
 8. Restart Gunicorn using `pkill gunicorn`, not `pkill -f gunicorn`.
 9. Test health endpoints before declaring deployment complete.
+
+## Agency-Managed Brand Account Architecture (August 2026)
+
+- An agency client workspace now links to a real `BrandProfile` through `client_workspaces.client_brand_id`.
+- New client workspaces create or link that real brand profile immediately. Existing workspaces are linked lazily the first time an agency opens them, preserving all historical data.
+- `POST /api/workspaces/<workspace_id>/enter-brand-session` creates a delegated, tab-scoped brand session.
+- `Work In Client` opens a separate browser tab. The original tab remains on the Agency Command Center.
+- The delegated tab stores its access token, client user, client profile, and workspace ID in `sessionStorage`; credentials must never be placed in the URL.
+- A delegated tab authenticates as the linked client brand user, so normal brand endpoints resolve the client profile and data correctly. The JWT carries the opening agency actor as delegated authority for workspace permissions and Agency plan entitlements; it must never cause the agency profile to replace the client identity.
+- `WorkspaceContext` must remain empty in a managed tab. Do not load the parent Agency workspace selector or Agency navigation into a client brand session.
+- The delegated tab uses the normal brand navbar and hides Agency controls and the agency workspace selector.
+- Brand profile GET/PUT/logo routes resolve the linked client brand whenever `X-Workspace-Id` identifies an accessible client workspace.
+- Creator-facing identity must resolve through `public_brand_payload(...)`, which prefers `workspace.client_brand` and must not expose the managing agency name or logo.
+- Production frontend assets are installed directly into `/var/www/bantubuzz/frontend`, never `/var/www/bantubuzz/frontend/dist`.
+- Migration: `backend/migrations/versions/202608261000_add_client_brand_link_to_workspaces.py`.
+- Initial deployment: `deployment/vps/DEPLOY-NEW-VPS-AGENCY-BRAND-ACCOUNT-ARCHITECTURE.bat`. Follow-up client-session correction: `deployment/vps/DEPLOY-NEW-VPS-AGENCY-BRAND-CLIENT-SESSION-FIX.bat`.
+- Future direct-client-login work should add an explicit invite/claim flow for the linked client user and progressively transfer historical workspace ownership without breaking agency portfolio access.
+
+## Agency Dashboard and Reporting (August 2026)
+
+- The Agency Dashboard is an operations view only: Agency Command Center, plan usage, client workspaces, and quick links. Do not add date filters, exports, email-report controls, or an account switcher back into this page.
+- Agency-wide filtering and reporting live at `/brand/agency/analytics`. It supports client workspace and date-range filters, CSV/PDF exports, and emailed white-label reports.
+- `GET /api/workspaces/master-dashboard`, `/export`, and `/email-report` accept an optional `workspace_id`, in addition to `start_date` and `end_date`. Validate that the workspace belongs to the signed-in agency before expanding this endpoint.
+- Agencies viewing `/brand/campaigns` receive campaigns belonging to their active client workspaces. The page supports a client selector and client-name search. A managed client tab remains a normal brand view and only sees that client brand's campaigns.
+- White-label reports must not add a BantuBuzz footer. Use the agency/client report logo, colours, sender identity, and signature. Public BantuBuzz reports may retain product branding only where explicitly required.
+- Updating a client workspace must also update its linked `BrandProfile` fields (`company_name`, logo, industry, website, description), so the client account and creator-facing identity never drift apart.
+- Existing BantuBuzz brands are connected through explicit consent, never by automatically matching a billing email. Agencies request a connection through `POST /api/workspaces/connect-existing-brand`; the owner approves or declines it from `/brand/agency-connection/:token` while signed into that exact brand account.
+- Consent is persisted in `workspace_connection_requests`. The client keeps its own credentials, public brand identity, and data ownership. Approval activates the linked workspace (or creates a pending extra-workspace add-on when the Agency limit has been reached).
+- `create_workspace_addon_if_needed` must include an inactive connection candidate in its projected workspace count. Otherwise a pending existing-brand connection can silently exceed the agency plan limit when approved.

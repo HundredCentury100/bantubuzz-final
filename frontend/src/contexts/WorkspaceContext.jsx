@@ -15,6 +15,18 @@ export const WorkspaceProvider = ({ children }) => {
   const [loading, setLoading] = useState(false);
 
   const refreshWorkspaces = useCallback(async () => {
+    const isManagedBrandSession = Boolean(sessionStorage.getItem('managed_access_token'));
+
+    // A client tab is deliberately a normal brand experience. Do not load the
+    // parent agency's workspace selector or let agency navigation leak in.
+    if (isManagedBrandSession) {
+      setWorkspaces([]);
+      setIsAgency(false);
+      setWorkspaceMeta(null);
+      setSelectedWorkspaceId('all');
+      return;
+    }
+
     if (!isAuthenticated || user?.user_type !== 'brand') {
       setWorkspaces([]);
       setIsAgency(false);
@@ -48,6 +60,7 @@ export const WorkspaceProvider = ({ children }) => {
   }, [refreshWorkspaces]);
 
   const selectWorkspace = useCallback((workspaceId) => {
+    if (sessionStorage.getItem('managed_access_token')) return;
     const nextValue = workspaceId ? String(workspaceId) : 'all';
     localStorage.setItem('selected_workspace_id', nextValue);
     setSelectedWorkspaceId(nextValue);

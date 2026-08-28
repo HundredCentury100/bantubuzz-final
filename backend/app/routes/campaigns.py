@@ -9,7 +9,7 @@ CRITICAL RULES:
 
 from flask import Blueprint, request, jsonify, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from decimal import Decimal
 from sqlalchemy import text, or_, and_
 from app import db
@@ -21,11 +21,54 @@ from app.models.package import Package
 from app.models.booking import Booking
 from app.models.collaboration import Collaboration
 from app.models.spotlight_boost import SpotlightBoost
+from app.models.client_workspace import ClientWorkspace
 from app.services.creator_matching_service import CreatorMatchingService
 from app.services.workspace_service import get_request_workspace_id, require_workspace_access, scope_query_to_workspace
 from app.utils.notifications import create_notification
 
 bp = Blueprint('campaigns', __name__, url_prefix='/api/campaigns')
+
+COUNTRY_ALIASES = {
+    'zw': 'zimbabwe',
+    'zwe': 'zimbabwe',
+    'zim': 'zimbabwe',
+    'zimbabwe': 'zimbabwe',
+    'za': 'south africa',
+    'zaf': 'south africa',
+    'rsa': 'south africa',
+    'south africa': 'south africa',
+    'ke': 'kenya',
+    'ken': 'kenya',
+    'kenya': 'kenya',
+    'ng': 'nigeria',
+    'nga': 'nigeria',
+    'nigeria': 'nigeria',
+    'gh': 'ghana',
+    'gha': 'ghana',
+    'ghana': 'ghana',
+}
+
+GLOBAL_LOCATION_VALUES = {'global', 'worldwide', 'anywhere', 'all', 'all locations', 'international'}
+
+
+def _normalize_location_value(value):
+    if not value:
+        return None
+    normalized = str(value).strip().lower()
+    if not normalized:
+        return None
+    normalized = normalized.replace(',', ' ')
+    normalized = ' '.join(normalized.split())
+    return COUNTRY_ALIASES.get(normalized, normalized)
+
+
+def _normalize_location_set(values):
+    normalized = set()
+    for value in values or []:
+        item = _normalize_location_value(value)
+        if item:
+            normalized.add(item)
+    return normalized
 
 
 # ========================================
@@ -221,21 +264,34 @@ def get_campaigns():
         # Get filter parameters
         status = request.args.get('status')
         workspace_id = get_request_workspace_id()
+        client_workspace_id = request.args.get('client_workspace_id', type=int)
         workspace, workspace_error, workspace_status = require_workspace_access(user_id, workspace_id)
         if workspace_error:
             return jsonify({'error': workspace_error}), workspace_status
 
-        query = Campaign.query.filter_by(brand_id=brand.id)
-        query = scope_query_to_workspace(query, Campaign, workspace.id if workspace else None)
+        if getattr(brand, 'account_type', None) in ['agency', 'enterprise'] and not workspace:
+            workspace_query = ClientWorkspace.query.filter_by(agency_brand_id=brand.id, is_active=True)
+            if client_workspace_id:
+                workspace_query = workspace_query.filter(ClientWorkspace.id == client_workspace_id)
+            workspace_ids = [item.id for item in workspace_query.all()]
+            query = Campaign.query.filter(Campaign.workspace_id.in_(workspace_ids)) if workspace_ids else Campaign.query.filter(False)
+        else:
+            query = Campaign.query.filter_by(brand_id=brand.id)
+            query = scope_query_to_workspace(query, Campaign, workspace.id if workspace else None)
 
         if status:
             query = query.filter_by(status=status)
 
         campaigns = query.order_by(Campaign.created_at.desc()).all()
 
-        return jsonify({
-            'campaigns': [c.to_dict() for c in campaigns]
-        }), 200
+        campaign_data = []
+        for campaign in campaigns:
+            item = campaign.to_dict()
+            if campaign.workspace:
+                item['client_workspace_id'] = campaign.workspace_id
+                item['client_name'] = campaign.workspace.to_dict().get('name')
+            campaign_data.append(item)
+        return jsonify({'campaigns': campaign_data}), 200
 
     except Exception as e:
         print(f"Error fetching campaigns: {str(e)}")
@@ -261,7 +317,10 @@ def get_campaign(campaign_id):
                 if workspace_error:
                     return jsonify({'error': workspace_error}), workspace_status
 
-        campaign_data = campaign.to_dict(include_brand=True)
+        campaign_data = campaign.to_dict(
+            include_brand=True,
+            prefer_workspace_brand=bool(user and user.user_type == 'creator')
+        )
 
         if user and user.user_type == 'creator':
             creator = CreatorProfile.query.filter_by(user_id=user_id).first()
@@ -502,14 +561,6 @@ def browse_campaigns():
             return jsonify({'error': 'Creator profile not found'}), 404
 
         now = datetime.now(timezone.utc)
-        creator_categories = set(creator.categories or [])
-        creator_locations = {
-            value.strip().lower()
-            for value in [creator.location, creator.city, creator.country]
-            if value and value.strip()
-        }
-        creator_followers = creator.get_total_followers()
-
         query = Campaign.query.filter(
             Campaign.status == 'active',
             Campaign.allows_applications == True,
@@ -557,32 +608,11 @@ def browse_campaigns():
 
         matched_campaigns = []
         for campaign in campaigns:
-            target_categories = set(campaign.target_categories or [])
-            if target_categories and creator_categories and target_categories.isdisjoint(creator_categories):
-                continue
-            if target_categories and not creator_categories:
-                continue
-
-            target_locations = {
-                value.strip().lower()
-                for value in (campaign.target_locations or [])
-                if value and value.strip()
-            }
-            if target_locations and creator_locations and target_locations.isdisjoint(creator_locations):
-                continue
-            if target_locations and not creator_locations:
-                continue
-
-            if campaign.target_min_followers is not None and creator_followers < campaign.target_min_followers:
-                continue
-            if campaign.target_max_followers is not None and creator_followers > campaign.target_max_followers:
-                continue
-
             proposal = CampaignProposal.query.filter_by(
                 campaign_id=campaign.id,
                 creator_id=creator.id
             ).first()
-            campaign_data = campaign.to_dict(include_brand=True)
+            campaign_data = campaign.to_dict(include_brand=True, prefer_workspace_brand=True)
             campaign_data['has_applied'] = proposal is not None
             campaign_data['application_status'] = proposal.status if proposal else None
             matched_campaigns.append(campaign_data)
@@ -996,6 +1026,8 @@ def add_package_to_campaign(campaign_id):
         package = Package.query.get(package_id)
         if not package:
             return jsonify({'error': 'Package not found'}), 404
+        if not package.has_deliverables():
+            return jsonify({'error': 'This package cannot be added because it has no deliverables'}), 400
 
         # Check if already added
         if package in campaign.packages:
@@ -1053,6 +1085,8 @@ def complete_package_payment(campaign_id, package_id):
 
         if not campaign or not package:
             return jsonify({'error': 'Campaign or package not found'}), 404
+        if not package.has_deliverables():
+            return jsonify({'error': 'This package cannot be activated because it has no deliverables'}), 400
 
         # Add package to campaign NOW (after payment)
         campaign.packages.append(package)
@@ -1445,6 +1479,136 @@ def get_campaign_performance(campaign_id):
         print(f"Error getting campaign performance: {str(e)}")
         import traceback
         traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
+
+
+@bp.route('/<int:campaign_id>/comments-ai-overviews', methods=['GET'])
+@jwt_required()
+def get_campaign_comments_ai_overviews(campaign_id):
+    """Return comment insights for synced posts in a campaign."""
+    try:
+        user_id = int(get_jwt_identity())
+        brand = BrandProfile.query.filter_by(user_id=user_id).first()
+
+        if not brand:
+            return jsonify({'error': 'Brand profile not found'}), 404
+
+        campaign = Campaign.query.get(campaign_id)
+        if not campaign or campaign.brand_id != brand.id:
+            return jsonify({'error': 'Campaign not found or unauthorized'}), 404
+        if campaign.workspace_id:
+            _, workspace_error, workspace_status = require_workspace_access(
+                user_id,
+                campaign.workspace_id,
+                'can_view_analytics',
+            )
+            if workspace_error:
+                return jsonify({'error': workspace_error}), workspace_status
+
+        from app.models import PostMetrics, Collaboration, ThunziAccount
+        from app.services.thunzi_service import thunzi_service
+        from app.utils.post_url_parser import PostURLParser
+        from app.utils.campaign_helpers import get_campaign_collaborations
+
+        collaborations = get_campaign_collaborations(campaign_id)
+        collaboration_ids = [collaboration.id for collaboration in collaborations]
+        if not collaboration_ids:
+            return jsonify({'success': True, 'insights': []}), 200
+
+        metrics_rows = PostMetrics.query.filter(
+            PostMetrics.collaboration_id.in_(collaboration_ids)
+        ).order_by(PostMetrics.last_synced_at.desc().nullslast()).limit(25).all()
+
+        def _looks_like_internal_thunzi_id(value):
+            if not value or not str(value).isdigit():
+                return False
+            return len(str(value)) <= 10
+
+        collaboration_by_id = {
+            collaboration.id: collaboration for collaboration in Collaboration.query.filter(
+                Collaboration.id.in_(collaboration_ids)
+            ).all()
+        }
+        company_posts_cache = {}
+        insights = []
+        unavailable = 0
+
+        for metric in metrics_rows:
+            thunzi_post_id = None
+            if _looks_like_internal_thunzi_id(metric.thunzi_post_id):
+                thunzi_post_id = int(metric.thunzi_post_id)
+
+            original_post_candidates = []
+            for candidate in [metric.post_id, metric.thunzi_post_id]:
+                if candidate and str(candidate) not in original_post_candidates:
+                    original_post_candidates.append(str(candidate))
+            parsed_post = PostURLParser.parse_url(metric.post_url)
+            if parsed_post and parsed_post.get('post_id') and parsed_post['post_id'] not in original_post_candidates:
+                original_post_candidates.append(parsed_post['post_id'])
+
+            collaboration = collaboration_by_id.get(metric.collaboration_id)
+            creator = getattr(collaboration, 'creator', None) if collaboration else None
+
+            if not thunzi_post_id and creator:
+                thunzi_account = ThunziAccount.query.filter_by(user_id=creator.user_id).first()
+                if thunzi_account and thunzi_account.thunzi_company_id:
+                    company_id = thunzi_account.thunzi_company_id
+                    if company_id not in company_posts_cache:
+                        end_date = datetime.utcnow()
+                        start_date = end_date - timedelta(days=365)
+                        company_posts_cache[company_id] = thunzi_service.get_posts_by_company_id(
+                            company_id,
+                            start_date.strftime('%Y-%m-%d'),
+                            end_date.strftime('%Y-%m-%d')
+                        ) or []
+                    for post in company_posts_cache[company_id]:
+                        original_id = str(post.get('originalId') or post.get('originalPostId') or '')
+                        original_variants = {original_id}
+                        if '_' in original_id:
+                            original_variants.add(original_id.split('_', 1)[1])
+                        if any(candidate in original_variants for candidate in original_post_candidates):
+                            recovered_id = post.get('id') or post.get('postId')
+                            if _looks_like_internal_thunzi_id(recovered_id):
+                                thunzi_post_id = int(recovered_id)
+                                metric.thunzi_post_id = str(recovered_id)
+                                db.session.commit()
+                            break
+
+            attempts = []
+            if thunzi_post_id:
+                attempts.append({'post_id': thunzi_post_id, 'original_post_id': None})
+            for original_post_id in original_post_candidates:
+                attempts.append({'post_id': None, 'original_post_id': original_post_id})
+
+            overview = None
+            for attempt in attempts:
+                response = thunzi_service.get_post_comments_ai_overview(**attempt)
+                overview = response.get('overview') if isinstance(response, dict) else None
+                if overview:
+                    break
+            if not overview:
+                unavailable += 1
+                continue
+
+            insights.append({
+                'post_metrics_id': metric.id,
+                'collaboration_id': metric.collaboration_id,
+                'deliverable_id': metric.deliverable_id,
+                'platform': metric.post_platform,
+                'post_url': metric.post_url,
+                'comments': metric.comments or 0,
+                'creator_name': getattr(creator, 'display_name', None) or getattr(creator, 'username', None) or 'Creator',
+                'overview': overview,
+            })
+
+        return jsonify({
+            'success': True,
+            'insights': insights,
+            'unavailable_count': unavailable,
+        }), 200
+
+    except Exception as e:
+        current_app.logger.error('Campaign comment insights failed', exc_info=True)
         return jsonify({'error': str(e)}), 500
 
 

@@ -45,6 +45,8 @@ const Navbar = () => {
   const workspaceLanguage = workspaceMeta?.language || {};
   const workspaceNavLabel = workspaceLanguage.account_type === 'enterprise' ? 'Enterprise' : 'Agency';
   const workspacePluralLabel = workspaceLanguage.workspace_plural || 'clients';
+  const isManagedBrandSession = Boolean(sessionStorage.getItem('managed_access_token'));
+  const showAgencyControls = user?.user_type === 'brand' && isAgency && !isManagedBrandSession;
   const isNativeApp = isNativeAppRuntime();
 
   // Helper function to check if a link is active
@@ -296,7 +298,7 @@ const Navbar = () => {
                 </Link>
                 {user?.user_type === 'brand' && (
                   <>
-                    {isAgency && (
+                    {showAgencyControls && (
                       <Link
                         to="/brand/agency"
                         className={`text-gray-700 hover:text-gray-900 transition-colors text-sm font-medium ${
@@ -307,7 +309,7 @@ const Navbar = () => {
                       </Link>
                     )}
                     <Link
-                      to="/brand/analytics"
+                      to={showAgencyControls ? '/brand/agency/analytics' : '/brand/analytics'}
                       className={`text-gray-700 hover:text-gray-900 transition-colors text-sm font-medium ${
                         isActive('/brand/analytics') ? 'border-b-2 border-primary pb-1' : ''
                       }`}
@@ -342,7 +344,7 @@ const Navbar = () => {
                 >
                   Collaborations
                 </Link>
-                {user?.user_type === 'brand' && isAgency && (
+                {showAgencyControls && location.pathname !== '/brand/agency' && (
                   <select
                     value={selectedWorkspaceId || 'all'}
                     onChange={(event) => handleWorkspaceChange(event.target.value)}
@@ -675,7 +677,7 @@ const Navbar = () => {
                             </Link>
                           )}
                         </Menu.Item>
-                        {user?.user_type === 'brand' && isAgency && (
+                        {showAgencyControls && (
                           <Menu.Item>
                             {({ active }) => (
                               <Link
@@ -693,7 +695,7 @@ const Navbar = () => {
                           <Menu.Item>
                             {({ active }) => (
                               <Link
-                                to="/brand/analytics"
+                                to={showAgencyControls ? '/brand/agency/analytics' : '/brand/analytics'}
                                 className={`${
                                   active || isActive('/brand/analytics') ? 'bg-light' : ''
                                 } block px-4 py-2 text-sm text-gray-700 rounded-lg`}
@@ -717,7 +719,7 @@ const Navbar = () => {
                             )}
                           </Menu.Item>
                         )}
-                        {user?.user_type === 'brand' && isAgency && (
+                        {showAgencyControls && location.pathname !== '/brand/agency' && (
                           <div className="px-4 py-2">
                             <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">
                               Client

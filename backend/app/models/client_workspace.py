@@ -9,6 +9,7 @@ class ClientWorkspace(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     agency_brand_id = db.Column(db.Integer, db.ForeignKey('brand_profiles.id', ondelete='CASCADE'), nullable=False, index=True)
+    client_brand_id = db.Column(db.Integer, db.ForeignKey('brand_profiles.id', ondelete='SET NULL'), nullable=True, index=True)
     name = db.Column(db.String(160), nullable=False)
     slug = db.Column(db.String(180), nullable=False)
     logo = db.Column(db.String(255))
@@ -20,7 +21,16 @@ class ClientWorkspace(db.Model):
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-    agency_brand = db.relationship('BrandProfile', backref=db.backref('client_workspaces', lazy='dynamic'))
+    agency_brand = db.relationship(
+        'BrandProfile',
+        foreign_keys=[agency_brand_id],
+        backref=db.backref('client_workspaces', lazy='dynamic'),
+    )
+    client_brand = db.relationship(
+        'BrandProfile',
+        foreign_keys=[client_brand_id],
+        backref=db.backref('managed_by_workspaces', lazy='dynamic'),
+    )
     member_permissions = db.relationship(
         'WorkspaceMemberPermission',
         backref='workspace',
@@ -39,16 +49,27 @@ class ClientWorkspace(db.Model):
     )
 
     def to_dict(self, include_counts=False):
+        client_brand = self.client_brand
+        client_brand_data = client_brand.to_dict(include_user=True) if client_brand else None
+        display_name = client_brand.company_name if client_brand else self.name
+        display_logo = client_brand.logo if client_brand and client_brand.logo else self.logo
+        display_industry = client_brand.industry if client_brand and client_brand.industry else self.industry
+        display_website = client_brand.website if client_brand and client_brand.website else self.website
+        display_description = client_brand.description if client_brand and client_brand.description else self.description
         data = {
             'id': self.id,
             'agency_brand_id': self.agency_brand_id,
-            'name': self.name,
+            'client_brand_id': self.client_brand_id,
+            'client_user_id': client_brand.user_id if client_brand else None,
+            'name': display_name,
+            'workspace_name': self.name,
             'slug': self.slug,
-            'logo': self.logo,
-            'industry': self.industry,
-            'website': self.website,
-            'description': self.description,
+            'logo': display_logo,
+            'industry': display_industry,
+            'website': display_website,
+            'description': display_description,
             'billing_email': self.billing_email,
+            'client_brand': client_brand_data,
             'is_active': self.is_active,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,
@@ -145,6 +166,51 @@ class WorkspaceInvitation(db.Model):
             'accepted_at': self.accepted_at.isoformat() if self.accepted_at else None,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,
+        }
+
+
+class WorkspaceConnectionRequest(db.Model):
+    """Consent record for an agency connecting an existing BantuBuzz brand."""
+    __tablename__ = 'workspace_connection_requests'
+
+    id = db.Column(db.Integer, primary_key=True)
+    workspace_id = db.Column(db.Integer, db.ForeignKey('client_workspaces.id', ondelete='CASCADE'), nullable=False, unique=True, index=True)
+    client_brand_id = db.Column(db.Integer, db.ForeignKey('brand_profiles.id', ondelete='CASCADE'), nullable=False, index=True)
+    requested_by_user_id = db.Column(db.Integer, db.ForeignKey('users.id', ondelete='SET NULL'), nullable=True)
+    token = db.Column(db.String(120), unique=True, nullable=False, index=True)
+    status = db.Column(db.String(20), default='pending', nullable=False, index=True)
+    expires_at = db.Column(db.DateTime, nullable=False)
+    responded_at = db.Column(db.DateTime)
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+    workspace = db.relationship('ClientWorkspace', backref=db.backref('connection_request', uselist=False, cascade='all, delete-orphan'))
+    client_brand = db.relationship('BrandProfile', foreign_keys=[client_brand_id])
+    requested_by = db.relationship('User', foreign_keys=[requested_by_user_id])
+
+    @staticmethod
+    def generate_token():
+        return secrets.token_urlsafe(32)
+
+    @staticmethod
+    def default_expiry():
+        return datetime.utcnow() + timedelta(days=7)
+
+    def is_expired(self):
+        return self.expires_at and self.expires_at < datetime.utcnow()
+
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'workspace_id': self.workspace_id,
+            'client_brand_id': self.client_brand_id,
+            'agency_brand_id': self.workspace.agency_brand_id if self.workspace else None,
+            'agency_name': self.workspace.agency_brand.company_name if self.workspace and self.workspace.agency_brand else None,
+            'client_name': self.client_brand.company_name if self.client_brand else None,
+            'status': self.status,
+            'expires_at': self.expires_at.isoformat() if self.expires_at else None,
+            'responded_at': self.responded_at.isoformat() if self.responded_at else None,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
         }
 
 
